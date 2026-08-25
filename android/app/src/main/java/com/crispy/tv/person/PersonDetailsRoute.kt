@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -125,7 +127,14 @@ private fun PersonDetailsScreen(
                         .background(MaterialTheme.colorScheme.background)
                         .navigationBarsPadding()
                         .imePadding(),
-                contentPadding = PaddingValues(bottom = 28.dp)
+                contentPadding =
+                    PaddingValues(
+                        top =
+                            TopAppBarDefaults.windowInsets.asPaddingValues().calculateTopPadding() +
+                                TopAppBarDefaults.TopAppBarHeight +
+                                8.dp,
+                        bottom = 28.dp
+                    )
             ) {
                 item(key = "header") {
                     PersonHeader(
@@ -211,7 +220,12 @@ private fun PersonHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Box(modifier = Modifier.size(PersonAvatarSize)) {
+        Box(
+            modifier =
+                Modifier
+                    .size(PersonAvatarSize)
+                    .clip(CircleShape)
+        ) {
             if (profileModel != null) {
                 val imageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {

@@ -123,7 +123,8 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
         birthday = birthday,
         placeOfBirth = placeOfBirth,
         profileUrl = profileUrl,
-        knownFor = knownFor.mapNotNull { it.toCatalogItem() },
+        knownFor = knownFor.mapNotNull { it.toCatalogItem() }
+            .distinctBy { "${it.type}:${it.id}" },
     )
 }
 

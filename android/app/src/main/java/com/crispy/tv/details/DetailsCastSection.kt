@@ -39,6 +39,7 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.ui.components.rememberCrispyImageModel
+import com.crispy.tv.ui.components.SharedImageMemoryKeys
 
 @Composable
 internal fun SimpleCastItem(
@@ -134,6 +135,11 @@ internal fun MetadataCastCard(
                         contentDescription = null,
                         modifier = imageModifier,
                         contentScale = ContentScale.Crop,
+                        onSuccess = { result ->
+                            result.result.memoryCacheKey?.let { cacheKey ->
+                                SharedImageMemoryKeys.putCardKey(profileKey, cacheKey)
+                            }
+                        },
                     )
                 }
             } else {
