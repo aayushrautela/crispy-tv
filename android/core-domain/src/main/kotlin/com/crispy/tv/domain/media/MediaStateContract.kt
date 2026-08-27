@@ -33,18 +33,19 @@ fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStat
 }
 
 private fun normalizeBaseItemDto(payload: Map<String, Any?>): MediaStateNormalized? {
-    val itemId = payload.stringValue("Id") ?: return null
-    val mediaType = payload.stringValue("Type") ?: return null
-    val title = payload.stringValue("Name") ?: return null
+    val itemId = payload.stringValue("itemId") ?: payload.stringValue("Id") ?: return null
+    val mediaType = payload.stringValue("mediaType") ?: payload.stringValue("Type") ?: return null
+    val title = payload.stringValue("title") ?: payload.stringValue("Name") ?: return null
+    val images = payload.objectValue("images")
     val imageTags = payload.objectValue("ImageTags")
     return MediaStateNormalized(
         cardFamily = "media_item",
         itemId = itemId,
         mediaType = mediaType,
         title = title,
-        posterUrl = imageTags?.imageTagMedium("Primary"),
-        backdropUrl = imageTags?.backdropMedium(),
-        subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
+        posterUrl = images?.imageSetMedium("poster") ?: imageTags?.imageTagMedium("Primary"),
+        backdropUrl = images?.imageSetMedium("backdrop") ?: imageTags?.backdropMedium(),
+        subtitle = payload.nullableStringValue("subtitle") ?: payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("overview") ?: payload.nullableStringValue("Overview"),
     )
 }
 

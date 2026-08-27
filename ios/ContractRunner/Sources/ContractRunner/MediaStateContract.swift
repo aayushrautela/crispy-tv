@@ -75,20 +75,21 @@ public func normalizeMediaStateCard(payload: [String: Any], kind: String) -> Med
 }
 
 private func normalizeBaseItemDto(_ payload: [String: Any]) -> MediaStateNormalized? {
-    guard let itemId = stringValue(payload, "Id"),
-          let mediaType = stringValue(payload, "Type"),
-          let title = stringValue(payload, "Name") else {
+    guard let itemId = stringValue(payload, "itemId") ?? stringValue(payload, "Id"),
+          let mediaType = stringValue(payload, "mediaType") ?? stringValue(payload, "Type"),
+          let title = stringValue(payload, "title") ?? stringValue(payload, "Name") else {
         return nil
     }
+    let images = objectValue(payload, "images")
     let imageTags = objectValue(payload, "ImageTags")
     return MediaStateNormalized(
         cardFamily: "media_item",
         itemId: itemId,
         mediaType: mediaType,
         title: title,
-        posterUrl: imageTagMedium(imageTags, "Primary"),
-        backdropUrl: backdropMedium(imageTags),
-        subtitle: nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview")
+        posterUrl: imageSetMedium(images, "poster") ?? imageTagMedium(imageTags, "Primary"),
+        backdropUrl: imageSetMedium(images, "backdrop") ?? backdropMedium(imageTags),
+        subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "overview") ?? nullableStringValue(payload, "Overview")
     )
 }
 

@@ -242,27 +242,27 @@ internal fun CrispyBackendClient.parseSearchSuggestionItems(array: JSONArray?): 
 }
 
 internal fun CrispyBackendClient.parseSearchSuggestionItem(json: JSONObject): SearchSuggestionItem {
-    val itemId = json.optNullableString("Id")
+    val itemId = json.optNullableString("itemId")
     if (itemId.isNullOrBlank()) {
-        throw IllegalStateException("Search suggestion is missing Id.")
+        throw IllegalStateException("Search suggestion is missing itemId.")
     }
-    val type = json.optNullableString("Type")
-    if (type.isNullOrBlank()) {
-        throw IllegalStateException("Search suggestion is missing Type.")
+    val mediaType = json.optNullableString("mediaType")
+    if (mediaType.isNullOrBlank()) {
+        throw IllegalStateException("Search suggestion is missing mediaType.")
     }
-    val title = json.optNullableString("Name")
+    val title = json.optNullableString("title")
     if (title.isNullOrBlank()) {
         throw IllegalStateException("Search suggestion is missing title.")
     }
-    val imageTags = json.optJSONObject("ImageTags")
-    val primaryImage = imageTags?.optJSONObject("Primary")
+    val images = json.optJSONObject("images")
+    val primaryImage = images?.optJSONObject("poster")
     return SearchSuggestionItem(
         itemId = itemId,
-        itemType = parseMediaItemType(type),
-        title = title,
-        year = json.optIntOrNull("ProductionYear"),
+        itemType = mediaType,
+        title: title,
+        year = json.optIntOrNull("year"),
         posterUrl = primaryImage?.optNullableString("medium") ?: primaryImage?.optNullableString("large") ?: primaryImage?.optNullableString("small"),
-        providerIds = parseProviderIds(json.optJSONObject("ProviderIds")),
+        providerIds = parseProviderIds(json.optJSONObject("providerIds")),
     )
 }
 
@@ -279,52 +279,58 @@ internal fun CrispyBackendClient.parseMediaItems(array: JSONArray?): List<MediaI
 }
 
 internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
-    val itemId = json.optNullableString("Id")
-    val type = json.optNullableString("Type")
-    val name = json.optNullableString("Name")
-    if (itemId.isNullOrBlank() || type.isNullOrBlank() || name.isNullOrBlank()) {
-        throw IllegalStateException("BaseItemDto is missing required identity fields.")
+    val itemId = json.optNullableString("itemId") ?: json.optNullableString("Id")
+    val mediaType = json.optNullableString("mediaType") ?: json.optNullableString("Type")?.let { parseMediaItemType(it) }
+    val title = json.optNullableString("title") ?: json.optNullableString("Name")
+    if (itemId.isNullOrBlank() || mediaType.isNullOrBlank() || title.isNullOrBlank()) {
+        throw IllegalStateException("ClientMediaCard is missing required identity fields.")
     }
+    val images = json.optJSONObject("images")
     val imageTags = json.optJSONObject("ImageTags")
-    val taglines = json.optStringList("Taglines")
+    val parent = json.optJSONObject("parent")
+    val ticks = json.optLongOrNull("RunTimeTicks")
+    val seconds = json.optIntOrNull("runtimeSeconds")
     return MediaItem(
         itemId = itemId,
-        itemType = parseMediaItemType(type),
-        title = name,
+        itemType = mediaType,
+        title = title,
         originalTitle = json.optNullableString("OriginalTitle"),
-        overview = json.optNullableString("Overview"),
-        poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
-        backdrop = parseBackdropImageUrl(imageTags),
-        logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
-        still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
-        releaseDate = json.optNullableString("PremiereDate"),
-        releaseYear = json.optIntOrNull("ProductionYear"),
-        rating = json.optDoubleOrNull("CommunityRating"),
-        genres = json.optStringList("Genres"),
-        runtimeMinutes = json.optLongOrNull("RunTimeTicks")?.let { if (it > 0L) (it / 600_000_000L).toInt() else null },
-        status = json.optNullableString("Status"),
-        maturityRating = json.optNullableString("OfficialRating"),
+        overview = json.optNullableString("overview") ?: json.optNullableString("Overview"),
+        poster = parseResponsiveImageSet(images?.optJSONObject("poster")) ?: parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
+        backdrop = parseResponsiveImageSet(images?.optJSONObject("backdrop")) ?: parseBackdropImageUrl(imageTags),
+        logo = parseResponsiveImageSet(images?.optJSONObject("logo")) ?: parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
+        still = parseResponsiveImageSet(images?.optJSONObject("still")) ?: parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
+        releaseDate = json.optNullableString("releaseDate") ?: json.optNullableString("PremiereDate"),
+        releaseYear = json.optIntOrNull("year") ?: json.optIntOrNull("ProductionYear"),
+        rating = json.optDoubleOrNull("rating") ?: json.optDoubleOrNull("CommunityRating"),
+        genres = json.optStringList("genres") ?: json.optStringList("Genres"),
+        runtimeMinutes = seconds?.let { if (it > 0) it / 60 else null } ?: ticks?.let { if (it > 0L) (it / 600_000_000L).toInt() else null },
+        status = json.optNullableString("status") ?: json.optNullableString("Status"),
+        maturityRating = json.optNullableString("maturityRating") ?: json.optNullableString("OfficialRating"),
         certification = json.optNullableString("Certification"),
-        externalIds = parseProviderIds(json.optJSONObject("ProviderIds")),
-        seasonNumber = json.optIntOrNull("ParentIndexNumber"),
-        episodeNumber = json.optIntOrNull("IndexNumber"),
+        externalIds = parseProviderIds(json.optJSONObject("providerIds") ?: json.optJSONObject("ProviderIds")),
+        seasonNumber = parent?.optIntOrNull("seasonNumber") ?: json.optIntOrNull("ParentIndexNumber"),
+        episodeNumber = parent?.optIntOrNull("episodeNumber") ?: json.optIntOrNull("IndexNumber"),
         absoluteEpisodeNumber = json.optIntOrNull("AbsoluteIndexNumber"),
-        episodeTitle = json.optNullableString("EpisodeTitle"),
-        airDate = json.optNullableString("AirDate"),
-        tagline = taglines.firstOrNull(),
-        seriesId = json.optNullableString("SeriesId"),
-        seriesName = json.optNullableString("SeriesName"),
-        seasonId = json.optNullableString("SeasonId"),
+        episodeTitle = if (mediaType == "episode") title else json.optNullableString("EpisodeTitle"),
+        airDate = if (mediaType == "episode") json.optNullableString("releaseDate") else json.optNullableString("AirDate"),
+        tagline = null,
+        seriesId = parent?.optNullableString("seriesItemId") ?: json.optNullableString("SeriesId"),
+        seriesName = parent?.optNullableString("seriesTitle") ?: json.optNullableString("SeriesName"),
+        seasonId = parent?.optNullableString("seasonItemId") ?: json.optNullableString("SeasonId"),
         seasonName = json.optNullableString("SeasonName"),
     )
 }
 
 internal fun CrispyBackendClient.parseProviderIds(json: JSONObject?): MediaExternalIds {
     val safe = json ?: JSONObject()
+    val tmdb = safe.optNullableString("tmdb")?.trim()?.toIntOrNull() ?: safe.optNullableString("Tmdb")?.trim()?.toIntOrNull()
+    val imdb = safe.optNullableString("imdb")?.trim()?.ifBlank { null } ?: safe.optNullableString("Imdb")?.trim()?.ifBlank { null }
+    val tvdb = safe.optNullableString("tvdb")?.trim()?.toIntOrNull() ?: safe.optNullableString("Tvdb")?.trim()?.toIntOrNull()
     return MediaExternalIds(
-        tmdb = safe.optString("Tmdb").trim().toIntOrNull(),
-        imdb = safe.optString("Imdb").trim().ifBlank { null },
-        tvdb = safe.optString("Tvdb").trim().toIntOrNull(),
+        tmdb = tmdb,
+        imdb = imdb,
+        tvdb = tvdb,
     )
 }
 
@@ -557,42 +563,45 @@ internal fun CrispyBackendClient.parseWatchActionResponse(json: JSONObject): Wat
 
 internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataView {
     val item = parseMediaItem(json)
+    val images = json.optJSONObject("images")
     val imageTags = json.optJSONObject("ImageTags")
     return MetadataView(
-        itemId = item.itemId,
-        itemType = item.itemType,
-        kind = "metadata_detail",
-        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
-        seasonNumber = item.seasonNumber,
-        episodeNumber = item.episodeNumber,
-        title = item.title,
-        subtitle = item.episodeTitle,
-        summary = item.overview,
-        overview = item.overview,
-        images = MetadataImages(
-            poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
-            backdrop = parseBackdropImageUrl(imageTags),
-            still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
-            logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
+        itemId: item.itemId,
+        itemType: item.itemType,
+        kind: "metadata_detail",
+        absoluteEpisodeNumber: item.absoluteEpisodeNumber,
+        seasonNumber: item.seasonNumber,
+        episodeNumber: item.episodeNumber,
+        title: item.title,
+        subtitle: item.episodeTitle,
+        summary: item.overview,
+        overview: item.overview,
+        images: MetadataImages(
+            poster = parseResponsiveImageSet(images?.optJSONObject("poster")) ?: parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
+            backdrop = parseResponsiveImageSet(images?.optJSONObject("backdrop")) ?: parseBackdropImageUrl(imageTags),
+            still = parseResponsiveImageSet(images?.optJSONObject("still")) ?: parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
+            logo = parseResponsiveImageSet(images?.optJSONObject("logo")) ?: parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
         ),
-        releaseDate = item.releaseDate,
-        releaseYear = item.releaseYear,
-        runtimeMinutes = item.runtimeMinutes,
-        rating = item.rating,
-        certification = item.certification,
-        status = item.status,
-        genres = item.genres,
-        externalIds = MetadataExternalIds(
+        releaseDate: item.releaseDate,
+        releaseYear: item.releaseYear,
+        runtimeMinutes: item.runtimeMinutes,
+        rating: item.rating,
+        certification: item.certification,
+        status: item.status,
+        genres: item.genres,
+        externalIds: MetadataExternalIds(
             tmdb = item.externalIds.tmdb,
             imdb = item.externalIds.imdb,
             tvdb = item.externalIds.tvdb,
         ),
-        seasonCount = null,
-        episodeCount = null,
-        nextEpisode = null,
-        remoteTrailers = parseRemoteTrailers(json),
+        seasonCount: null,
+        episodeCount: null,
+        nextEpisode: null,
+        remoteTrailers: parseRemoteTrailers(json),
     )
 }
+
+
 
 private fun CrispyBackendClient.parseRemoteTrailers(json: JSONObject): List<RemoteTrailerDto> {
     val array = json.optJSONArray("RemoteTrailers") ?: return emptyList()
@@ -623,7 +632,7 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemViews(array: JSONArray?
 
 internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject): MetadataCardView {
     val item = parseMediaItem(json)
-    val imageTags = json.optJSONObject("ImageTags")
+    val images = json.optJSONObject("images")
     return MetadataCardView(
         id = item.itemId,
         itemId = item.itemId,
@@ -637,10 +646,10 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject):
         summary = item.overview,
         overview = item.overview,
         images = MetadataImages(
-            poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
-            backdrop = parseBackdropImageUrl(imageTags),
-            still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
-            logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
+            poster = parseResponsiveImageSet(images?.optJSONObject("poster")),
+            backdrop = parseResponsiveImageSet(images?.optJSONObject("backdrop")),
+            still = parseResponsiveImageSet(images?.optJSONObject("still")),
+            logo = parseResponsiveImageSet(images?.optJSONObject("logo")),
         ),
         releaseDate = item.releaseDate,
         releaseYear = item.releaseYear,
@@ -663,49 +672,51 @@ internal fun CrispyBackendClient.parseMetadataSeasonViews(array: JSONArray?): Li
 }
 
 internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): MetadataSeasonView {
-    val itemId = json.optNullableString("Id")
-    val seasonNumber = json.optIntOrNull("IndexNumber")
+    val itemId = json.optNullableString("itemId")
+    val parent = json.optJSONObject("parent")
+    val seasonNumber = parent?.optIntOrNull("seasonNumber")
     if (itemId.isNullOrBlank() || seasonNumber == null) {
         throw IllegalStateException("Backend season view is missing required fields.")
     }
-    val imageTags = json.optJSONObject("ImageTags")
+    val images = json.optJSONObject("images")
     return MetadataSeasonView(
         itemId = itemId,
         seasonNumber = seasonNumber,
-        title = json.optNullableString("Name"),
-        summary = json.optNullableString("Overview"),
-        airDate = json.optNullableString("PremiereDate"),
+        title = json.optNullableString("title"),
+        summary = json.optNullableString("overview"),
+        airDate = json.optNullableString("releaseDate"),
         episodeCount = null,
-        posterUrl = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")).medium,
+        posterUrl = parseResponsiveImageSet(images?.optJSONObject("poster")).medium,
     )
 }
 
 internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): MetadataEpisodeView {
-    val itemId = json.optNullableString("Id")
+    val itemId = json.optNullableString("itemId")
     if (itemId.isNullOrBlank()) {
-        throw IllegalStateException("Backend episode view is missing Id.")
+        throw IllegalStateException("Backend episode view is missing itemId.")
     }
-    val imageTags = json.optJSONObject("ImageTags")
-    val providerIds = parseProviderIds(json.optJSONObject("ProviderIds"))
+    val images = json.optJSONObject("images")
+    val parent = json.optJSONObject("parent")
+    val providerIds = parseProviderIds(json.optJSONObject("providerIds"))
     return MetadataEpisodeView(
         itemId = itemId,
-        itemType = parseMediaItemType(json.optNullableString("Type") ?: "Episode"),
-        absoluteEpisodeNumber = json.optIntOrNull("AbsoluteIndexNumber"),
-        seasonNumber = json.optIntOrNull("ParentIndexNumber"),
-        episodeNumber = json.optIntOrNull("IndexNumber"),
-        title = json.optNullableString("EpisodeTitle") ?: json.optNullableString("Name"),
-        summary = json.optNullableString("Overview"),
-        airDate = json.optNullableString("AirDate") ?: json.optNullableString("PremiereDate"),
-        runtimeMinutes = json.optLongOrNull("RunTimeTicks")?.let { if (it > 0L) (it / 600_000_000L).toInt() else null },
-        rating = json.optDoubleOrNull("CommunityRating"),
+        itemType = json.optNullableString("mediaType") ?: "episode",
+        absoluteEpisodeNumber = null,
+        seasonNumber = parent?.optIntOrNull("seasonNumber"),
+        episodeNumber = parent?.optIntOrNull("episodeNumber"),
+        title = json.optNullableString("title"),
+        summary = json.optNullableString("overview"),
+        airDate = json.optNullableString("releaseDate"),
+        runtimeMinutes = json.optIntOrNull("runtimeSeconds")?.let { if (it > 0) it / 60 else null },
+        rating = json.optDoubleOrNull("rating"),
         images = MetadataImages(
-            poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
-            backdrop = parseBackdropImageUrl(imageTags),
-            still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
-            logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
+            poster = parseResponsiveImageSet(images?.optJSONObject("poster")),
+            backdrop = parseResponsiveImageSet(images?.optJSONObject("backdrop")),
+            still = parseResponsiveImageSet(images?.optJSONObject("still")),
+            logo = parseResponsiveImageSet(images?.optJSONObject("logo")),
         ),
-        showItemId = json.optNullableString("SeriesId"),
-        showTitle = json.optNullableString("SeriesName"),
+        showItemId = parent?.optNullableString("seriesItemId"),
+        showTitle = parent?.optNullableString("seriesTitle"),
         showExternalIds = MetadataExternalIds(
             tmdb = providerIds.tmdb,
             imdb = providerIds.imdb,

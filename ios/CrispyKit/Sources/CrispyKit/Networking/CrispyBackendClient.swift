@@ -417,24 +417,24 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
     }
 
     private func parseSearchMediaItem(_ json: [String: Any]) -> SearchMediaItem? {
-        guard let itemId = json.jsonString("Id"),
-              let type = json.jsonString("Type"),
-              let name = json.jsonString("Name") else { return nil }
-        let imageTags = json.jsonObject("ImageTags")
+        guard let itemId = json.jsonString("itemId"),
+              let mediaType = json.jsonString("mediaType"),
+              let title = json.jsonString("title") else { return nil }
+        let images = json.jsonObject("images")
         return SearchMediaItem(
             itemId: itemId,
-            itemType: normalizeMediaType(type),
-            title: name,
-            posterUrl: ResponsiveImageSetDto.parse(imageTags?.jsonObject("Primary")).medium ?? ResponsiveImageSetDto.parse(imageTags?.jsonObject("Primary")).large,
-            backdropUrl: ResponsiveImageSetDto.parse((imageTags?.jsonObject("Backdrop") as? [[String: Any]])?.first).medium,
-            logoUrl: ResponsiveImageSetDto.parse(imageTags?.jsonObject("Logo")).medium,
-            year: json.jsonInt("ProductionYear"),
-            rating: json.jsonDouble("CommunityRating"),
-            genres: json.jsonStringList("Genres"),
-            maturityRating: json.jsonString("OfficialRating"),
-            overview: json.jsonString("Overview"),
-            providerIds: MediaExternalIds.parse(json.jsonObject("ProviderIds")),
-            seriesItemId: json.jsonString("SeriesId")
+            itemType: mediaType,
+            title: title,
+            posterUrl: ResponsiveImageSetDto.parse(images?.jsonObject("poster")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("poster")).large,
+            backdropUrl: ResponsiveImageSetDto.parse(images?.jsonObject("backdrop")).medium,
+            logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
+            year: json.jsonInt("year"),
+            rating: json.jsonDouble("rating"),
+            genres: json.jsonStringList("genres"),
+            maturityRating: json.jsonString("maturityRating"),
+            overview: json.jsonString("overview"),
+            providerIds: MediaExternalIds.parse(json.jsonObject("providerIds")),
+            seriesItemId: json.jsonObject("parent")?.jsonString("seriesItemId")
         )
     }
 
@@ -449,15 +449,16 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
     }
 
     private func parseSearchSuggestion(_ json: [String: Any]) -> SearchSuggestionItem? {
-        guard let itemId = json.jsonString("Id"),
-              let type = json.jsonString("Type"),
-              let title = json.jsonString("Name") else { return nil }
-        let primary = json.jsonObject("ImageTags")?.jsonObject("Primary")
+        guard let itemId = json.jsonString("itemId"),
+              let mediaType = json.jsonString("mediaType"),
+              let title = json.jsonString("title") else { return nil }
+        let images = json.jsonObject("images")
+        let primary = images?.jsonObject("poster")
         return SearchSuggestionItem(
             itemId: itemId,
-            itemType: normalizeMediaType(type),
+            itemType: mediaType,
             title: title,
-            year: json.jsonInt("ProductionYear"),
+            year: json.jsonInt("year"),
             posterUrl: primary?.jsonString("medium") ?? primary?.jsonString("large") ?? primary?.jsonString("small")
         )
     }
@@ -499,44 +500,46 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
     }
 
     private func parseMetadataEpisodeFromView(_ json: [String: Any]) -> MetadataEpisode? {
-        guard let itemId = json.jsonString("Id") else { return nil }
-        let imageTags = json.jsonObject("ImageTags")
+        guard let itemId = json.jsonString("itemId") else { return nil }
+        let images = json.jsonObject("images")
+        let parent = json.jsonObject("parent")
         return MetadataEpisode(
             itemId: itemId,
-            seasonNumber: json.jsonInt("ParentIndexNumber"),
-            episodeNumber: json.jsonInt("IndexNumber"),
-            title: json.jsonString("EpisodeTitle") ?? json.jsonString("Name") ?? "Episode",
-            summary: json.jsonString("Overview"),
-            airDate: json.jsonString("AirDate") ?? json.jsonString("PremiereDate"),
-            runtimeMinutes: runtimeMinutes(fromTicks: json.jsonInt("RunTimeTicks")),
-            rating: json.jsonDouble("CommunityRating"),
-            stillUrl: MetadataImagesDto.parse(imageTags).stillUrl,
-            showItemId: json.jsonString("SeriesId")
+            seasonNumber: parent?.jsonInt("seasonNumber"),
+            episodeNumber: parent?.jsonInt("episodeNumber"),
+            title: json.jsonString("title") ?? "Episode",
+            summary: json.jsonString("overview"),
+            airDate: json.jsonString("releaseDate"),
+            runtimeMinutes: runtimeMinutes(fromSeconds: json.jsonInt("runtimeSeconds")),
+            rating: json.jsonDouble("rating"),
+            stillUrl: ResponsiveImageSetDto.parse(images?.jsonObject("still")).medium,
+            showItemId: parent?.jsonString("seriesItemId")
         )
     }
 
     private func parseMetadataSeason(_ json: [String: Any]) -> MetadataSeason? {
-        guard let itemId = json.jsonString("Id"), let seasonNumber = json.jsonInt("IndexNumber") else { return nil }
+        guard let itemId = json.jsonString("itemId"), let seasonNumber = json.jsonObject("parent")?.jsonInt("seasonNumber") else { return nil }
+        let images = json.jsonObject("images")
         return MetadataSeason(
             itemId: itemId,
             seasonNumber: seasonNumber,
-            title: json.jsonString("Name"),
-            summary: json.jsonString("Overview"),
-            posterUrl: ResponsiveImageSetDto.parse(json.jsonObject("ImageTags")?.jsonObject("Primary")).medium
+            title: json.jsonString("title"),
+            summary: json.jsonString("overview"),
+            posterUrl: ResponsiveImageSetDto.parse(images?.jsonObject("poster")).medium
         )
     }
 
     private func parseMetadataCard(_ json: [String: Any]) -> MetadataCard? {
-        guard let itemId = json.jsonString("Id"),
-              let type = json.jsonString("Type"),
-              let name = json.jsonString("Name") else { return nil }
+        guard let itemId = json.jsonString("itemId"),
+              let mediaType = json.jsonString("mediaType"),
+              let title = json.jsonString("title") else { return nil }
         return MetadataCard(
             itemId: itemId,
-            itemType: normalizeMediaType(type),
-            title: name,
-            images: MetadataImagesDto.parse(json.jsonObject("ImageTags")),
-            releaseYear: json.jsonInt("ProductionYear"),
-            rating: json.jsonDouble("CommunityRating")
+            itemType: mediaType,
+            title: title,
+            images: MetadataImagesDto.parse(json.jsonObject("images")),
+            releaseYear: json.jsonInt("year"),
+            rating: json.jsonDouble("rating")
         )
     }
 
@@ -572,15 +575,16 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
         guard let itemId = json.jsonString("itemId"),
               let mediaType = json.jsonString("mediaType"),
               let title = json.jsonString("title") else { return nil }
+        let images = json.jsonObject("images")
         return PersonKnownForItem(
             itemId: itemId,
             mediaType: mediaType,
             title: title,
-            posterUrl: ResponsiveImageSetDto.parse(json.jsonObject("poster")).medium,
-            backdropUrl: ResponsiveImageSetDto.parse(json.jsonObject("backdrop")).medium,
-            logoUrl: ResponsiveImageSetDto.parse(json.jsonObject("logo")).medium,
+            posterUrl: ResponsiveImageSetDto.parse(images?.jsonObject("poster")).medium,
+            backdropUrl: ResponsiveImageSetDto.parse(images?.jsonObject("backdrop")).medium,
+            logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
             rating: json.jsonDouble("rating"),
-            releaseYear: json.jsonInt("releaseYear")
+            releaseYear: json.jsonInt("year")
         )
     }
 
@@ -604,6 +608,11 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
     private func runtimeMinutes(fromTicks ticks: Int?) -> Int? {
         guard let ticks, ticks > 0 else { return nil }
         return ticks / 600_000_000
+    }
+
+    private func runtimeMinutes(fromSeconds seconds: Int?) -> Int? {
+        guard let seconds, seconds > 0 else { return nil }
+        return seconds / 60
     }
 
     private func normalizeMediaType(_ raw: String) -> String {

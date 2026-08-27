@@ -9,14 +9,15 @@ fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedItemId = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedType = normalizedCatalogMediaType()
-    val normalizedPosterUrl = images.posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedPosterUrl = images.poster.medium ?: images.poster.large ?: images.poster.small
+    if (normalizedPosterUrl.isNullOrBlank()) return null
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,
         title = itemTitle,
         posterUrl = normalizedPosterUrl,
-        backdropUrl = images.backdropUrl,
-        logoUrl = images.logoUrl,
+        backdropUrl = images.backdrop.medium ?: images.backdrop.large ?: images.backdrop.small,
+        logoUrl = images.logo.medium ?: images.logo.large ?: images.logo.small,
         poster = images.poster.toUiResponsiveImageSet(),
         backdrop = images.backdrop.toUiResponsiveImageSet(),
         logo = images.logo.toUiResponsiveImageSet(),
@@ -35,16 +36,19 @@ fun CrispyBackendClient.MediaItem.toCatalogItem(): CatalogItem? {
     val normalizedType = when (itemType.trim()) {
         "movie" -> "movie"
         "show" -> "show"
+        "tv" -> "show"
+        "season" -> "season"
+        "episode" -> "episode"
         else -> return null
     }
-    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedPosterUrl = poster.medium ?: poster.large ?: poster.small
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,
         title = itemTitle,
         posterUrl = normalizedPosterUrl,
-        backdropUrl = backdropUrl,
-        logoUrl = logoUrl,
+        backdropUrl = backdrop.medium ?: backdrop.large ?: backdrop.small,
+        logoUrl = logo.medium ?: logo.large ?: logo.small,
         poster = poster.toUiResponsiveImageSet(),
         backdrop = backdrop.toUiResponsiveImageSet(),
         logo = logo.toUiResponsiveImageSet(),
