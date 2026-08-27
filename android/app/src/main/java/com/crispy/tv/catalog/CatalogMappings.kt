@@ -28,3 +28,31 @@ fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
         description = summary ?: overview,
     )
 }
+
+fun CrispyBackendClient.MediaItem.toCatalogItem(): CatalogItem? {
+    val itemTitle = title.trim().takeIf { it.isNotBlank() } ?: return null
+    val normalizedItemId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
+    val normalizedType = when (itemType.trim()) {
+        "movie" -> "movie"
+        "show" -> "show"
+        else -> return null
+    }
+    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    return CatalogItem(
+        id = normalizedItemId,
+        itemId = normalizedItemId,
+        title = itemTitle,
+        posterUrl = normalizedPosterUrl,
+        backdropUrl = backdropUrl,
+        logoUrl = logoUrl,
+        poster = poster.toUiResponsiveImageSet(),
+        backdrop = backdrop.toUiResponsiveImageSet(),
+        logo = logo.toUiResponsiveImageSet(),
+        addonId = "backend",
+        type = normalizedType,
+        rating = formatRating(rating),
+        year = releaseYear?.toString() ?: releaseDate?.take(4),
+        genre = genres.firstOrNull(),
+        description = overview,
+    )
+}

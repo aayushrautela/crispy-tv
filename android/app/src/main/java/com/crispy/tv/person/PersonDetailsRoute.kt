@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -60,10 +61,12 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.initials
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.animateContentAlpha
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -116,8 +119,17 @@ private fun PersonDetailsScreen(
         }
     }
     val person = uiState.person
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    val contentAlpha = animatedVisibilityScope?.let { scope ->
+        with(scope) { animateContentAlpha() }
+    } ?: 1f
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = contentAlpha)
+    ) {
         if (person != null || uiState.isLoading) {
             LazyColumn(
                 state = listState,
@@ -210,6 +222,7 @@ private fun PersonHeader(
         width = PersonAvatarSize,
         height = PersonAvatarSize,
         memoryCacheKey = profileKey,
+        placeholderMemoryCacheKey = SharedImageMemoryKeys.getCardKey(profileKey),
     )
 
     Row(

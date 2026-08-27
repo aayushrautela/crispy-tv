@@ -581,20 +581,6 @@ class CrispyBackendClient(
         val season: MetadataSeasonView?,
     )
 
-    data class MetadataPersonKnownForItem(
-        val itemId: String,
-        val mediaType: String,
-        val title: String,
-        val poster: ResponsiveImageSet,
-        val backdrop: ResponsiveImageSet,
-        val logo: ResponsiveImageSet,
-        val rating: Double?,
-        val releaseYear: Int?,
-    ) {
-        val id: String
-            get() = itemId
-    }
-
     data class MetadataPersonDetail(
         val personId: String,
         val name: String,
@@ -603,7 +589,7 @@ class CrispyBackendClient(
         val birthday: String?,
         val placeOfBirth: String?,
         val profileUrl: String?,
-        val knownFor: List<MetadataPersonKnownForItem>,
+        val knownFor: List<MediaItem>,
     )
 
     // --- Watch Actions ---

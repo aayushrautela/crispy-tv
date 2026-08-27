@@ -21,7 +21,6 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataExternalIds
 import com.crispy.tv.backend.CrispyBackendClient.MetadataImages
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
-import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonKnownForItem
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonRefView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataProductionInfoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataReviewView
@@ -729,35 +728,8 @@ internal fun CrispyBackendClient.parseMetadataPersonDetail(json: JSONObject): Me
         birthday = json.optNullableString("birthday"),
         placeOfBirth = json.optNullableString("placeOfBirth"),
         profileUrl = json.optNullableString("profileUrl"),
-        knownFor = parseMetadataPersonKnownForItems(json.optJSONArray("knownFor")),
+        knownFor = parseMediaItems(json.optJSONArray("knownFor")),
     )
-}
-
-internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArray?): List<MetadataPersonKnownForItem> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            val itemId = item.optString("itemId").trim()
-            val mediaType = item.optString("mediaType").trim()
-            val title = item.optString("title").trim()
-            if (itemId.isBlank() || mediaType.isBlank() || title.isBlank()) {
-                continue
-            }
-            add(
-                MetadataPersonKnownForItem(
-                    itemId = itemId,
-                    mediaType = mediaType,
-                    title = title,
-                    poster = parseResponsiveImageSet(item.optJSONObject("poster")),
-                    backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop")),
-                    logo = parseResponsiveImageSet(item.optJSONObject("logo")),
-                    rating = item.optDoubleOrNull("rating"),
-                    releaseYear = item.optIntOrNull("releaseYear"),
-                )
-            )
-        }
-    }
 }
 
 internal fun CrispyBackendClient.parseMetadataVideoViews(array: JSONArray?): List<MetadataVideoView> {

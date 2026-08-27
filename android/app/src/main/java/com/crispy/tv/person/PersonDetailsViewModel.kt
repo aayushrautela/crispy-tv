@@ -9,7 +9,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.addons.util.formatRating
+import com.crispy.tv.catalog.toCatalogItem
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -125,33 +125,5 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
         profileUrl = profileUrl,
         knownFor = knownFor.mapNotNull { it.toCatalogItem() }
             .distinctBy { "${it.type}:${it.id}" },
-    )
-}
-
-private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem? {
-    val type = if (mediaType.equals("movie", ignoreCase = true)) "movie" else "show"
-    val normalizedItemId = itemId.trim().ifBlank { return null }
-    val normalizedPosterUrl = poster.medium?.trim()?.takeIf { it.isNotBlank() }
-        ?: poster.large?.trim()?.takeIf { it.isNotBlank() }
-        ?: poster.small?.trim()?.takeIf { it.isNotBlank() }
-        ?: return null
-    val normalizedBackdropUrl = backdrop.medium?.trim()?.takeIf { it.isNotBlank() }
-        ?: backdrop.large?.trim()?.takeIf { it.isNotBlank() }
-        ?: backdrop.small?.trim()?.takeIf { it.isNotBlank() }
-    val normalizedLogoUrl = logo.medium?.trim()?.takeIf { it.isNotBlank() }
-        ?: logo.large?.trim()?.takeIf { it.isNotBlank() }
-        ?: logo.small?.trim()?.takeIf { it.isNotBlank() }
-    return CatalogItem(
-        id = normalizedItemId,
-        itemId = normalizedItemId,
-        title = title,
-        posterUrl = normalizedPosterUrl,
-        backdropUrl = normalizedBackdropUrl,
-        logoUrl = normalizedLogoUrl,
-        addonId = "backend",
-        type = type,
-        rating = formatRating(rating),
-        year = releaseYear?.toString(),
-        genre = null,
     )
 }
