@@ -75,7 +75,8 @@ public func load(environment: AppEnvironment) async {
                     maturityRating: nil,
                     description: nil,
                     progressPercent: nil,
-                    parentSeriesId: nil
+                    parentSeriesId: nil,
+                    watchlisted: false
                 )
             }
             extrasLoaded = true

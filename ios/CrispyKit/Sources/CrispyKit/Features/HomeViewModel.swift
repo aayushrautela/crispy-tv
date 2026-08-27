@@ -115,9 +115,7 @@ public func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironme
     }
 
     private static func makeThisWeekItem(_ item: SearchMediaItem) -> ThisWeekItem {
-        let dateText = item.releaseDate ?? item.airDate
-        let badge = dateText.flatMap(dayLabel(from:))
-        return ThisWeekItem(card: MediaCard.from(item), badge: badge)
+        return ThisWeekItem(card: MediaCard.from(item), badge: nil)
     }
 
     /// "Mon"-style label for an ISO date string.
