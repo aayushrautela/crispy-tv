@@ -25,62 +25,39 @@ fun CrispyBackendClient.MetadataTitleExtrasResponse.seasonNumbers(): List<Int> {
     return seasonNumbers
 }
 
-fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
+fun CrispyBackendClient.ClientMediaCard.toMediaDetails(): MediaDetails {
     return MediaDetails(
-        id = id,
+        id = itemId,
         itemId = itemId,
-        imdbId = externalIds.imdb,
+        imdbId = providerIds?.imdb,
         itemType = normalizedCatalogMediaType(),
-        title = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: id,
-        posterUrl = images.posterUrl,
-        backdropUrl = images.backdropUrl,
-        logoUrl = images.logoUrl,
-        description = summary ?: overview,
+        title = title.trim().takeIf { it.isNotBlank() } ?: itemId,
+        posterUrl = images.poster.medium,
+        backdropUrl = images.backdrop.medium,
+        logoUrl = images.logo.medium,
+        description = overview,
         genres = genres,
-        year = releaseYear?.toString() ?: releaseDate?.take(4),
-        runtime = runtimeMinutes?.takeIf { it > 0 }?.let { "$it min" },
-        certification = certification,
+        year = year?.toString() ?: releaseDate?.take(4),
+        runtime = runtimeSeconds?.takeIf { it > 0 }?.let { "${it / 60} min" },
+        certification = maturityRating,
         rating = formatRating(rating),
         cast = emptyList(),
         directors = emptyList(),
         creators = emptyList(),
-        videos = nextEpisode?.let { listOfNotNull(it.toMediaVideo()) } ?: emptyList(),
-        seasonNumber = seasonNumber,
-        episodeNumber = episodeNumber,
+        videos = emptyList(),
+        seasonNumber = parent?.seasonNumber,
+        episodeNumber = parent?.episodeNumber,
         addonId = "backend",
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
+        absoluteEpisodeNumber = null,
     )
 }
 
-fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo? {
-    val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
-    val season = seasonNumber
-    val episode = episodeNumber
-    val titleText =
-        title?.trim()?.takeIf { it.isNotBlank() }
-            ?: when {
-                episode != null -> "Episode $episode"
-                else -> canonicalId
-            }
-    return MediaVideo(
-        id = canonicalId,
-        title = titleText,
-        season = season,
-        episode = episode,
-        released = airDate,
-        overview = summary,
-        thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = buildAddonEpisodeLookupId(showExternalIds.imdb, season, episode) ?: itemId,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
-    )
-}
-
-fun CrispyBackendClient.MetadataView.toMediaVideo(): MediaVideo? {
+fun CrispyBackendClient.ClientMediaCard.toMediaVideo(): MediaVideo? {
     val canonicalId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
-    val season = seasonNumber
-    val episode = episodeNumber
+    val season = parent?.seasonNumber
+    val episode = parent?.episodeNumber
     val titleText =
-        title?.trim()?.takeIf { it.isNotBlank() }
+        title.trim().takeIf { it.isNotBlank() }
             ?: when {
                 episode != null -> "Episode $episode"
                 else -> canonicalId
@@ -91,34 +68,11 @@ fun CrispyBackendClient.MetadataView.toMediaVideo(): MediaVideo? {
         season = season,
         episode = episode,
         released = releaseDate,
-        overview = overview ?: summary,
-        thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = buildAddonEpisodeLookupId(externalIds.imdb, season, episode) ?: itemId,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
+        overview = overview,
+        thumbnailUrl = images.still.medium ?: images.poster.medium,
+        lookupId = buildAddonEpisodeLookupId(providerIds?.imdb, season, episode) ?: itemId,
+        absoluteEpisodeNumber = null,
     )
-}
-
-fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVideo? {
-  val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
-  val season = seasonNumber
-  val episode = episodeNumber
-  val titleText =
-    title?.trim()?.takeIf { it.isNotBlank() }
-      ?: when {
-        episode != null -> "Episode $episode"
-        else -> canonicalId
-      }
-  return MediaVideo(
-    id = canonicalId,
-    title = titleText,
-    season = season,
-    episode = episode,
-    released = airDate,
-    overview = summary,
-    thumbnailUrl = images.stillUrl ?: images.posterUrl,
-    lookupId = itemId,
-    absoluteEpisodeNumber = absoluteEpisodeNumber,
-  )
 }
 
 fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
@@ -136,19 +90,11 @@ fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
     )
 }
 
-fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
+fun CrispyBackendClient.ClientMediaCard.normalizedCatalogMediaType(): String {
     return when {
-        itemType.equals("anime", ignoreCase = true) -> "anime"
-        itemType.equals("episode", ignoreCase = true) -> "episode"
-        itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
-        else -> "movie"
-    }
-}
-
-fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): String {
-    return when {
-        itemType.equals("anime", ignoreCase = true) -> "anime"
-        itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
+        mediaType.equals("anime", ignoreCase = true) -> "anime"
+        mediaType.equals("episode", ignoreCase = true) -> "episode"
+        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
 }

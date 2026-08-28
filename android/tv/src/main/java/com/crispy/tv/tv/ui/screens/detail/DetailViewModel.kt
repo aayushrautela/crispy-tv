@@ -69,7 +69,7 @@ data class DetailUiState(
     val status: String? = null,
     val seasonCount: Int? = null,
     val episodeCount: Int? = null,
-    val seasons: List<CrispyBackendClient.MetadataSeasonView> = emptyList(),
+    val seasons: List<CrispyBackendClient.ClientMediaCard> = emptyList(),
     val selectedSeason: Int? = null,
     val episodes: List<DetailEpisodeUi> = emptyList(),
     val episodesLoading: Boolean = false,
@@ -234,8 +234,10 @@ class DetailViewModel(
             val detail = detailDeferred.await()
             val extras = extrasDeferred.await()
             val item = detail.item
-            val isSeries = !item.seasonCount.isNullOrEmptyOrZero() ||
-                item.itemType.equals("series", ignoreCase = true)
+            val seasonCount = extras?.seasons?.size
+            val isSeries = item.mediaType.equals("show", ignoreCase = true) ||
+                item.mediaType.equals("tv", ignoreCase = true) ||
+                (seasonCount != null && seasonCount > 0)
 
             val detailsModel = item.toMediaDetails()
             val fallbackType = if (isSeries) MetadataLabMediaType.SERIES else MetadataLabMediaType.MOVIE
@@ -254,33 +256,32 @@ class DetailViewModel(
                 )
             }.getOrNull()
 
-            val firstSeason = extras?.seasons?.minOfOrNull { it.seasonNumber } ?: 1
+            val firstSeason = extras?.seasons?.minOfOrNull { it.parent?.seasonNumber ?: 0 } ?: 1
             val episodes = if (isSeries) loadEpisodes(context, firstSeason) else emptyList()
 
             val metaParts = buildList {
-                item.releaseYear?.let { add(it.toString()) }
-                item.runtimeMinutes?.let { add("${it}m") }
+                item.year?.let { add(it.toString()) }
+                item.runtimeSeconds?.let { add("${it / 60}m") }
                 item.rating?.let { add("★ ${roundToOne(it)}") }
-                item.certification?.let { add(it) }
-                if (isSeries && item.seasonCount != null) {
-                    add("${item.seasonCount} seasons")
-                    item.episodeCount?.let { add("$it episodes") }
+                item.maturityRating?.let { add(it) }
+                if (isSeries && seasonCount != null) {
+                    add("$seasonCount seasons")
                 }
-                item.status?.takeIf { it.isNotBlank() && !it.equals("released", true) }?.let { add(it) }
+                item.genres.firstOrNull()?.let { add(it) }
             }
 
-            val cta = resolveWatchCta(item, watchState, isSeries)
+            val cta = resolveWatchCta(item, detail.nextEpisode, watchState, isSeries)
             val episodeIds = episodes.map { it.itemId }
             val episodeStates = loadEpisodeStates(context, episodeIds)
 
             DetailUiState(
                 loading = false,
                 itemId = itemId,
-                itemType = item.itemType,
-                title = item.title ?: "Untitled",
+                itemType = item.mediaType,
+                title = item.title,
                 itemRating = item.rating,
                 subtitleMeta = metaParts.takeIf { it.isNotEmpty() }?.joinToString(" · "),
-                overview = item.overview ?: item.summary,
+                overview = item.overview,
                 backdropUrl = item.images.backdrop.large
                     ?: item.images.backdrop.medium
                     ?: item.images.backdrop.small
@@ -289,11 +290,11 @@ class DetailViewModel(
                     ?: item.images.logo.medium
                     ?: item.images.logo.small,
                 genres = item.genres,
-                certification = item.certification,
-                status = item.status,
-                seasonCount = item.seasonCount,
-                episodeCount = item.episodeCount,
-                seasons = extras?.seasons.orEmpty().sortedBy { it.seasonNumber },
+                certification = item.maturityRating,
+                status = null,
+                seasonCount = seasonCount,
+                episodeCount = null,
+                seasons = extras?.seasons.orEmpty().sortedBy { it.parent?.seasonNumber ?: 0 },
                 selectedSeason = if (isSeries) firstSeason else null,
                 episodes = episodes,
                 isInWatchlist = watchState?.isInWatchlist ?: false,
@@ -328,30 +329,18 @@ class DetailViewModel(
                 production = (detail.production.companies + detail.production.networks)
                     .distinctBy { it.id }
                     .map { company -> CompanyUi(id = company.id, name = company.name, logoUrl = company.logoUrl) },
-                detailRows = buildDetailRows(item, detailsModel, detail.production, isSeries),
-                collectionName = extras?.collection?.name,
-                collectionItems = extras?.collection?.parts.orEmpty()
-                    .filter { it.itemId != null }
-                    .map { it.toCardItem() },
-                similar = extras?.similar.orEmpty()
-                    .filter { it.itemId != null }
-                    .map { it.toCardItem() },
-                trailers = buildTrailerSources(item, detail.videos),
+                detailRows = buildDetailRows(item, detailsModel, detail.production, isSeries, seasonCount),
+                collectionName = null,
+                collectionItems = extras?.collection.orEmpty().map { it.toCardItem() },
+                similar = extras?.similar.orEmpty().map { it.toCardItem() },
+                trailers = buildTrailerSources(detail.videos),
             )
         }
     }
 
     private fun buildTrailerSources(
-        item: CrispyBackendClient.MetadataView,
         videos: List<CrispyBackendClient.MetadataVideoView>,
     ): List<TvTrailerEntry> {
-        val remote = item.remoteTrailers
-        if (remote.isNotEmpty()) {
-            return remote.mapNotNull { dto ->
-                dto.url.trim().takeIf { it.isNotBlank() }
-                    ?.let { TvTrailerEntry(id = it, source = classifyTrailerSource(it)) }
-            }
-        }
         val trailerVideo = videos.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
             ?: videos.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
             ?: videos.firstOrNull { it.key.isNotBlank() }
@@ -360,7 +349,8 @@ class DetailViewModel(
     }
 
     private fun resolveWatchCta(
-        item: CrispyBackendClient.MetadataView,
+        item: CrispyBackendClient.ClientMediaCard,
+        nextEpisode: CrispyBackendClient.ClientMediaCard?,
         watchState: com.crispy.tv.player.CanonicalWatchStateSnapshot?,
         isSeries: Boolean,
     ): Triple<String, String, Int?> {
@@ -375,9 +365,9 @@ class DetailViewModel(
             hasResume && !played -> {
                 kind = "CONTINUE"
                 label = if (isSeries) {
-                    val next = item.nextEpisode
-                    if (next?.seasonNumber != null && next.episodeNumber != null) {
-                        "Continue S${next.seasonNumber}:E${next.episodeNumber}"
+                    val next = nextEpisode
+                    if (next?.parent?.seasonNumber != null && next.parent?.episodeNumber != null) {
+                        "Continue S${next.parent?.seasonNumber}:E${next.parent?.episodeNumber}"
                     } else {
                         "Continue"
                     }
@@ -395,7 +385,7 @@ class DetailViewModel(
             }
         }
 
-        val remaining = item.runtimeMinutes?.takeIf { it > 0 }?.let { runtime ->
+        val remaining = item.runtimeSeconds?.div(60)?.takeIf { it > 0 }?.let { runtime ->
             when {
                 kind == "CONTINUE" && progress != null -> {
                     kotlin.math.round(runtime * (1.0 - progress / 100.0)).toInt().coerceAtLeast(0)
@@ -406,18 +396,18 @@ class DetailViewModel(
         return Triple(label, kind, remaining)
     }
 
-    private fun CrispyBackendClient.MetadataCardView.toCardItem(): CrispyCardItem =
+    private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem =
         CrispyCardItem(
-            id = itemId!!,
-            title = title ?: "Untitled",
+            id = itemId,
+            title = title,
             imageUrl = images.backdrop.large
                 ?: images.backdrop.medium
                 ?: images.backdrop.small
                 ?: images.poster.medium,
             logoUrl = images.logo.large ?: images.logo.medium ?: images.logo.small,
             rating = rating?.let { roundToOne(it) },
-            year = releaseYear?.toString(),
-            genre = genre,
+            year = year?.toString(),
+            genre = genres.firstOrNull(),
         )
 
     private fun CrispyBackendClient.MetadataVideoView.toExtraVideo(): ExtraVideoUi? {
@@ -523,17 +513,16 @@ class DetailViewModel(
         kotlin.math.round(value * 10.0).div(10.0).toString()
 
     private fun buildDetailRows(
-        item: CrispyBackendClient.MetadataView,
+        item: CrispyBackendClient.ClientMediaCard,
         detailsModel: com.crispy.tv.addons.model.MediaDetails,
         production: CrispyBackendClient.MetadataProductionInfoView,
         isSeries: Boolean,
+        seasonCount: Int?,
     ): List<Pair<String, String>> = buildList {
-        item.status?.takeIf { it.isNotBlank() }?.let { add("STATUS" to it) }
         if (isSeries) {
             item.releaseDate?.let { add("FIRST AIR DATE" to it) }
-            item.seasonCount?.takeIf { it > 0 }?.let { add("SEASONS" to "$it") }
-            item.episodeCount?.takeIf { it > 0 }?.let { add("EPISODES" to "$it") }
-            item.runtimeMinutes?.takeIf { it > 0 }?.let { add("EPISODE RUNTIME" to "$it min") }
+            seasonCount?.takeIf { it > 0 }?.let { add("SEASONS" to "$it") }
+            detailsModel.runtime?.takeIf { it.isNotBlank() }?.let { add("RUNTIME" to it) }
         } else {
             item.releaseDate?.let { add("RELEASE DATE" to it) }
             detailsModel.runtime?.takeIf { it.isNotBlank() }?.let { add("RUNTIME" to it) }
@@ -563,14 +552,14 @@ class DetailViewModel(
                 response.items.map { ep ->
                     DetailEpisodeUi(
                         itemId = ep.itemId,
-                        seasonNumber = ep.seasonNumber,
-                        episodeNumber = ep.episodeNumber,
-                        title = ep.title ?: "Episode ${ep.episodeNumber ?: ""}".trim(),
-                        lookupId = buildAddonEpisodeLookupId(ep.externalIds.imdb, ep.seasonNumber, ep.episodeNumber)
+                        seasonNumber = ep.parent?.seasonNumber,
+                        episodeNumber = ep.parent?.episodeNumber,
+                        title = ep.title ?: "Episode ${ep.parent?.episodeNumber ?: ""}".trim(),
+                        lookupId = buildAddonEpisodeLookupId(ep.providerIds?.imdb, ep.parent?.seasonNumber, ep.parent?.episodeNumber)
                             ?: ep.itemId,
                         airDate = ep.releaseDate,
-                        runtimeMinutes = ep.runtimeMinutes,
-                        overview = ep.summary ?: ep.overview,
+                        runtimeMinutes = ep.runtimeSeconds?.div(60),
+                        overview = ep.overview,
                     )
                 }
             },

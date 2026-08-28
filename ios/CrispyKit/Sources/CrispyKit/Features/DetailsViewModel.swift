@@ -11,9 +11,10 @@ public let itemId: String
 public let itemType: String
 
     public private(set) var detail: MetadataTitleDetail?
-    public private(set) var seasons: [MetadataSeason] = []
+    public private(set) var seasons: [ClientMediaCard] = []
     public private(set) var similar: [MediaCard] = []
-    public private(set) var episodes: [MetadataEpisode] = []
+    public private(set) var episodes: [ClientMediaCard] = []
+    public private(set) var reviews: [MetadataReview] = []
     public private(set) var selectedSeasonNumber: Int?
     public private(set) var isLoadingDetail = true
     public private(set) var isLoadingEpisodes = false
@@ -29,15 +30,7 @@ public init(itemId: String, itemType: String) {
         self.itemType = itemType
     }
 
-    fileprivate static func makeCard(_ card: MetadataCard) -> MediaCard {
-        MediaCard(
-            itemId: card.itemId, type: card.itemType, title: card.title,
-            posterUrl: card.images.posterUrl, backdropUrl: card.images.backdropUrl, logoUrl: card.images.logoUrl,
-            ratingText: formatRating(card.rating), yearText: card.releaseYear.map(String.init),
-            genre: nil, maturityRating: nil, description: nil,
-            progressPercent: nil, parentSeriesId: nil, watchlisted: false
-        )
-    }
+
 
     public func loadIfNeeded(environment: AppEnvironment) async {
         guard detail == nil else { return }
@@ -61,24 +54,8 @@ public func load(environment: AppEnvironment) async {
 
             let extras = try? await extrasResult
             seasons = extras?.seasons ?? []
-            similar = (extras?.similar ?? []).map { card in
-                MediaCard(
-                    itemId: card.itemId,
-                    type: card.itemType,
-                    title: card.title,
-                    posterUrl: card.images.posterUrl,
-                    backdropUrl: card.images.backdropUrl,
-                    logoUrl: card.images.logoUrl,
-                    ratingText: formatRating(card.rating),
-                    yearText: card.releaseYear.map(String.init),
-                    genre: nil,
-                    maturityRating: nil,
-                    description: nil,
-                    progressPercent: nil,
-                    parentSeriesId: nil,
-                    watchlisted: false
-                )
-            }
+            similar = (extras?.similar ?? []).map { MediaCard.from($0) }
+            reviews = extras?.reviews ?? []
             extrasLoaded = true
 
             if let context2 = await environment.backendContext() {
@@ -118,7 +95,7 @@ public func load(environment: AppEnvironment) async {
     }
 
 public var isShow: Bool {
-        itemType == "show" || !seasons.isEmpty || (detail?.item.itemType == "show")
+        itemType == "show" || itemType == "tv" || !seasons.isEmpty || (detail?.item.mediaType == "tv")
     }
 
 public func selectSeason(_ seasonNumber: Int, environment: AppEnvironment) async {

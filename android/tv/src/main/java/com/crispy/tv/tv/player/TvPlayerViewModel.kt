@@ -100,8 +100,8 @@ class TvPlayerViewModel(
             _state.value = TvPlayerUiState(
                 loading = false,
                 title = item.title ?: "Now playing",
-                seasonNumber = item.seasonNumber,
-                episodeNumber = item.episodeNumber,
+                seasonNumber = item.parent?.seasonNumber,
+                episodeNumber = item.parent?.episodeNumber,
                 hasSource = !streamUrl.isNullOrBlank(),
                 error = if (streamUrl.isNullOrBlank()) {
                     "No stream source yet — source selection arrives with the addon integration."

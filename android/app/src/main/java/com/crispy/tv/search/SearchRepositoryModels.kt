@@ -2,6 +2,7 @@ package com.crispy.tv.search
 
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.catalog.toCatalogItem
 
 data class SearchResultBuckets(
     val movies: List<SearchCatalogItem> = emptyList(),
@@ -59,6 +60,12 @@ internal fun CrispyBackendClient.SearchSuggestionItem.toSearchSuggestion(): Sear
         year = year,
         itemId = itemId,
     )
+}
+
+internal fun CrispyBackendClient.ClientMediaCard.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
+    val base = toCatalogItem() ?: return null
+    if (defaultGenre.isNullOrBlank() || !base.genre.isNullOrBlank()) return base
+    return base.copy(genre = defaultGenre)
 }
 
 internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(defaultGenre: String? = null): SearchResultsPayload {

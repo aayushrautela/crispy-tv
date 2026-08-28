@@ -246,7 +246,7 @@ internal class DetailsUseCases(
             Log.w(TAG, "Failed to load series episodes for itemId=$itemId", error)
         }.getOrNull()
             ?.items
-            ?.mapNotNull(CrispyBackendClient.MetadataView::toMediaVideo)
+            ?.mapNotNull(CrispyBackendClient.ClientMediaCard::toMediaVideo)
             .orEmpty()
     }
 
@@ -317,7 +317,7 @@ internal class DetailsUseCases(
 
         val videos = response
             ?.items
-            ?.mapNotNull(CrispyBackendClient.MetadataView::toMediaVideo)
+            ?.mapNotNull(CrispyBackendClient.ClientMediaCard::toMediaVideo)
             .orEmpty()
         if (videos.isEmpty()) {
             return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")

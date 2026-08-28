@@ -37,21 +37,21 @@ class UpNextService internal constructor(
     }
 
     private fun toCanonicalContinueWatchingItem(view: CrispyBackendClient.UpNextItem): CanonicalContinueWatchingItem? {
-        val episodeId = view.nextEpisodeItemId ?: return null
-        val seriesId = view.showItemId ?: return null
+        val episode = view.nextEpisode ?: return null
+        val seriesId = view.show?.itemId ?: return null
         return CanonicalContinueWatchingItem(
-            id = episodeId,
+            id = episode.itemId,
             titleItemId = seriesId,
-            playbackItemId = episodeId,
+            playbackItemId = episode.itemId,
             itemType = "episode",
-            title = view.showTitle ?: "",
-            episodeTitle = view.nextEpisodeTitle,
-            season = view.nextEpisodeSeasonNumber,
-            episode = view.nextEpisodeEpisodeNumber,
+            title = view.show?.title ?: "",
+            episodeTitle = episode.title,
+            season = episode.parent?.seasonNumber,
+            episode = episode.parent?.episodeNumber,
             progressPercent = 0.0,
             lastUpdatedEpochMs = parseUpNextDate(view.lastInteractedAt),
-            posterUrl = view.showPosterUrl,
-            backdropUrl = view.showBackdropUrl,
+            posterUrl = view.show?.images?.poster?.medium,
+            backdropUrl = view.show?.images?.backdrop?.medium,
         )
     }
 

@@ -264,8 +264,10 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
             guard let showItemId = show?.jsonString("itemId"),
                   let showTitle = show?.jsonString("title") else { return nil }
             let images = show?.jsonObject("images")
-            let season = item.jsonInt("nextEpisodeSeasonNumber")
-            let episode = item.jsonInt("nextEpisodeEpisodeNumber")
+            let nextEpisode = item.jsonObject("nextEpisode")
+            let nextParent = nextEpisode?.jsonObject("parent")
+            let season = nextParent?.jsonInt("seasonNumber")
+            let episode = nextParent?.jsonInt("episodeNumber")
             var badge: String?
             if let season, let episode {
                 badge = "S\(season)E\(episode)"
@@ -290,7 +292,7 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
             URLQueryItem(name: "itemId", value: itemId.trimmingCharacters(in: .whitespacesAndNewlines)),
             URLQueryItem(name: "extended", value: "true"),
         ]
-        let json = try await getJson(url: try requireURL(components.url), accessToken: accessToken)
+        let json = try await getJson(path: "", queryItems: [], url: try requireURL(components.url), accessToken: accessToken)
         let progress = ClientProgress.parse(json.jsonObject("progress"))
         return WatchState(
             itemId: json.jsonString("itemId") ?? itemId,
@@ -312,22 +314,25 @@ public func getMetadataItemDetail(accessToken: String, itemId: String) async thr
         let production = (json.jsonObject("Production")?.jsonArray("companies") ?? []) +
             (json.jsonObject("Production")?.jsonArray("networks") ?? [])
         return MetadataTitleDetail(
-            item: try parseMetadataItem(itemJson),
+            item: try ClientMediaCard.parse(itemJson),
             cast: parsePersonRefs(json.jsonArray("Cast")),
             directors: parsePersonRefs(json.jsonArray("Directors")),
             creators: parsePersonRefs(json.jsonArray("Creators")),
             videos: json.jsonArray("Videos").compactMap(parseMetadataVideo),
-            production: production.compactMap(parseMetadataCompany)
+            production: production.compactMap(parseMetadataCompany),
+            backdrops: json.jsonArray("Backdrops").compactMap { $0 as? String },
+            nextEpisode: json.jsonObject("NextEpisode").flatMap { try? ClientMediaCard.parse($0) }
         )
     }
 
 public func getMetadataItemExtras(accessToken: String, itemId: String) async throws -> MetadataTitleExtras {
         let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))/extras", accessToken: accessToken)
+        let collection = (json.jsonObject("Collection")?["Items"] as? [[String: Any]])?.compactMap { try? ClientMediaCard.parse($0) }
         return MetadataTitleExtras(
-            seasons: json.jsonArray("Seasons").compactMap(parseMetadataSeason),
-            similar: json.jsonArray("Similar").compactMap(parseMetadataCard),
+            seasons: json.jsonArray("Seasons").compactMap { try? ClientMediaCard.parse($0) },
+            similar: json.jsonArray("Similar").compactMap { try? ClientMediaCard.parse($0) },
             reviews: json.jsonArray("Reviews").compactMap(parseMetadataReview),
-            collection: json.jsonObject("Collection").map { $0.jsonArray("Items").compactMap(parseMetadataCard) } ?? []
+            collection: collection
         )
     }
 
@@ -344,13 +349,13 @@ public func getMetadataItemExtras(accessToken: String, itemId: String) async thr
         )
     }
 
-public func getSeriesEpisodes(accessToken: String, seriesItemId: String, season: Int?) async throws -> [MetadataEpisode] {
+public func getSeriesEpisodes(accessToken: String, seriesItemId: String, season: Int?) async throws -> [ClientMediaCard] {
         var query: [URLQueryItem] = []
         if let season {
             query.append(URLQueryItem(name: "season", value: String(season)))
         }
         let json = try await getJson(path: "/v1/metadata/shows/\(seriesItemId.trimmingCharacters(in: .whitespacesAndNewlines))/episodes", queryItems: query, accessToken: accessToken)
-        return json.jsonArray("Items").compactMap(parseMetadataEpisodeFromView)
+        return json.jsonArray("Items").compactMap { try? ClientMediaCard.parse($0) }
     }
 
 public func getMetadataPersonDetail(accessToken: String, personId: String) async throws -> PersonDetail {
@@ -473,76 +478,6 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
 
     // MARK: Metadata parsers (mirror CrispyBackendParsers.kt)
 
-    private func parseMetadataItem(_ json: [String: Any]) throws -> MetadataItem {
-        guard let itemId = json.jsonString("Id"),
-              let type = json.jsonString("Type"),
-              let name = json.jsonString("Name") else {
-            throw CrispyBackendError(httpCode: 200, code: nil, message: "BaseItemDto is missing required identity fields.", category: nil, retryable: false, requestId: nil, details: nil)
-        }
-        let imageTags = json.jsonObject("ImageTags")
-        return MetadataItem(
-            itemId: itemId,
-            itemType: normalizeMediaType(type),
-            title: name,
-            subtitle: json.jsonString("EpisodeTitle") ?? nil,
-            overview: json.jsonString("Overview"),
-            images: MetadataImagesDto.parse(imageTags),
-            releaseDate: json.jsonString("PremiereDate"),
-            releaseYear: json.jsonInt("ProductionYear"),
-            runtimeMinutes: runtimeMinutes(fromTicks: json.jsonInt("RunTimeTicks")),
-            rating: json.jsonDouble("CommunityRating"),
-            certification: json.jsonString("Certification"),
-            status: json.jsonString("Status"),
-            genres: json.jsonStringList("Genres"),
-            seasonNumber: json.jsonInt("ParentIndexNumber"),
-            episodeNumber: json.jsonInt("IndexNumber")
-        )
-    }
-
-    private func parseMetadataEpisodeFromView(_ json: [String: Any]) -> MetadataEpisode? {
-        guard let itemId = json.jsonString("itemId") else { return nil }
-        let images = json.jsonObject("images")
-        let parent = json.jsonObject("parent")
-        return MetadataEpisode(
-            itemId: itemId,
-            seasonNumber: parent?.jsonInt("seasonNumber"),
-            episodeNumber: parent?.jsonInt("episodeNumber"),
-            title: json.jsonString("title") ?? "Episode",
-            summary: json.jsonString("overview"),
-            airDate: json.jsonString("releaseDate"),
-            runtimeMinutes: runtimeMinutes(fromSeconds: json.jsonInt("runtimeSeconds")),
-            rating: json.jsonDouble("rating"),
-            stillUrl: ResponsiveImageSetDto.parse(images?.jsonObject("still")).medium,
-            showItemId: parent?.jsonString("seriesItemId")
-        )
-    }
-
-    private func parseMetadataSeason(_ json: [String: Any]) -> MetadataSeason? {
-        guard let itemId = json.jsonString("itemId"), let seasonNumber = json.jsonObject("parent")?.jsonInt("seasonNumber") else { return nil }
-        let images = json.jsonObject("images")
-        return MetadataSeason(
-            itemId: itemId,
-            seasonNumber: seasonNumber,
-            title: json.jsonString("title"),
-            summary: json.jsonString("overview"),
-            posterUrl: ResponsiveImageSetDto.parse(images?.jsonObject("poster")).medium
-        )
-    }
-
-    private func parseMetadataCard(_ json: [String: Any]) -> MetadataCard? {
-        guard let itemId = json.jsonString("itemId"),
-              let mediaType = json.jsonString("mediaType"),
-              let title = json.jsonString("title") else { return nil }
-        return MetadataCard(
-            itemId: itemId,
-            itemType: mediaType,
-            title: title,
-            images: MetadataImagesDto.parse(json.jsonObject("images")),
-            releaseYear: json.jsonInt("year"),
-            rating: json.jsonDouble("rating")
-        )
-    }
-
     private func parsePersonRefs(_ array: [[String: Any]]) -> [MetadataPersonRef] {
         var seen = Set<String>()
         return array.compactMap { item in
@@ -603,26 +538,6 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
     private func parseMetadataCompany(_ json: [String: Any]) -> MetadataCompany? {
         guard let id = json.jsonString("id"), let name = json.jsonString("name") else { return nil }
         return MetadataCompany(id: id, name: name, logoUrl: ResponsiveImageSetDto.parse(json.jsonObject("logo")).medium)
-    }
-
-    private func runtimeMinutes(fromTicks ticks: Int?) -> Int? {
-        guard let ticks, ticks > 0 else { return nil }
-        return ticks / 600_000_000
-    }
-
-    private func runtimeMinutes(fromSeconds seconds: Int?) -> Int? {
-        guard let seconds, seconds > 0 else { return nil }
-        return seconds / 60
-    }
-
-    private func normalizeMediaType(_ raw: String) -> String {
-        switch raw.trimmingCharacters(in: .whitespacesAndNewlines) {
-        case "Movie": return "movie"
-        case "Series": return "show"
-        case "Season": return "season"
-        case "Episode": return "episode"
-        default: return "unknown"
-        }
     }
 
     // MARK: - Transport plumbing
@@ -701,6 +616,11 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             components.queryItems = (components.queryItems ?? []) + queryItems
         }
         let response = try await httpClient.get(url: try requireURL(components.url), headers: authHeaders(accessToken))
+        return try perform(response)
+    }
+
+    private func getJson(path: String, queryItems: [URLQueryItem], url: URL, accessToken: String) async throws -> [String: Any] {
+        let response = try await httpClient.get(url: url, headers: authHeaders(accessToken))
         return try perform(response)
     }
 

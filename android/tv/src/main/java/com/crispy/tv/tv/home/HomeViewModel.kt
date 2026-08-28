@@ -164,34 +164,19 @@ private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem {
 }
 
 private fun CrispyBackendClient.UpNextItem.toCardItem(): CrispyCardItem? {
-    val episodeId = nextEpisodeItemId ?: return null
-    val seasonEpisode = listOfNotNull(nextEpisodeSeasonNumber, nextEpisodeEpisodeNumber)
+    val episode = nextEpisode ?: return null
+    val seasonEpisode = listOfNotNull(episode.parent?.seasonNumber, episode.parent?.episodeNumber)
         .joinToString(" E", prefix = "S")
-        .takeIf { nextEpisodeSeasonNumber != null && nextEpisodeEpisodeNumber != null }
+        .takeIf { episode.parent?.seasonNumber != null && episode.parent?.episodeNumber != null }
         .orEmpty()
     return CrispyCardItem(
-        id = episodeId,
-        title = showTitle ?: "Next episode",
-        badge = sequenceOf(seasonEpisode, nextEpisodeTitle)
+        id = episode.itemId,
+        title = show?.title ?: "Next episode",
+        badge = sequenceOf(seasonEpisode, episode.title)
             .filterNotNull()
             .filter { it.isNotBlank() }
             .joinToString(" · "),
-        imageUrl = showBackdropUrl ?: showPosterUrl,
+        imageUrl = show?.images?.backdrop?.medium ?: show?.images?.poster?.medium,
         description = reason,
     )
 }
-
-private fun CrispyBackendClient.MediaItem.toCardItem(): CrispyCardItem =
-    CrispyCardItem(
-        id = itemId,
-        title = title,
-        year = releaseYear?.toString(),
-        imageUrl = backdrop.large
-            ?: backdrop.medium
-            ?: backdrop.small
-            ?: poster.medium,
-        logoUrl = logo.large ?: logo.medium ?: logo.small,
-        rating = rating?.let { formatRating(it) },
-        genre = genres.firstOrNull(),
-        description = overview,
-    )

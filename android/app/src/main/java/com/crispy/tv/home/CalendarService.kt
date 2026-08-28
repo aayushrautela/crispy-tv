@@ -178,14 +178,14 @@ class CalendarService internal constructor(
         )
     }
 
-    private fun List<CrispyBackendClient.MediaItem>.toCalendarSections(nowMs: Long): List<CalendarSection> {
+    private fun List<CrispyBackendClient.CalendarItem>.toCalendarSections(nowMs: Long): List<CalendarSection> {
         val thisWeek = mutableListOf<CalendarEpisodeItem>()
         val upcoming = mutableListOf<CalendarEpisodeItem>()
         val recentlyReleased = mutableListOf<CalendarEpisodeItem>()
         val noScheduled = mutableListOf<CalendarSeriesItem>()
 
         for (media in this) {
-            val date = media.releaseDate?.trim()?.takeIf { it.isNotBlank() } ?: media.airDate?.trim()?.takeIf { it.isNotBlank() }
+            val date = media.airDate?.trim()?.takeIf { it.isNotBlank() } ?: media.card.releaseDate?.trim()?.takeIf { it.isNotBlank() }
             val releasedAtMs = parseCalendarReleaseToEpochMs(date)
 
             if (releasedAtMs == null) {
@@ -218,31 +218,32 @@ class CalendarService internal constructor(
         }
     }
 
-    private fun CrispyBackendClient.MediaItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem {
-        val season = seasonNumber
-        val episode = episodeNumber
-        val releaseDate = releaseDate?.trim()?.takeIf { !it.isNullOrBlank() } ?: airDate?.trim()?.takeIf { !it.isNullOrBlank() }
+    private fun CrispyBackendClient.CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem {
+        val card = card
+        val season = card.parent?.seasonNumber
+        val episode = card.parent?.episodeNumber
+        val releaseDate = airDate?.trim()?.takeIf { !it.isNullOrBlank() } ?: card.releaseDate?.trim()?.takeIf { !it.isNullOrBlank() }
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate)
         val watchedKey = if (season != null && episode != null) {
-            "$itemId:$season:$episode"
+            "${card.itemId}:$season:$episode"
         } else {
-            itemId
+            card.itemId
         }
         val localKeySuffix = when {
             season != null && episode != null -> ":$season:$episode"
             !releaseDate.isNullOrBlank() -> ":${releaseDate.take(10)}"
             else -> ""
         }
-        val localKey = "$itemId$localKeySuffix"
+        val localKey = "${card.itemId}$localKeySuffix"
         return CalendarEpisodeItem(
             id = localKey,
-            titleItemId = seriesId ?: itemId,
-            playbackItemId = itemId,
+            titleItemId = card.parent?.seriesItemId ?: card.itemId,
+            playbackItemId = card.itemId,
             localKey = localKey,
             highlightEpisodeId = null,
-            seriesName = seriesName ?: title,
-            episodeTitle = episodeTitle,
-            overview = overview ?: episodeTitle ?: tagline,
+            seriesName = card.parent?.seriesTitle ?: card.title,
+            episodeTitle = card.title,
+            overview = card.overview ?: card.title,
             season = season,
             episode = episode,
             episodeRange = null,
@@ -251,23 +252,24 @@ class CalendarService internal constructor(
             releasedAtMs = releasedAtMs,
             isReleased = releasedAtMs?.let { it <= nowMs } ?: false,
             isGroup = false,
-            posterUrl = poster.medium,
-            backdropUrl = backdrop.medium,
-            thumbnailUrl = still.medium ?: backdrop.medium,
+            posterUrl = card.images.poster.medium,
+            backdropUrl = card.images.backdrop.medium,
+            thumbnailUrl = card.images.still.medium ?: card.images.backdrop.medium,
             watchedKeys = setOf(watchedKey),
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
+            absoluteEpisodeNumber = null,
         )
     }
 
-    private fun CrispyBackendClient.MediaItem.toCalendarSeriesItem(): CalendarSeriesItem {
-        val localKey = seriesId ?: itemId
+    private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
+        val card = card
+        val localKey = card.parent?.seriesItemId ?: card.itemId
         return CalendarSeriesItem(
             id = localKey,
             itemId = localKey,
             localKey = localKey,
-            title = seriesName ?: title,
-            posterUrl = poster.medium,
-            backdropUrl = backdrop.medium,
+            title = card.parent?.seriesTitle ?: card.title,
+            posterUrl = card.images.poster.medium,
+            backdropUrl = card.images.backdrop.medium,
             sourceLabel = null,
         )
     }

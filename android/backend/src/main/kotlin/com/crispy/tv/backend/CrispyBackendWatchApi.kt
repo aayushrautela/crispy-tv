@@ -97,23 +97,10 @@ internal fun CrispyBackendClient.parseUpNextItems(array: JSONArray?): List<UpNex
     return buildList {
         for (i in 0 until safe.length()) {
             val item = safe.optJSONObject(i) ?: continue
-            val show = item.optJSONObject("show")
-            val images = show?.optJSONObject("images")
-            val poster = images?.optJSONObject("poster")
-            val backdrop = images?.optJSONObject("backdrop")
             add(
                 UpNextItem(
-                    showItemId = show?.optNullableString("itemId"),
-                    showTitle = show?.optNullableString("title"),
-                    showPosterUrl = poster?.optNullableString("medium")
-                        ?: poster?.optNullableString("large")
-                        ?: poster?.optNullableString("small"),
-                    showBackdropUrl = backdrop?.optNullableString("medium")
-                        ?: backdrop?.optNullableString("large"),
-                    nextEpisodeItemId = item.optNullableString("nextEpisodeItemId"),
-                    nextEpisodeSeasonNumber = item.optIntOrNull("nextEpisodeSeasonNumber"),
-                    nextEpisodeEpisodeNumber = item.optIntOrNull("nextEpisodeEpisodeNumber"),
-                    nextEpisodeTitle = item.optNullableString("nextEpisodeTitle"),
+                    show = item.optJSONObject("show")?.let(::parseClientMediaCard),
+                    nextEpisode = item.optJSONObject("nextEpisode")?.let(::parseClientMediaCard),
                     nextEpisodeAirDate = item.optNullableString("nextEpisodeAirDate"),
                     lastInteractedAt = item.optNullableString("lastInteractedAt"),
                     reason = item.optNullableString("reason"),

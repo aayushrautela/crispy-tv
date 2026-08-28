@@ -50,14 +50,6 @@ data class ContractUserItemData(
     val dismissedFromContinueWatching: Boolean?,
 )
 
-data class ContractBaseItemDtoQueryResult(
-    val items: List<ContractMediaItem>,
-    val startIndex: Int,
-    val totalRecordCount: Int,
-    val nextCursor: String?,
-    val hasMore: Boolean,
-)
-
 data class ContractCalendarEnvelope(
     val profileId: String,
     val source: String,
@@ -65,18 +57,6 @@ data class ContractCalendarEnvelope(
     val generatedAt: String,
     val items: List<ContractMediaItem>,
 )
-
-fun normalizeBaseItemDtoQueryResult(payload: Map<String, Any?>): ContractBaseItemDtoQueryResult? {
-    if (!payload.hasExactKeys(setOf("Items", "StartIndex", "TotalRecordCount", "NextCursor", "HasMore"))) return null
-    val items = payload.requiredList("Items")?.mapStrict { value ->
-        (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseMediaItem)
-    } ?: return null
-    val startIndex = payload.nullableInt("StartIndex") ?: 0
-    val totalRecordCount = payload.nullableInt("TotalRecordCount") ?: items.size
-    val nextCursor = payload.nullableString("NextCursor")
-    val hasMore = payload.requiredBoolean("HasMore") ?: return null
-    return ContractBaseItemDtoQueryResult(items, startIndex, totalRecordCount, nextCursor, hasMore)
-}
 
 fun normalizeCalendarEnvelope(payload: Map<String, Any?>): ContractCalendarEnvelope? {
     if (!payload.hasRequiredKeys(setOf("profileId", "source", "generatedAt", "items"))) return null
@@ -181,8 +161,6 @@ private fun Map<String, Any?>.backdropMedium(): String? {
         else -> null
     }
 }
-
-private fun Map<String, Any?>.hasExactKeys(expected: Set<String>): Boolean = keys == expected
 
 private fun Map<String, Any?>.hasRequiredKeys(required: Set<String>): Boolean = required.all { containsKey(it) }
 

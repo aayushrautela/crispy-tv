@@ -481,7 +481,7 @@ private fun DetailContent(
                 modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 12.dp),
             )
             SeasonChips(
-                seasons = state.seasons.map { it.seasonNumber },
+                seasons = state.seasons.map { it.parent?.seasonNumber },
                 selected = state.selectedSeason,
                 fallbackSeasonCount = state.seasonCount,
                 onSelect = onSelectSeason,

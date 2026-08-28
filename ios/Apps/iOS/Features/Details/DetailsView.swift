@@ -178,7 +178,7 @@ struct DetailsScreen: View {
                         EmptyView()
                     }
 
-                    reviewsRail(detail)
+                    reviewsRail(viewModel)
 
                     if !viewModel.errorMessage.isEmpty {
                         Text(viewModel.errorMessage)
@@ -200,7 +200,7 @@ struct DetailsScreen: View {
 
     private func hero(_ detail: MetadataTitleDetail) -> some View {
         ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: detail.item.images.backdropUrl ?? detail.item.images.posterUrl)
+            RemoteImage(url: detail.item.backdropUrl ?? detail.item.posterUrl)
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.8)],
@@ -209,7 +209,7 @@ struct DetailsScreen: View {
             )
 
             Group {
-                if let logoUrl = detail.item.images.logoUrl.nilIfBlank {
+                if let logoUrl = detail.item.logoUrl.nilIfBlank {
                     RemoteImage(url: logoUrl)
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 56, alignment: .leading)
@@ -229,10 +229,10 @@ struct DetailsScreen: View {
 
     @ViewBuilder
     private func metaLine(_ detail: MetadataTitleDetail) -> some View {
-        let yearPart: String? = detail.item.releaseYear.map(String.init)
+        let yearPart: String? = detail.item.year.map(String.init)
         let ratingPart: String? = formatRating(detail.item.rating).map { "★ \($0)" }
-        let runtimePart: String? = detail.item.runtimeMinutes.map { "\($0)m" }
-        let parts = [yearPart, detail.item.certification ?? detail.item.status, runtimePart, ratingPart]
+        let runtimePart: String? = detail.item.runtimeSeconds.map { "\($0 / 60)m" }
+        let parts = [yearPart, detail.item.maturityRating, runtimePart, ratingPart]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         if !parts.isEmpty {
@@ -295,13 +295,13 @@ struct DetailsScreen: View {
     private func episodesSection(_ viewModel: DetailsViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Picker("Season", selection: Binding<Int>(
-                get: { viewModel.selectedSeasonNumber ?? viewModel.seasons.first?.seasonNumber ?? 1 },
+                get: { viewModel.selectedSeasonNumber ?? viewModel.seasons.first?.parent?.seasonNumber ?? 1 },
                 set: { newValue in
                     Task { await viewModel.selectSeason(newValue, environment: environment) }
                 }
             )) {
                 ForEach(viewModel.seasons) { season in
-                    Text(season.displayTitle).tag(season.seasonNumber)
+                    Text(season.title.nilIfBlank ?? "Season \(season.parent?.seasonNumber ?? 0)").tag(season.parent?.seasonNumber ?? 0)
                 }
             }
             .pickerStyle(.menu)
@@ -321,13 +321,12 @@ struct DetailsScreen: View {
     }
 
     @ViewBuilder
-    @ViewBuilder
-    private func reviewsRail(_ detail: MetadataTitleDetail) -> some View {
-        if !detail.reviews.isEmpty {
+    private func reviewsRail(_ viewModel: DetailsViewModel) -> some View {
+        if !viewModel.reviews.isEmpty {
             RailSectionView(title: "Reviews") {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 12) {
-                        ForEach(detail.reviews) { review in
+                        ForEach(viewModel.reviews) { review in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(review.author ?? review.provider)
                                     .font(.caption.weight(.semibold))
@@ -368,15 +367,19 @@ struct DetailsScreen: View {
 }
 
 struct EpisodeRow: View {
-    let episode: MetadataEpisode
+    let episode: ClientMediaCard
+
+    private var stillUrl: String? {
+        episode.images.still.medium ?? episode.images.still.large ?? episode.images.still.small
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             ZStack(alignment: .bottomLeading) {
-                RemoteImage(url: episode.stillUrl)
+                RemoteImage(url: stillUrl)
                     .aspectRatio(Theme.landscapeAspectRatio, contentMode: .fit)
                     .clipShape(.rect(cornerRadius: 10))
-                if let number = episode.episodeNumber {
+                if let number = episode.parent?.episodeNumber {
                     Text("\(number)")
                         .font(.caption.weight(.bold))
                         .padding(5)
@@ -391,12 +394,12 @@ struct EpisodeRow: View {
                 Text(episode.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                if let airDate = episode.airDate.nilIfBlank {
+                if let airDate = episode.releaseDate.nilIfBlank {
                     Text(airDate)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                if let summary = episode.summary.nilIfBlank {
+                if let summary = episode.overview.nilIfBlank {
                     Text(summary)
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -263,78 +263,7 @@ public let mode: String
 public let reason: String?
 }
 
-// MARK: - Metadata / details (Jellyfin BaseItemDto shapes, mirrors parseMetadata*)
-
-public struct MetadataImagesDto: Equatable {
-public let poster: ResponsiveImageSetDto
-public let backdrop: ResponsiveImageSetDto
-public let still: ResponsiveImageSetDto
-public let logo: ResponsiveImageSetDto
-
-public static func parse(_ json: [String: Any]?) -> MetadataImagesDto {
-        MetadataImagesDto(
-            poster: ResponsiveImageSetDto.parse(json?.jsonObject("Primary")),
-            backdrop: (json?.jsonObject("Backdrop") as? [[String: Any]]).flatMap { $0.first }.map { ResponsiveImageSetDto.parse($0) } ?? .empty(),
-            still: ResponsiveImageSetDto.parse(json?.jsonObject("Thumb")),
-            logo: ResponsiveImageSetDto.parse(json?.jsonObject("Logo"))
-        )
-    }
-
-public var posterUrl: String? { poster.medium ?? poster.large ?? poster.small }
-public var backdropUrl: String? { backdrop.medium ?? backdrop.large ?? backdrop.small }
-public var stillUrl: String? { still.medium ?? still.large ?? still.small }
-public var logoUrl: String? { logo.medium ?? logo.large ?? logo.small }
-}
-
-/// Detail view for a movie/show; also used for episode rows.
-public struct MetadataItem: Equatable, Identifiable {
-public let itemId: String
-public let itemType: String
-public let title: String
-public let subtitle: String?
-public let overview: String?
-public let images: MetadataImagesDto
-public let releaseDate: String?
-public let releaseYear: Int?
-public let runtimeMinutes: Int?
-public let rating: Double?
-public let certification: String?
-public let status: String?
-public let genres: [String]
-public let seasonNumber: Int?
-public let episodeNumber: Int?
-
-public var id: String { itemId }
-}
-
-public struct MetadataEpisode: Equatable, Identifiable {
-public let itemId: String
-public let seasonNumber: Int?
-public let episodeNumber: Int?
-public let title: String
-public let summary: String?
-public let airDate: String?
-public let runtimeMinutes: Int?
-public let rating: Double?
-public let stillUrl: String?
-public let showItemId: String?
-
-public var id: String { itemId }
-}
-
-public struct MetadataSeason: Equatable, Identifiable {
-public let itemId: String
-public let seasonNumber: Int
-public let title: String?
-public let summary: String?
-public let posterUrl: String?
-
-public var id: String { itemId }
-
-public var displayTitle: String {
-        title.nilIfBlank ?? "Season \(seasonNumber)"
-    }
-}
+// MARK: - Metadata / details (mirrors server MetadataTitleDetail / TitleExtras)
 
 public struct MetadataPersonRef: Equatable, Identifiable {
 public let personId: String
@@ -346,27 +275,22 @@ public let profileUrl: String?
 public var id: String { personId }
 }
 
-public struct MetadataCard: Equatable, Identifiable {
-public let itemId: String
-public let itemType: String
-public let title: String
-public let images: MetadataImagesDto
-public let releaseYear: Int?
-public let rating: Double?
-
-public var id: String { itemId }
-}
-
 public struct MetadataTitleDetail: Equatable {
-public let item: MetadataItem
+public let item: ClientMediaCard
 public let cast: [MetadataPersonRef]
 public let directors: [MetadataPersonRef]
 public let creators: [MetadataPersonRef]
+public let videos: [MetadataVideo]
+public let production: [MetadataCompany]
+public let backdrops: [String]
+public let nextEpisode: ClientMediaCard?
 }
 
 public struct MetadataTitleExtras: Equatable {
-public let seasons: [MetadataSeason]
-public let similar: [MetadataCard]
+public let seasons: [ClientMediaCard]
+public let similar: [ClientMediaCard]
+public let reviews: [MetadataReview]
+public let collection: [ClientMediaCard]?
 }
 
 public struct PersonKnownForItem: Equatable, Identifiable {
@@ -460,18 +384,14 @@ public struct TitleRatings: Equatable {
     public let audience: Double?
 
     public var visible: [(String, String)] {
-        [
-            ("IMDb", imdb).map { ($0.0, formatRating($0.1)) },
-            ("TMDB", tmdb).map { ($0.0, formatRating($0.1)) },
-            ("Trakt", trakt.map { $0 * 10 }).map { ($0.0, formatRating($0.1)) },
-            ("MC", metacritic).map { ($0.0, $0.1.map { String(Int($0)) }) },
-            ("RT", rottenTomatoes).map { ($0.0, $0.1.map { String(Int($0)) + "%" }) },
-            ("Aud.", audience).map { ($0.0, $0.1.map { String(Int($0)) + "%" }) },
-        ]
-        .compactMap { pair in
-            guard let value = pair.1 else { return nil }
-            return (pair.0, value)
-        }
+        var result: [(String, String)] = []
+        if let value = formatRating(imdb) { result.append(("IMDb", value)) }
+        if let value = formatRating(tmdb) { result.append(("TMDB", value)) }
+        if let traktValue = trakt, let value = formatRating(traktValue * 10) { result.append(("Trakt", value)) }
+        if let value = metacritic.map({ String(Int($0)) }) { result.append(("MC", value)) }
+        if let value = rottenTomatoes.map({ String(Int($0)) + "%" }) { result.append(("RT", value)) }
+        if let value = audience.map({ String(Int($0)) + "%" }) { result.append(("Aud.", value)) }
+        return result
     }
 }
 

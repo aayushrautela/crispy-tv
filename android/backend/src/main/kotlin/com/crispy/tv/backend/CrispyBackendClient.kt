@@ -123,49 +123,6 @@ class CrispyBackendClient(
         val tvdb: Int?,
     )
 
-    data class MediaItem(
-        val itemId: String,
-        val itemType: String,
-        val title: String,
-        val originalTitle: String?,
-        val overview: String?,
-        val poster: ResponsiveImageSet,
-        val backdrop: ResponsiveImageSet,
-        val logo: ResponsiveImageSet,
-        val still: ResponsiveImageSet,
-        val releaseDate: String?,
-        val releaseYear: Int?,
-        val rating: Double?,
-        val genres: List<String>,
-        val runtimeMinutes: Int?,
-        val status: String?,
-        val maturityRating: String?,
-        val certification: String?,
-        val externalIds: MediaExternalIds,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val absoluteEpisodeNumber: Int?,
-        val episodeTitle: String?,
-        val airDate: String?,
-        val tagline: String?,
-        val seriesId: String?,
-        val seriesName: String?,
-        val seasonId: String?,
-        val seasonName: String?,
-    ) {
-        val posterUrl: String?
-            get() = poster.medium
-
-        val backdropUrl: String?
-            get() = backdrop.medium
-
-        val logoUrl: String?
-            get() = logo.medium
-
-        val stillUrl: String?
-            get() = still.medium
-    }
-
     data class ResponsiveImageSet(
         val small: String?,
         val medium: String?,
@@ -188,8 +145,8 @@ class CrispyBackendClient(
 
     data class SearchResultsResponse(
         val query: String,
-        val movies: List<MediaItem>,
-        val series: List<MediaItem>,
+        val movies: List<ClientMediaCard>,
+        val series: List<ClientMediaCard>,
         val people: List<PersonSearchResultItem>,
     )
 
@@ -269,23 +226,23 @@ class CrispyBackendClient(
 
     // --- Calendar ---
 
+    data class CalendarItem(
+        val card: ClientMediaCard,
+        val airDate: String?,
+        val bucket: String?,
+    )
+
     data class CalendarResponse(
         val profileId: String,
         val source: String,
         val kind: String?,
         val generatedAt: String?,
-        val items: List<MediaItem>,
+        val items: List<CalendarItem>,
     )
 
     data class UpNextItem(
-        val showItemId: String?,
-        val showTitle: String?,
-        val showPosterUrl: String?,
-        val showBackdropUrl: String?,
-        val nextEpisodeItemId: String?,
-        val nextEpisodeSeasonNumber: Int?,
-        val nextEpisodeEpisodeNumber: Int?,
-        val nextEpisodeTitle: String?,
+        val show: ClientMediaCard?,
+        val nextEpisode: ClientMediaCard?,
         val nextEpisodeAirDate: String?,
         val lastInteractedAt: String?,
         val reason: String?,
@@ -342,117 +299,9 @@ class CrispyBackendClient(
 
     // --- Metadata / Playback (Jellyfin Item-based, unchanged) ---
 
-    data class MetadataImages(
-        val poster: ResponsiveImageSet,
-        val backdrop: ResponsiveImageSet,
-        val still: ResponsiveImageSet,
-        val logo: ResponsiveImageSet,
-    ) {
-        val posterUrl: String?
-            get() = poster.medium
-
-        val backdropUrl: String?
-            get() = backdrop.medium
-
-        val stillUrl: String?
-            get() = still.medium
-
-        val logoUrl: String?
-            get() = logo.medium
-    }
-
-    data class MetadataExternalIds(
-        val tmdb: Int?,
-        val imdb: String?,
-        val tvdb: Int?,
-    )
-
-    data class MetadataEpisodePreview(
-        val itemId: String,
-        val itemType: String,
-        val absoluteEpisodeNumber: Int?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val title: String?,
-        val summary: String?,
-        val airDate: String?,
-        val runtimeMinutes: Int?,
-        val rating: Double?,
-        val images: MetadataImages,
-        val providerIds: MediaExternalIds? = null,
-    ) {
-        val id: String
-            get() = itemId
-    }
-
-    data class MetadataView(
-        val itemId: String,
-        val itemType: String,
-        val kind: String,
-        val absoluteEpisodeNumber: Int?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val title: String?,
-        val subtitle: String?,
-        val summary: String?,
-        val overview: String?,
-        val images: MetadataImages,
-        val releaseDate: String?,
-        val releaseYear: Int?,
-        val runtimeMinutes: Int?,
-        val rating: Double?,
-        val certification: String?,
-        val status: String?,
-        val genres: List<String>,
-        val externalIds: MetadataExternalIds,
-        val seasonCount: Int?,
-        val episodeCount: Int?,
-        val nextEpisode: MetadataEpisodePreview?,
-        val remoteTrailers: List<RemoteTrailerDto> = emptyList(),
-    ) {
-        val id: String
-            get() = itemId
-    }
-
-    data class MetadataSeasonView(
-        val itemId: String,
-        val seasonNumber: Int,
-        val title: String?,
-        val summary: String?,
-        val airDate: String?,
-        val episodeCount: Int?,
-        val posterUrl: String?,
-    ) {
-        val id: String
-            get() = itemId
-    }
-
-    data class MetadataEpisodeView(
-        val itemId: String,
-        val itemType: String,
-        val absoluteEpisodeNumber: Int?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val title: String?,
-        val summary: String?,
-        val airDate: String?,
-        val runtimeMinutes: Int?,
-        val rating: Double?,
-        val images: MetadataImages,
-        val showItemId: String?,
-        val showTitle: String?,
-        val showExternalIds: MetadataExternalIds,
-    ) {
-        val id: String
-            get() = itemId
-
-        val showId: String?
-            get() = showItemId
-    }
-
     data class MetadataTitleDetailResponse(
-        val item: MetadataView,
-        val nextEpisode: MetadataEpisodeView?,
+        val item: ClientMediaCard,
+        val nextEpisode: ClientMediaCard?,
         val videos: List<MetadataVideoView>,
         val cast: List<MetadataPersonRefView>,
         val directors: List<MetadataPersonRefView>,
@@ -461,36 +310,14 @@ class CrispyBackendClient(
     )
 
     data class MetadataTitleExtrasResponse(
-        val seasons: List<MetadataSeasonView>,
+        val seasons: List<ClientMediaCard>,
         val reviews: List<MetadataReviewView>,
-        val similar: List<MetadataCardView>,
-        val collection: MetadataCollectionView?,
+        val similar: List<ClientMediaCard>,
+        val collection: List<ClientMediaCard>?,
     )
 
     data class MetadataSeriesEpisodesResponse(
-        val items: List<MetadataView>,
-    )
-
-    data class MetadataCardView(
-        val id: String?,
-        val itemId: String?,
-        val itemType: String,
-        val kind: String,
-        val absoluteEpisodeNumber: Int?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val title: String?,
-        val subtitle: String?,
-        val summary: String?,
-        val overview: String?,
-        val images: MetadataImages,
-        val releaseDate: String?,
-        val releaseYear: Int?,
-        val runtimeMinutes: Int?,
-        val rating: Double?,
-        val status: String?,
-        val genre: String? = null,
-        val providerIds: MediaExternalIds? = null,
+        val items: List<ClientMediaCard>,
     )
 
     data class MetadataVideoView(
@@ -536,20 +363,6 @@ class CrispyBackendClient(
             get() = logo.medium
     }
 
-    data class MetadataCollectionView(
-        val id: String,
-        val name: String,
-        val poster: ResponsiveImageSet,
-        val backdrop: ResponsiveImageSet,
-        val parts: List<MetadataCardView>,
-    ) {
-        val posterUrl: String?
-            get() = poster.medium
-
-        val backdropUrl: String?
-            get() = backdrop.medium
-    }
-
     data class MetadataProductionInfoView(
         val originalLanguage: String?,
         val originCountries: List<String>,
@@ -576,9 +389,9 @@ class CrispyBackendClient(
     )
 
     data class PlaybackResolveResponse(
-        val item: MetadataView,
-        val show: MetadataView?,
-        val season: MetadataSeasonView?,
+        val item: ClientMediaCard,
+        val show: ClientMediaCard?,
+        val season: ClientMediaCard?,
     )
 
     data class MetadataPersonDetail(
@@ -589,7 +402,7 @@ class CrispyBackendClient(
         val birthday: String?,
         val placeOfBirth: String?,
         val profileUrl: String?,
-        val knownFor: List<MediaItem>,
+        val knownFor: List<ClientMediaCard>,
     )
 
     // --- Watch Actions ---
