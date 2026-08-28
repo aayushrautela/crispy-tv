@@ -335,14 +335,14 @@ class DetailsViewModel internal constructor(
 
                 _uiState.update { state ->
                     val extrasSeasons = titleExtras?.seasons
-                        ?.map { it.seasonNumber }
+                        ?.mapNotNull { it.parent?.seasonNumber }
                         ?.filter { it > 0 }
                         ?.distinct()
                         ?.sorted()
                         .orEmpty()
                     val seasonItemIds = titleExtras?.seasons
-                        ?.filter { it.seasonNumber > 0 }
-                        ?.associate { it.seasonNumber to it.itemId }
+                        ?.filter { (it.parent?.seasonNumber ?: 0) > 0 }
+                        ?.associate { it.parent?.seasonNumber!! to it.itemId }
                         .orEmpty()
                     val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
                         videos = allEpisodes,

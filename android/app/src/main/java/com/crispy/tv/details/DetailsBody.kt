@@ -329,35 +329,21 @@ internal fun LazyListScope.detailsBodyContent(
         )
     }
 
-    val collection = uiState.titleExtras?.collection
-    collection?.let { col ->
-        val collectionParts = col.parts.mapNotNull { it.toCatalogItem() }
-        if (collectionParts.isNotEmpty()) {
-            item(key = "collection-header") {
-                Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Text(
-                        text = col.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+    val collection = uiState.titleExtras?.collection.orEmpty()
+    val collectionParts = collection.mapNotNull { it.toCatalogItem() }
+    if (collectionParts.isNotEmpty()) {
+        item(key = "collection-row") {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(items = collectionParts, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
+                    val key = "details-collection-${item.itemId}"
+                    HomeCatalogPosterCard(
+                        item = item,
+                        sharedElementKey = key,
+                        onClick = { onItemClick(item, key) },
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-            }
-            item(key = "collection-row") {
-                LazyRow(
-                    contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(items = collectionParts, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                        val key = "details-collection-${item.itemId}"
-                        HomeCatalogPosterCard(
-                            item = item,
-                            sharedElementKey = key,
-                            onClick = { onItemClick(item, key) },
-                        )
-                    }
                 }
             }
         }

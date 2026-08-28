@@ -351,6 +351,7 @@ internal fun CrispyBackendClient.parseClientMediaCard(json: JSONObject): ClientM
         genres = json.optStringList("genres"),
         runtimeSeconds = json.optIntOrNull("runtimeSeconds"),
         images = parseClientImages(json.optJSONObject("images")),
+        trailerUrl = json.optNullableString("trailerUrl"),
         progress = parseClientProgress(json.optJSONObject("progress")),
         parent = parseClientParentRef(json.optJSONObject("parent")),
         providerIds = parseClientProviderIds(json.optJSONObject("providerIds")),

@@ -36,12 +36,9 @@ internal fun buildDetailsRows(
         details.itemType.equals("show", ignoreCase = true) ||
             details.itemType.equals("anime", ignoreCase = true)
     ) {
-        item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
-
         formatLongDate(item?.releaseDate)?.let { rows += "FIRST AIR DATE" to it }
 
         titleExtras?.seasons?.size?.takeIf { it > 0 }?.let { rows += "SEASONS" to "$it" }
-        item?.episodeCount?.takeIf { it > 0 }?.let { rows += "EPISODES" to "$it" }
 
         details.runtime?.takeIf { it.isNotBlank() }?.let { rows += "EPISODE RUNTIME" to it }
 
@@ -57,13 +54,9 @@ internal fun buildDetailsRows(
         item?.overview?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
             rows += "PLOT" to it
         }
-        item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
-
         formatLongDate(item?.releaseDate)?.let { rows += "RELEASE DATE" to it }
 
-        (details.runtime?.takeIf { it.isNotBlank() } ?: formatRuntimeMinutes(item?.runtimeMinutes))?.let {
-            rows += "RUNTIME" to it
-        }
+        details.runtime?.takeIf { it.isNotBlank() }?.let { rows += "RUNTIME" to it }
 
         val originCountry = production?.originCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
             ?: production?.productionCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")

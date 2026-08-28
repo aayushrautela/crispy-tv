@@ -160,12 +160,9 @@ internal fun DetailsScreen(
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
 
     val heroTrailerSources = remember(uiState.titleDetail) {
-        val remote = uiState.titleDetail?.item?.remoteTrailers
-        if (!remote.isNullOrEmpty()) {
-            remote.mapNotNull { dto ->
-                val url = dto.url.trim()
-                if (url.isBlank()) null else HeroTrailerSource(id = url, source = classifyTrailerSource(url))
-            }
+        val remote = uiState.titleDetail?.item?.trailerUrl
+        if (!remote.isNullOrBlank()) {
+            listOf(HeroTrailerSource(id = remote, source = classifyTrailerSource(remote)))
         } else {
             val videos = uiState.titleDetail?.videos
             val yt = videos?.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }

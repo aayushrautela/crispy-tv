@@ -203,6 +203,7 @@ class CrispyBackendClient(
         val genres: List<String>,
         val runtimeSeconds: Int?,
         val images: ClientImages,
+        val trailerUrl: String? = null,
         val progress: ClientProgress?,
         val parent: ClientParentRef?,
         val providerIds: MediaExternalIds? = null,
