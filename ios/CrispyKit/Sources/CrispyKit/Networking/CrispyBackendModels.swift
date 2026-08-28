@@ -291,6 +291,7 @@ public let seasons: [ClientMediaCard]
 public let similar: [ClientMediaCard]
 public let reviews: [MetadataReview]
 public let collection: [ClientMediaCard]?
+public let collectionName: String?
 }
 
 public struct PersonKnownForItem: Equatable, Identifiable {

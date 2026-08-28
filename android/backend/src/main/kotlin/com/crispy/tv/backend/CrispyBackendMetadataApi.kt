@@ -184,6 +184,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
             collection = json.optJSONObject("Collection")?.optJSONArray("Items")?.let {
                 parseClientMediaCards(it).takeIf { cards -> cards.isNotEmpty() }
             },
+            collectionName = json.optNullableString("CollectionName"),
         )
     }
 }

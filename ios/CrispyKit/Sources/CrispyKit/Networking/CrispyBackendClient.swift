@@ -332,7 +332,8 @@ public func getMetadataItemExtras(accessToken: String, itemId: String) async thr
             seasons: json.jsonArray("Seasons").compactMap { try? ClientMediaCard.parse($0) },
             similar: json.jsonArray("Similar").compactMap { try? ClientMediaCard.parse($0) },
             reviews: json.jsonArray("Reviews").compactMap(parseMetadataReview),
-            collection: collection
+            collection: collection,
+            collectionName: json.jsonString("CollectionName")
         )
     }
 

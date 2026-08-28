@@ -315,6 +315,7 @@ class CrispyBackendClient(
         val reviews: List<MetadataReviewView>,
         val similar: List<ClientMediaCard>,
         val collection: List<ClientMediaCard>?,
+        val collectionName: String? = null,
     )
 
     data class MetadataSeriesEpisodesResponse(

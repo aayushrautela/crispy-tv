@@ -329,9 +329,22 @@ internal fun LazyListScope.detailsBodyContent(
         )
     }
 
+    val collectionName = uiState.titleExtras?.collectionName
     val collection = uiState.titleExtras?.collection.orEmpty()
     val collectionParts = collection.mapNotNull { it.toCatalogItem() }
     if (collectionParts.isNotEmpty()) {
+        item(key = "collection-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = collectionName ?: "Franchise Collection",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
         item(key = "collection-row") {
             LazyRow(
                 contentPadding = contentPadding,
