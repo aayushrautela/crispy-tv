@@ -6,6 +6,7 @@ import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightSlideKind
 import com.crispy.tv.ai.AiInsightStandoutTag
 import com.crispy.tv.backend.CrispyBackendClient.ClientImages
+import com.crispy.tv.backend.CrispyBackendClient.CalendarItem
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.ClientParentRef

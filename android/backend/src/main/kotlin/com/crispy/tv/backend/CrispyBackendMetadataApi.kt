@@ -9,6 +9,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataSeriesEpisodesResponse
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
+import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
