@@ -38,8 +38,8 @@ class BackendEpisodeListProvider(
         return response.items
             .asSequence()
             .mapNotNull { episode ->
-                val season = episode.seasonNumber ?: return@mapNotNull null
-                val number = episode.episodeNumber ?: return@mapNotNull null
+                val season = episode.parent?.seasonNumber ?: return@mapNotNull null
+                val number = episode.parent?.episodeNumber ?: return@mapNotNull null
                 if (season <= 0 || number <= 0) return@mapNotNull null
                 EpisodeInfo(
                     season = season,
