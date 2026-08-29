@@ -31,5 +31,8 @@ dependencies {
 
     api("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
-    "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5") {
+        exclude(group = "org.mozilla", module = "rhino")
+    }
+    "fossImplementation"("org.mozilla:rhino-android:1.7.15")
 }
