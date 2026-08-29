@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -14,6 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.metrics.performance.JankStats
+import androidx.metrics.performance.PerformanceMetricsState
 import com.crispy.tv.accounts.PendingProviderAuthStore
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.playerui.ComponentActivityPlayerHost
@@ -25,6 +28,7 @@ import com.crispy.tv.ui.theme.CrispyRewriteTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var playerHost: ComponentActivityPlayerHost
+    private lateinit var jankStats: JankStats
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -37,6 +41,18 @@ class MainActivity : ComponentActivity() {
         handleDeepLink(intent)
         // Registered before composition so activity-result contracts stay valid.
         playerHost = ComponentActivityPlayerHost(this)
+
+        PerformanceMetricsState.getHolderForHierarchy(window.decorView).state?.putState(
+            "Activity", "MainActivity"
+        )
+        jankStats = JankStats.createAndTrack(window) { frameData ->
+            if (frameData.isJank) {
+                Log.i(
+                    "JankStats",
+                    "jank frame duration=${frameData.frameDurationUiNanos / 1_000_000}ms",
+                )
+            }
+        }
 
         setContent {
             CompositionLocalProvider(LocalPlayerHost provides playerHost) {

@@ -183,6 +183,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-svg:3.5.0")
     implementation("io.coil-kt.coil3:coil-core:3.5.0")
     implementation("com.materialkolor:material-kolor:5.0.0")
+    implementation("androidx.metrics:metrics-performance:1.0.0")
 
     implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:13.0.0")
 
