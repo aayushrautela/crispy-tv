@@ -148,7 +148,7 @@ private fun HomeCollectionCard(
             val bow = size.width * 0.08f
             val path = Path().apply {
                 moveTo(midX, 0f)
-                quadraticBezierTo(midX - bow, size.height / 2f, midX, size.height)
+                quadraticTo(midX - bow, size.height / 2f, midX, size.height)
                 lineTo(size.width, size.height)
                 lineTo(size.width, 0f)
                 close()
