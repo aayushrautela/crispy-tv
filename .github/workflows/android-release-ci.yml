@@ -75,8 +75,8 @@ jobs:
       - name: Run JVM contract tests
         run: gradle :android:contract-tests:test
 
-      - name: Build Play bundle and foss APKs
-        run: gradle :android:app:bundlePlayRelease :android:app:assembleFossRelease
+      - name: Build Play bundle
+        run: gradle :android:app:bundlePlayRelease
 
       - name: Upload play-flavor AAB
         uses: actions/upload-artifact@v6
@@ -85,12 +85,8 @@ jobs:
           path: android/app/build/outputs/bundle/playRelease/*.aab
           if-no-files-found: warn
 
-      - name: Upload foss release APK
-        uses: actions/upload-artifact@v6
-        with:
-          name: crispy-rewrite-app-foss-release-universal
-          path: android/app/build/outputs/apk/foss/release/*-universal-*.apk
-          if-no-files-found: warn
+      - name: Build foss APKs
+        run: gradle -PbuildFossApks :android:app:assembleFossRelease
 
       - name: Upload foss arm64-v8a APK
         uses: actions/upload-artifact@v6

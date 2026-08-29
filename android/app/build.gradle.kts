@@ -73,7 +73,7 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            isEnable = project.hasProperty("buildFossApks")
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86_64")
         }
