@@ -34,5 +34,5 @@ dependencies {
     "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5") {
         exclude(group = "org.mozilla", module = "rhino")
     }
-    "fossImplementation"("org.mozilla:rhino-android:1.7.15")
+    "fossImplementation"("com.faendir.rhino:rhino-android:1.6.0")
 }
