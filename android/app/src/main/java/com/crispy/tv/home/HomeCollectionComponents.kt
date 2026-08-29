@@ -1,50 +1,58 @@
 package com.crispy.tv.home
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogSectionRef
-import kotlin.text.RegexOption
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
+import kotlin.math.abs
+import kotlin.text.RegexOption
+
+private data class PanelColor(val background: Color, val text: Color)
+
+private val COLLECTION_PANELS = listOf(
+    PanelColor(Color(0xFF1E3A3A), Color(0xFFE0F0F0)),
+    PanelColor(Color(0xFF3A2A4A), Color(0xFFF0E6FF)),
+    PanelColor(Color(0xFF4A2E2A), Color(0xFFFFEDE8)),
+    PanelColor(Color(0xFF2A3A2E), Color(0xFFECF5EE)),
+    PanelColor(Color(0xFF2A2F45), Color(0xFFE8ECFF)),
+    PanelColor(Color(0xFF3E3834), Color(0xFFF5EEE8)),
+)
+
+private fun panelFor(key: String): PanelColor {
+    val index = abs(key.hashCode()) % COLLECTION_PANELS.size
+    return COLLECTION_PANELS[index]
+}
 
 @Composable
 internal fun HomeCollectionSectionRow(
@@ -113,15 +121,7 @@ private fun HomeCollectionCard(
         height = 200.dp,
     )
     val shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
-    val scrim = remember {
-        Brush.radialGradient(
-            colorStops = arrayOf(
-                0f to Color.Black.copy(alpha = 0.25f),
-                0.7f to Color.Black.copy(alpha = 0.30f),
-                1f to Color.Black.copy(alpha = 0.45f),
-            ),
-        )
-    }
+    val panel = remember(sectionUi.section.key) { panelFor(sectionUi.section.key) }
 
     Box(
         modifier = Modifier
@@ -136,78 +136,53 @@ private fun HomeCollectionCard(
                 model = backdropModel,
                 contentDescription = null,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f }
-                    .blur(8.dp),
+                    .fillMaxWidth(0.5f)
+                    .fillMaxHeight(),
                 contentScale = ContentScale.Crop,
             )
-            Box(modifier = Modifier.fillMaxSize().background(scrim))
         }
 
-        CollectionTitle(
-            title = sectionUi.section.displayTitle,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        )
-    }
-}
-
-@Composable
-private fun CollectionTitle(title: String, modifier: Modifier = Modifier) {
-    val words = remember(title) { collectionDisplayWords(title) }
-
-    BoxWithConstraints(
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
-    ) {
-        val availableWidth = maxWidth
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            words.forEach { word ->
-                StretchedWord(word = word, availableWidth = availableWidth)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val midX = size.width / 2f
+            val bow = size.width * 0.08f
+            val path = Path().apply {
+                moveTo(midX, 0f)
+                quadraticBezierTo(midX - bow, size.height / 2f, midX, size.height)
+                lineTo(size.width, size.height)
+                lineTo(size.width, 0f)
+                close()
             }
+            drawPath(path, panel.background)
         }
-    }
-}
 
-@Composable
-private fun StretchedWord(word: String, availableWidth: Dp) {
-    val density = LocalDensity.current
-    var scaleX by remember(word) { mutableFloatStateOf(1f) }
-
-    BasicText(
-        text = word,
-        onTextLayout = { result ->
-            val natural = result.size.width.toFloat()
-            if (natural > 0f) {
-                val availablePx = with(density) { availableWidth.roundToPx() }
-                val target = (availablePx / natural).coerceIn(1f, 1.6f)
-                if (kotlin.math.abs(target - scaleX) > 0.01f) {
-                    scaleX = target
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxWidth(0.45f)
+                .fillMaxHeight()
+                .padding(12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val words = remember(sectionUi.section.displayTitle) {
+                collectionDisplayWords(sectionUi.section.displayTitle)
+            }
+            Column(
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                words.forEach { word ->
+                    Text(
+                        text = word,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = panel.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-        },
-        style = TextStyle(
-            fontWeight = FontWeight.Black,
-            fontSize = 38.sp,
-            lineHeight = 35.sp,
-            textAlign = TextAlign.Center,
-            color = Color(0xFFB4B4B4),
-            shadow = Shadow(
-                color = Color.Black.copy(alpha = 0.45f),
-                offset = Offset(0f, 1f),
-                blurRadius = 6f,
-            ),
-        ),
-        modifier = Modifier.graphicsLayer {
-            this.scaleX = scaleX
-            transformOrigin = TransformOrigin.Center
-        },
-    )
+        }
+    }
 }
 
 private val COLLECTION_STOPWORDS = setOf("the", "a", "an", "of", "and", "&")
