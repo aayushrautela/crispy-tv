@@ -169,7 +169,7 @@ private fun HomeCollectionCard(
                 collectionDisplayWords(sectionUi.section.displayTitle)
             }
             Column(
-                modifier = Modifier.graphicsLayer { rotationZ = 90f },
+                modifier = Modifier.graphicsLayer { rotationZ = -90f },
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
