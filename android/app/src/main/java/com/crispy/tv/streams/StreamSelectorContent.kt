@@ -97,7 +97,7 @@ fun StreamSelectorModal(
     ModalBottomSheet(
         onDismissRequest = callbacks.onDismiss,
         sheetState = sheetState,
-        sheetMaxWidth = if (isCompact) Dp.Unconstrained else SHEET_MAX_WIDTH,
+        sheetMaxWidth = if (isCompact) Dp.Infinity else SHEET_MAX_WIDTH,
         scrimColor = chrome.scrimColor ?: BottomSheetDefaults.ScrimColor,
         modifier = Modifier.testTag("stream_sheet"),
     ) {
