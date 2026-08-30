@@ -47,9 +47,7 @@ data class HomeWideRailItemUi(
 
 @Immutable
 sealed interface RailLoadState {
-    data object Loading : RailLoadState
     data class Ready(val items: List<HomeWideRailItemUi>) : RailLoadState
-    data object Hidden : RailLoadState
 }
 
 @Immutable
@@ -57,7 +55,7 @@ data class HomeWideRailSectionUi(
     val key: String,
     val title: String,
     val kind: HomeWideRailSectionKind,
-    val state: RailLoadState = RailLoadState.Loading,
+    val state: RailLoadState,
 )
 
 @Immutable

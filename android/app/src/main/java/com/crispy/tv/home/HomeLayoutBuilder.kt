@@ -17,9 +17,7 @@ internal fun buildHomeLayoutState(
         THIS_WEEK_SECTION_KEY,
     ).forEach { key ->
         val section = wideRails[key] ?: return@forEach
-        if (section.isVisible()) {
-            blocks += HomeWideRailLayoutUi(key = section.key, kind = section.kind)
-        }
+        blocks += HomeWideRailLayoutUi(key = section.key, kind = section.kind)
     }
 
     var index = 0

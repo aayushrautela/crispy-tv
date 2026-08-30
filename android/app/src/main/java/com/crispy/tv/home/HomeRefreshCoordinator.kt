@@ -84,7 +84,7 @@ internal class HomeRefreshCoordinator(
         )
     }
 
-    suspend fun loadContinueWatching(): HomeWideRailSectionUi {
+    suspend fun loadContinueWatching(): HomeWideRailSectionUi? {
         val suppressionMap = suppressionStore.read()
         val canonicalResult = watchHistoryService.getCanonicalContinueWatching(limit = continueWatchingLimit)
         val filtered = canonicalResult.copy(
@@ -99,30 +99,33 @@ internal class HomeRefreshCoordinator(
             throw IllegalStateException(result.statusMessage.ifBlank { "Unable to load continue watching." })
         }
 
-        val nowMs = System.currentTimeMillis()
+        val items = result.entries.map { item -> item.toWideRailItem(System.currentTimeMillis()) }
+        if (items.isEmpty()) return null
+
         return defaultWideRailSection(
             key = CONTINUE_WATCHING_SECTION_KEY,
             title = "Continue Watching",
             kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-        ).copy(
-            state = RailLoadState.Ready(items = result.entries.map { item -> item.toWideRailItem(nowMs) }),
+            items = items,
         )
     }
 
-    suspend fun loadUpNext(): HomeWideRailSectionUi = upNextService.loadUpNext(System.currentTimeMillis())
+    suspend fun loadUpNext(): HomeWideRailSectionUi? = upNextService.loadUpNext(System.currentTimeMillis())
 
-    suspend fun loadThisWeekSection(): HomeWideRailSectionUi {
+    suspend fun loadThisWeekSection(): HomeWideRailSectionUi? {
         val thisWeekResult = calendarService.loadThisWeek(System.currentTimeMillis())
         if (thisWeekResult.isError) {
             throw IllegalStateException(thisWeekResult.statusMessage ?: "Unable to load this week.")
         }
 
+        val items = thisWeekResult.items.map { item -> item.toWideRailItem() }
+        if (items.isEmpty()) return null
+
         return defaultWideRailSection(
             key = THIS_WEEK_SECTION_KEY,
             title = "This Week",
             kind = HomeWideRailSectionKind.THIS_WEEK,
-        ).copy(
-            state = RailLoadState.Ready(items = thisWeekResult.items.map { item -> item.toWideRailItem() }),
+            items = items,
         )
     }
 

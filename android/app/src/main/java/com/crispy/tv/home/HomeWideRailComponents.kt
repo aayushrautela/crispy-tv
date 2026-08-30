@@ -66,8 +66,7 @@ internal fun HomeWideRailSection(
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {
-    val readyItems = (section.state as? RailLoadState.Ready)?.items
-        ?: return
+    val readyItems = (section.state as RailLoadState.Ready).items
 
     var actionsItemKey by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))

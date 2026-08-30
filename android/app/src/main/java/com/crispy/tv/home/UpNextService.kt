@@ -10,7 +10,7 @@ class UpNextService internal constructor(
     private val backendClient: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
 ) {
-    suspend fun loadUpNext(nowMs: Long): HomeWideRailSectionUi {
+    suspend fun loadUpNext(nowMs: Long): HomeWideRailSectionUi? {
         val backendContext = backendContextResolver.resolve()
             ?: throw IllegalStateException("Sign in and select a profile to load Up Next.")
 
@@ -26,13 +26,14 @@ class UpNextService internal constructor(
         }
 
         val items = result.items.mapNotNull { view -> toCanonicalContinueWatchingItem(view) }
+        if (items.isEmpty()) return null
 
+        val railItems = items.map { item -> item.toWideRailItem(nowMs) }
         return defaultWideRailSection(
             key = UP_NEXT_SECTION_KEY,
             title = "Up Next",
             kind = HomeWideRailSectionKind.UP_NEXT,
-        ).copy(
-            state = RailLoadState.Ready(items = items.map { item -> item.toWideRailItem(nowMs) }),
+            items = railItems,
         )
     }
 
