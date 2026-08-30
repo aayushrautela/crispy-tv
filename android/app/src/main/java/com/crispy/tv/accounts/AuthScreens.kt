@@ -570,6 +570,12 @@ private fun ProfileSelectorScreen(
                         androidx.compose.material3.Switch(
                             checked = uiState.dialogIsKids,
                             onCheckedChange = onDialogKidsToggle,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                     AvatarPickerGrid(
@@ -902,6 +908,12 @@ private fun ProfileManagementScreen(
                         androidx.compose.material3.Switch(
                             checked = uiState.dialogIsKids,
                             onCheckedChange = onDialogKidsToggle,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                     AvatarPickerGrid(
@@ -924,29 +936,50 @@ private fun ProfileManagementScreen(
 
 @Composable
 private fun ProfileRow(name: String, isKids: Boolean, avatarUrl: String?) {
-    ListItem(
-        supportingContent = if (isKids) ({ Text(text = "Kids") }) else null,
-        leadingContent = {
-            if (avatarUrl != null) {
-                AvatarImage(url = avatarUrl, contentDescription = name)
-            } else {
-                Icon(Icons.Outlined.AccountCircle, contentDescription = null)
-            }
-        },
-    ) {
-        Text(text = name)
-    }
-}
-
-@Composable
-private fun AvatarImage(url: String, contentDescription: String) {
-    coil3.compose.AsyncImage(
-        model = url,
-        contentDescription = contentDescription,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(Dimensions.ListItemPadding),
-    )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(Color(ProfileTileFallback)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (avatarUrl != null) {
+                coil3.compose.AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = name,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                )
+            } else {
+                Icon(
+                    Icons.Outlined.AccountCircle,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+        }
+        Column {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (isKids) {
+                Text(
+                    text = "Kids",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

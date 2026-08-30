@@ -76,7 +76,13 @@ fun PlaybackSettingsScreen(
                     trailingContent = {
                         Switch(
                             checked = settings.trailerAutoplayEnabled,
-                            onCheckedChange = onTrailerAutoplayChanged
+                            onCheckedChange = onTrailerAutoplayChanged,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 ) {
@@ -92,7 +98,13 @@ fun PlaybackSettingsScreen(
                     trailingContent = {
                         Switch(
                             checked = settings.skipIntroEnabled,
-                            onCheckedChange = onSkipIntroChanged
+                            onCheckedChange = onSkipIntroChanged,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 ) {
@@ -108,7 +120,13 @@ fun PlaybackSettingsScreen(
                     trailingContent = {
                         Switch(
                             checked = settings.autoSelectStream,
-                            onCheckedChange = onAutoSelectStreamChanged
+                            onCheckedChange = onAutoSelectStreamChanged,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 ) {
@@ -136,7 +154,13 @@ fun PlaybackSettingsScreen(
                     trailingContent = {
                         Switch(
                             checked = settings.useLibass,
-                            onCheckedChange = onUseLibassChanged
+                            onCheckedChange = onUseLibassChanged,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 ) {

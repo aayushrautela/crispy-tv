@@ -113,8 +113,8 @@ internal fun EpisodeCard(
                         .align(Alignment.TopEnd)
                         .padding(10.dp),
                     shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -138,8 +138,8 @@ internal fun EpisodeCard(
                         .align(Alignment.TopEnd)
                         .padding(10.dp),
                     shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.94f),
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
                     Text(
                         text = "${watchState.progressPercent.roundToInt()}%",

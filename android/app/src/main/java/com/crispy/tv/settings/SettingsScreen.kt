@@ -100,21 +100,21 @@ fun SettingsScreen(
                             label = "Playback",
                             description = "Player defaults and intro controls",
                             icon = Icons.Outlined.VideoSettings,
-                            iconTint = MaterialTheme.colorScheme.secondary,
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToPlaybackSettings
                         ),
                         SettingsItem(
                             label = "Image Quality",
                             description = "Choose artwork detail and cache size",
                             icon = Icons.Outlined.Image,
-                            iconTint = MaterialTheme.colorScheme.secondary,
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToImageSettings
                         ),
                         SettingsItem(
                             label = "Subtitles",
                             description = "Caption styling and defaults",
                             icon = Icons.Outlined.ClosedCaption,
-                            iconTint = MaterialTheme.colorScheme.secondary
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
             ),
@@ -145,7 +145,7 @@ fun SettingsScreen(
                             label = "About",
                             description = "Version, licenses, and credits",
                             icon = Icons.Outlined.Info,
-                            iconTint = MaterialTheme.colorScheme.secondary
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
             )

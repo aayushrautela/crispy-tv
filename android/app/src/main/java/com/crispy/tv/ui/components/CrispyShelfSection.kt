@@ -144,14 +144,14 @@ private fun CrispyViewAllPill(
         modifier = modifier
             .size(actionSize)
             .clip(RoundedCornerShape(999.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .then(clickModifier),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             contentDescription = "View all",
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(iconSize),
         )
     }
