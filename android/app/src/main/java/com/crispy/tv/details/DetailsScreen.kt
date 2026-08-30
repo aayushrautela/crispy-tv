@@ -130,7 +130,7 @@ internal fun DetailsScreen(
     val logoUrl = remember(details, initialLogoUrl) {
         details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: initialLogoUrl
     }
-    val fallbackSeed = Color(0xFFF56E3C)
+    val fallbackSeed = Color.White
     val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed
     val detailsScheme = rememberDetailsColorScheme(seedColor = seedColor)

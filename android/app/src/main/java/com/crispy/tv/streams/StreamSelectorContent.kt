@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -457,7 +458,10 @@ private fun LoadingMoreStreamsRow(indicatorSize: androidx.compose.ui.unit.Dp) {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LoadingIndicator(modifier = Modifier.size(indicatorSize))
+        LoadingIndicator(
+            modifier = Modifier.size(indicatorSize),
+            color = Color.White,
+        )
     }
 }
 
