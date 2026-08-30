@@ -72,7 +72,7 @@ fun rememberDetailsSeedColor(imageUrl: String?, fallbackSeed: Color): State<Colo
 @Composable
 fun rememberDetailsTvColorScheme(seedColor: Color?): androidx.tv.material3.ColorScheme {
     val m3: M3ColorScheme = rememberDynamicColorScheme(
-        seedColor = seedColor ?: Color(0xFFFFC400),
+        seedColor = seedColor ?: Color(0xFFF56E3C),
         isDark = true,
         style = PaletteStyle.TonalSpot,
     )
