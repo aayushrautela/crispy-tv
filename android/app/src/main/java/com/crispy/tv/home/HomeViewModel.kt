@@ -68,7 +68,7 @@ data class HomeUiState(
     val headerPills: List<CatalogSectionRef> = emptyList(),
     val heroState: HeroState = HeroState(),
     val layoutState: HomeLayoutState = defaultHomeLayoutState(),
-    val wideRailSections: Map<String, HomeWideRailSectionUi> = defaultWideRailSections(),
+    val wideRailSections: Map<String, HomeWideRailSectionUi> = emptyMap(),
     val catalogSections: Map<String, HomeCatalogSectionUi> = emptyMap(),
 )
 
@@ -244,45 +244,18 @@ class HomeViewModel internal constructor(
     }
 
     private suspend fun loadContinueWatching() {
-        val section = runCatching { loadWithRetry { refreshCoordinator.loadContinueWatching() } }.getOrElse { error ->
-            if (error is CancellationException) throw error
-            Log.w(TAG, "Continue watching load failed", error)
-            _errorEvents.tryEmit(error.message ?: "Failed to load continue watching.")
-            defaultWideRailSection(
-                key = CONTINUE_WATCHING_SECTION_KEY,
-                title = "Continue Watching",
-                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-            ).copy(state = RailLoadState.Hidden)
-        }
-        applyWideRailSection(section)
+        val section = runCatching { loadWithRetry { refreshCoordinator.loadContinueWatching() } }.getOrNull()
+        if (section != null) applyWideRailSection(section)
     }
 
     private suspend fun loadUpNext() {
-        val section = runCatching { loadWithRetry { refreshCoordinator.loadUpNext() } }.getOrElse { error ->
-            if (error is CancellationException) throw error
-            Log.w(TAG, "Up next load failed", error)
-            _errorEvents.tryEmit(error.message ?: "Failed to load up next.")
-            defaultWideRailSection(
-                key = UP_NEXT_SECTION_KEY,
-                title = "Up Next",
-                kind = HomeWideRailSectionKind.UP_NEXT,
-            ).copy(state = RailLoadState.Hidden)
-        }
-        applyWideRailSection(section)
+        val section = runCatching { loadWithRetry { refreshCoordinator.loadUpNext() } }.getOrNull()
+        if (section != null) applyWideRailSection(section)
     }
 
     private suspend fun loadThisWeek() {
-        val section = runCatching { loadWithRetry { refreshCoordinator.loadThisWeekSection() } }.getOrElse { error ->
-            if (error is CancellationException) throw error
-            Log.w(TAG, "This week load failed", error)
-            _errorEvents.tryEmit(error.message ?: "Failed to load this week.")
-            defaultWideRailSection(
-                key = THIS_WEEK_SECTION_KEY,
-                title = "This Week",
-                kind = HomeWideRailSectionKind.THIS_WEEK,
-            ).copy(state = RailLoadState.Hidden)
-        }
-        applyWideRailSection(section)
+        val section = runCatching { loadWithRetry { refreshCoordinator.loadThisWeekSection() } }.getOrNull()
+        if (section != null) applyWideRailSection(section)
     }
 
     private suspend fun <T> loadWithRetry(block: suspend () -> T): T {
@@ -351,36 +324,10 @@ class HomeViewModel internal constructor(
     }
 }
 
-private fun defaultWideRailSections(): Map<String, HomeWideRailSectionUi> {
-    return linkedMapOf(
-        CONTINUE_WATCHING_SECTION_KEY to
-            defaultWideRailSection(
-                key = CONTINUE_WATCHING_SECTION_KEY,
-                title = "Continue Watching",
-                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-            ),
-        UP_NEXT_SECTION_KEY to
-            defaultWideRailSection(
-                key = UP_NEXT_SECTION_KEY,
-                title = "Up Next",
-                kind = HomeWideRailSectionKind.UP_NEXT,
-            ),
-        THIS_WEEK_SECTION_KEY to
-            defaultWideRailSection(
-                key = THIS_WEEK_SECTION_KEY,
-                title = "This Week",
-                kind = HomeWideRailSectionKind.THIS_WEEK,
-            ),
-    )
-}
+
 
 private fun defaultHomeLayoutState(): HomeLayoutState {
-    val blocks = listOf(
-        HomeWideRailLayoutUi(key = CONTINUE_WATCHING_SECTION_KEY, kind = HomeWideRailSectionKind.CONTINUE_WATCHING),
-        HomeWideRailLayoutUi(key = UP_NEXT_SECTION_KEY, kind = HomeWideRailSectionKind.UP_NEXT),
-        HomeWideRailLayoutUi(key = THIS_WEEK_SECTION_KEY, kind = HomeWideRailSectionKind.THIS_WEEK),
-    )
-    return HomeLayoutState(blocks = blocks)
+    return HomeLayoutState(blocks = emptyList())
 }
 
 internal fun defaultWideRailSection(
