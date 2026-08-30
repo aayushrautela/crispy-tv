@@ -145,7 +145,7 @@ fun PlaybackSettingsScreen(
                                 Text(
                                     text = "Render: ${settings.libassRenderType}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 6.dp),
                                 )
                             }
@@ -240,7 +240,7 @@ private fun EnginePreferenceChips(
                             Text(
                                 text = "On",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     },
@@ -287,7 +287,7 @@ private fun LibassRenderTypeChips(
                             Text(
                                 text = "On",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     },

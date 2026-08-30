@@ -49,8 +49,7 @@ fun PlayerRoute(
     val positionMsState = session.playbackPositionMs.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val imageUrl = if (uiState.isMetadataLoaded) uiState.backdropUrl ?: uiState.artworkUrl else null
-    val baseScheme = MaterialTheme.colorScheme
-    val fallbackSeed = baseScheme.primary
+    val fallbackSeed = Color(0xFFF56E3C)
     val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed
 

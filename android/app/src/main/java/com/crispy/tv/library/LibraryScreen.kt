@@ -48,6 +48,7 @@ import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.ui.graphics.Color
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.Dimensions
@@ -584,8 +585,8 @@ internal fun LibraryFiltersRow(
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         labelColor = MaterialTheme.colorScheme.onSurface,
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedContainerColor = Color.White,
+                        selectedLabelColor = Color(0xFF141414),
                     ),
                 )
             }

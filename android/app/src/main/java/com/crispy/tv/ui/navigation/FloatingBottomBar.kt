@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -119,7 +120,7 @@ private fun BarChip(
     }
     val contentColor by animateColorAsState(
         targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.onSecondaryContainer
+            Color(0xFF141414)
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
@@ -128,7 +129,7 @@ private fun BarChip(
     )
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.secondaryContainer
+            Color.White
         } else {
             MaterialTheme.colorScheme.surfaceContainer
         },

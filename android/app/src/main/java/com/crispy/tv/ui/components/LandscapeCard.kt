@@ -168,7 +168,7 @@ fun LandscapeCard(
         if (badge != null) {
             Surface(
                 shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = Color.Black.copy(alpha = 0.65f),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(8.dp),
@@ -177,7 +177,7 @@ fun LandscapeCard(
                     text = badge,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = Color.White,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }

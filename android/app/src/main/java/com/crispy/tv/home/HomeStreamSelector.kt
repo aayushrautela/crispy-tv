@@ -1,8 +1,8 @@
 package com.crispy.tv.home
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.streams.SelectorCallbacks
@@ -17,8 +17,8 @@ internal fun HomeStreamSelector(viewModel: HomeSelectorViewModel) {
 
     val chrome =
         SelectorChrome(
-            accentColor = MaterialTheme.colorScheme.primaryContainer,
-            onAccentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            accentColor = Color.White,
+            onAccentColor = Color(0xFF141414),
             showSkeletonChips = true,
             loadingIndicatorSize = 48.dp,
         )

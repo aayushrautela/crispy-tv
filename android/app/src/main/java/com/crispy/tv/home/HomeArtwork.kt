@@ -76,8 +76,8 @@ internal fun LandscapeArtworkFrame(
                     .align(badgeAlignment)
                     .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                 shape = RoundedCornerShape(999.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = Color.Black.copy(alpha = 0.65f),
+                contentColor = Color.White,
             ) {
                 Text(
                     text = badgeLabel,
