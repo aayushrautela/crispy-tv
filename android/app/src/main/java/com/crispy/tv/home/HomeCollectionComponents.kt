@@ -169,7 +169,9 @@ private fun HomeCollectionCard(
                 collectionDisplayWords(sectionUi.section.displayTitle)
             }
             Column(
-                modifier = Modifier.graphicsLayer { rotationZ = -90f },
+                modifier = Modifier
+                    .graphicsLayer { rotationZ = -90f }
+                    .padding(start = 4.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -179,8 +181,6 @@ private fun HomeCollectionCard(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = panel.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
