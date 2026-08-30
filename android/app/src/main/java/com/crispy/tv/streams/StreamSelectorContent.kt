@@ -53,9 +53,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.details.DetailsSkeletonColors
@@ -89,11 +91,13 @@ fun StreamSelectorModal(
 ) {
     if (!state.visible) return
 
+    val configuration = LocalConfiguration.current
+    val isCompact = configuration.screenWidthDp < 600
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     ModalBottomSheet(
         onDismissRequest = callbacks.onDismiss,
         sheetState = sheetState,
-        sheetMaxWidth = SHEET_MAX_WIDTH,
+        sheetMaxWidth = if (isCompact) Dp.Unconstrained else SHEET_MAX_WIDTH,
         scrimColor = chrome.scrimColor ?: BottomSheetDefaults.ScrimColor,
         modifier = Modifier.testTag("stream_sheet"),
     ) {
