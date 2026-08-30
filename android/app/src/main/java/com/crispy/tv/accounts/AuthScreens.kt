@@ -159,9 +159,7 @@ private fun AuthScreen(
             )
 
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .width(max = 400.dp),
+                modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
