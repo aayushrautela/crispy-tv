@@ -26,6 +26,25 @@ Remove Material You dynamic colors entirely. Replace with fixed dark-only palett
 
 ---
 
+## Key Principle: Brand Color Is Scarce
+
+**Coral should be rare. White/grey dominates.**
+
+> "Material recommends applying limited color accents for dark themes by preferring the use of the surface color over the primary color in most cases." — Material Design Guidelines
+
+| ✅ Use coral for | ❌ NOT for |
+|-----------------|-----------|
+| Primary CTAs (Watch, Subscribe, Sign In) | Section headings |
+| Selected/active states (selected tab, selected chip) | Icon tints |
+| Progress bars | Badges/tags |
+| | Navigation arrows |
+| | Switches/toggles |
+| | Decorative elements |
+
+> **One accent per surface.** If a surface already has coral, don't add more.
+
+---
+
 ## Current State
 
 ### App module (`android/app`)
@@ -57,25 +76,33 @@ Remove Material You dynamic colors entirely. Replace with fixed dark-only palett
 
 ### App Module — Full `darkColorScheme()`
 
+> **Note:** `secondary` and `tertiary` are GREY, not coral. This prevents accidental brand overload. Coral is reserved for `primary` only.
+
 ```kotlin
+package com.crispy.tv.ui.theme
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+
 private val CrispyDarkColors = darkColorScheme(
-    // Accent (coral — use sparingly)
+    // Brand accent (coral — use sparingly, one per surface)
     primary = Color(0xFFF56E3C),
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFD95A30),
     onPrimaryContainer = Color(0xFFFFFFFF),
     inversePrimary = Color(0xFFF56E3C),
 
-    // Secondary (coral for consistency)
-    secondary = Color(0xFFF56E3C),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD95A30),
+    // Secondary/tertiary are GREY — not coral
+    // This prevents accidental brand overload
+    secondary = Color(0xFFB3B3B3),
+    onSecondary = Color(0xFF141414),
+    secondaryContainer = Color(0xFF333333),
     onSecondaryContainer = Color(0xFFFFFFFF),
-
-    // Tertiary (coral for consistency)
-    tertiary = Color(0xFFF56E3C),
+    tertiary = Color(0xFF888888),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFD95A30),
+    tertiaryContainer = Color(0xFF2A2A2A),
     onTertiaryContainer = Color(0xFFFFFFFF),
 
     // Foundation (dark canvas + white/grey text)
@@ -113,6 +140,11 @@ private val CrispyDarkColors = darkColorScheme(
     // Scrim
     scrim = Color(0xFF000000),
 )
+
+@Composable
+fun CrispyRewriteTheme(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = CrispyDarkColors, content = content)
+}
 ```
 
 ### TV Module — Full `darkColorScheme()`
@@ -122,6 +154,13 @@ Same palette, but TV uses different token names:
 - `borderVariant` instead of `outlineVariant`
 
 ```kotlin
+package com.crispy.tv.tv.ui.theme
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.darkColorScheme
+
 private val CrispyTvDarkColors = darkColorScheme(
     primary = Color(0xFFF56E3C),
     onPrimary = Color(0xFFFFFFFF),
@@ -129,9 +168,9 @@ private val CrispyTvDarkColors = darkColorScheme(
     onPrimaryContainer = Color(0xFFFFFFFF),
     inversePrimary = Color(0xFFF56E3C),
 
-    secondary = Color(0xFFF56E3C),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD95A30),
+    secondary = Color(0xFFB3B3B3),
+    onSecondary = Color(0xFF141414),
+    secondaryContainer = Color(0xFF333333),
     onSecondaryContainer = Color(0xFFFFFFFF),
 
     background = Color(0xFF141414),
@@ -150,6 +189,11 @@ private val CrispyTvDarkColors = darkColorScheme(
     errorContainer = Color(0xFFB03040),
     onErrorContainer = Color(0xFFFFDAD6),
 )
+
+@Composable
+fun CrispyTvTheme(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = CrispyTvDarkColors, content = content)
+}
 ```
 
 ---
@@ -171,105 +215,9 @@ private val CrispyTvDarkColors = darkColorScheme(
 - Single `darkColorScheme` with coral + white/grey palette (as above)
 - Always use it, no conditions
 
-**Result structure:**
-```kotlin
-package com.crispy.tv.ui.theme
-
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-
-private val CrispyDarkColors = darkColorScheme(
-    primary = Color(0xFFF56E3C),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD95A30),
-    onPrimaryContainer = Color(0xFFFFFFFF),
-    inversePrimary = Color(0xFFF56E3C),
-    secondary = Color(0xFFF56E3C),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD95A30),
-    onSecondaryContainer = Color(0xFFFFFFFF),
-    tertiary = Color(0xFFF56E3C),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFD95A30),
-    onTertiaryContainer = Color(0xFFFFFFFF),
-    background = Color(0xFF141414),
-    onBackground = Color(0xFFFFFFFF),
-    surface = Color(0xFF1F1F1F),
-    onSurface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFF2A2A2A),
-    onSurfaceVariant = Color(0xFFB3B3B3),
-    surfaceContainer = Color(0xFF1F1F1F),
-    surfaceContainerHigh = Color(0xFF2A2A2A),
-    surfaceContainerHighest = Color(0xFF333333),
-    surfaceContainerLow = Color(0xFF141414),
-    surfaceContainerLowest = Color(0xFF0A0A0A),
-    surfaceTint = Color(0xFFF56E3C),
-    surfaceDim = Color(0xFF0A0A0A),
-    surfaceBright = Color(0xFF2A2A2A),
-    outline = Color(0xFF333333),
-    outlineVariant = Color(0xFF262626),
-    error = Color(0xFFE8455C),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFB03040),
-    onErrorContainer = Color(0xFFFFDAD6),
-    inverseSurface = Color(0xFFECE1C6),
-    inverseOnSurface = Color(0xFF141414),
-    scrim = Color(0xFF000000),
-)
-
-@Composable
-fun CrispyRewriteTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = CrispyDarkColors, content = content)
-}
-```
-
----
-
 ### 2. Rewrite TV Theme (`android/tv/.../ui/theme/Theme.kt`)
 
 Same palette as app, but use TV-specific tokens (`border`/`borderVariant` instead of `outline`/`outlineVariant`).
-
-```kotlin
-package com.crispy.tv.tv.ui.theme
-
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.darkColorScheme
-
-private val CrispyTvDarkColors = darkColorScheme(
-    primary = Color(0xFFF56E3C),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD95A30),
-    onPrimaryContainer = Color(0xFFFFFFFF),
-    inversePrimary = Color(0xFFF56E3C),
-    secondary = Color(0xFFF56E3C),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD95A30),
-    onSecondaryContainer = Color(0xFFFFFFFF),
-    background = Color(0xFF141414),
-    onBackground = Color(0xFFFFFFFF),
-    surface = Color(0xFF1F1F1F),
-    onSurface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFF2A2A2A),
-    onSurfaceVariant = Color(0xFFB3B3B3),
-    border = Color(0xFF333333),
-    borderVariant = Color(0xFF262626),
-    error = Color(0xFFE8455C),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFB03040),
-    onErrorContainer = Color(0xFFFFDAD6),
-)
-
-@Composable
-fun CrispyTvTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = CrispyTvDarkColors, content = content)
-}
-```
-
----
 
 ### 3. Update DetailPalette.kt Fallback Seed
 
@@ -277,11 +225,7 @@ fun CrispyTvTheme(content: @Composable () -> Unit) {
 
 Line 75: Change fallback seed from `Color(0xFFFFC400)` to `Color(0xFFF56E3C)` (coral).
 
-This ensures: if poster extraction fails, the detail page defaults to coral, not yellow.
-
----
-
-### 4. Audit hardcoded colors in screen files
+### 4. Audit screen files for coral misuse
 
 Search for any hardcoded `Color(0xFF...)` or `Color.White`/`Color.Black` in screen files. Replace with semantic tokens:
 
@@ -301,6 +245,10 @@ Search for any hardcoded `Color(0xFF...)` or `Color.White`/`Color.Black` in scre
 - Gradient overlays
 - Specific screen backgrounds
 - Any `Color.White` used for text
+- Home arrow buttons next to list names (should use `surfaceVariant`, not `secondaryContainer`)
+- Episode number tags/badges
+- Settings row icons
+- Profile maker switches (use explicit grey colors)
 
 **Note:** Most screen files already use semantic tokens correctly. Only fix the ones that hardcode.
 
@@ -329,6 +277,10 @@ After removing `LightColors`:
 - [ ] Detail page fallback is coral (not yellow) if extraction fails
 - [ ] TV module uses same palette
 - [ ] No pure black `#000000` as background (use `#141414`)
+- [ ] Section headings are white (`onSurface`), not coral
+- [ ] Icon tints are grey (`onSurfaceVariant`), not coral
+- [ ] Badges/tags use `surfaceContainerHigh`, not `primaryContainer`
+- [ ] Switches use explicit grey colors, not default `primaryContainer`
 - [ ] Contrast ratios meet WCAG AA:
   - `onSurface` (#FFFFFF) on `background` (#141414) = 17:1 ✅
   - `onSurfaceVariant` (#B3B3B3) on `background` (#141414) = 7.5:1 ✅
@@ -347,6 +299,8 @@ After removing `LightColors`:
 - **Don't use pure black `#000000` for backgrounds** — use `#141414`
 - **Don't keep light mode code paths** — app is dark-only
 - **Don't use `Color.White` directly** — use `MaterialTheme.colorScheme.onSurface`
+- **Don't use `secondary`/`tertiary` for brand colors** — they should be grey
+- **Don't apply coral to every interactive element** — one accent per surface
 
 ---
 
@@ -380,3 +334,26 @@ Verify:
 - No hardcoded `Color.White`/`Color(0xFF...)` in screen files
 - App is dark-only with coral accent
 - All text uses semantic tokens
+- Coral appears only on primary CTAs and active/selected states
+
+---
+
+## Design Philosophy Reference
+
+### Netflix Pattern (what we follow)
+- White text on `#141414` background
+- Red used SPARINGLY: only on Play buttons, progress bars, active tabs, selected states
+- Everything else is white/grey chrome
+- **One accent per surface**
+
+### Material Design 3 Dark Theme Guidance
+- "Material recommends applying limited color accents for dark themes by preferring the use of the surface color over the primary color in most cases"
+- "Desaturating Primary Colors to Prevent Visual Vibration — Bright, fully saturated colors that work well in light mode often behave very differently in dark mode. They appear to vibrate or bleed."
+- Pure white `#FFFFFF` on pure black `#000000` = 21:1 contrast (too harsh, causes halation)
+- Off-white `#E6E6E6` on `#141414` = 15:1 contrast (passes AAA, comfortable to read)
+
+### WCAG Accessibility
+- Body text: minimum 4.5:1 contrast (AA)
+- Large text: minimum 3:1 contrast (AA)
+- Secondary text should pass on its actual surface (not just page background)
+- Test focus states by tabbing through the entire page in dark mode
