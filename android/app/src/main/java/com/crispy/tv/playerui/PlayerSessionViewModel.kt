@@ -13,6 +13,7 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.addons.mapping.seasonNumbers
 import com.crispy.tv.addons.mapping.toMediaVideo
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
@@ -66,6 +67,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 enum class PlayerSurface {
     NONE,
     INFO,
+    EPISODES,
     STREAMS,
     AUDIO,
     SUBTITLES,
@@ -358,6 +360,14 @@ class PlayerSessionViewModel(
         selectorCoordinator.dismiss()
         _uiState.update { state ->
             state.copy(activeSurface = PlayerSurface.INFO)
+        }
+    }
+
+    fun showEpisodes() {
+        if (_uiState.value.details?.itemType.equals("movie", ignoreCase = true)) return
+        selectorCoordinator.dismiss()
+        _uiState.update { state ->
+            state.copy(activeSurface = PlayerSurface.EPISODES)
         }
     }
 
@@ -699,6 +709,8 @@ class PlayerSessionViewModel(
             details.itemType.toMetadataLabMediaTypeOrNull() ?: activeIdentity?.contentType
                 ?: MetadataLabMediaType.MOVIE
         val selectedSeason = _uiState.value.selectedSeason ?: activeIdentity?.season
+        val isSeries = !details.itemType.equals("movie", ignoreCase = true)
+        val initialSeasons = if (isSeries && selectedSeason != null) listOf(selectedSeason) else emptyList()
         _uiState.update {
             it.copy(
                 details = details,
@@ -708,12 +720,17 @@ class PlayerSessionViewModel(
                 subtitle = buildPlayerSubtitle(mediaType, details, details.title, details.seasonNumber, details.episodeNumber),
                 isMetadataLoaded = true,
                 selectedSeason = selectedSeason,
+                seasons = if (isSeries && it.seasons.isEmpty()) initialSeasons else it.seasons,
                 episodesIsLoading = true,
             )
         }
 
+        if (isSeries) {
+            fetchSeasonsForDetails(details.itemId)
+        }
+
         val seasonToLoad = _uiState.value.selectedSeason
-        if (!details.itemType.equals("movie", ignoreCase = true) && seasonToLoad != null) {
+        if (isSeries && seasonToLoad != null) {
             loadEpisodesForSeason(seasonToLoad, force = true)
         }
     }
@@ -745,6 +762,24 @@ class PlayerSessionViewModel(
             viewModelScope.launch { playResolvedStream(top, target) }
         } else {
             _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
+        }
+    }
+
+    private fun fetchSeasonsForDetails(itemId: String?) {
+        val id = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return
+        viewModelScope.launch {
+            val session = runCatching { withContext(Dispatchers.IO) { supabase.ensureValidSession() } }.getOrNull() ?: return@launch
+            val token = session.accessToken
+            val extras =
+                runCatching {
+                    withContext(Dispatchers.IO) { backendClient.getMetadataItemExtras(accessToken = token, itemId = id) }
+                }.getOrNull() ?: return@launch
+            val numbers = extras.seasonNumbers()
+            if (numbers.isEmpty()) return@launch
+            _uiState.update { current ->
+                if (current.seasons.size == numbers.size && current.seasons.containsAll(numbers)) current
+                else current.copy(seasons = numbers)
+            }
         }
     }
 

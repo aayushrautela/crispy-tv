@@ -51,6 +51,7 @@ internal fun PlayerOverlay(
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onShowInfo: () -> Unit,
+    onShowEpisodes: () -> Unit,
     onShowStreams: () -> Unit,
     onShowAudio: () -> Unit,
     onShowSubtitles: () -> Unit,
@@ -63,6 +64,8 @@ internal fun PlayerOverlay(
     onSelectSubtitleTrack: (String?) -> Unit,
     onRefreshAddonSubtitles: () -> Unit,
     onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
+    onSelectEpisode: (String) -> Unit,
+    onSeasonSelected: (Int) -> Unit,
     onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
 ) {
@@ -190,6 +193,8 @@ internal fun PlayerOverlay(
                         latestOnBack()
                     },
                     onShowInfo = { openSurface(onShowInfo) },
+                    onShowEpisodes = { openSurface(onShowEpisodes) },
+                    showEpisodesButton = uiState.details?.itemType?.equals("movie", ignoreCase = true) == false,
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
 
@@ -254,6 +259,27 @@ internal fun PlayerOverlay(
             palette = palette,
             onClose = onCloseSurface,
             headerEpisode = uiState.streamSelector.headerEpisode,
+        )
+
+        PlayerEpisodesSheet(
+            visible = uiState.activeSurface == PlayerSurface.EPISODES,
+            seasons = uiState.seasons,
+            selectedSeason = uiState.selectedSeason,
+            seasonEpisodes = uiState.seasonEpisodes,
+            episodesIsLoading = uiState.episodesIsLoading,
+            episodesStatusMessage = uiState.episodesStatusMessage,
+            palette = palette,
+            activeSeason = uiState.activeIdentity?.season,
+            activeEpisode = uiState.activeIdentity?.episode,
+            onSeasonSelected = {
+                resetControlsTimer()
+                onSeasonSelected(it)
+            },
+            onEpisodeSelected = {
+                resetControlsTimer()
+                onSelectEpisode(it)
+            },
+            onClose = onCloseSurface,
         )
 
         PlayerStreamsSheet(

@@ -203,6 +203,7 @@ fun PlayerRoute(
                 },
                 onSeekTo = session::seekTo,
                 onShowInfo = session::showInfo,
+                onShowEpisodes = session::showEpisodes,
                 onShowStreams = session::showStreams,
                 onShowAudio = session::showAudioTracks,
                 onShowSubtitles = session::showSubtitles,
@@ -215,6 +216,8 @@ fun PlayerRoute(
                 onSelectSubtitleTrack = session::selectSubtitleTrack,
                 onRefreshAddonSubtitles = session::refreshAddonSubtitles,
                 onSelectAddonSubtitle = session::selectAddonSubtitle,
+                onSelectEpisode = session::showStreamsForEpisode,
+                onSeasonSelected = session::onSeasonSelected,
                 onCycleResizeMode = {
                     val next = uiState.resizeMode.next()
                     session.setResizeMode(next)
