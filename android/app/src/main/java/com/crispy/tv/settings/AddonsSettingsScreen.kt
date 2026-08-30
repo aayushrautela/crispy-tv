@@ -762,7 +762,7 @@ private fun AddonListRow(
                     Icon(
                         imageVector = Icons.Outlined.Extension,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
