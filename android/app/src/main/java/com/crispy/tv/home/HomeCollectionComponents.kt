@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,7 +29,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -39,7 +37,7 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 import kotlin.math.abs
-import kotlin.text.RegexOption
+
 
 private data class PanelColor(val background: Color, val text: Color)
 
@@ -158,43 +156,17 @@ private fun HomeCollectionCard(
             drawPath(path, panel.background)
         }
 
-        Box(
+        Text(
+            text = sectionUi.section.displayTitle,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = panel.text,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .fillMaxWidth(0.45f)
-                .fillMaxHeight()
-                .padding(12.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            val words = remember(sectionUi.section.displayTitle) {
-                collectionDisplayWords(sectionUi.section.displayTitle)
-            }
-            Row(
-                modifier = Modifier
-                    .graphicsLayer { rotationZ = -90f }
-                    .padding(end = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                words.forEach { word ->
-                    Text(
-                        text = word,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = panel.text,
-                    )
-                }
-            }
-        }
+                .padding(end = 4.dp)
+                .graphicsLayer { rotationZ = -90f },
+        )
     }
 }
 
-private val COLLECTION_STOPWORDS = setOf("the", "a", "an", "of", "and", "&")
 
-private fun collectionDisplayWords(title: String): List<String> {
-    val cleaned = title.replace(Regex("\\s+collection$", RegexOption.IGNORE_CASE), "").trim()
-    val split = cleaned.split(Regex("\\s+")).filter { it.isNotBlank() }
-    val filtered = split.filter { it.lowercase() !in COLLECTION_STOPWORDS }
-    val source = if (filtered.isNotEmpty()) filtered else split
-    return source.take(5)
-}
