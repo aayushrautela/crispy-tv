@@ -77,10 +77,10 @@ import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
-private val NetflixProfileBackground = Color(0xFF141414)
-private val NetflixTileFallback = Color(0xFF333333)
-private val NetflixTileShape = RoundedCornerShape(8.dp)
-private val NetflixTileSize = 140.dp
+private const val ProfileBackground = 0xFF141414
+private const val ProfileTileFallback = 0xFF333333
+private val ProfileAvatarSize = 120.dp
+private val ProfileAddStroke = 2.dp
 
 @Composable
 fun AuthRoute(
@@ -483,22 +483,22 @@ private fun ProfileSelectorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(NetflixProfileBackground),
+            .background(Color(ProfileBackground)),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 32.dp)
-                .padding(top = 64.dp, bottom = 32.dp),
+                .padding(top = 48.dp, bottom = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
             val isSetup = uiState.profiles.isEmpty()
             Text(
                 text = if (isSetup) "Finish setting up" else "Who's watching?",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
 
@@ -530,8 +530,8 @@ private fun ProfileSelectorScreen(
                 TextButton(onClick = onBack) {
                     Text(
                         text = "Sign out",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleSmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -692,17 +692,17 @@ private fun ProfileGrid(
 private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
-            .width(NetflixTileSize + 16.dp)
+            .width(ProfileAvatarSize + 24.dp)
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(4.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(NetflixTileSize)
-                .clip(NetflixTileShape)
-                .background(NetflixTileFallback),
+                .size(ProfileAvatarSize)
+                .clip(CircleShape)
+                .background(Color(ProfileTileFallback)),
             contentAlignment = Alignment.Center,
         ) {
             if (avatarUrl != null) {
@@ -711,16 +711,26 @@ private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
                     contentDescription = name,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(NetflixTileShape),
+                        .clip(CircleShape),
                 )
             } else {
                 Icon(
                     Icons.Outlined.AccountCircle,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(72.dp),
+                    modifier = Modifier.size(64.dp),
                 )
             }
+        }
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+    }
+}
         }
         Text(
             text = name,
@@ -736,29 +746,29 @@ private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
 private fun ProfileAddCard(onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
-            .width(NetflixTileSize + 16.dp)
+            .width(ProfileAvatarSize + 24.dp)
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(4.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(NetflixTileSize)
-                .clip(NetflixTileShape)
-                .border(2.dp, Color.White.copy(alpha = 0.5f), NetflixTileShape),
+                .size(ProfileAvatarSize)
+                .clip(CircleShape)
+                .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Outlined.Add,
                 contentDescription = "Add profile",
                 tint = Color.White,
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(48.dp),
             )
         }
         Text(
             text = "Add profile",
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.bodyLarge,
             color = Color.White,
             textAlign = TextAlign.Center,
         )
