@@ -68,7 +68,13 @@ data class HomeUiState(
     val headerPills: List<CatalogSectionRef> = emptyList(),
     val heroState: HeroState = HeroState(),
     val layoutState: HomeLayoutState = defaultHomeLayoutState(),
-    val wideRailSections: Map<String, HomeWideRailSectionUi> = emptyMap(),
+    val wideRailSections: Map<String, HomeWideRailSectionUi> = linkedMapOf(
+        CONTINUE_WATCHING_SECTION_KEY to defaultWideRailSection(
+            key = CONTINUE_WATCHING_SECTION_KEY,
+            title = "Continue Watching",
+            kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+        ),
+    ),
     val catalogSections: Map<String, HomeCatalogSectionUi> = emptyMap(),
 )
 
@@ -327,25 +333,31 @@ class HomeViewModel internal constructor(
 
 
 private fun defaultHomeLayoutState(): HomeLayoutState {
-    return HomeLayoutState(blocks = emptyList())
+    return HomeLayoutState(
+        blocks = listOf(
+            HomeWideRailLayoutUi(
+                key = CONTINUE_WATCHING_SECTION_KEY,
+                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+            ),
+        ),
+    )
 }
 
 internal fun defaultWideRailSection(
     key: String,
     title: String,
     kind: HomeWideRailSectionKind,
+    items: List<HomeWideRailItemUi>? = null,
 ): HomeWideRailSectionUi {
     return HomeWideRailSectionUi(
         key = key,
         title = title,
         kind = kind,
-        state = RailLoadState.Loading,
+        state = items?.let { RailLoadState.Ready(it) } ?: RailLoadState.Loading,
     )
 }
 
-internal fun HomeWideRailSectionUi.isVisible(): Boolean {
-    return state !is RailLoadState.Hidden
-}
+
 
 private fun CanonicalContinueWatchingItem.sectionKey(): String {
     return CONTINUE_WATCHING_SECTION_KEY

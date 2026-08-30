@@ -66,7 +66,8 @@ internal fun HomeWideRailSection(
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {
-    val readyItems = (section.state as RailLoadState.Ready).items
+    val isLoading = section.state is RailLoadState.Loading
+    val readyItems = (section.state as? RailLoadState.Ready)?.items.orEmpty()
 
     var actionsItemKey by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -74,6 +75,7 @@ internal fun HomeWideRailSection(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = section.title,
+            skeleton = isLoading,
             action = onViewAllClick?.let { action ->
                 {
                     TextButton(onClick = action) {
@@ -88,37 +90,43 @@ internal fun HomeWideRailSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = crispyRowHuggingPadding(horizontalPadding),
         ) {
-            items(readyItems, key = { it.key }, contentType = { "wideRailCard" }) { item ->
-                val key = "homerail-${section.kind.name.lowercase()}-${item.key}"
-                HomeWideRailCard(
-                    item = item,
-                    showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
-                    actionsVisible = actionsItemKey == item.key,
-                    onToggleActions = { key2 ->
-                        actionsItemKey = if (actionsItemKey == key2) null else key2
-                    },
-                    onClick = {
-                        when (item.kind) {
-                            HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let { onContinueWatchingClick(it, key) }
-                            HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let { onThisWeekClick(it, key) }
-                        }
-                    },
-                    onDetailsClick = {
-                        when (item.kind) {
-                            HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let { onContinueWatchingOpenDetails(it, key) }
-                            HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let { onThisWeekClick(it, key) }
-                        }
-                    },
-                    sharedElementKey = key,
-                    onRemoveClick =
-                        if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
-                            item.continueWatchingItem?.let { continueWatchingItem ->
-                                { onRemoveContinueWatchingItem(continueWatchingItem) }
-                            }
-                        } else {
-                            null
+            if (isLoading) {
+                items(HOME_WIDE_SKELETON_COUNT, contentType = { "wideSkeleton" }) {
+                    HomeWideRailSkeletonCard()
+                }
+            } else {
+                items(readyItems, key = { it.key }, contentType = { "wideRailCard" }) { item ->
+                    val key = "homerail-${section.kind.name.lowercase()}-${item.key}"
+                    HomeWideRailCard(
+                        item = item,
+                        showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
+                        actionsVisible = actionsItemKey == item.key,
+                        onToggleActions = { key2 ->
+                            actionsItemKey = if (actionsItemKey == key2) null else key2
                         },
-                )
+                        onClick = {
+                            when (item.kind) {
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let { onContinueWatchingClick(it, key) }
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let { onThisWeekClick(it, key) }
+                            }
+                        },
+                        onDetailsClick = {
+                            when (item.kind) {
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let { onContinueWatchingOpenDetails(it, key) }
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let { onThisWeekClick(it, key) }
+                            }
+                        },
+                        sharedElementKey = key,
+                        onRemoveClick =
+                            if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
+                                item.continueWatchingItem?.let { continueWatchingItem ->
+                                    { onRemoveContinueWatchingItem(continueWatchingItem) }
+                                }
+                            } else {
+                                null
+                            },
+                    )
+                }
             }
         }
     }
@@ -172,6 +180,18 @@ internal fun HomeWideRailSection(
             }
         }
     }
+}
+
+private const val HOME_WIDE_SKELETON_COUNT = 3
+
+@Composable
+private fun HomeWideRailSkeletonCard() {
+    Box(
+        modifier = Modifier
+            .width(Dimensions.WideCardWidth)
+            .aspectRatio(Dimensions.WideCardAspectRatio)
+            .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false)
+    )
 }
 
 @Composable

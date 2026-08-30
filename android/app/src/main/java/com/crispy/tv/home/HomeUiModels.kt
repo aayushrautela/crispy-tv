@@ -47,6 +47,7 @@ data class HomeWideRailItemUi(
 
 @Immutable
 sealed interface RailLoadState {
+    data object Loading : RailLoadState
     data class Ready(val items: List<HomeWideRailItemUi>) : RailLoadState
 }
 
