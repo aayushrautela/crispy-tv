@@ -87,7 +87,7 @@ fun SettingsScreen(
                             label = "Account and subscription",
                             description = "Manage your account, subscription, profiles, and billing",
                             icon = Icons.Outlined.Person,
-                            iconTint = MaterialTheme.colorScheme.primary,
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToAccountsProfiles
                         )
                     )
@@ -126,14 +126,14 @@ fun SettingsScreen(
                             label = "Addons",
                             description = "Install and remove addon manifests",
                             icon = Icons.Outlined.Extension,
-                            iconTint = MaterialTheme.colorScheme.primary,
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToAddonsSettings
                         ),
                         SettingsItem(
                             label = "Language & Region",
                             description = "Preferred content language",
                             icon = Icons.Outlined.Language,
-                            iconTint = MaterialTheme.colorScheme.primary
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
             ),
@@ -213,7 +213,7 @@ private fun SettingsGroupCard(
         Text(
             text = group.title,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = Dimensions.ListItemPadding, bottom = 8.dp)
         )
         
