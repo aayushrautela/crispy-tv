@@ -168,12 +168,12 @@ private fun HomeCollectionCard(
             val words = remember(sectionUi.section.displayTitle) {
                 collectionDisplayWords(sectionUi.section.displayTitle)
             }
-            Column(
+            Row(
                 modifier = Modifier
                     .graphicsLayer { rotationZ = -90f }
                     .padding(end = 4.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 words.forEach { word ->
                     Text(
