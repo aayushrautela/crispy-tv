@@ -731,16 +731,6 @@ private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
         )
     }
 }
-        }
-        Text(
-            text = name,
-            style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
-    }
-}
 
 @Composable
 private fun ProfileAddCard(onClick: () -> Unit) {
