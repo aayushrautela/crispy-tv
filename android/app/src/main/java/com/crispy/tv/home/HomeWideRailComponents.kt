@@ -68,7 +68,8 @@ internal fun HomeWideRailSection(
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {
-    if (section.state is RailLoadState.Hidden) {
+    val readyItems = (section.state as? RailLoadState.Ready)?.items
+    if (section.state is RailLoadState.Hidden || readyItems.isNullOrEmpty()) {
         return
     }
     val isLoading = section.state is RailLoadState.Loading
@@ -99,7 +100,7 @@ internal fun HomeWideRailSection(
                     HomeWideRailSkeletonCard()
                 }
             } else {
-                val railItems = (section.state as RailLoadState.Ready).items
+                val railItems = readyItems
                 items(railItems, key = { it.key }, contentType = { "wideRailCard" }) { item ->
                     val key = "homerail-${section.kind.name.lowercase()}-${item.key}"
                     HomeWideRailCard(
@@ -137,7 +138,7 @@ internal fun HomeWideRailSection(
     }
 
     actionsItemKey?.let { key ->
-        val actionItem = (section.state as? RailLoadState.Ready)?.items?.firstOrNull { it.key == key }
+        val actionItem = readyItems?.firstOrNull { it.key == key }
         if (actionItem != null) {
             val actionSharedKey = "homerail-${section.kind.name.lowercase()}-${actionItem.key}"
             val actions = buildList {
