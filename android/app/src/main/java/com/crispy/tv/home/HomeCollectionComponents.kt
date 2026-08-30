@@ -171,14 +171,14 @@ private fun HomeCollectionCard(
             Column(
                 modifier = Modifier
                     .graphicsLayer { rotationZ = -90f }
-                    .padding(start = 4.dp),
+                    .padding(end = 4.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 words.forEach { word ->
                     Text(
                         text = word,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = panel.text,
                     )
