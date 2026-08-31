@@ -574,6 +574,59 @@ class DetailsViewModel internal constructor(
         )
     }
 
+    private fun reresolveWatchCta() {
+        val state = _uiState.value
+        val details = state.details ?: return
+        if (details.itemType.equals("movie", ignoreCase = true)) return
+        // If continue-watching entry exists, resolver already set the right CTA.
+        if (!state.continueVideoId.isNullOrBlank()) return
+
+        val episodes = state.seasonEpisodes.sortedBy { it.episode ?: Int.MAX_VALUE }
+        if (episodes.isEmpty()) return
+
+        val watchStates = state.episodeWatchStates
+        val firstUnwatched = episodes.firstOrNull { video ->
+            val ws = watchStates[video.id]
+            ws == null || !ws.isWatched
+        }
+
+        val newCta =
+            if (firstUnwatched == null) {
+                WatchCta(
+                    kind = WatchCtaKind.REWATCH,
+                    label = "Rewatch",
+                    icon = WatchCtaIcon.REPLAY,
+                    remainingMinutes = null,
+                    lastWatchedAtEpochMs = null,
+                )
+            } else {
+                val season = firstUnwatched.season
+                val episode = firstUnwatched.episode
+                if (season != null && episode != null) {
+                    WatchCta(
+                        kind = WatchCtaKind.WATCH,
+                        label = "Play S$season:E$episode",
+                        icon = WatchCtaIcon.PLAY,
+                        remainingMinutes = null,
+                        lastWatchedAtEpochMs = null,
+                    )
+                } else {
+                    WatchCta(
+                        kind = WatchCtaKind.WATCH,
+                        label = "Watch now",
+                        icon = WatchCtaIcon.PLAY,
+                        remainingMinutes = null,
+                        lastWatchedAtEpochMs = null,
+                    )
+                }
+            }
+
+        _uiState.update { current ->
+            if (current.watchCta.label == newCta.label && current.watchCta.kind == newCta.kind) current
+            else current.copy(watchCta = newCta)
+        }
+    }
+
     private fun loadEpisodesForSeason(
         season: Int,
         force: Boolean = false,
@@ -647,6 +700,7 @@ class DetailsViewModel internal constructor(
                     )
                 }
                 maybeConsumePendingEpisodeNavigation(result.videos)
+                reresolveWatchCta()
             }
     }
 
