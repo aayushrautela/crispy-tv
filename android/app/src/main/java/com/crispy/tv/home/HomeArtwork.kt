@@ -25,7 +25,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @Composable
@@ -93,17 +92,20 @@ internal fun LandscapeArtworkFrame(
 
         if (progressFraction != null && progressFraction > 0f) {
             val progressWidth = progressFraction.coerceIn(0f, 1f)
-            val progressColor = MaterialTheme.colorScheme.tertiary
+            val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+            val fillColor = MaterialTheme.colorScheme.onSurface
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .background(Color.White.copy(alpha = 0.25f))
+                    .padding(bottom = 4.dp)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(trackColor)
                     .drawWithContent {
                         drawContent()
                         drawRect(
-                            color = progressColor,
+                            color = fillColor,
                             size = size.copy(width = size.width * progressWidth),
                         )
                     },

@@ -382,7 +382,7 @@ internal fun HomeWideRailCard(
                     Text(
                         text = item.subtitle,
                         style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.78f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
