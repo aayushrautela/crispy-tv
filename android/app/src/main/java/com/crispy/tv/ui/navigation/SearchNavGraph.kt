@@ -12,7 +12,7 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
             SearchRoute(
             onItemClick = { item, sharedElementKey ->
                 if (item.type.equals("person", ignoreCase = true)) {
-                    navController.navigate(AppRoutes.personDetailsRoute(item.id, item.posterUrl))
+                    navController.navigate(AppRoutes.personDetailsRoute(item.id, item.artworkUrl))
                 } else {
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(

@@ -92,8 +92,7 @@ internal fun AiInsightsStoryOverlay(
     result: AiInsightsResult,
     backdropUrls: List<String>,
     onDismiss: () -> Unit,
-    posterUrl: String?,
-    backdropUrl: String?,
+    artworkUrl: String?,
     palette: DetailsPaletteColors,
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
@@ -193,18 +192,17 @@ internal fun AiInsightsStoryOverlay(
                     modifier = Modifier.fillMaxSize(),
                 ) { pageIndex ->
                     val slide = slides[pageIndex.coerceIn(0, slides.lastIndex)]
-                    AiInsightsStorySlide(
-                        slide = slide,
-                        cyclingBackdropUrl =
-                            if (cyclingBackdrops.isEmpty()) {
-                                null
-                            } else {
-                                cyclingBackdrops[pageIndex % cyclingBackdrops.size]
-                            },
-                        posterUrl = posterUrl,
-                        backdropUrl = backdropUrl,
-                        palette = palette,
-                    )
+                        AiInsightsStorySlide(
+                            slide = slide,
+                            cyclingBackdropUrl =
+                                if (cyclingBackdrops.isEmpty()) {
+                                    null
+                                } else {
+                                    cyclingBackdrops[pageIndex % cyclingBackdrops.size]
+                                },
+                            artworkUrl = artworkUrl,
+                            palette = palette,
+                        )
                 }
             }
 
@@ -223,15 +221,13 @@ internal fun AiInsightsStoryOverlay(
 private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
     cyclingBackdropUrl: String?,
-    posterUrl: String?,
-    backdropUrl: String?,
+    artworkUrl: String?,
     palette: DetailsPaletteColors,
 ) {
     val imageUrl = resolveSlideImageUrl(
         slide = slide,
         cyclingBackdropUrl = cyclingBackdropUrl,
-        posterUrl = posterUrl,
-        backdropUrl = backdropUrl,
+        artworkUrl = artworkUrl,
     )
     val accentColor = slideAccentColor(slide, palette)
 
@@ -843,13 +839,11 @@ private fun List<AiInsightSlide>.sortedForDisplay(): List<AiInsightSlide> =
 private fun resolveSlideImageUrl(
     slide: AiInsightSlide,
     cyclingBackdropUrl: String?,
-    posterUrl: String?,
-    backdropUrl: String?,
+    artworkUrl: String?,
 ): String? {
     return (slide.backdrop.large ?: slide.backdrop.medium ?: slide.backdrop.small)?.normalizedUrl()
         ?: cyclingBackdropUrl.normalizedUrl()
-        ?: backdropUrl.normalizedUrl()
-        ?: posterUrl.normalizedUrl()
+        ?: artworkUrl.normalizedUrl()
 }
 
 private fun slideAccentColor(slide: AiInsightSlide, fallback: DetailsPaletteColors): Color {

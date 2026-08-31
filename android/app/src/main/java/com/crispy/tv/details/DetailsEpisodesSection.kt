@@ -43,13 +43,11 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalFoundationApi::class)
 internal fun EpisodeCard(
     video: MediaVideo,
-    watchState: EpisodeWatchState,
     isHighlighted: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onLongPress: () -> Unit = {},
 ) {
-    val progressFraction = (watchState.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
     ElevatedCard(
         modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
         colors = CardDefaults.elevatedCardColors(containerColor = Color.Transparent),
