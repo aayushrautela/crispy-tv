@@ -33,7 +33,6 @@ import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.details.EpisodeCard
 import com.crispy.tv.details.EpisodeCardSkeleton
-import com.crispy.tv.details.EpisodeWatchState
 import com.crispy.tv.ui.theme.Dimensions
 
 @Composable
@@ -42,7 +41,6 @@ internal fun PlayerEpisodesSheet(
     seasons: List<Int>,
     selectedSeason: Int?,
     seasonEpisodes: List<MediaVideo>,
-    episodeWatchStates: Map<String, EpisodeWatchState>,
     episodesIsLoading: Boolean,
     episodesStatusMessage: String,
     palette: DetailsPaletteColors,
@@ -153,7 +151,6 @@ internal fun PlayerEpisodesSheet(
                                     video.season == activeSeason && video.episode == activeEpisode
                                 EpisodeCard(
                                     video = video,
-                                    watchState = episodeWatchStates[video.id] ?: EpisodeWatchState(),
                                     isHighlighted = isActive,
                                     modifier = Modifier.width(Dimensions.WideCardWidth),
                                     onClick = { onEpisodeSelected(video.id) },
