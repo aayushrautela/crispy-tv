@@ -102,7 +102,6 @@ class HomeCatalogsContractTest {
             itemId = json.requireString("item_id", path),
             title = json.requireString("title", path),
             artworkUrl = json.optionalString("artwork_url", path),
-            logoUrl = json.optionalString("logo_url", path),
             addonId = json.requireString("addon_id", path),
             type = json.requireString("type", path),
             rating = json.optionalString("rating", path),
