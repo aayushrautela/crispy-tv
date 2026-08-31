@@ -1,5 +1,5 @@
 {
-  "contract_version": 7,
+  "contract_version": 8,
   "suite": "home_catalogs",
   "case_id": "plans_hero_sections_discover_and_global_page",
   "input": {
@@ -23,8 +23,7 @@
             {
               "item_id": "movie:tmdb:157336",
               "title": "Arrival",
-              "poster_url": null,
-              "backdrop_url": "https://img/arrival-backdrop.jpg",
+              "artwork_url": "https://img/arrival-backdrop.jpg",
               "addon_id": "supabase",
               "type": "movie",
               "rating": "8.0",
@@ -34,8 +33,7 @@
             {
               "item_id": "movie:tmdb:438631",
               "title": "Dune",
-              "poster_url": "https://img/dune-poster.jpg",
-              "backdrop_url": null,
+              "artwork_url": "https://img/dune-poster.jpg",
               "addon_id": "supabase",
               "type": "movie",
               "rating": "8.2",
@@ -45,8 +43,7 @@
             {
               "item_id": "movie:tmdb:999003",
               "title": "No Art",
-              "poster_url": null,
-              "backdrop_url": null,
+              "artwork_url": null,
               "addon_id": "supabase",
               "type": "movie",
               "rating": null,
@@ -71,8 +68,7 @@
             {
               "item_id": "show:tmdb:95396",
               "title": "Severance",
-              "poster_url": "https://img/severance.jpg",
-              "backdrop_url": "https://img/severance-backdrop.jpg",
+              "artwork_url": "https://img/severance-backdrop.jpg",
               "addon_id": "supabase",
               "type": "series",
               "rating": "8.7",
@@ -82,8 +78,7 @@
             {
               "item_id": "show:tmdb:125988",
               "title": "Silo",
-              "poster_url": "https://img/silo.jpg",
-              "backdrop_url": "https://img/silo-backdrop.jpg",
+              "artwork_url": "https://img/silo-backdrop.jpg",
               "addon_id": "supabase",
               "type": "series",
               "rating": "8.1",
@@ -108,8 +103,7 @@
             {
               "item_id": "movie:tmdb:786892",
               "title": "Furiosa",
-              "poster_url": "https://img/furiosa.jpg",
-              "backdrop_url": "https://img/furiosa-backdrop.jpg",
+              "artwork_url": "https://img/furiosa-backdrop.jpg",
               "addon_id": "supabase",
               "type": "movie",
               "rating": "7.7",
@@ -142,7 +136,7 @@
             "rating": "8.0",
             "year": "2016",
             "genres": [],
-            "backdrop_url": "https://img/arrival-backdrop.jpg",
+            "artwork_url": "https://img/arrival-backdrop.jpg",
             "addon_id": "supabase",
             "type": "movie"
           },
@@ -153,7 +147,7 @@
             "rating": "8.2",
             "year": "2021",
             "genres": [],
-            "backdrop_url": "https://img/dune-poster.jpg",
+            "artwork_url": "https://img/dune-poster.jpg",
             "addon_id": "supabase",
             "type": "movie"
           }
@@ -208,8 +202,7 @@
         {
           "item_id": "show:tmdb:125988",
           "title": "Silo",
-          "poster_url": "https://img/silo.jpg",
-          "backdrop_url": "https://img/silo-backdrop.jpg",
+          "artwork_url": "https://img/silo-backdrop.jpg",
           "addon_id": "supabase",
           "type": "series",
           "rating": "8.1",

@@ -5,11 +5,9 @@ import java.util.Locale
 data class HomeCatalogItem(
     val itemId: String,
     val title: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
+    val artworkUrl: String?,
     val logoUrl: String? = null,
-    val poster: Map<String, String?> = emptyMap(),
-    val backdrop: Map<String, String?> = emptyMap(),
+    val artwork: Map<String, String?> = emptyMap(),
     val logo: Map<String, String?> = emptyMap(),
     val addonId: String,
     val type: String,
@@ -91,8 +89,8 @@ data class HomeCatalogHeroItem(
     val rating: String?,
     val year: String? = null,
     val genres: List<String> = emptyList(),
-    val backdropUrl: String,
-    val backdrop: Map<String, String?> = emptyMap(),
+    val artworkUrl: String,
+    val artwork: Map<String, String?> = emptyMap(),
     val addonId: String,
     val type: String,
 )
@@ -319,8 +317,8 @@ private fun buildHeroResult(
         heroList.items
             .asSequence()
             .mapNotNull { item ->
-                val backdrop = item.backdropUrl ?: item.posterUrl
-                if (backdrop.isNullOrBlank()) return@mapNotNull null
+                val artwork = item.artworkUrl
+                if (artwork.isNullOrBlank()) return@mapNotNull null
                 HomeCatalogHeroItem(
                     itemId = item.itemId,
                     title = item.title,
@@ -328,8 +326,8 @@ private fun buildHeroResult(
                     rating = item.rating,
                     year = item.year,
                     genres = emptyList(),
-                    backdropUrl = backdrop,
-                    backdrop = item.backdrop,
+                    artworkUrl = artwork,
+                    artwork = item.artwork,
                     addonId = item.addonId,
                     type = item.type,
                 )

@@ -1,5 +1,5 @@
 {
-  "contract_version": 7,
+  "contract_version": 8,
   "suite": "home_catalogs",
   "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
   "input": {
@@ -23,8 +23,7 @@
             {
               "item_id": "movie:tmdb:991001",
               "title": "Invisible",
-              "poster_url": null,
-              "backdrop_url": null,
+              "artwork_url": null,
               "addon_id": "supabase",
               "type": "movie",
               "rating": null,
@@ -49,8 +48,7 @@
             {
               "item_id": "show:tmdb:157239",
               "title": "Dark Matter",
-              "poster_url": "https://img/dark-matter.jpg",
-              "backdrop_url": "https://img/dark-matter-backdrop.jpg",
+              "artwork_url": "https://img/dark-matter-backdrop.jpg",
               "addon_id": "supabase",
               "type": "series",
               "rating": "7.5",

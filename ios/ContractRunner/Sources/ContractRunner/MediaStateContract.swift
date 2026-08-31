@@ -5,8 +5,7 @@ public struct MediaStateNormalized: Equatable {
     public let itemId: String?
     public let mediaType: String?
     public let title: String?
-    public let posterUrl: String?
-    public let backdropUrl: String?
+    public let artworkUrl: String?
     public let subtitle: String?
     public let progressPercent: Double?
     public let watchedAt: String?
@@ -21,8 +20,7 @@ public struct MediaStateNormalized: Equatable {
         itemId: String? = nil,
         mediaType: String? = nil,
         title: String? = nil,
-        posterUrl: String? = nil,
-        backdropUrl: String? = nil,
+        artworkUrl: String? = nil,
         subtitle: String? = nil,
         progressPercent: Double? = nil,
         watchedAt: String? = nil,
@@ -36,8 +34,7 @@ public struct MediaStateNormalized: Equatable {
         self.itemId = itemId
         self.mediaType = mediaType
         self.title = title
-        self.posterUrl = posterUrl
-        self.backdropUrl = backdropUrl
+        self.artworkUrl = artworkUrl
         self.subtitle = subtitle
         self.progressPercent = progressPercent
         self.watchedAt = watchedAt
@@ -87,8 +84,7 @@ private func normalizeBaseItemDto(_ payload: [String: Any]) -> MediaStateNormali
         itemId: itemId,
         mediaType: mediaType,
         title: title,
-        posterUrl: imageSetMedium(images, "poster") ?? imageTagMedium(imageTags, "Primary"),
-        backdropUrl: imageSetMedium(images, "backdrop") ?? backdropMedium(imageTags),
+        artworkUrl: imageSetMedium(images, "artwork") ?? imageTagMedium(imageTags, "Primary"),
         subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "overview") ?? nullableStringValue(payload, "Overview")
     )
 }
@@ -106,8 +102,7 @@ private func normalizeClientMediaCard(_ payload: [String: Any]) -> MediaStateNor
         itemId: itemId,
         mediaType: mediaType,
         title: title,
-        posterUrl: imageSetMedium(images, "poster"),
-        backdropUrl: imageSetMedium(images, "backdrop"),
+        artworkUrl: imageSetMedium(images, "artwork"),
         subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "overview"),
         progressPercent: doubleValue(progress, "percent")
     )
@@ -130,8 +125,7 @@ private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNo
         itemId: normalized.itemId,
         mediaType: normalized.mediaType,
         title: normalized.title,
-        posterUrl: normalized.posterUrl,
-        backdropUrl: normalized.backdropUrl,
+        artworkUrl: normalized.artworkUrl,
         subtitle: normalized.subtitle,
         progressPercent: doubleValue(ud, "PlayedPercentage") ?? 0,
         lastActivityAt: stringValue(ud, "LastPlayedDate"),
@@ -148,8 +142,7 @@ private func normalizeWatchedItem(_ payload: [String: Any]) -> MediaStateNormali
         itemId: normalized.itemId,
         mediaType: normalized.mediaType,
         title: normalized.title,
-        posterUrl: normalized.posterUrl,
-        backdropUrl: normalized.backdropUrl,
+        artworkUrl: normalized.artworkUrl,
         subtitle: normalized.subtitle,
         watchedAt: stringValue(ud, "LastPlayedDate"),
         origins: []
@@ -163,8 +156,7 @@ private func normalizeWatchlistItem(_ payload: [String: Any]) -> MediaStateNorma
         itemId: normalized.itemId,
         mediaType: normalized.mediaType,
         title: normalized.title,
-        posterUrl: normalized.posterUrl,
-        backdropUrl: normalized.backdropUrl,
+        artworkUrl: normalized.artworkUrl,
         subtitle: normalized.subtitle,
         origins: []
     )
@@ -177,8 +169,7 @@ private func normalizeRatingItem(_ payload: [String: Any]) -> MediaStateNormaliz
         itemId: normalized.itemId,
         mediaType: normalized.mediaType,
         title: normalized.title,
-        posterUrl: normalized.posterUrl,
-        backdropUrl: normalized.backdropUrl,
+        artworkUrl: normalized.artworkUrl,
         subtitle: normalized.subtitle,
         origins: []
     )
@@ -191,8 +182,7 @@ private func normalizeLibraryItem(_ payload: [String: Any]) -> MediaStateNormali
         itemId: normalized.itemId,
         mediaType: normalized.mediaType,
         title: normalized.title,
-        posterUrl: normalized.posterUrl,
-        backdropUrl: normalized.backdropUrl,
+        artworkUrl: normalized.artworkUrl,
         subtitle: normalized.subtitle,
         origins: []
     )
@@ -262,12 +252,5 @@ private func imageTagMedium(_ tags: [String: Any]?, _ key: String) -> String? {
     guard let tag = tags?[key] else { return nil }
     if let string = tag as? String { return string }
     if let dict = tag as? [String: Any] { return nullableStringValue(dict, "medium") }
-    return nil
-}
-
-private func backdropMedium(_ tags: [String: Any]?) -> String? {
-    guard let backdrops = tags?["Backdrop"] as? [Any], let first = backdrops.first else { return nil }
-    if let string = first as? String { return string }
-    if let dict = first as? [String: Any] { return nullableStringValue(dict, "medium") }
     return nil
 }

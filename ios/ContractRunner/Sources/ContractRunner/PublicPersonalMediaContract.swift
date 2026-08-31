@@ -55,8 +55,7 @@ public struct ContractMediaItem: Equatable {
     public let title: String
     public let originalTitle: String?
     public let overview: String?
-    public let posterUrl: String?
-    public let backdropUrl: String?
+    public let artworkUrl: String?
     public let logoUrl: String?
     public let stillUrl: String?
     public let releaseDate: String?
@@ -85,8 +84,7 @@ public struct ContractMediaItem: Equatable {
         title: String,
         originalTitle: String? = nil,
         overview: String? = nil,
-        posterUrl: String? = nil,
-        backdropUrl: String? = nil,
+        artworkUrl: String? = nil,
         logoUrl: String? = nil,
         stillUrl: String? = nil,
         releaseDate: String? = nil,
@@ -114,8 +112,7 @@ public struct ContractMediaItem: Equatable {
         self.title = title
         self.originalTitle = originalTitle
         self.overview = overview
-        self.posterUrl = posterUrl
-        self.backdropUrl = backdropUrl
+        self.artworkUrl = artworkUrl
         self.logoUrl = logoUrl
         self.stillUrl = stillUrl
         self.releaseDate = releaseDate
@@ -226,8 +223,7 @@ private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
         title: name,
         originalTitle: optionalString(payload, "OriginalTitle"),
         overview: optionalString(payload, "Overview"),
-        posterUrl: imageTagMedium(imageTags, "Primary"),
-        backdropUrl: backdropMedium(imageTags),
+        artworkUrl: imageTagMedium(imageTags, "Primary") ?? backdropMedium(imageTags),
         logoUrl: imageTagMedium(imageTags, "Logo"),
         stillUrl: imageTagMedium(imageTags, "Thumb"),
         releaseDate: optionalString(payload, "PremiereDate"),

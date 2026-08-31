@@ -99,13 +99,7 @@
                 "null"
               ]
             },
-            "poster_url": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "backdrop_url": {
+            "artwork_url": {
               "type": [
                 "string",
                 "null"

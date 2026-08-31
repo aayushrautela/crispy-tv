@@ -3,8 +3,7 @@ import Foundation
 public struct HomeCatalogItem: Equatable {
     public let mediaKey: String
     public let title: String
-    public let posterUrl: String?
-    public let backdropUrl: String?
+    public let artworkUrl: String?
     public let addonId: String
     public let type: String
     public let rating: String?
@@ -14,8 +13,7 @@ public struct HomeCatalogItem: Equatable {
     public init(
         mediaKey: String,
         title: String,
-        posterUrl: String?,
-        backdropUrl: String?,
+        artworkUrl: String?,
         addonId: String,
         type: String,
         rating: String? = nil,
@@ -24,8 +22,7 @@ public struct HomeCatalogItem: Equatable {
     ) {
         self.mediaKey = mediaKey
         self.title = title
-        self.posterUrl = posterUrl
-        self.backdropUrl = backdropUrl
+        self.artworkUrl = artworkUrl
         self.addonId = addonId
         self.type = type
         self.rating = rating
@@ -134,7 +131,7 @@ public struct HomeCatalogHeroItem: Equatable {
     public let rating: String?
     public let year: String?
     public let genres: [String]
-    public let backdropUrl: String
+    public let artworkUrl: String
     public let addonId: String
     public let type: String
 
@@ -145,7 +142,7 @@ public struct HomeCatalogHeroItem: Equatable {
         rating: String?,
         year: String? = nil,
         genres: [String] = [],
-        backdropUrl: String,
+        artworkUrl: String,
         addonId: String,
         type: String
     ) {
@@ -155,7 +152,7 @@ public struct HomeCatalogHeroItem: Equatable {
         self.rating = rating
         self.year = year
         self.genres = genres
-        self.backdropUrl = backdropUrl
+        self.artworkUrl = artworkUrl
         self.addonId = addonId
         self.type = type
     }
@@ -421,8 +418,7 @@ private func buildHeroResult(snapshot: HomeCatalogSnapshot) -> HomeCatalogHeroRe
         "Recommended for you."
     ) ?? "Recommended for you."
     let heroItems = heroList.items.compactMap { item -> HomeCatalogHeroItem? in
-        let backdrop = item.backdropUrl ?? item.posterUrl
-        guard let backdrop, !backdrop.isEmpty else {
+        guard let artwork = item.artworkUrl, !artwork.isEmpty else {
             return nil
         }
         return HomeCatalogHeroItem(
@@ -432,7 +428,7 @@ private func buildHeroResult(snapshot: HomeCatalogSnapshot) -> HomeCatalogHeroRe
             rating: item.rating,
             year: item.year,
             genres: [],
-            backdropUrl: backdrop,
+            artworkUrl: artwork,
             addonId: item.addonId,
             type: item.type
         )

@@ -58,7 +58,7 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - `contract_version` 7 removes the hero shelf limit; hero items include every valid item from the selected list (no `hero_limit` cap).
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection uses the first `presentation = hero` list; if no list has `presentation = hero`, the hero result is empty (no fallback to non-hero lists).
-  - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
+  - Hero items require `artwork_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
   - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | collection_shelf | rail` UI decisions and unknown values normalize to `rail`.
   - Wire-level `sectionType` ∈ {`categoryTabs`, `heroCarousel`, `contentRail`, `collectionRail`} is mapped to `presentation` deterministically: `categoryTabs` → `pill`, `heroCarousel` → `hero`, `collectionRail` → `collection_shelf`, else → `rail`.
   - Discover filtering accepts only `movie` and `show`, includes only `presentation = rail` sections, and page results use canonical attempted-url keys with source + kind + variant.

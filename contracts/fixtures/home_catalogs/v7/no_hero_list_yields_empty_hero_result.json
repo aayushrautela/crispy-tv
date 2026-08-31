@@ -1,5 +1,5 @@
 {
-  "contract_version": 7,
+  "contract_version": 8,
   "suite": "home_catalogs",
   "case_id": "no_hero_list_yields_empty_hero_result",
   "input": {
@@ -23,8 +23,7 @@
             {
               "item_id": "show:tmdb:95396",
               "title": "Severance",
-              "poster_url": "https://img/severance.jpg",
-              "backdrop_url": null,
+              "artwork_url": "https://img/severance.jpg",
               "addon_id": "supabase",
               "type": "series",
               "rating": null,
@@ -34,8 +33,7 @@
             {
               "item_id": "show:tmdb:125988",
               "title": "Silo",
-              "poster_url": "https://img/silo.jpg",
-              "backdrop_url": null,
+              "artwork_url": "https://img/silo.jpg",
               "addon_id": "supabase",
               "type": "series",
               "rating": null,
@@ -60,8 +58,7 @@
             {
               "item_id": "movie:tmdb:157336",
               "title": "Arrival",
-              "poster_url": "https://img/arrival.jpg",
-              "backdrop_url": null,
+              "artwork_url": "https://img/arrival.jpg",
               "addon_id": "supabase",
               "type": "movie",
               "rating": "8.0",
@@ -122,20 +119,19 @@
       ],
       "status_message": ""
     },
-    "page": {
-      "items": [
-        {
-          "item_id": "show:tmdb:95396",
-          "title": "Severance",
-          "poster_url": "https://img/severance.jpg",
-          "backdrop_url": null,
-          "addon_id": "supabase",
-          "type": "series",
-          "rating": null,
-          "year": "2022",
-          "description": null
-        }
-      ],
+      "page": {
+        "items": [
+          {
+            "item_id": "show:tmdb:95396",
+            "title": "Severance",
+            "artwork_url": "https://img/severance.jpg",
+            "addon_id": "supabase",
+            "type": "series",
+            "rating": null,
+            "year": "2022",
+            "description": null
+          }
+        ],
       "status_message": "",
       "attempted_urls": [
         "supabase:personal:p1:featured:default:page=1"

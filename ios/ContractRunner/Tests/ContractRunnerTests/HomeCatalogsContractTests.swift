@@ -82,8 +82,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         return HomeCatalogItem(
             mediaKey: try requireString(object, "item_id", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
-            posterUrl: optionalString(object, "poster_url"),
-            backdropUrl: optionalString(object, "backdrop_url"),
+            artworkUrl: optionalString(object, "artwork_url"),
             addonId: try requireString(object, "addon_id", fixture: fixture),
             type: try requireString(object, "type", fixture: fixture),
             rating: optionalString(object, "rating"),
@@ -119,7 +118,7 @@ final class HomeCatalogsContractTests: XCTestCase {
             rating: optionalString(object, "rating"),
             year: optionalString(object, "year"),
             genres: try stringArrayValue(try requireArray(object, "genres", fixture: fixture), fixture: fixture, field: "genres"),
-            backdropUrl: try requireString(object, "backdrop_url", fixture: fixture),
+            artworkUrl: try requireString(object, "artwork_url", fixture: fixture),
             addonId: try requireString(object, "addon_id", fixture: fixture),
             type: try requireString(object, "type", fixture: fixture)
         )

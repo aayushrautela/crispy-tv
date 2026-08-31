@@ -101,8 +101,7 @@ class HomeCatalogsContractTest {
         return HomeCatalogItem(
             itemId = json.requireString("item_id", path),
             title = json.requireString("title", path),
-            posterUrl = json.optionalString("poster_url", path),
-            backdropUrl = json.optionalString("backdrop_url", path),
+            artworkUrl = json.optionalString("artwork_url", path),
             logoUrl = json.optionalString("logo_url", path),
             addonId = json.requireString("addon_id", path),
             type = json.requireString("type", path),
@@ -135,7 +134,7 @@ class HomeCatalogsContractTest {
             rating = json.optionalString("rating", path),
             year = json.optionalString("year", path),
             genres = json.requireJsonArray("genres", path).toStringList(path),
-            backdropUrl = json.requireString("backdrop_url", path),
+            artworkUrl = json.requireString("artwork_url", path),
             addonId = json.requireString("addon_id", path),
             type = json.requireString("type", path),
         )

@@ -271,8 +271,7 @@
       "required": [
         "item_id",
         "title",
-        "poster_url",
-        "backdrop_url",
+        "artwork_url",
         "addon_id",
         "type",
         "rating",
@@ -287,13 +286,7 @@
         "title": {
           "type": "string"
         },
-        "poster_url": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "backdrop_url": {
+        "artwork_url": {
           "type": [
             "string",
             "null"
@@ -334,7 +327,7 @@
         "rating",
         "year",
         "genres",
-        "backdrop_url",
+        "artwork_url",
         "addon_id",
         "type"
       ],
@@ -367,7 +360,7 @@
             "type": "string"
           }
         },
-        "backdrop_url": {
+        "artwork_url": {
           "type": "string"
         },
         "addon_id": {
