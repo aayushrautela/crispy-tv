@@ -77,6 +77,7 @@ internal fun PlayerEpisodesSheet(
             visible = visible,
             enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(220)) { it },
             exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(animationSpec = tween(180)) { it },
+            modifier = Modifier.fillMaxSize(),
         ) {
             Column(
                 modifier =
