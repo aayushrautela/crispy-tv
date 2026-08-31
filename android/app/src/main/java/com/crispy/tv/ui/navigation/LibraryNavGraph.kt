@@ -22,7 +22,6 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                         itemId = item.itemId,
                         itemType = item.type,
                         artworkUrl = item.artworkUrl,
-                        logoUrl = item.logoUrl,
                         sharedElementKey = sharedElementKey,
                     )
                 )

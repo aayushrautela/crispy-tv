@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -49,9 +48,7 @@ fun LandscapeCard(
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier,
-    logoUrl: String? = null,
     artwork: ResponsiveImageSet? = null,
-    logo: ResponsiveImageSet? = null,
     rating: String? = null,
     year: String? = null,
     maturityRating: String? = null,
@@ -63,16 +60,13 @@ fun LandscapeCard(
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val screenBackground = MaterialTheme.colorScheme.background
     val imageUrl = artwork?.low ?: artworkUrl
-    val resolvedLogoUrl = logo?.low ?: logoUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
-    val logoKey = resolvedKey?.let { "logo-$it" }
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight, memoryCacheKey = backdropKey)
-    val logoModel = crispyImageRequest(url = resolvedLogoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
 
     val scrimBrush = remember {
         Brush.verticalGradient(
@@ -188,41 +182,16 @@ fun LandscapeCard(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.Bottom,
         ) {
-            if (logoModel != null) {
-                val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
-                    with(sharedTransitionScope) {
-                        Modifier
-                            .sharedElement(
-                                rememberSharedContentState(key = logoKey),
-                                animatedVisibilityScope = animatedVisibilityScope,
-                            )
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp)
-                    }
-                } else {
-                    Modifier
-                        .fillMaxWidth(0.60f)
-                        .height(30.dp)
-                }
-                AsyncImage(
-                    model = logoModel,
-                    contentDescription = title,
-                    modifier = logoModifier,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart,
-                )
-            } else {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.96f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Start,
-                    modifier = Modifier.widthIn(max = 240.dp),
-                )
-            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.widthIn(max = 240.dp),
+            )
 
             val metadataParts = buildList {
                 yearText?.let { add(it) }

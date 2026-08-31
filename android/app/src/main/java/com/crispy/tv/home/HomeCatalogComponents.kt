@@ -151,9 +151,7 @@ internal fun HomeCatalogPosterCard(
     LandscapeCard(
         title = item.title,
         artworkUrl = item.artworkUrl,
-        logoUrl = item.logoUrl,
         artwork = item.artwork,
-        logo = item.logo,
         rating = item.rating,
         year = item.year,
         genre = item.genre,

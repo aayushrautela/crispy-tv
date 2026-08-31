@@ -23,7 +23,6 @@ object AppRoutes {
     const val HomeDetailsRuntimeEpisodeNumberArg = "runtimeEpisodeNumber"
     const val HomeDetailsRuntimeAbsoluteEpisodeArg = "runtimeAbsoluteEpisodeNumber"
     const val HomeDetailsArtworkUrlArg = "artworkUrl"
-    const val HomeDetailsLogoUrlArg = "logoUrl"
     const val HomeDetailsSharedElementKeyArg = "sharedElementKey"
 
     const val PersonDetailsRoute = "person/details"
@@ -81,13 +80,12 @@ object AppRoutes {
     fun homeDetailsRoute(
         itemId: String,
         itemType: String,
+        highlightEpisodeId: String? = null,
+        autoOpenEpisode: Boolean = false,
         seasonNumber: Int? = null,
         episodeNumber: Int? = null,
         absoluteEpisodeNumber: Int? = null,
-        highlightEpisodeId: String? = null,
-        autoOpenEpisode: Boolean = false,
         artworkUrl: String? = null,
-        logoUrl: String? = null,
         sharedElementKey: String? = null,
     ): String {
         return "$HomeDetailsRoute/${Uri.encode(itemType.trim())}/${Uri.encode(itemId.trim())}" +
@@ -97,7 +95,6 @@ object AppRoutes {
             "&$HomeDetailsRuntimeEpisodeNumberArg=${episodeNumber?.toString().orEmpty()}" +
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}" +
             "&$HomeDetailsArtworkUrlArg=${Uri.encode(artworkUrl.orEmpty())}" +
-            "&$HomeDetailsLogoUrlArg=${Uri.encode(logoUrl.orEmpty())}" +
             "&$HomeDetailsSharedElementKeyArg=${Uri.encode(sharedElementKey.orEmpty())}"
     }
 

@@ -151,7 +151,6 @@ private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem {
         id = itemId,
         title = displayTitle,
         imageUrl = bestImageUrl(),
-        logoUrl = bestLogoUrl(),
         rating = rating?.let { formatRating(it) },
         year = year?.toString(),
         certification = maturityRating,

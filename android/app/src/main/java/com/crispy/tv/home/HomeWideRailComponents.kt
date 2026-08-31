@@ -263,7 +263,6 @@ internal fun HomeWideRailCard(
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.detailsItemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
-    val logoKey = resolvedKey?.let { "logo-$it" }
     val artworkModel = rememberCrispyImageModel(
         url = item.imageUrl,
         width = Dimensions.WideCardWidth,
@@ -332,12 +331,6 @@ internal fun HomeWideRailCard(
         scrimMaxAlpha = 0.88f,
         imageModifier = backdropModifier,
         bottomOverlayContent = {
-            val logoModel = rememberCrispyImageModel(
-                url = item.logoUrl,
-                width = 112.dp,
-                height = 30.dp,
-                memoryCacheKey = logoKey,
-            )
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -345,39 +338,14 @@ internal fun HomeWideRailCard(
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                if (logoModel != null) {
-                    val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
-                        with(sharedTransitionScope) {
-                            Modifier
-                                .sharedElement(
-                                    rememberSharedContentState(key = logoKey),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                )
-                                .fillMaxWidth(0.60f)
-                                .height(30.dp)
-                        }
-                    } else {
-                        Modifier
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp)
-                    }
-                    AsyncImage(
-                        model = logoModel,
-                        contentDescription = item.title,
-                        modifier = logoModifier,
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.CenterStart,
-                    )
-                } else {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 if (item.subtitle.isNotBlank()) {
                     Text(
                         text = item.subtitle,

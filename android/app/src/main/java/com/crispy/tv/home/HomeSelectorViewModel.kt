@@ -87,7 +87,6 @@ internal class HomeSelectorViewModel(
                 itemType = item.itemType,
                 title = item.title,
                 artworkUrl = item.artworkUrl,
-                logoUrl = item.logoUrl,
                 year = null,
                 runtime = null,
                 certification = null,

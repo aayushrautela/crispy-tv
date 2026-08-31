@@ -43,7 +43,6 @@ data class CrispyCardItem(
     val id: String,
     val title: String,
     val imageUrl: String? = null,
-    val logoUrl: String? = null,
     val rating: String? = null,
     val year: String? = null,
     val certification: String? = null,
@@ -161,26 +160,14 @@ fun CrispyLandscapeCard(
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
-                if (item.logoUrl != null) {
-                    AsyncImage(
-                        model = item.logoUrl,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.CenterStart,
-                        modifier = Modifier
-                            .fillMaxWidth(0.62f)
-                            .height(26.dp),
-                    )
-                } else {
-                    Text(
-                        text = item.title,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.96f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    text = item.title,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 val metaParts = buildList {
                     item.year?.let { add(it) }
                     item.certification?.let { add(it) }

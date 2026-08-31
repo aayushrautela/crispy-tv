@@ -89,17 +89,7 @@ fun TvHeroSection(
                 .align(Alignment.BottomStart)
                 .padding(start = 48.dp, end = 320.dp, bottom = 24.dp),
         ) {
-            if (item?.logoUrl != null) {
-                AsyncImage(
-                    model = item.logoUrl,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart,
-                    modifier = Modifier
-                        .width(300.dp)
-                        .height(84.dp),
-                )
-            } else if (item != null) {
+            if (item != null) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.displaySmall,

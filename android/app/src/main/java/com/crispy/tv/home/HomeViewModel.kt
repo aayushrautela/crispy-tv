@@ -377,7 +377,6 @@ internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWide
         title = displayTitle,
         subtitle = buildHomeWatchActivitySubtitle(),
         imageUrl = stillUrl ?: artworkUrl,
-        logoUrl = logoUrl,
         progressFraction = progressPercent?.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
         kind = HomeWideRailItemKind.WATCH_ACTIVITY,
         continueWatchingItem = this,

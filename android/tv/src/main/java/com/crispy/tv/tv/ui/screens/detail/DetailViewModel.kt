@@ -402,7 +402,6 @@ class DetailViewModel(
             imageUrl = images.artwork.large
                 ?: images.artwork.medium
                 ?: images.artwork.small,
-            logoUrl = images.logo.large ?: images.logo.medium ?: images.logo.small,
             rating = rating?.let { roundToOne(it) },
             year = year?.toString(),
             genre = genres.firstOrNull(),

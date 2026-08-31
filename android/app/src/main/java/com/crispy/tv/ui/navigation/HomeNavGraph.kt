@@ -42,7 +42,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             highlightEpisodeId = item.playbackItemId,
                             autoOpenEpisode = false,
                             artworkUrl = item.artworkUrl,
-                            logoUrl = item.logoUrl,
                             sharedElementKey = sharedElementKey,
                         )
                     )
@@ -62,7 +61,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             itemId = item.itemId,
                             itemType = item.type,
                             artworkUrl = item.artworkUrl,
-                            logoUrl = item.logoUrl,
                             sharedElementKey = sharedElementKey,
                         )
                     )
@@ -140,7 +138,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             itemId = item.itemId,
                             itemType = item.type,
                             artworkUrl = item.artworkUrl,
-                            logoUrl = item.logoUrl,
                             sharedElementKey = sharedElementKey,
                         )
                     )
@@ -195,7 +192,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             itemId = item.itemId,
                             itemType = item.type,
                             artworkUrl = item.artworkUrl,
-                            logoUrl = item.logoUrl,
                             sharedElementKey = sharedElementKey,
                         )
                     )
@@ -240,7 +236,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             itemId = item.itemId,
                             itemType = item.type,
                             artworkUrl = item.artworkUrl,
-                            logoUrl = item.logoUrl,
                             sharedElementKey = sharedElementKey,
                         )
                     )
