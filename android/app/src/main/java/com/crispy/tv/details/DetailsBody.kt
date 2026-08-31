@@ -52,6 +52,7 @@ import com.crispy.tv.ui.theme.Dimensions
 internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
     horizontalPadding: Dp,
+    palette: DetailsPaletteColors,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,

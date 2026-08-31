@@ -306,6 +306,7 @@ internal fun DetailsScreen(
                 detailsBodyContent(
                     uiState = visibleUiState,
                     horizontalPadding = bodyHorizontalPadding,
+                    palette = palette,
                     onRetry = onRetry,
                     onSeasonSelected = onSeasonSelected,
                     onItemClick = onItemClick,
