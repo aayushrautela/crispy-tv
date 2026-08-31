@@ -370,6 +370,7 @@ internal fun DetailsScreen(
             StreamSelectorBottomSheet(
                 details = visibleDetails,
                 state = visibleUiState.streamSelector,
+                palette = palette,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
                 onRetryProvider = onRetryProvider,

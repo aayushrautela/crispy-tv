@@ -12,7 +12,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -74,45 +73,40 @@ internal fun PlayerBottomSheet(
             exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(animationSpec = tween(180)) { fullHeight -> fullHeight },
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                Surface(
+                Column(
                     modifier =
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .heightIn(max = 520.dp)
-                            .widthIn(max = 900.dp),
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                    color = palette.pageBackground,
-                    contentColor = palette.onPageBackground,
-                    shadowElevation = 8.dp,
+                            .widthIn(max = 900.dp)
+                            .background(palette.pageBackground, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                            .navigationBarsPadding(),
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = palette.onPageBackground,
-                                modifier = Modifier.weight(1f),
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.onPageBackground,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onClose) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Close",
+                                tint = palette.onPageBackground,
                             )
-                            IconButton(onClick = onClose) {
-                                Icon(
-                                    imageVector = Icons.Filled.Close,
-                                    contentDescription = "Close",
-                                    tint = palette.onPageBackground,
-                                )
-                            }
                         }
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            content()
-                        }
-                        Spacer(modifier = Modifier.padding(bottom = 8.dp))
+                    }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        content()
                     }
                 }
             }

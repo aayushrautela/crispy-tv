@@ -201,8 +201,6 @@ internal fun PlayerOverlay(
                         latestOnBack()
                     },
                     onShowInfo = { openSurface(onShowInfo) },
-                    onShowEpisodes = { openSurface(onShowEpisodes) },
-                    showEpisodesButton = uiState.details?.itemType?.equals("movie", ignoreCase = true) == false,
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
 
@@ -215,7 +213,7 @@ internal fun PlayerOverlay(
                         colors =
                             IconButtonDefaults.filledIconButtonColors(
                                 containerColor = palette.accent,
-                                contentColor = palette.onAccent,
+                                contentColor = Color.White,
                             ),
                         modifier =
                             Modifier

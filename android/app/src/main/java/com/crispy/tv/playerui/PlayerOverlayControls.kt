@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.ui.res.painterResource
@@ -72,8 +71,6 @@ internal fun PlayerTopBar(
     isMetadataLoaded: Boolean,
     onBack: () -> Unit,
     onShowInfo: () -> Unit,
-    onShowEpisodes: () -> Unit,
-    showEpisodesButton: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -122,19 +119,6 @@ internal fun PlayerTopBar(
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        if (showEpisodesButton) {
-            IconButton(
-                onClick = onShowEpisodes,
-                enabled = isMetadataLoaded,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ViewModule,
-                    contentDescription = "Episodes",
-                    tint = if (isMetadataLoaded) palette.onPillBackground else palette.onPillBackground.copy(alpha = 0.4f),
                 )
             }
         }
@@ -195,19 +179,19 @@ internal fun PlayerBottomControls(
     ) {
         if (showEpisodesPill && onShowEpisodes != null) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
                 Surface(
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = palette.pillBackground,
                     contentColor = palette.onPillBackground,
                     modifier = Modifier.clickable(onClick = onShowEpisodes),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                     ) {
                         Text(
                             text = episodesLabel,
@@ -220,8 +204,8 @@ internal fun PlayerBottomControls(
                                 contentScale = ContentScale.Crop,
                                 modifier =
                                     Modifier
-                                        .size(width = 44.dp, height = 26.dp)
-                                        .clip(RoundedCornerShape(8.dp)),
+                                        .size(width = 56.dp, height = 32.dp)
+                                        .clip(RoundedCornerShape(10.dp)),
                             )
                         }
                     }

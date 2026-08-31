@@ -53,7 +53,7 @@ internal fun PlayerEpisodesSheet(
             if (seasons.isNotEmpty()) {
                 val selected = selectedSeason ?: seasons.firstOrNull()
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(seasons, key = { it }) { season ->
@@ -66,8 +66,8 @@ internal fun PlayerEpisodesSheet(
                                 FilterChipDefaults.filterChipColors(
                                     containerColor = palette.pillBackground,
                                     labelColor = palette.onPillBackground,
-                                    selectedContainerColor = Color.White,
-                                    selectedLabelColor = Color(0xFF141414),
+                                    selectedContainerColor = palette.accent,
+                                    selectedLabelColor = palette.onAccent,
                                 ),
                         )
                     }

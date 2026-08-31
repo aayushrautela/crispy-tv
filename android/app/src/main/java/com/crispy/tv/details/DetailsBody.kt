@@ -240,6 +240,7 @@ internal fun LazyListScope.detailsBodyContent(
                                             imageVector = Icons.Filled.Check,
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp),
+                                            tint = palette.accent,
                                         )
                                     }
                                 } else {
@@ -249,8 +250,8 @@ internal fun LazyListScope.detailsBodyContent(
                                 colors = FilterChipDefaults.filterChipColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                     labelColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedContainerColor = Color.White,
-                                    selectedLabelColor = Color(0xFF141414),
+                                    selectedContainerColor = palette.accent,
+                                    selectedLabelColor = palette.onAccent,
                                 ),
                             )
                         }

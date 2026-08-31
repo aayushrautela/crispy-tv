@@ -4,6 +4,7 @@ package com.crispy.tv.details
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.addons.model.MediaDetails
@@ -16,17 +17,18 @@ import com.crispy.tv.addons.streams.StreamSelectorUiState
 internal fun StreamSelectorBottomSheet(
     details: MediaDetails?,
     state: StreamSelectorUiState,
+    palette: DetailsPaletteColors,
     onDismiss: () -> Unit,
     onProviderSelected: (String?) -> Unit,
-    onRetryProvider: (String) -> Unit,
+    onRetryProvider: () -> Unit,
     onStreamSelected: (com.crispy.tv.addons.streams.AddonStream) -> Unit,
 ) {
     if (!state.visible) return
 
     val chrome =
         SelectorChrome(
-            accentColor = Color.White,
-            onAccentColor = Color(0xFF141414),
+            accentColor = palette.accent,
+            onAccentColor = palette.onAccent,
             useCrispyImageModel = false,
             showSkeletonChips = true,
             loadingIndicatorSize = 48.dp,
