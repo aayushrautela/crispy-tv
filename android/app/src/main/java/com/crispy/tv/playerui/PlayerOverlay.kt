@@ -70,6 +70,14 @@ internal fun PlayerOverlay(
     onDoubleTapSeek: (Long) -> Unit,
 ) {
     val overlayPadding = rememberOverlayPadding(minPadding = 12.dp)
+    // Keep top/sides at 12dp, pull bottom 8dp closer (4dp + insets).
+    val tightBottomPadding =
+        androidx.compose.foundation.layout.PaddingValues(
+            start = overlayPadding.calculateStartPadding(androidx.compose.ui.platform.LocalLayoutDirection.current),
+            end = overlayPadding.calculateEndPadding(androidx.compose.ui.platform.LocalLayoutDirection.current),
+            top = overlayPadding.calculateTopPadding(),
+            bottom = maxOf(4.dp, overlayPadding.calculateBottomPadding() - 8.dp),
+        )
     val effectiveDurationMs = if (uiState.stableDurationMs > 0L) uiState.stableDurationMs else uiState.durationMs
 
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
@@ -181,7 +189,7 @@ internal fun PlayerOverlay(
             enter = fadeIn(animationSpec = tween(200)),
             exit = fadeOut(animationSpec = tween(200)),
         ) {
-            Box(modifier = Modifier.fillMaxSize().padding(overlayPadding)) {
+            Box(modifier = Modifier.fillMaxSize().padding(tightBottomPadding)) {
                 PlayerTopBar(
                     title = uiState.title,
                     subtitle = uiState.subtitle ?: uiState.statusMessage.takeIf { it.isNotBlank() && it != "Playing" },
