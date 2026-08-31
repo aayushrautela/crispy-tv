@@ -239,7 +239,7 @@ class DetailsViewModel internal constructor(
             val enrichedDetails = result.details
             Log.d(
                 "DetailsViewModel",
-                "rendered details itemId=${enrichedDetails?.itemId} title=${enrichedDetails?.title} logoUrl=${enrichedDetails?.logoUrl}",
+                "rendered details itemId=${enrichedDetails?.itemId} title=${enrichedDetails?.title}",
             )
 
             _uiState.update { state ->

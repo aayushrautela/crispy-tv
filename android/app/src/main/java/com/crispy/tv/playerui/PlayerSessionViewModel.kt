@@ -581,7 +581,6 @@ class PlayerSessionViewModel(
                         },
                     title = state.title.ifBlank { id.title.ifBlank { "Player" } },
                     artworkUrl = null,
-                    logoUrl = null,
                     description = null,
                     genres = emptyList(),
                     year = id.year?.toString(),

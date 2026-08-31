@@ -125,9 +125,6 @@ internal fun DetailsScreen(
     val imageUrl = remember(details, initialArtworkUrl) {
         detailsHeroImageUrl(details = details) ?: initialArtworkUrl
     }
-    val logoUrl = remember(details) {
-        details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
-    }
     val fallbackSeed = Color.White
     val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed
@@ -255,7 +252,6 @@ internal fun DetailsScreen(
                     HeroSection(
                         details = visibleDetails,
                         imageUrl = imageUrl,
-                        logoUrl = logoUrl,
                         palette = palette,
                         trailer = heroTrailerSources,
                         showTrailer = showTrailer,

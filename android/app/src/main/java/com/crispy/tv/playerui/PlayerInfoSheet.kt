@@ -11,14 +11,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -168,34 +166,19 @@ private fun TitleArea(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
 ) {
-    val logoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotBlank() }
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (logoUrl != null) {
-            Box(modifier = Modifier.fillMaxWidth(0.81f)) {
-                AsyncImage(
-                    model = logoUrl,
-                    contentDescription = details.title,
-                    modifier =
-                        Modifier
-                            .align(Alignment.Center)
-                            .heightIn(min = 72.dp, max = 120.dp),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                )
-            }
-        } else {
-            Text(
-                text = details?.title ?: "",
-                style = MaterialTheme.typography.headlineMedium,
-                color = palette.onPageBackground,
-                textAlign = TextAlign.Center,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        Text(
+            text = details?.title ?: "",
+            style = MaterialTheme.typography.headlineMedium,
+            color = palette.onPageBackground,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

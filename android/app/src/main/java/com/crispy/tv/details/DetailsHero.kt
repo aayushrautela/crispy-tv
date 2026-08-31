@@ -94,7 +94,6 @@ internal data class HeroTrailerSource(
 internal fun HeroSection(
     details: MediaDetails?,
     imageUrl: String?,
-    logoUrl: String? = null,
     palette: DetailsPaletteColors,
     trailer: List<HeroTrailerSource> = emptyList(),
     showTrailer: Boolean,
@@ -231,7 +230,7 @@ internal fun HeroSection(
             ) {}
         }
 
-        if (details == null && logoUrl.isNullOrBlank()) {
+        if (details == null) {
             return@BoxWithConstraints
         }
 
@@ -321,8 +320,8 @@ internal fun HeroSection(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: logoUrl
-            if (!resolvedLogoUrl.isNullOrBlank()) {
+            val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
+            if (resolvedLogoUrl != null) {
                 val logoWidth = heroMaxWidth * 0.81f
                 val logoModel = rememberCrispyImageModel(
                     url = resolvedLogoUrl,
