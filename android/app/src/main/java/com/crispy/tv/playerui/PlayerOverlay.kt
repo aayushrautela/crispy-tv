@@ -222,6 +222,22 @@ internal fun PlayerOverlay(
                     }
                 }
 
+                val isSeries = uiState.details?.itemType?.equals("movie", ignoreCase = true) == false
+                val episodesThumbUrl =
+                    remember(uiState.seasonEpisodes, uiState.activeIdentity, uiState.artworkUrl) {
+                        val active = uiState.activeIdentity
+                        val sorted = uiState.seasonEpisodes.sortedBy { it.episode ?: Int.MAX_VALUE }
+                        val currentIdx = sorted.indexOfFirst { it.episode == active?.episode && it.season == active?.season }
+                        val thumb =
+                            when {
+                                currentIdx >= 0 && currentIdx + 1 < sorted.size -> sorted[currentIdx + 1].thumbnailUrl
+                                currentIdx >= 0 -> sorted[currentIdx].thumbnailUrl
+                                sorted.isNotEmpty() -> sorted.firstOrNull()?.thumbnailUrl
+                                else -> null
+                            }
+                        thumb?.trim()?.takeIf { it.isNotBlank() } ?: uiState.artworkUrl ?: uiState.backdropUrl
+                    }
+
                 PlayerBottomControls(
                     positionMsState = positionMsState,
                     durationMs = effectiveDurationMs,
@@ -240,6 +256,10 @@ internal fun PlayerOverlay(
                     },
                     resizeMode = uiState.resizeMode,
                     modifier = Modifier.align(Alignment.BottomCenter),
+                    showEpisodesPill = isSeries,
+                    episodesThumbUrl = episodesThumbUrl,
+                    episodesLabel = "Episodes",
+                    onShowEpisodes = { openSurface(onShowEpisodes) },
                 )
             }
         }

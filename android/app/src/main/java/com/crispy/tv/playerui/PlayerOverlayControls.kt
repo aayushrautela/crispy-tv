@@ -34,6 +34,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,10 +48,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import coil3.compose.AsyncImage
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.ui.components.skeletonElement
@@ -179,11 +185,51 @@ internal fun PlayerBottomControls(
     onCycleResizeMode: () -> Unit,
     resizeMode: PlayerResizeMode,
     modifier: Modifier = Modifier,
+    showEpisodesPill: Boolean = false,
+    episodesThumbUrl: String? = null,
+    episodesLabel: String = "Episodes",
+    onShowEpisodes: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        if (showEpisodesPill && onShowEpisodes != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = palette.pillBackground,
+                    contentColor = palette.onPillBackground,
+                    modifier = Modifier.clickable(onClick = onShowEpisodes),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    ) {
+                        Text(
+                            text = episodesLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        if (episodesThumbUrl != null) {
+                            AsyncImage(
+                                model = episodesThumbUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier =
+                                    Modifier
+                                        .size(width = 44.dp, height = 26.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         PlayerSeekBar(
             positionMsState = positionMsState,
             durationMs = durationMs,
