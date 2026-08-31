@@ -191,6 +191,20 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
             )
         }
 
+        // No continue target but user has watched before → finished series → Rewatch.
+        if (providerState.lastPlayedAtEpochMs != null) {
+            return Resolution(
+                WatchCta(
+                    kind = WatchCtaKind.REWATCH,
+                    label = "Rewatch",
+                    icon = WatchCtaIcon.REPLAY,
+                    remainingMinutes = null,
+                    lastWatchedAtEpochMs = providerState.lastPlayedAtEpochMs,
+                ),
+                null,
+            )
+        }
+
         return Resolution(
             WatchCta(
                 kind = WatchCtaKind.WATCH,
