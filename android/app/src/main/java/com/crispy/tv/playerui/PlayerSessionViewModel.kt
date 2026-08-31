@@ -27,7 +27,6 @@ import com.crispy.tv.addons.lookup.resolveStreamLookupTargetFromIdentity
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
-import com.crispy.tv.details.EpisodeWatchState
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
@@ -96,7 +95,6 @@ data class PlayerUiState(
     val seasons: List<Int> = emptyList(),
     val selectedSeason: Int? = null,
     val seasonEpisodes: List<MediaVideo> = emptyList(),
-    val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
     val episodesIsLoading: Boolean = false,
     val episodesStatusMessage: String = "",
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
