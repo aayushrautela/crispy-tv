@@ -73,8 +73,8 @@ internal fun PlayerOverlay(
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
     val tightBottomPadding =
         androidx.compose.foundation.layout.PaddingValues(
-            start = overlayPadding.calculateStartPadding(layoutDirection),
-            end = overlayPadding.calculateEndPadding(layoutDirection),
+            start = overlayPadding.calculateLeftPadding(layoutDirection),
+            end = overlayPadding.calculateRightPadding(layoutDirection),
             top = overlayPadding.calculateTopPadding(),
             bottom = maxOf(4.dp, overlayPadding.calculateBottomPadding() - 8.dp),
         )
