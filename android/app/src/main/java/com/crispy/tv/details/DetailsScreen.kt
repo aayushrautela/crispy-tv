@@ -88,7 +88,7 @@ private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 internal fun DetailsScreen(
     uiState: DetailsUiState,
     playbackSettings: PlaybackSettings,
-    initialBackdropUrl: String? = null,
+    initialArtworkUrl: String? = null,
     initialLogoUrl: String? = null,
     sharedElementKey: String? = null,
     onBack: () -> Unit,
@@ -115,8 +115,7 @@ internal fun DetailsScreen(
     val aiBackdropUrls =
         remember(details) {
             buildList {
-                details?.backdropUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
-                details?.posterUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
+                details?.artworkUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
             }.distinct()
         }
     val listState = rememberLazyListState()
@@ -124,8 +123,8 @@ internal fun DetailsScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val imageUrl = remember(details, initialBackdropUrl) {
-        detailsHeroImageUrl(details = details) ?: initialBackdropUrl
+    val imageUrl = remember(details, initialArtworkUrl) {
+        detailsHeroImageUrl(details = details) ?: initialArtworkUrl
     }
     val logoUrl = remember(details, initialLogoUrl) {
         details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: initialLogoUrl
@@ -492,8 +491,7 @@ internal fun DetailsScreen(
                             selectedEpisode.thumbnailUrl
                                 ?.trim()
                                 ?.takeIf { it.isNotBlank() }
-                                ?: visibleDetails?.backdropUrl
-                                ?: visibleDetails?.posterUrl,
+                                ?: visibleDetails?.artworkUrl,
                         actions = episodeActions,
                     )
                 }
@@ -501,15 +499,13 @@ internal fun DetailsScreen(
 
             if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
                 val aiOverlayTitle = visibleDetails?.title ?: details?.title
-                val aiOverlayPosterUrl = visibleDetails?.posterUrl ?: details?.posterUrl
-                val aiOverlayBackdropUrl = visibleDetails?.backdropUrl ?: details?.backdropUrl
+                val aiOverlayArtworkUrl = visibleDetails?.artworkUrl ?: details?.artworkUrl
                 val shareTitle = aiOverlayTitle?.trim()?.takeIf { it.isNotEmpty() } ?: "this title"
                 AiInsightsStoryOverlay(
                     result = visibleUiState.aiInsights,
                     backdropUrls = aiBackdropUrls,
                     onDismiss = onDismissAiInsights,
-                    posterUrl = aiOverlayPosterUrl,
-                    backdropUrl = aiOverlayBackdropUrl,
+                     artworkUrl = aiOverlayArtworkUrl,
                     palette = palette,
                     isInWatchlist = visibleUiState.isInWatchlist,
                     onToggleWatchlist = onToggleWatchlist,

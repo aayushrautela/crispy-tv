@@ -22,7 +22,7 @@ object AppRoutes {
     const val HomeDetailsRuntimeSeasonNumberArg = "runtimeSeasonNumber"
     const val HomeDetailsRuntimeEpisodeNumberArg = "runtimeEpisodeNumber"
     const val HomeDetailsRuntimeAbsoluteEpisodeArg = "runtimeAbsoluteEpisodeNumber"
-    const val HomeDetailsBackdropUrlArg = "backdropUrl"
+    const val HomeDetailsArtworkUrlArg = "artworkUrl"
     const val HomeDetailsLogoUrlArg = "logoUrl"
     const val HomeDetailsSharedElementKeyArg = "sharedElementKey"
 
@@ -68,7 +68,7 @@ object AppRoutes {
             "&$HomeDetailsRuntimeSeasonNumberArg={$HomeDetailsRuntimeSeasonNumberArg}" +
             "&$HomeDetailsRuntimeEpisodeNumberArg={$HomeDetailsRuntimeEpisodeNumberArg}" +
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}" +
-            "&$HomeDetailsBackdropUrlArg={$HomeDetailsBackdropUrlArg}" +
+            "&$HomeDetailsArtworkUrlArg={$HomeDetailsArtworkUrlArg}" +
             "&$HomeDetailsLogoUrlArg={$HomeDetailsLogoUrlArg}" +
             "&$HomeDetailsSharedElementKeyArg={$HomeDetailsSharedElementKeyArg}"
     val PersonDetailsRoutePattern: String =
@@ -86,7 +86,7 @@ object AppRoutes {
         absoluteEpisodeNumber: Int? = null,
         highlightEpisodeId: String? = null,
         autoOpenEpisode: Boolean = false,
-        backdropUrl: String? = null,
+        artworkUrl: String? = null,
         logoUrl: String? = null,
         sharedElementKey: String? = null,
     ): String {
@@ -96,7 +96,7 @@ object AppRoutes {
             "&$HomeDetailsRuntimeSeasonNumberArg=${seasonNumber?.toString().orEmpty()}" +
             "&$HomeDetailsRuntimeEpisodeNumberArg=${episodeNumber?.toString().orEmpty()}" +
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}" +
-            "&$HomeDetailsBackdropUrlArg=${Uri.encode(backdropUrl.orEmpty())}" +
+            "&$HomeDetailsArtworkUrlArg=${Uri.encode(artworkUrl.orEmpty())}" +
             "&$HomeDetailsLogoUrlArg=${Uri.encode(logoUrl.orEmpty())}" +
             "&$HomeDetailsSharedElementKeyArg=${Uri.encode(sharedElementKey.orEmpty())}"
     }

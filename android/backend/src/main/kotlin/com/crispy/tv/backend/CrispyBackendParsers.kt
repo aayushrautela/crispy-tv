@@ -248,13 +248,13 @@ internal fun CrispyBackendClient.parseSearchSuggestionItem(json: JSONObject): Se
         throw IllegalStateException("Search suggestion is missing title.")
     }
     val images = json.optJSONObject("images")
-    val primaryImage = images?.optJSONObject("poster")
+    val primaryImage = images?.optJSONObject("artwork")
     return SearchSuggestionItem(
         itemId = itemId,
         itemType = mediaType,
         title = title,
         year = json.optIntOrNull("year"),
-        posterUrl = primaryImage?.optNullableString("medium") ?: primaryImage?.optNullableString("large") ?: primaryImage?.optNullableString("small"),
+        artworkUrl = primaryImage?.optNullableString("medium") ?: primaryImage?.optNullableString("large") ?: primaryImage?.optNullableString("small"),
         providerIds = parseProviderIds(json.optJSONObject("providerIds")),
     )
 }
@@ -369,8 +369,7 @@ internal fun CrispyBackendClient.parseClientProviderIds(json: JSONObject?): Medi
 
 internal fun CrispyBackendClient.parseClientImages(json: JSONObject?): ClientImages {
     return ClientImages(
-        poster = parseResponsiveImageSet(json?.optJSONObject("poster")),
-        backdrop = parseResponsiveImageSet(json?.optJSONObject("backdrop")),
+        artwork = parseResponsiveImageSet(json?.optJSONObject("artwork")),
         logo = parseResponsiveImageSet(json?.optJSONObject("logo")),
         still = parseResponsiveImageSet(json?.optJSONObject("still")),
     )

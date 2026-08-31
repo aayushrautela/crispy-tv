@@ -233,8 +233,7 @@ private fun StreamSheetHeader(
         episode?.thumbnailUrl
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: details?.backdropUrl
-            ?: details?.posterUrl
+            ?: details?.artworkUrl
     val description =
         episode?.overview
             ?.trim()

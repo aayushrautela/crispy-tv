@@ -48,7 +48,7 @@ fun PlayerRoute(
     // leaves, not the whole overlay tree.
     val positionMsState = session.playbackPositionMs.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val imageUrl = if (uiState.isMetadataLoaded) uiState.backdropUrl ?: uiState.artworkUrl else null
+    val imageUrl = if (uiState.isMetadataLoaded) uiState.artworkUrl else null
     val fallbackSeed = Color.White
     val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed

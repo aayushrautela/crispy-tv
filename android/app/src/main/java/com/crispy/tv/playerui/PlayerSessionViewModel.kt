@@ -80,7 +80,6 @@ data class PlayerUiState(
     val subtitle: String? = null,
     val isMetadataLoaded: Boolean = false,
     val artworkUrl: String? = null,
-    val backdropUrl: String? = null,
     val activeEngine: NativePlaybackEngine = NativePlaybackEngine.EXO,
     val isBuffering: Boolean = true,
     val isPlaying: Boolean = false,
@@ -183,7 +182,6 @@ class PlayerSessionViewModel(
                 title = "",
                 subtitle = null,
                 artworkUrl = null,
-                backdropUrl = null,
                 details = null,
                 activeIdentity = activeIdentity,
                 seasons = emptyList(),
@@ -582,8 +580,7 @@ class PlayerSessionViewModel(
                             else -> "movie"
                         },
                     title = state.title.ifBlank { id.title.ifBlank { "Player" } },
-                    posterUrl = null,
-                    backdropUrl = null,
+                    artworkUrl = null,
                     logoUrl = null,
                     description = null,
                     genres = emptyList(),
@@ -715,8 +712,7 @@ class PlayerSessionViewModel(
         _uiState.update {
             it.copy(
                 details = details,
-                backdropUrl = details.backdropUrl,
-                artworkUrl = it.artworkUrl ?: details.backdropUrl ?: details.posterUrl,
+                artworkUrl = it.artworkUrl ?: details.artworkUrl,
                 title = details.title.trim().ifBlank { it.title },
                 subtitle = buildPlayerSubtitle(mediaType, details, details.title, details.seasonNumber, details.episodeNumber),
                 isMetadataLoaded = true,

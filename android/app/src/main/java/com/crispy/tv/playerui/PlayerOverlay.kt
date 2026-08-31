@@ -242,7 +242,7 @@ internal fun PlayerOverlay(
                                 sorted.isNotEmpty() -> sorted.firstOrNull()?.thumbnailUrl
                                 else -> null
                             }
-                        thumb?.trim()?.takeIf { it.isNotBlank() } ?: uiState.artworkUrl ?: uiState.backdropUrl
+                        thumb?.trim()?.takeIf { it.isNotBlank() } ?: uiState.artworkUrl
                     }
 
                 PlayerBottomControls(

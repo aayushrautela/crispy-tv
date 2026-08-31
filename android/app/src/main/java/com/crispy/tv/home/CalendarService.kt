@@ -26,8 +26,7 @@ data class CalendarEpisodeItem(
     val releasedAtMs: Long?,
     val isReleased: Boolean,
     val isGroup: Boolean,
-    val posterUrl: String?,
-    val backdropUrl: String?,
+    val artworkUrl: String?,
     val thumbnailUrl: String?,
     val watchedKeys: Set<String> = emptySet(),
     val absoluteEpisodeNumber: Int? = null,
@@ -40,8 +39,7 @@ data class CalendarSeriesItem(
     val itemId: String,
     val localKey: String,
     val title: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
+    val artworkUrl: String?,
     val sourceLabel: String?,
     val type: String = "show",
 )
@@ -252,9 +250,8 @@ class CalendarService internal constructor(
             releasedAtMs = releasedAtMs,
             isReleased = releasedAtMs?.let { it <= nowMs } ?: false,
             isGroup = false,
-            posterUrl = card.images.poster.medium,
-            backdropUrl = card.images.backdrop.medium,
-            thumbnailUrl = card.images.still.medium ?: card.images.backdrop.medium,
+            artworkUrl = card.images.artwork.medium,
+            thumbnailUrl = card.images.still.medium ?: card.images.artwork.medium,
             watchedKeys = setOf(watchedKey),
             absoluteEpisodeNumber = null,
         )
@@ -268,8 +265,7 @@ class CalendarService internal constructor(
             itemId = localKey,
             localKey = localKey,
             title = card.parent?.seriesTitle ?: card.title,
-            posterUrl = card.images.poster.medium,
-            backdropUrl = card.images.backdrop.medium,
+            artworkUrl = card.images.artwork.medium,
             sourceLabel = null,
         )
     }

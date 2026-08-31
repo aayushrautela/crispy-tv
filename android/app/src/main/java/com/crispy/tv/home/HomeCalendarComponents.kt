@@ -38,7 +38,7 @@ internal fun CalendarEpisodeCard(
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.titleItemId
     val backdropKey = "backdrop-$resolvedKey"
     val imageModel = rememberCrispyImageModel(
-        url = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
+        url = item.thumbnailUrl ?: item.artworkUrl,
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
         memoryCacheKey = backdropKey,
@@ -131,7 +131,7 @@ internal fun CalendarSeriesCard(
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.itemId
     val backdropKey = "backdrop-$resolvedKey"
     val imageModel = rememberCrispyImageModel(
-        url = item.backdropUrl ?: item.posterUrl,
+        url = item.artworkUrl,
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
         memoryCacheKey = backdropKey,

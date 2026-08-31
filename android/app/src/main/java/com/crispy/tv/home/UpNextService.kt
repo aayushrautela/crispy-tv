@@ -51,8 +51,7 @@ class UpNextService internal constructor(
             episode = episode.parent?.episodeNumber,
             progressPercent = 0.0,
             lastUpdatedEpochMs = parseUpNextDate(view.lastInteractedAt),
-            posterUrl = view.show?.images?.poster?.medium,
-            backdropUrl = view.show?.images?.backdrop?.medium,
+            artworkUrl = view.show?.images?.artwork?.medium,
         )
     }
 

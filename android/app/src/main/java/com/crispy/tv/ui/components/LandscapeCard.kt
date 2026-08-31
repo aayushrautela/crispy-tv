@@ -45,14 +45,12 @@ import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 @Composable
 fun LandscapeCard(
     title: String,
-    backdropUrl: String?,
+    artworkUrl: String?,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier,
-    posterUrl: String? = null,
     logoUrl: String? = null,
-    backdrop: ResponsiveImageSet? = null,
-    poster: ResponsiveImageSet? = null,
+    artwork: ResponsiveImageSet? = null,
     logo: ResponsiveImageSet? = null,
     rating: String? = null,
     year: String? = null,
@@ -64,7 +62,7 @@ fun LandscapeCard(
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val screenBackground = MaterialTheme.colorScheme.background
-    val imageUrl = backdrop?.low ?: poster?.low ?: backdropUrl ?: posterUrl
+    val imageUrl = artwork?.low ?: artworkUrl
     val resolvedLogoUrl = logo?.low ?: logoUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp

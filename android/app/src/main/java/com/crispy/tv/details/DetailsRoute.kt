@@ -22,7 +22,7 @@ fun DetailsRoute(
     runtimeEntry: RuntimeDetailsEntry? = null,
     highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
-    initialBackdropUrl: String? = null,
+    initialArtworkUrl: String? = null,
     initialLogoUrl: String? = null,
     sharedElementKey: String? = null,
     onBack: () -> Unit,
@@ -91,7 +91,7 @@ fun DetailsRoute(
     DetailsScreen(
         uiState = uiState,
         playbackSettings = playbackSettings,
-        initialBackdropUrl = initialBackdropUrl,
+        initialArtworkUrl = initialArtworkUrl,
         initialLogoUrl = initialLogoUrl,
         sharedElementKey = sharedElementKey,
         onBack = onBack,

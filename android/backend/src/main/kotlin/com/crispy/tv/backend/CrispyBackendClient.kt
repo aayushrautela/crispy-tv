@@ -155,7 +155,7 @@ class CrispyBackendClient(
         val itemType: String,
         val title: String,
         val year: Int?,
-        val posterUrl: String?,
+        val artworkUrl: String?,
         val providerIds: MediaExternalIds,
     )
 
@@ -185,8 +185,7 @@ class CrispyBackendClient(
     )
 
     data class ClientImages(
-        val poster: ResponsiveImageSet,
-        val backdrop: ResponsiveImageSet,
+        val artwork: ResponsiveImageSet,
         val logo: ResponsiveImageSet,
         val still: ResponsiveImageSet,
     )

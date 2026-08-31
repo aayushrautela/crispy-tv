@@ -46,8 +46,8 @@ data class HomeHeroItem(
     val rating: String?,
     val year: String? = null,
     val genres: List<String> = emptyList(),
-    val backdropUrl: String?,
-    val backdrop: ResponsiveImageSet = ResponsiveImageSet.fromSingle(backdropUrl),
+    val artworkUrl: String?,
+    val artwork: ResponsiveImageSet = ResponsiveImageSet.fromSingle(artworkUrl),
     val addonId: String,
     val type: String,
 )
@@ -245,17 +245,14 @@ class HomeCatalogService internal constructor(
     private fun CrispyBackendClient.ClientMediaCard.toCatalogItem(): HomeCatalogItem? {
         val normalizedItemId = itemId.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
-        val poster = images.poster
-        val backdrop = images.backdrop
+        val artwork = images.artwork
         val logo = images.logo
         return HomeCatalogItem(
             itemId = normalizedItemId,
             title = normalizedTitle,
-            posterUrl = poster.medium,
-            backdropUrl = backdrop.medium,
+            artworkUrl = artwork.medium,
             logoUrl = logo.medium,
-            poster = poster.toDomainMap(),
-            backdrop = backdrop.toDomainMap(),
+            artwork = artwork.toDomainMap(),
             logo = logo.toDomainMap(),
             addonId = "backend",
             type = mediaType.toCatalogType(),
@@ -272,11 +269,9 @@ class HomeCatalogService internal constructor(
             id = normalizedItemId,
             itemId = normalizedItemId,
             title = title,
-            posterUrl = posterUrl,
-            backdropUrl = backdropUrl,
+            artworkUrl = artworkUrl,
             logoUrl = logoUrl,
-            poster = responsiveImageSetFromDomainMap(poster),
-            backdrop = responsiveImageSetFromDomainMap(backdrop),
+            artwork = responsiveImageSetFromDomainMap(artwork),
             logo = responsiveImageSetFromDomainMap(logo),
             addonId = addonId,
             type = type,
@@ -351,11 +346,9 @@ class HomeCatalogService internal constructor(
                                                         JSONObject()
                                                             .put("item_id", item.itemId)
                                                             .put("title", item.title)
-                                                            .put("poster_url", item.posterUrl)
-                                                            .put("backdrop_url", item.backdropUrl)
+                                                            .put("artwork_url", item.artworkUrl)
                                                             .put("logo_url", item.logoUrl)
-                                                            .put("poster", JSONObject(item.poster))
-                                                            .put("backdrop", JSONObject(item.backdrop))
+                                                            .put("artwork", JSONObject(item.artwork))
                                                             .put("logo", JSONObject(item.logo))
                                                             .put("addon_id", item.addonId)
                                                             .put("type", item.type)
@@ -432,11 +425,9 @@ class HomeCatalogService internal constructor(
         return HomeCatalogItem(
             itemId = itemId,
             title = title,
-            posterUrl = json.optString("poster_url").trim().ifBlank { null },
-            backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
+            artworkUrl = json.optString("artwork_url").trim().ifBlank { null },
             logoUrl = json.optString("logo_url").trim().ifBlank { null },
-            poster = json.optJSONObject("poster")?.toStringMap() ?: emptyMap(),
-            backdrop = json.optJSONObject("backdrop")?.toStringMap() ?: emptyMap(),
+            artwork = json.optJSONObject("artwork")?.toStringMap() ?: emptyMap(),
             logo = json.optJSONObject("logo")?.toStringMap() ?: emptyMap(),
             addonId = addonId,
             type = type,
@@ -472,8 +463,8 @@ class HomeCatalogService internal constructor(
                                 rating = hero.rating,
                                 year = hero.year,
                                 genres = hero.genres,
-                                backdropUrl = hero.backdropUrl,
-                                backdrop = responsiveImageSetFromDomainMap(hero.backdrop),
+                                artworkUrl = hero.artworkUrl,
+                                artwork = responsiveImageSetFromDomainMap(hero.artwork),
                                 addonId = hero.addonId,
                                 type = hero.type,
                             )

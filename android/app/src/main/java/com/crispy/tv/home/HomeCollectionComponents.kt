@@ -117,7 +117,7 @@ private fun HomeCollectionCard(
 ) {
     val featured = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
     val backdropModel = rememberCrispyImageModel(
-        image = featured?.backdrop,
+        image = featured?.artwork,
         width = 200.dp,
         height = 200.dp,
     )

@@ -32,8 +32,7 @@ fun CrispyBackendClient.ClientMediaCard.toMediaDetails(): MediaDetails {
         imdbId = providerIds?.imdb,
         itemType = normalizedCatalogMediaType(),
         title = title.trim().takeIf { it.isNotBlank() } ?: itemId,
-        posterUrl = images.poster.medium,
-        backdropUrl = images.backdrop.medium,
+        artworkUrl = images.artwork.medium,
         logoUrl = images.logo.medium,
         description = overview,
         genres = genres,
@@ -69,7 +68,7 @@ fun CrispyBackendClient.ClientMediaCard.toMediaVideo(): MediaVideo? {
         episode = episode,
         released = releaseDate,
         overview = overview,
-        thumbnailUrl = images.still.medium ?: images.poster.medium,
+        thumbnailUrl = images.still.medium ?: images.artwork.medium,
         lookupId = buildAddonEpisodeLookupId(providerIds?.imdb, season, episode) ?: itemId,
         absoluteEpisodeNumber = null,
     )

@@ -430,11 +430,9 @@ internal fun LazyListScope.historyItems(
                         val sharedElementKey = "library-history-${row.monthKey}-${item.itemId}"
                         LandscapeCard(
                             title = item.title,
-                            backdropUrl = item.backdropUrl,
-                            posterUrl = item.posterUrl,
+                            artworkUrl = item.artworkUrl,
                             logoUrl = item.logoUrl,
-                            backdrop = item.backdrop,
-                            poster = item.poster,
+                            artwork = item.artwork,
                             logo = item.logo,
                             rating = item.rating,
                             year = item.year,
@@ -485,11 +483,9 @@ internal fun LazyListScope.ratingsItems(
                         val sharedElementKey = "library-ratings-${row.bandKey}-${item.itemId}"
                         LandscapeCard(
                             title = item.title,
-                            backdropUrl = item.backdropUrl,
-                            posterUrl = item.posterUrl,
+                            artworkUrl = item.artworkUrl,
                             logoUrl = item.logoUrl,
-                            backdrop = item.backdrop,
-                            poster = item.poster,
+                            artwork = item.artwork,
                             logo = item.logo,
                             rating = item.rating,
                             year = item.year,
@@ -539,11 +535,9 @@ internal fun LazyListScope.watchlistItems(
                         val sharedElementKey = "library-watchlist-${row.groupKey}-${item.itemId}"
                         LandscapeCard(
                             title = item.title,
-                            backdropUrl = item.backdropUrl,
-                            posterUrl = item.posterUrl,
+                            artworkUrl = item.artworkUrl,
                             logoUrl = item.logoUrl,
-                            backdrop = item.backdrop,
-                            poster = item.poster,
+                            artwork = item.artwork,
                             logo = item.logo,
                             rating = item.rating,
                             year = item.year,

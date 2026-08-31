@@ -82,7 +82,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
-    return details?.backdropUrl ?: details?.posterUrl
+    return details?.artworkUrl
 }
 
 internal data class HeroTrailerSource(

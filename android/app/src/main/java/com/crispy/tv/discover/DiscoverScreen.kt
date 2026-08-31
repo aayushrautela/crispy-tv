@@ -483,14 +483,12 @@ private fun DiscoverScreen(
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
                         val key = "discover-${item.itemId}-${index}"
-                         LandscapeCard(
-                             title = item.title,
-                             backdropUrl = item.backdropUrl,
-                             posterUrl = item.posterUrl,
-                             logoUrl = item.logoUrl,
-                             backdrop = item.backdrop,
-                             poster = item.poster,
-                             logo = item.logo,
+                          LandscapeCard(
+                              title = item.title,
+                              artworkUrl = item.artworkUrl,
+                              logoUrl = item.logoUrl,
+                              artwork = item.artwork,
+                              logo = item.logo,
                              rating = item.rating,
                              year = item.year,
                              genre = item.genre,

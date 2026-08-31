@@ -108,7 +108,7 @@ internal fun HomeHeroCarousel(
         val sharedElementKey = "homehero-${item.id}"
         val backdropKey = "backdrop-$sharedElementKey"
         val heroImageModel = rememberCrispyImageModel(
-            image = item.backdrop,
+            image = item.artwork,
             width = 320.dp,
             height = 320.dp,
             memoryCacheKey = backdropKey,

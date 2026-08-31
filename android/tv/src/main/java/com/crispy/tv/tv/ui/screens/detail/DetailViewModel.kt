@@ -62,7 +62,7 @@ data class DetailUiState(
     val title: String = "",
     val subtitleMeta: String? = null,
     val overview: String? = null,
-    val backdropUrl: String? = null,
+    val artworkUrl: String? = null,
     val logoUrl: String? = null,
     val genres: List<String> = emptyList(),
     val certification: String? = null,
@@ -282,10 +282,9 @@ class DetailViewModel(
                 itemRating = item.rating,
                 subtitleMeta = metaParts.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                 overview = item.overview,
-                backdropUrl = item.images.backdrop.large
-                    ?: item.images.backdrop.medium
-                    ?: item.images.backdrop.small
-                    ?: item.images.poster.large,
+                artworkUrl = item.images.artwork.large
+                    ?: item.images.artwork.medium
+                    ?: item.images.artwork.small,
                 logoUrl = item.images.logo.large
                     ?: item.images.logo.medium
                     ?: item.images.logo.small,
@@ -400,10 +399,9 @@ class DetailViewModel(
         CrispyCardItem(
             id = itemId,
             title = title,
-            imageUrl = images.backdrop.large
-                ?: images.backdrop.medium
-                ?: images.backdrop.small
-                ?: images.poster.medium,
+            imageUrl = images.artwork.large
+                ?: images.artwork.medium
+                ?: images.artwork.small,
             logoUrl = images.logo.large ?: images.logo.medium ?: images.logo.small,
             rating = rating?.let { roundToOne(it) },
             year = year?.toString(),

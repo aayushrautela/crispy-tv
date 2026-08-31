@@ -207,7 +207,7 @@ fun LibraryRoute(
                         item.genre?.takeIf { it.isNotBlank() },
                         item.episodeCount?.takeIf { it > 1 }?.let { "$it episodes" },
                     ).joinToString(" · ").takeIf { it.isNotBlank() },
-                    imageUrl = item.backdropUrl ?: item.posterUrl,
+                    imageUrl = item.artworkUrl,
                     actions = actions,
                 )
             }

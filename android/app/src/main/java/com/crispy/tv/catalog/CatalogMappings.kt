@@ -9,17 +9,15 @@ fun CrispyBackendClient.ClientMediaCard.toCatalogItem(): CatalogItem? {
     val itemTitle = title.trim().takeIf { it.isNotBlank() } ?: return null
     val normalizedItemId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
     val normalizedType = normalizedCatalogMediaType()
-    val normalizedPosterUrl = images.poster.medium ?: images.poster.large ?: images.poster.small
-    if (normalizedPosterUrl.isNullOrBlank()) return null
+    val normalizedArtworkUrl = images.artwork.medium ?: images.artwork.large ?: images.artwork.small
+    if (normalizedArtworkUrl.isNullOrBlank()) return null
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,
         title = itemTitle,
-        posterUrl = normalizedPosterUrl,
-        backdropUrl = images.backdrop.medium ?: images.backdrop.large ?: images.backdrop.small,
+        artworkUrl = normalizedArtworkUrl,
         logoUrl = images.logo.medium ?: images.logo.large ?: images.logo.small,
-        poster = images.poster.toUiResponsiveImageSet(),
-        backdrop = images.backdrop.toUiResponsiveImageSet(),
+        artwork = images.artwork.toUiResponsiveImageSet(),
         logo = images.logo.toUiResponsiveImageSet(),
         addonId = "backend",
         type = normalizedType,

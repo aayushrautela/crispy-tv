@@ -42,8 +42,7 @@ internal class CalendarMetaEpisodeService(
 
         return SeriesMetaEpisodes(
             seriesName = metadata.seriesName,
-            posterUrl = metadata.posterUrl,
-            backdropUrl = metadata.backdropUrl,
+            artworkUrl = metadata.artworkUrl,
             addonId = metadata.addonId,
             episodes = episodes,
         )
@@ -184,8 +183,7 @@ internal class CalendarMetaEpisodeService(
         }
         return MetaDetails(
             seriesName = name,
-            posterUrl = firstNonBlank(meta.optString("poster"), meta.optString("posterShape")),
-            backdropUrl = firstNonBlank(meta.optString("background"), meta.optString("poster")),
+            artworkUrl = firstNonBlank(meta.optString("poster"), meta.optString("background")),
             addonId = addonId,
             videos = videos,
         )
@@ -281,16 +279,14 @@ internal data class AddonMetaEndpoint(
 
 internal data class MetaDetails(
     val seriesName: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
+    val artworkUrl: String?,
     val addonId: String?,
     val videos: List<MetaVideo>,
 )
 
 internal data class SeriesMetaEpisodes(
     val seriesName: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
+    val artworkUrl: String?,
     val addonId: String?,
     val episodes: List<MetaVideo>,
 )

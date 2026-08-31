@@ -24,7 +24,7 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostControlle
                     AppRoutes.homeDetailsRoute(
                         itemId = item.itemId,
                         itemType = item.type,
-                        backdropUrl = item.backdropUrl,
+                        artworkUrl = item.artworkUrl,
                         logoUrl = item.logoUrl,
                         sharedElementKey = sharedElementKey,
                     )

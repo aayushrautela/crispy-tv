@@ -18,7 +18,7 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
-                            backdropUrl = item.backdropUrl,
+                            artworkUrl = item.artworkUrl,
                             logoUrl = item.logoUrl,
                             sharedElementKey = sharedElementKey,
                         )

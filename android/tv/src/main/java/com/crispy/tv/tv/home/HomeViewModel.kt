@@ -117,12 +117,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 private fun CrispyBackendClient.ClientMediaCard.bestImageUrl(): String? =
-    images.backdrop.large
-        ?: images.backdrop.medium
-        ?: images.backdrop.small
+    images.artwork.large
+        ?: images.artwork.medium
+        ?: images.artwork.small
         ?: images.still.medium
         ?: images.still.small
-        ?: images.poster.medium
 
 private fun CrispyBackendClient.ClientMediaCard.bestLogoUrl(): String? =
     images.logo.large ?: images.logo.medium ?: images.logo.small
@@ -176,7 +175,7 @@ private fun CrispyBackendClient.UpNextItem.toCardItem(): CrispyCardItem? {
             .filterNotNull()
             .filter { it.isNotBlank() }
             .joinToString(" · "),
-        imageUrl = show?.images?.backdrop?.medium ?: show?.images?.poster?.medium,
+        imageUrl = show?.images?.artwork?.medium,
         description = reason,
     )
 }

@@ -88,7 +88,7 @@ fun DetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val seed by rememberDetailsSeedColor(
-        imageUrl = if (state.loading) null else state.backdropUrl,
+        imageUrl = if (state.loading) null else state.artworkUrl,
         fallbackSeed = MaterialTheme.colorScheme.primary,
     )
     val themedScheme = rememberDetailsTvColorScheme(seed)
@@ -252,8 +252,7 @@ private fun DetailContent(
         AiInsightsStoryOverlay(
             result = state.aiInsights,
             title = state.title,
-            backdropUrl = state.backdropUrl,
-            posterUrl = null,
+            artworkUrl = state.artworkUrl,
             onDismiss = onDismissAiInsights,
         )
     }
@@ -270,7 +269,7 @@ private fun DetailContent(
         ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             AsyncImage(
-                model = state.backdropUrl,
+                model = state.artworkUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

@@ -394,11 +394,9 @@ private fun SearchSectionRow(
             }
             LandscapeCard(
                 title = item.title,
-                backdropUrl = item.backdropUrl,
-                posterUrl = item.posterUrl,
+                artworkUrl = item.artworkUrl,
                 logoUrl = item.logoUrl,
-                backdrop = item.backdrop,
-                poster = item.poster,
+                artwork = item.artwork,
                 logo = item.logo,
                 rating = item.rating,
                 year = item.year,
