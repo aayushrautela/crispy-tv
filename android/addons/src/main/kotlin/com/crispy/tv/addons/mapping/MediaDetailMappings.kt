@@ -33,7 +33,6 @@ fun CrispyBackendClient.ClientMediaCard.toMediaDetails(): MediaDetails {
         itemType = normalizedCatalogMediaType(),
         title = title.trim().takeIf { it.isNotBlank() } ?: itemId,
         artworkUrl = images.artwork.medium,
-        logoUrl = images.logo.medium,
         description = overview,
         genres = genres,
         year = year?.toString() ?: releaseDate?.take(4),

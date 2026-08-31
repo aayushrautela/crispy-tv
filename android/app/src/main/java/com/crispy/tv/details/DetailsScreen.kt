@@ -89,7 +89,6 @@ internal fun DetailsScreen(
     uiState: DetailsUiState,
     playbackSettings: PlaybackSettings,
     initialArtworkUrl: String? = null,
-    initialLogoUrl: String? = null,
     sharedElementKey: String? = null,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
@@ -126,8 +125,8 @@ internal fun DetailsScreen(
     val imageUrl = remember(details, initialArtworkUrl) {
         detailsHeroImageUrl(details = details) ?: initialArtworkUrl
     }
-    val logoUrl = remember(details, initialLogoUrl) {
-        details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: initialLogoUrl
+    val logoUrl = remember(details) {
+        details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
     }
     val fallbackSeed = Color.White
     val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)

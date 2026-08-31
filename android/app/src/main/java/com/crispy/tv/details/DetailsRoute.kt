@@ -23,12 +23,11 @@ fun DetailsRoute(
     highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
     initialArtworkUrl: String? = null,
-    initialLogoUrl: String? = null,
     sharedElementKey: String? = null,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit = { _, _ -> },
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
-        onOpenPlayer: (PlaybackIdentity, Long, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onOpenPlayer: (PlaybackIdentity, Long, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -92,7 +91,6 @@ fun DetailsRoute(
         uiState = uiState,
         playbackSettings = playbackSettings,
         initialArtworkUrl = initialArtworkUrl,
-        initialLogoUrl = initialLogoUrl,
         sharedElementKey = sharedElementKey,
         onBack = onBack,
         onItemClick = onItemClick,

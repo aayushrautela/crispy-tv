@@ -68,7 +68,6 @@ object AppRoutes {
             "&$HomeDetailsRuntimeEpisodeNumberArg={$HomeDetailsRuntimeEpisodeNumberArg}" +
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}" +
             "&$HomeDetailsArtworkUrlArg={$HomeDetailsArtworkUrlArg}" +
-            "&$HomeDetailsLogoUrlArg={$HomeDetailsLogoUrlArg}" +
             "&$HomeDetailsSharedElementKeyArg={$HomeDetailsSharedElementKeyArg}"
     val PersonDetailsRoutePattern: String =
         "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}" +

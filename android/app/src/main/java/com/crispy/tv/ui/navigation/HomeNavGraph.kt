@@ -157,7 +157,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navArgument(AppRoutes.HomeDetailsRuntimeEpisodeNumberArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsArtworkUrlArg) { type = NavType.StringType; defaultValue = "" },
-                navArgument(AppRoutes.HomeDetailsLogoUrlArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsSharedElementKeyArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
@@ -173,7 +172,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             it.seasonNumber != null || it.episodeNumber != null || it.absoluteEpisodeNumber != null
         }
         val initialArtworkUrl = entry.arguments?.getString(AppRoutes.HomeDetailsArtworkUrlArg)?.ifBlank { null }
-        val initialLogoUrl = entry.arguments?.getString(AppRoutes.HomeDetailsLogoUrlArg)?.ifBlank { null }
         val sharedElementKey = entry.arguments?.getString(AppRoutes.HomeDetailsSharedElementKeyArg)?.ifBlank { null }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             DetailsRoute(
@@ -183,7 +181,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 highlightEpisodeId = highlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
                 initialArtworkUrl = initialArtworkUrl,
-                initialLogoUrl = initialLogoUrl,
                 sharedElementKey = sharedElementKey,
                 onBack = { navController.popBackStack() },
                 onItemClick = { item, sharedElementKey ->

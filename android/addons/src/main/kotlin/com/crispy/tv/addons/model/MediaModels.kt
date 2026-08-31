@@ -7,7 +7,6 @@ data class MediaDetails(
     val itemType: String,
     val title: String,
     val artworkUrl: String?,
-    val logoUrl: String?,
     val description: String?,
     val genres: List<String> = emptyList(),
     val year: String?,
