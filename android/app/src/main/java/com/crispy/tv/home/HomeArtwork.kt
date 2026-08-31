@@ -97,10 +97,10 @@ internal fun LandscapeArtworkFrame(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.85f)
                     .padding(bottom = 4.dp)
                     .height(3.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .background(trackColor)
                     .drawWithContent {
                         drawContent()
