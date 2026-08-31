@@ -77,7 +77,7 @@ public func loadNextPageIfNeeded(current itemId: String, environment: AppEnviron
         } else if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index] = MediaCard(
                 itemId: item.itemId, type: item.type, title: item.title,
-                posterUrl: item.posterUrl, backdropUrl: item.backdropUrl, logoUrl: item.logoUrl,
+                artworkUrl: item.artworkUrl, logoUrl: item.logoUrl,
                 ratingText: item.ratingText, yearText: item.yearText, genre: item.genre,
                 maturityRating: item.maturityRating, description: item.description,
                 progressPercent: item.progressPercent, parentSeriesId: item.parentSeriesId,

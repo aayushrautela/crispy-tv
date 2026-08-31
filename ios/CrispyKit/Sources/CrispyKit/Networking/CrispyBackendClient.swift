@@ -277,8 +277,7 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
             return UpNextEntry(
                 showItemId: showItemId,
                 showTitle: showTitle,
-                backdropUrl: images?.jsonObject("backdrop")?.jsonString("medium") ?? images?.jsonObject("backdrop")?.jsonString("large"),
-                posterUrl: images?.jsonObject("poster")?.jsonString("medium") ?? images?.jsonObject("poster")?.jsonString("large"),
+                artworkUrl: images?.jsonObject("artwork")?.jsonString("medium") ?? images?.jsonObject("artwork")?.jsonString("large"),
                 logoUrl: images?.jsonObject("logo")?.jsonString("medium"),
                 badge: badge,
                 airDate: item.jsonString("nextEpisodeAirDate")
@@ -431,8 +430,7 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             itemId: itemId,
             itemType: mediaType,
             title: title,
-            posterUrl: ResponsiveImageSetDto.parse(images?.jsonObject("poster")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("poster")).large,
-            backdropUrl: ResponsiveImageSetDto.parse(images?.jsonObject("backdrop")).medium,
+            artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).large,
             logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
             year: json.jsonInt("year"),
             rating: json.jsonDouble("rating"),
@@ -459,13 +457,13 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
               let mediaType = json.jsonString("mediaType"),
               let title = json.jsonString("title") else { return nil }
         let images = json.jsonObject("images")
-        let primary = images?.jsonObject("poster")
+        let primary = images?.jsonObject("artwork")
         return SearchSuggestionItem(
             itemId: itemId,
             itemType: mediaType,
             title: title,
             year: json.jsonInt("year"),
-            posterUrl: primary?.jsonString("medium") ?? primary?.jsonString("large") ?? primary?.jsonString("small")
+            artworkUrl: primary?.jsonString("medium") ?? primary?.jsonString("large") ?? primary?.jsonString("small")
         )
     }
 
@@ -516,8 +514,7 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             itemId: itemId,
             mediaType: mediaType,
             title: title,
-            posterUrl: ResponsiveImageSetDto.parse(images?.jsonObject("poster")).medium,
-            backdropUrl: ResponsiveImageSetDto.parse(images?.jsonObject("backdrop")).medium,
+            artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium,
             logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
             rating: json.jsonDouble("rating"),
             releaseYear: json.jsonInt("year")

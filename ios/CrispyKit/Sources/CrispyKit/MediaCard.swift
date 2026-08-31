@@ -4,20 +4,19 @@ import ContractRunner
 /// UI-facing media card shared by Home/Discover/Library/Search, mirroring the
 /// fields the Android screens read off `CatalogItem`/`ClientMediaCard`.
 public struct MediaCard: Identifiable, Equatable {
-public let itemId: String
-public let type: String
-public let title: String
-public let posterUrl: String?
-public let backdropUrl: String?
-public let logoUrl: String?
-public let ratingText: String?
-public let yearText: String?
-public let genre: String?
-public let maturityRating: String?
-public let description: String?
-public let progressPercent: Double?
-public let parentSeriesId: String?
-public let watchlisted: Bool
+    public let itemId: String
+    public let type: String
+    public let title: String
+    public let artworkUrl: String?
+    public let logoUrl: String?
+    public let ratingText: String?
+    public let yearText: String?
+    public let genre: String?
+    public let maturityRating: String?
+    public let description: String?
+    public let progressPercent: Double?
+    public let parentSeriesId: String?
+    public let watchlisted: Bool
 
 public var id: String { itemId }
 
@@ -46,8 +45,7 @@ public static func from(_ card: ClientMediaCard) -> MediaCard {
             itemId: card.itemId,
             type: normalizeCatalogType(card.mediaType),
             title: card.title,
-            posterUrl: card.posterUrl,
-            backdropUrl: card.backdropUrl,
+            artworkUrl: card.artworkUrl,
             logoUrl: card.logoUrl,
             ratingText: formatRating(card.rating),
             yearText: card.year.map(String.init),
@@ -68,8 +66,7 @@ public static func from(_ item: HomeCatalogItem) -> MediaCard {
             itemId: item.mediaKey,
             type: item.type,
             title: item.title,
-            posterUrl: item.posterUrl,
-            backdropUrl: item.backdropUrl,
+            artworkUrl: item.artworkUrl,
             logoUrl: nil,
             ratingText: item.rating,
             yearText: item.year,
@@ -87,8 +84,7 @@ public static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
             itemId: suggestion.itemId,
             type: suggestion.itemType,
             title: suggestion.title,
-            posterUrl: suggestion.posterUrl,
-            backdropUrl: nil,
+            artworkUrl: suggestion.artworkUrl,
             logoUrl: nil,
             ratingText: nil,
             yearText: suggestion.year.map(String.init),
@@ -106,8 +102,7 @@ public static func from(_ item: SearchMediaItem) -> MediaCard {
             itemId: item.itemId,
             type: item.itemType,
             title: item.title,
-            posterUrl: item.posterUrl,
-            backdropUrl: item.backdropUrl,
+            artworkUrl: item.artworkUrl,
             logoUrl: item.logoUrl,
             ratingText: formatRating(item.rating),
             yearText: item.year.map(String.init),

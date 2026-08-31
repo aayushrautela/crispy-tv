@@ -38,7 +38,7 @@ public final class HomeViewModel {
         public let ratingText: String?
         public let yearText: String?
         public let genres: [String]
-        public let backdropUrl: String?
+        public let artworkUrl: String?
 
         public var id: String { mediaKey }
     }
@@ -144,7 +144,7 @@ public func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironme
                 ratingText: item.rating,
                 yearText: item.year,
                 genres: item.genres,
-                backdropUrl: item.backdropUrl
+                artworkUrl: item.artworkUrl
             )
         }
 

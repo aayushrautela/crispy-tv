@@ -33,10 +33,10 @@ struct RemoteImage: View {
 }
 
 /// 16:9 landscape media card mirroring the Android `LandscapeCard`:
-/// backdrop, bottom scrim, logo/title, metadata line, optional badge.
+/// artwork, bottom scrim, logo/title, metadata line, optional badge.
 struct LandscapeCardView: View {
     let title: String
-    let backdropUrl: String?
+    let artworkUrl: String?
     let logoUrl: String?
     let ratingText: String?
     let yearText: String?
@@ -49,7 +49,7 @@ struct LandscapeCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottomLeading) {
-                RemoteImage(url: backdropUrl)
+                RemoteImage(url: artworkUrl)
 
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.65)],

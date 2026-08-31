@@ -59,7 +59,7 @@ struct SearchScreen: View {
                             NavigationLink(value: item.detailsRoute) {
                                 LandscapeCardView(
                                     title: item.title,
-                                    backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                    artworkUrl: item.artworkUrl,
                                     logoUrl: item.logoUrl,
                                     ratingText: item.ratingText,
                                     yearText: item.yearText,

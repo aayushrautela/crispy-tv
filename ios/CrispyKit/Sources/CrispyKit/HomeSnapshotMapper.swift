@@ -14,8 +14,7 @@ public static func snapshot(from response: ProfileHomeResponse?) -> HomeCatalogS
                 HomeCatalogItem(
                     mediaKey: card.itemId.trimmingCharacters(in: .whitespacesAndNewlines),
                     title: card.title.trimmingCharacters(in: .whitespacesAndNewlines),
-                    posterUrl: card.images.poster.medium,
-                    backdropUrl: card.images.backdrop.medium,
+                    artworkUrl: card.images.artwork.medium,
                     addonId: "backend",
                     type: normalizeCatalogType(card.mediaType),
                     rating: formatRating(card.rating),

@@ -111,15 +111,13 @@ public static func parse(_ json: [String: Any]?) -> ClientParentRef? {
 }
 
 public struct ClientImages: Equatable {
-public let poster: ResponsiveImageSetDto
-public let backdrop: ResponsiveImageSetDto
-public let logo: ResponsiveImageSetDto
-public let still: ResponsiveImageSetDto
+    public let artwork: ResponsiveImageSetDto
+    public let logo: ResponsiveImageSetDto
+    public let still: ResponsiveImageSetDto
 
-public static func parse(_ json: [String: Any]?) -> ClientImages {
+    public static func parse(_ json: [String: Any]?) -> ClientImages {
         ClientImages(
-            poster: ResponsiveImageSetDto.parse(json?.jsonObject("poster")),
-            backdrop: ResponsiveImageSetDto.parse(json?.jsonObject("backdrop")),
+            artwork: ResponsiveImageSetDto.parse(json?.jsonObject("artwork")),
             logo: ResponsiveImageSetDto.parse(json?.jsonObject("logo")),
             still: ResponsiveImageSetDto.parse(json?.jsonObject("still"))
         )
@@ -144,9 +142,8 @@ public let providerIds: MediaExternalIds
 
 public var id: String { itemId }
 
-public var posterUrl: String? { images.poster.medium ?? images.poster.large ?? images.poster.small }
-public var backdropUrl: String? { images.backdrop.medium ?? images.backdrop.large ?? images.backdrop.small }
-public var logoUrl: String? { images.logo.medium ?? images.logo.large ?? images.logo.small }
+public var artworkUrl: String? { images.artwork.medium ?? images.artwork.large ?? images.artwork.small }
+    public var logoUrl: String? { images.logo.medium ?? images.logo.large ?? images.logo.small }
 
 public static func parse(_ json: [String: Any]) throws -> ClientMediaCard {
         guard let itemId = json.jsonString("itemId"),
@@ -212,21 +209,20 @@ public var id: String { personId }
 
 /// Jellyfin BaseItemDto-shaped result used by /v1/search/titles.
 public struct SearchMediaItem: Equatable, Identifiable {
-public let itemId: String
-public let itemType: String
-public let title: String
-public let posterUrl: String?
-public let backdropUrl: String?
-public let logoUrl: String?
-public let year: Int?
-public let rating: Double?
-public let genres: [String]
-public let maturityRating: String?
-public let overview: String?
-public let providerIds: MediaExternalIds
-public let seriesItemId: String?
+    public let itemId: String
+    public let itemType: String
+    public let title: String
+    public let artworkUrl: String?
+    public let logoUrl: String?
+    public let year: Int?
+    public let rating: Double?
+    public let genres: [String]
+    public let maturityRating: String?
+    public let overview: String?
+    public let providerIds: MediaExternalIds
+    public let seriesItemId: String?
 
-public var id: String { itemId }
+    public var id: String { itemId }
 }
 
 public struct SearchResultsResponse: Equatable {
@@ -242,13 +238,13 @@ public var allTitles: [SearchMediaItem] {
 }
 
 public struct SearchSuggestionItem: Equatable, Identifiable {
-public let itemId: String
-public let itemType: String
-public let title: String
-public let year: Int?
-public let posterUrl: String?
+    public let itemId: String
+    public let itemType: String
+    public let title: String
+    public let year: Int?
+    public let artworkUrl: String?
 
-public var id: String { itemId }
+    public var id: String { itemId }
 }
 
 public struct SearchSuggestionsResponse: Equatable {
@@ -295,16 +291,15 @@ public let collectionName: String?
 }
 
 public struct PersonKnownForItem: Equatable, Identifiable {
-public let itemId: String
-public let mediaType: String
-public let title: String
-public let posterUrl: String?
-public let backdropUrl: String?
-public let logoUrl: String?
-public let rating: Double?
-public let releaseYear: Int?
+    public let itemId: String
+    public let mediaType: String
+    public let title: String
+    public let artworkUrl: String?
+    public let logoUrl: String?
+    public let rating: Double?
+    public let releaseYear: Int?
 
-public var id: String { itemId }
+    public var id: String { itemId }
 }
 
 public struct PersonDetail: Equatable {
@@ -340,8 +335,7 @@ public struct AvatarItem: Equatable, Identifiable {
 public struct UpNextEntry: Equatable, Identifiable {
     public let showItemId: String
     public let showTitle: String
-    public let backdropUrl: String?
-    public let posterUrl: String?
+    public let artworkUrl: String?
     public let logoUrl: String?
     public let badge: String?
     public let airDate: String?

@@ -93,7 +93,7 @@ struct PersonScreen: View {
                                 )) {
                                     LandscapeCardView(
                                         title: item.title,
-                                        backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                        artworkUrl: item.artworkUrl,
                                         logoUrl: item.logoUrl,
                                         ratingText: formatRating(item.rating),
                                         yearText: item.releaseYear.map(String.init),

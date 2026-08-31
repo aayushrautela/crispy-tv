@@ -68,7 +68,7 @@ struct HomeScreen: View {
                             NavigationLink(value: item.detailsRoute) {
                                 LandscapeCardView(
                                     title: item.title,
-                                    backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                    artworkUrl: item.artworkUrl,
                                     logoUrl: nil,
                                     ratingText: nil,
                                     yearText: nil,
@@ -101,7 +101,7 @@ struct HomeScreen: View {
                             NavigationLink(value: AppRoute.details(itemId: entry.showItemId, itemType: "show")) {
                                 LandscapeCardView(
                                     title: entry.showTitle,
-                                    backdropUrl: entry.backdropUrl ?? entry.posterUrl,
+                                    artworkUrl: entry.artworkUrl,
                                     logoUrl: entry.logoUrl,
                                     ratingText: nil,
                                     yearText: nil,
@@ -126,7 +126,7 @@ struct HomeScreen: View {
                             NavigationLink(value: entry.card.detailsRoute) {
                                 LandscapeCardView(
                                     title: entry.card.title,
-                                    backdropUrl: entry.card.backdropUrl ?? entry.card.posterUrl,
+                                    artworkUrl: entry.card.artworkUrl,
                                     logoUrl: entry.card.logoUrl,
                                     ratingText: entry.card.ratingText,
                                     yearText: nil,
@@ -154,7 +154,7 @@ struct HomeScreen: View {
                             NavigationLink(value: item.detailsRoute) {
                                 LandscapeCardView(
                                     title: item.title,
-                                    backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                    artworkUrl: item.artworkUrl,
                                     logoUrl: item.logoUrl,
                                     ratingText: item.ratingText,
                                     yearText: item.yearText,
@@ -235,7 +235,7 @@ struct HeroCardView: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: hero.backdropUrl)
+            RemoteImage(url: hero.artworkUrl)
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.75)],

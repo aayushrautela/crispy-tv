@@ -95,7 +95,7 @@ struct DetailsScreen: View {
                                         NavigationLink(value: item.detailsRoute) {
                                             LandscapeCardView(
                                                 title: item.title,
-                                                backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                                artworkUrl: item.artworkUrl,
                                                 logoUrl: item.logoUrl,
                                                 ratingText: item.ratingText,
                                                 yearText: item.yearText,
@@ -200,7 +200,7 @@ struct DetailsScreen: View {
 
     private func hero(_ detail: MetadataTitleDetail) -> some View {
         ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: detail.item.backdropUrl ?? detail.item.posterUrl)
+            RemoteImage(url: detail.item.artworkUrl)
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.8)],
