@@ -42,6 +42,7 @@ internal fun PlayerEpisodesSheet(
     seasons: List<Int>,
     selectedSeason: Int?,
     seasonEpisodes: List<MediaVideo>,
+    episodeWatchStates: Map<String, EpisodeWatchState>,
     episodesIsLoading: Boolean,
     episodesStatusMessage: String,
     palette: DetailsPaletteColors,
@@ -151,7 +152,7 @@ internal fun PlayerEpisodesSheet(
                                     video.season == activeSeason && video.episode == activeEpisode
                                 EpisodeCard(
                                     video = video,
-                                    watchState = EpisodeWatchState(),
+                                    watchState = episodeWatchStates[video.id] ?: EpisodeWatchState(),
                                     isHighlighted = isActive,
                                     modifier = Modifier.width(Dimensions.WideCardWidth),
                                     onClick = { onEpisodeSelected(video.id) },

@@ -293,6 +293,7 @@ internal fun PlayerOverlay(
             seasons = uiState.seasons,
             selectedSeason = uiState.selectedSeason,
             seasonEpisodes = uiState.seasonEpisodes,
+            episodeWatchStates = uiState.episodeWatchStates,
             episodesIsLoading = uiState.episodesIsLoading,
             episodesStatusMessage = uiState.episodesStatusMessage,
             palette = palette,
