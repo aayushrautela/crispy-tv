@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.addons.mapping.normalizedCatalogMediaType
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.catalog.toCatalogItem
