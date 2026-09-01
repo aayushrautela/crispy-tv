@@ -342,7 +342,7 @@ internal fun HomeWideRailCard(
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        lineHeight = 16.sp,
+                        lineHeight = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     color = Color.White,
