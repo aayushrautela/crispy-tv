@@ -324,6 +324,7 @@ internal fun HeroSection(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
+            android.util.Log.d("DetailsHero", "logoUrl=${details?.logoUrl}, resolved=$resolvedLogoUrl, details=${details?.title}")
             if (resolvedLogoUrl != null) {
                 val logoModel = rememberCrispyImageModel(
                     url = resolvedLogoUrl,
