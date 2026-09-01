@@ -334,7 +334,7 @@ internal fun HomeWideRailCard(
         bottomOverlayContent = {
             val colonIndex = item.title.indexOf(':')
             val hasColonSplit = colonIndex in 0 until item.title.lastIndex
-            val titleMain = if (hasColonSplit) item.title.substring(0, colonIndex + 1) else item.title
+            val titleMain = if (hasColonSplit) item.title.substring(0, colonIndex) else item.title
             val titleSub = if (hasColonSplit) item.title.substring(colonIndex + 1).trim() else null
 
             Column(
@@ -347,7 +347,7 @@ internal fun HomeWideRailCard(
                 Text(
                     text = titleMain,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        lineHeight = if (titleSub != null) 14.sp else 15.sp,
+                        lineHeight = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     color = Color.White,
