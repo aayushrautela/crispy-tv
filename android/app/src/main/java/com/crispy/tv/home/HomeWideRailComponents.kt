@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import coil3.compose.AsyncImage
 import com.crispy.tv.player.CanonicalContinueWatchingItem
@@ -340,8 +341,10 @@ internal fun HomeWideRailCard(
             ) {
                 Text(
                     text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
                     color = Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
