@@ -21,6 +21,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataProductionInfoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataReviewView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatings
 import com.crispy.tv.backend.CrispyBackendClient.MetadataVideoView
+import com.crispy.tv.backend.CrispyBackendClient.PersonSocials
 import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeSection
 import com.crispy.tv.backend.CrispyBackendClient.ProviderState
