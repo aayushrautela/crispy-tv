@@ -136,6 +136,7 @@ internal fun HeroSection(
                 1f to palette.pageBackground,
             ),
         )
+        android.util.Log.d("HeroFade", "bottomFadeBrush created: 0.85f -> 1f, pageBackground=${palette.pageBackground}")
 
         if (details == null && imageUrl.isNullOrBlank()) {
             Box(
@@ -205,6 +206,7 @@ internal fun HeroSection(
                         drawRect(brush = bottomFadeBrush)
                     }
             }
+            android.util.Log.d("HeroFade", "Backdrop AsyncImage rendered with backdropModifier (bottomFadeBrush)")
             AsyncImage(
                 model = heroRequest ?: imageUrl,
                 contentDescription = details?.title,
@@ -256,8 +258,10 @@ internal fun HeroSection(
             label = "hero_trailer_cover_alpha",
         )
 
+        android.util.Log.d("HeroFade", "coverAlpha=$coverAlpha, showTrailer=$showTrailer, hasTrailer=$hasTrailer, trailerHasRenderedFirstFrame=$trailerHasRenderedFirstFrame, isActuallyPlaying=$isActuallyPlaying")
         if (showTrailer && hasTrailer && coverAlpha > 0.001f) {
             if (!imageUrl.isNullOrBlank()) {
+                android.util.Log.d("HeroFade", "Cover AsyncImage rendered with bottomFadeBrush, coverAlpha=$coverAlpha")
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = null,
@@ -354,6 +358,7 @@ private fun HeroBottomFade(
     pageBackground: Color,
     heightPx: Float,
 ) {
+    android.util.Log.d("HeroFade", "HeroBottomFade rendered: 0.66f -> 1f, heightPx=$heightPx")
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -542,6 +547,7 @@ private fun HeroTrailerLayer(
         }
     }
 
+    android.util.Log.d("HeroFade", "HeroTrailerLayer rendered, applying bottomFadeBrush")
     Box(
         modifier = modifier
             .clipToBounds()
