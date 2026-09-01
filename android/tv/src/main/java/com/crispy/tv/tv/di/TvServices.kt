@@ -111,7 +111,6 @@ object TvServices {
             val created = StreamResolver(
                 addonStreamsService = AddonStreamsService(
                     context = appContext,
-                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                     httpClient = AppHttp.client(appContext),
                 ),
             )

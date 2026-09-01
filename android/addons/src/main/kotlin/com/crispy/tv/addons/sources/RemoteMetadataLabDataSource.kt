@@ -23,10 +23,9 @@ import java.nio.charset.StandardCharsets
 
 class RemoteMetadataLabDataSource(
     context: Context,
-    addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
 ) : MetadataLabDataSource {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
+    private val addonRegistry = MetadataAddonRegistry(context.applicationContext)
     private val addonClient = AddonMetadataClient(addonRegistry, httpClient)
 
     override suspend fun load(

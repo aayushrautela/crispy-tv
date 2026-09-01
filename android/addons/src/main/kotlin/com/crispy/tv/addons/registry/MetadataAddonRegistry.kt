@@ -22,10 +22,7 @@ data class CloudAddonRow(
     val sortOrder: Int
 )
 
-class MetadataAddonRegistry(
-    context: Context,
-    private val configuredManifestUrlsCsv: String
-) {
+class MetadataAddonRegistry(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     @Volatile
@@ -276,8 +273,6 @@ class MetadataAddonRegistry(
     private fun buildDesiredSeeds(userRemovedAddonIds: Set<String>): List<ParsedAddonSeed> {
         val parsedSeeds = mutableListOf<ParsedAddonSeed>()
 
-        parseConfiguredManifestUrls(configuredManifestUrlsCsv).forEach(parsedSeeds::add)
-
         if (userRemovedAddonIds.none { it.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true) }) {
             parseManifestSeed(
                 manifestUrl = DEFAULT_OPENSUBTITLES_MANIFEST,
@@ -293,13 +288,6 @@ class MetadataAddonRegistry(
             }
         }
         return unique.values.toList()
-    }
-
-    private fun parseConfiguredManifestUrls(raw: String): List<ParsedAddonSeed> {
-        return raw.split(',')
-            .map { value -> value.trim() }
-            .filter { value -> value.isNotEmpty() }
-            .mapNotNull { manifestUrl -> parseManifestSeed(manifestUrl = manifestUrl, addonIdHintOverride = null) }
     }
 
     private fun parseManifestSeed(

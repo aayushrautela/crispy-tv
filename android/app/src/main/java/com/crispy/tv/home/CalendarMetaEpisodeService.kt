@@ -13,10 +13,9 @@ import org.json.JSONObject
 
 internal class CalendarMetaEpisodeService(
     context: Context,
-    addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
 ) {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
+    private val addonRegistry = MetadataAddonRegistry(context.applicationContext)
 
     suspend fun getUpcomingEpisodes(
         seriesId: String,

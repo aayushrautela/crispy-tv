@@ -12,7 +12,6 @@ import kotlinx.coroutines.withContext
 class RemoteSupabaseSyncLabService(
     context: Context,
     private val supabase: SupabaseAccountClient,
-    addonManifestUrlsCsv: String,
 ) : SupabaseSyncLabService {
     override suspend fun initialize(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
         result("Sync Lab is temporarily disabled until addon sync moves to backend APIs.")

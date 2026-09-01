@@ -33,7 +33,6 @@ object StreamResolverProvider {
         val addonStreamsService =
             AddonStreamsService(
                 context = appContext,
-                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                 httpClient = AppHttp.client(appContext),
             )
         return StreamResolver(addonStreamsService)

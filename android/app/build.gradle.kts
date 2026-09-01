@@ -23,11 +23,6 @@ val introDbApiUrl =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
-val metadataAddonUrls =
-    (providers.gradleProperty("METADATA_ADDON_URLS").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
 val releaseKeystorePath = providers.gradleProperty("RELEASE_KEYSTORE_PATH").orNull
 val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASSWORD").orNull
 val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull
@@ -57,7 +52,6 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
         buildConfigField("String", "CRISPY_BACKEND_URL", "\"$crispyBackendUrl\"")
         buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
-        buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
 
     flavorDimensions += "distribution"

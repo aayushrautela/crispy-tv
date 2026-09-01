@@ -94,15 +94,10 @@ class CrispyBackendClient(
         val hasMdbListAccess: Boolean,
     )
 
-    /**
-     * A single addon row as persisted in the account-scoped `addons` setting.
-     * Order is significant: lower [sortOrder] addons resolve first.
-     */
-    data class AddonCloudRow(
+    data class AddonDto(
+        val id: String,
         val manifestUrl: String,
-        val sortOrder: Int,
-        val name: String? = null,
-        val enabled: Boolean = true,
+        val createdAt: String,
     )
 
     data class Avatar(
@@ -605,12 +600,16 @@ class CrispyBackendClient(
         return deleteAccountApi(accessToken)
     }
 
-    suspend fun getAddons(accessToken: String): List<AddonCloudRow> {
-        return getAddonsApi(accessToken)
+    suspend fun listAddons(accessToken: String): List<AddonDto> {
+        return listAddonsApi(accessToken)
     }
 
-    suspend fun putAddons(accessToken: String, rows: List<AddonCloudRow>): List<AddonCloudRow> {
-        return putAddonsApi(accessToken, rows)
+    suspend fun installAddon(accessToken: String, manifestUrl: String): AddonDto {
+        return installAddonApi(accessToken, manifestUrl)
+    }
+
+    suspend fun uninstallAddon(accessToken: String, addonId: String): Boolean {
+        return uninstallAddonApi(accessToken, addonId)
     }
 
     suspend fun getAvatars(): List<Avatar> {

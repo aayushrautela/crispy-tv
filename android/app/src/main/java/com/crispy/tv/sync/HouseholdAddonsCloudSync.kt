@@ -4,13 +4,8 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
+import java.util.Locale
 
-/**
- * Two-way sync of the household addon roster against the account-scoped
- * `addons` setting on the backend. Addons are account-wide (every profile on
- * the household shares them), so they are read/written through the account
- * settings surface rather than per-profile.
- */
 internal class HouseholdAddonsCloudSync(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
@@ -26,14 +21,13 @@ internal class HouseholdAddonsCloudSync(
         if (session == null) return Result.success(Unit)
 
         return try {
-            val cloudRows = backend.getAddons(session.accessToken)
-            val localRows =
-                cloudRows.map { cloudRow ->
-                    CloudAddonRow(
-                        manifestUrl = cloudRow.manifestUrl,
-                        sortOrder = cloudRow.sortOrder,
-                    )
-                }
+            val dtos = backend.listAddons(session.accessToken)
+            val localRows = dtos.mapIndexed { index, dto ->
+                CloudAddonRow(
+                    manifestUrl = dto.manifestUrl,
+                    sortOrder = index,
+                )
+            }
             addonRegistry.reconcileCloudAddons(localRows)
             Result.success(Unit)
         } catch (t: Throwable) {
@@ -51,15 +45,24 @@ internal class HouseholdAddonsCloudSync(
         if (session == null) return Result.success(Unit)
 
         return try {
+            val serverAddons = backend.listAddons(session.accessToken)
             val localRows = addonRegistry.exportCloudAddons()
-            val cloudRows =
-                localRows.map { localRow ->
-                    CrispyBackendClient.AddonCloudRow(
-                        manifestUrl = localRow.manifestUrl,
-                        sortOrder = localRow.sortOrder,
-                    )
+
+            val serverByUrl = serverAddons.associateBy { it.manifestUrl.lowercase(Locale.US) }
+            val localByUrl = localRows.associateBy { it.manifestUrl.lowercase(Locale.US) }
+
+            localRows.forEach { local ->
+                if (local.manifestUrl.lowercase(Locale.US) !in serverByUrl) {
+                    backend.installAddon(session.accessToken, local.manifestUrl)
                 }
-            backend.putAddons(session.accessToken, cloudRows)
+            }
+
+            serverAddons.forEach { server ->
+                if (server.manifestUrl.lowercase(Locale.US) !in localByUrl) {
+                    backend.uninstallAddon(session.accessToken, server.id)
+                }
+            }
+
             Result.success(Unit)
         } catch (t: Throwable) {
             Result.failure(t)

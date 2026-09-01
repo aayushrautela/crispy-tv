@@ -26,7 +26,7 @@ import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeSection
 import com.crispy.tv.backend.CrispyBackendClient.ProviderState
 import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
-import com.crispy.tv.backend.CrispyBackendClient.AddonCloudRow
+import com.crispy.tv.backend.CrispyBackendClient.AddonDto
 import com.crispy.tv.backend.CrispyBackendClient.Avatar
 import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
@@ -141,7 +141,7 @@ internal fun CrispyBackendClient.parseAccountSettings(json: JSONObject): Account
     )
 }
 
-internal fun CrispyBackendClient.parseAddonCloudRows(value: Any?): List<AddonCloudRow> {
+internal fun CrispyBackendClient.parseAddons(value: Any?): List<AddonDto> {
     val safeArray = when (value) {
         is JSONArray -> value
         is List<*> -> JSONArray(value)
@@ -150,18 +150,33 @@ internal fun CrispyBackendClient.parseAddonCloudRows(value: Any?): List<AddonClo
     return buildList {
         for (index in 0 until safeArray.length()) {
             val obj = safeArray.optJSONObject(index) ?: continue
+            val id = obj.optString("id").trim()
             val manifestUrl = obj.optString("manifestUrl").trim()
-            if (manifestUrl.isBlank()) continue
+            if (id.isBlank() || manifestUrl.isBlank()) continue
             add(
-                AddonCloudRow(
+                AddonDto(
+                    id = id,
                     manifestUrl = manifestUrl,
-                    sortOrder = obj.optInt("sortOrder", index),
-                    name = obj.optString("name").trim().ifBlank { null },
-                    enabled = obj.optBoolean("enabled", true),
+                    createdAt = obj.optString("createdAt").trim(),
                 ),
             )
         }
     }
+}
+
+internal fun CrispyBackendClient.parseAddon(value: Any?): AddonDto? {
+    val obj = when (value) {
+        is JSONObject -> value
+        else -> null
+    } ?: return null
+    val id = obj.optString("id").trim()
+    val manifestUrl = obj.optString("manifestUrl").trim()
+    if (id.isBlank() || manifestUrl.isBlank()) return null
+    return AddonDto(
+        id = id,
+        manifestUrl = manifestUrl,
+        createdAt = obj.optString("createdAt").trim(),
+    )
 }
 
 internal fun CrispyBackendClient.parseAvatars(array: JSONArray?): List<Avatar> {

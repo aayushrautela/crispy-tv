@@ -415,10 +415,7 @@ internal class AddonsSettingsViewModel(
                     if (modelClass.isAssignableFrom(AddonsSettingsViewModel::class.java)) {
                         val httpClient = AppHttp.client(appContext)
                         val addonRegistry =
-                            MetadataAddonRegistry(
-                                context = appContext,
-                                configuredManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
-                            )
+                            MetadataAddonRegistry(context = appContext)
                         @Suppress("UNCHECKED_CAST")
                         return AddonsSettingsViewModel(
                             addonRegistry = addonRegistry,

@@ -243,10 +243,9 @@ data class StreamProviderDescriptor(
 
 class AddonStreamsService(
     context: Context,
-    addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
 ) {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
+    private val addonRegistry = MetadataAddonRegistry(context.applicationContext)
     private val manifestFetchSemaphore = Semaphore(6)
     private val endpointsCacheLock = Any()
 

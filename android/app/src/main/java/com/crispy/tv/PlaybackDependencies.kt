@@ -55,7 +55,6 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
     return CoreDomainMetadataLabResolver(
         RemoteMetadataLabDataSource(
             context = appContext,
-            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
             httpClient = AppHttp.client(appContext),
         )
     )
@@ -96,7 +95,6 @@ private fun newSupabaseSyncService(
     return RemoteSupabaseSyncLabService(
         context = appContext,
         supabase = SupabaseServicesProvider.accountClient(appContext),
-        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
     )
 }
 
