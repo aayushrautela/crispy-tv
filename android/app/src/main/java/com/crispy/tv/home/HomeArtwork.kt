@@ -21,12 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -124,18 +119,19 @@ internal fun BoxScope.HomeArtworkBottomScrim(
     heightFraction: Float,
     maxAlpha: Float,
 ) {
+    val scrimBrush = remember(maxAlpha) {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color.Black.copy(alpha = maxAlpha),
+            ),
+        )
+    }
     Box(
         modifier = Modifier
-            .align(Alignment.BottomStart)
-            .fillMaxWidth(0.7f)
-            .fillMaxHeight(0.4f)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = maxAlpha),
-                    ),
-                ),
-            ),
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .fillMaxHeight(heightFraction.coerceIn(0f, 1f))
+            .background(scrimBrush),
     )
 }
