@@ -8,6 +8,7 @@ import ContractRunner
 @MainActor
 @Observable
 public final class HomeViewModel {
+    public init() {}
     public struct RailSection: Identifiable, Equatable {
         public let catalogId: String
         public let title: String

@@ -6,6 +6,7 @@ import Observation
 @MainActor
 @Observable
 public final class LibraryViewModel {
+    public init() {}
     public enum Section: String, CaseIterable, Identifiable {
         case history = "History"
         case watchlist = "Watchlist"

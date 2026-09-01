@@ -7,6 +7,7 @@ import ContractRunner
 @MainActor
 @Observable
 public final class DiscoverViewModel {
+    public init() {}
     public struct CatalogOption: Identifiable, Equatable {
         public let catalogId: String
         public let title: String
