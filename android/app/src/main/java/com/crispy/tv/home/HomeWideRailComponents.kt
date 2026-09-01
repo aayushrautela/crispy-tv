@@ -332,6 +332,11 @@ internal fun HomeWideRailCard(
         scrimMaxAlpha = 0.88f,
         imageModifier = backdropModifier,
         bottomOverlayContent = {
+            val colonIndex = item.title.indexOf(':')
+            val hasColonSplit = colonIndex in 0 until item.title.lastIndex
+            val titleMain = if (hasColonSplit) item.title.substring(0, colonIndex + 1) else item.title
+            val titleSub = if (hasColonSplit) item.title.substring(colonIndex + 1).trim() else null
+
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -340,15 +345,26 @@ internal fun HomeWideRailCard(
                 verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
                 Text(
-                    text = item.title,
+                    text = titleMain,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        lineHeight = 15.sp,
+                        lineHeight = if (titleSub != null) 14.sp else 15.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     color = Color.White,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (titleSub != null) {
+                    Text(
+                        text = titleSub,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Normal,
+                        ),
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (item.subtitle.isNotBlank()) {
                     Text(
                         text = item.subtitle,
