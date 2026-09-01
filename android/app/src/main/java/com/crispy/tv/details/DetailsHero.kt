@@ -351,6 +351,13 @@ internal fun HeroSection(
                 )
             }
         }
+
+        // Fixed fade overlay on top of everything (backdrop, trailer, cover)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(bottomFadeBrush)
+        )
     }
 }
 
