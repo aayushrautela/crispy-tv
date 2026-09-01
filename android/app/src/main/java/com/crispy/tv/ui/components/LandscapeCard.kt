@@ -1,7 +1,5 @@
 package com.crispy.tv.ui.components
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -13,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -27,21 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.addons.util.formatRating
@@ -58,7 +49,9 @@ fun LandscapeCard(
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier,
+    logoUrl: String? = null,
     artwork: ResponsiveImageSet? = null,
+    logo: ResponsiveImageSet? = null,
     rating: String? = null,
     year: String? = null,
     maturityRating: String? = null,
@@ -70,24 +63,25 @@ fun LandscapeCard(
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val screenBackground = MaterialTheme.colorScheme.background
     val imageUrl = artwork?.low ?: artworkUrl
+    val resolvedLogoUrl = logo?.low ?: logoUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
+    val logoKey = resolvedKey?.let { "logo-$it" }
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight, memoryCacheKey = backdropKey)
+    val logoModel = crispyImageRequest(url = resolvedLogoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
 
     val scrimBrush = remember {
         Brush.verticalGradient(
-            colorStops = arrayOf(
-                0f to Color.Transparent,
-                0.3f to Color.Black.copy(alpha = 0.6f),
-                1f to Color.Black.copy(alpha = 0.7f),
+            colors = listOf(
+                Color.Transparent,
+                Color.Black.copy(alpha = 0.55f),
             ),
         )
     }
-
     val bottomFadeBrush = remember(screenBackground) {
         Brush.verticalGradient(
             colorStops = arrayOf(
@@ -161,33 +155,13 @@ fun LandscapeCard(
             )
         }
 
-        Canvas(
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .fillMaxHeight(0.4f),
-        ) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.7f),
-                    ),
-                ),
-                size = size,
-            )
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Black,
-                        0.6f to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                ),
-                blendMode = BlendMode.DstIn,
-                size = size,
-            )
-        }
+                .fillMaxHeight(0.50f)
+                .background(scrimBrush),
+        )
 
         if (badge != null) {
             Surface(
@@ -207,37 +181,42 @@ fun LandscapeCard(
             }
         }
 
-        val colonIndex = title.indexOf(':')
-        val hasColonSplit = colonIndex in 0 until title.lastIndex
-        val titleMain = if (hasColonSplit) title.substring(0, colonIndex) else title
-        val titleSub = if (hasColonSplit) title.substring(colonIndex + 1).trim() else null
-
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.Bottom,
         ) {
-            Text(
-                text = titleMain,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    lineHeight = if (titleSub != null) 14.sp else 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.widthIn(max = 240.dp),
-            )
-            if (titleSub != null) {
+            if (logoModel != null) {
+                val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
+                    with(sharedTransitionScope) {
+                        Modifier
+                            .sharedElement(
+                                rememberSharedContentState(key = logoKey),
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
+                            .fillMaxWidth(0.60f)
+                            .height(30.dp)
+                    }
+                } else {
+                    Modifier
+                        .fillMaxWidth(0.60f)
+                        .height(30.dp)
+                }
+                AsyncImage(
+                    model = logoModel,
+                    contentDescription = title,
+                    modifier = logoModifier,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                )
+            } else {
                 Text(
-                    text = titleSub,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Normal,
-                    ),
-                    color = Color.White.copy(alpha = 0.85f),
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.96f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Start,
@@ -253,15 +232,15 @@ fun LandscapeCard(
             }
             if (metadataParts.isNotEmpty()) {
                 Row(
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
                         text = metadataParts.joinToString(separator = " · "),
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Bold,
+                        color = metadataColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
