@@ -21,7 +21,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -121,17 +126,38 @@ internal fun BoxScope.HomeArtworkBottomScrim(
 ) {
     val scrimBrush = remember(maxAlpha) {
         Brush.verticalGradient(
-            colors = listOf(
-                Color.Transparent,
-                Color.Black.copy(alpha = maxAlpha),
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                0.5f to Color.Black.copy(alpha = maxAlpha * 0.4f),
+                1f to Color.Black.copy(alpha = maxAlpha),
             ),
         )
     }
+    val curvedScrimShape = remember {
+        object : Shape {
+            override fun createOutline(
+                size: androidx.compose.ui.geometry.Size,
+                layoutDirection: LayoutDirection,
+                density: Density,
+            ): Outline {
+                val w = size.width
+                val h = size.height
+                val path = Path().apply {
+                    moveTo(0f, h * 0.3f)
+                    quadraticBezierTo(w * 0.6f, h * 0.3f, w * 0.7f, h)
+                    lineTo(0f, h)
+                    close()
+                }
+                return Outline.Generic(path)
+            }
+        }
+    }
     Box(
         modifier = Modifier
-            .align(Alignment.BottomCenter)
+            .align(Alignment.BottomStart)
             .fillMaxWidth()
-            .fillMaxHeight(heightFraction.coerceIn(0f, 1f))
+            .fillMaxHeight((heightFraction + 0.15f).coerceIn(0f, 1f))
+            .clip(curvedScrimShape)
             .background(scrimBrush),
     )
 }

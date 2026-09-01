@@ -27,7 +27,12 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,11 +76,32 @@ fun LandscapeCard(
 
     val scrimBrush = remember {
         Brush.verticalGradient(
-            colors = listOf(
-                Color.Transparent,
-                Color.Black.copy(alpha = 0.55f),
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                0.5f to Color.Black.copy(alpha = 0.4f),
+                1f to Color.Black.copy(alpha = 0.92f),
             ),
         )
+    }
+
+    val curvedScrimShape = remember {
+        object : Shape {
+            override fun createOutline(
+                size: androidx.compose.ui.geometry.Size,
+                layoutDirection: LayoutDirection,
+                density: Density,
+            ): Outline {
+                val w = size.width
+                val h = size.height
+                val path = Path().apply {
+                    moveTo(0f, h * 0.35f)
+                    quadraticBezierTo(w * 0.6f, h * 0.35f, w * 0.75f, h)
+                    lineTo(0f, h)
+                    close()
+                }
+                return Outline.Generic(path)
+            }
+        }
     }
     val bottomFadeBrush = remember(screenBackground) {
         Brush.verticalGradient(
@@ -152,9 +178,10 @@ fun LandscapeCard(
 
         Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .fillMaxHeight(0.50f)
+                .fillMaxHeight(0.65f)
+                .clip(curvedScrimShape)
                 .background(scrimBrush),
         )
 
