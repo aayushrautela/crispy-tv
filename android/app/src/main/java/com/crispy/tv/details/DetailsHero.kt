@@ -110,7 +110,6 @@ internal fun HeroSection(
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
-    val logoKey = resolvedKey?.let { "logo-$it" }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -322,32 +321,17 @@ internal fun HeroSection(
         ) {
             val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
             if (resolvedLogoUrl != null) {
-                val logoWidth = heroMaxWidth * 0.81f
                 val logoModel = rememberCrispyImageModel(
                     url = resolvedLogoUrl,
-                    width = logoWidth,
+                    width = heroMaxWidth * 0.81f,
                     height = 104.dp,
-                    memoryCacheKey = logoKey?.let { "${it}-hero" },
                 )
-                val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
-                    with(sharedTransitionScope) {
-                        Modifier
-                            .sharedElement(
-                                rememberSharedContentState(key = logoKey),
-                                animatedVisibilityScope = animatedVisibilityScope,
-                            )
-                            .fillMaxWidth(0.81f)
-                            .height(104.dp)
-                    }
-                } else {
-                    Modifier
-                        .fillMaxWidth(0.81f)
-                        .height(104.dp)
-                }
                 AsyncImage(
                     model = logoModel ?: resolvedLogoUrl,
                     contentDescription = details?.title,
-                    modifier = logoModifier,
+                    modifier = Modifier
+                        .fillMaxWidth(0.81f)
+                        .height(104.dp),
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.Center
                 )
