@@ -176,6 +176,11 @@ fun LandscapeCard(
             }
         }
 
+        val colonIndex = title.indexOf(':')
+        val hasColonSplit = colonIndex in 0 until title.lastIndex
+        val titleMain = if (hasColonSplit) title.substring(0, colonIndex) else title
+        val titleSub = if (hasColonSplit) title.substring(colonIndex + 1).trim() else null
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -184,17 +189,30 @@ fun LandscapeCard(
             verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             Text(
-                text = title,
+                text = titleMain,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    lineHeight = 16.sp,
+                    lineHeight = if (titleSub != null) 14.sp else 16.sp,
                     fontWeight = FontWeight.SemiBold,
                 ),
                 color = Color.White,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Start,
                 modifier = Modifier.widthIn(max = 240.dp),
             )
+            if (titleSub != null) {
+                Text(
+                    text = titleSub,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Normal,
+                    ),
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.widthIn(max = 240.dp),
+                )
+            }
 
             val metadataParts = buildList {
                 yearText?.let { add(it) }
