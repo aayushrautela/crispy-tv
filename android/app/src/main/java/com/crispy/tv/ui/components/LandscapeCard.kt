@@ -1,6 +1,7 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -159,20 +161,33 @@ fun LandscapeCard(
             )
         }
 
-        Box(
+        Canvas(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .fillMaxWidth(0.7f)
-                .fillMaxHeight(0.4f)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.7f),
-                        ),
+                .fillMaxWidth()
+                .fillMaxHeight(0.4f),
+        ) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.7f),
                     ),
                 ),
-        )
+                size = size,
+            )
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Black,
+                        0.6f to Color.Black,
+                        1f to Color.Transparent,
+                    ),
+                ),
+                blendMode = BlendMode.DstIn,
+                size = size,
+            )
+        }
 
         if (badge != null) {
             Surface(
