@@ -128,8 +128,8 @@ internal fun BoxScope.HomeArtworkBottomScrim(
         Brush.verticalGradient(
             colorStops = arrayOf(
                 0f to Color.Transparent,
-                0.5f to Color.Black.copy(alpha = maxAlpha * 0.4f),
-                1f to Color.Black.copy(alpha = maxAlpha),
+                0.3f to Color.Black.copy(alpha = 0.55f),
+                1f to Color.Black.copy(alpha = 0.65f),
             ),
         )
     }

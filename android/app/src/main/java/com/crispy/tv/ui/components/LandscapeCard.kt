@@ -78,8 +78,8 @@ fun LandscapeCard(
         Brush.verticalGradient(
             colorStops = arrayOf(
                 0f to Color.Transparent,
-                0.5f to Color.Black.copy(alpha = 0.4f),
-                1f to Color.Black.copy(alpha = 0.92f),
+                0.3f to Color.Black.copy(alpha = 0.6f),
+                1f to Color.Black.copy(alpha = 0.7f),
             ),
         )
     }
