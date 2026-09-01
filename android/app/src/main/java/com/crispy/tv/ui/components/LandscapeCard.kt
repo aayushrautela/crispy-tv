@@ -159,31 +159,20 @@ fun LandscapeCard(
             )
         }
 
-        Canvas(
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .fillMaxHeight(0.45f),
-        ) {
-            val w = size.width
-            val h = size.height
-            val path = Path().apply {
-                moveTo(0f, h * 0.2f)
-                cubicTo(w * 0.5f, h * 0.2f, w * 0.75f, h * 0.6f, w * 0.65f, h)
-                lineTo(0f, h)
-                close()
-            }
-            drawPath(
-                path = path,
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Transparent,
-                        0.4f to Color.Black.copy(alpha = 0.5f),
-                        1f to Color.Black.copy(alpha = 0.65f),
+                .fillMaxWidth(0.7f)
+                .fillMaxHeight(0.4f)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.7f),
+                        ),
                     ),
                 ),
-            )
-        }
+        )
 
         if (badge != null) {
             Surface(

@@ -124,40 +124,18 @@ internal fun BoxScope.HomeArtworkBottomScrim(
     heightFraction: Float,
     maxAlpha: Float,
 ) {
-    val scrimBrush = remember(maxAlpha) {
-        Brush.verticalGradient(
-            colorStops = arrayOf(
-                0f to Color.Transparent,
-                0.3f to Color.Black.copy(alpha = 0.55f),
-                1f to Color.Black.copy(alpha = 0.65f),
-            ),
-        )
-    }
-    val curvedScrimShape = remember {
-        object : Shape {
-            override fun createOutline(
-                size: androidx.compose.ui.geometry.Size,
-                layoutDirection: LayoutDirection,
-                density: Density,
-            ): Outline {
-                val w = size.width
-                val h = size.height
-                val path = Path().apply {
-                    moveTo(0f, h * 0.3f)
-                    quadraticBezierTo(w * 0.6f, h * 0.3f, w * 0.7f, h)
-                    lineTo(0f, h)
-                    close()
-                }
-                return Outline.Generic(path)
-            }
-        }
-    }
     Box(
         modifier = Modifier
             .align(Alignment.BottomStart)
-            .fillMaxWidth()
-            .fillMaxHeight((heightFraction + 0.15f).coerceIn(0f, 1f))
-            .clip(curvedScrimShape)
-            .background(scrimBrush),
+            .fillMaxWidth(0.7f)
+            .fillMaxHeight(0.4f)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = maxAlpha),
+                    ),
+                ),
+            ),
     )
 }
