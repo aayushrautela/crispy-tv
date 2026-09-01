@@ -153,6 +153,22 @@ internal fun HeroSection(
                             .skeletonElement(color = DetailsSkeletonColors.Elevated)
                     )
                 }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.5f to Color.Transparent,
+                                    0.7f to palette.pageBackground.copy(alpha = 0.2f),
+                                    0.85f to palette.pageBackground.copy(alpha = 0.6f),
+                                    1.0f to palette.pageBackground,
+                                )
+                            )
+                        )
+                )
             }
             return@BoxWithConstraints
         }
@@ -274,6 +290,23 @@ internal fun HeroSection(
             }
         }
 
+        // Smooth bottom fade overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            0.7f to palette.pageBackground.copy(alpha = 0.2f),
+                            0.85f to palette.pageBackground.copy(alpha = 0.6f),
+                            1.0f to palette.pageBackground,
+                        )
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -309,23 +342,6 @@ internal fun HeroSection(
                 )
             }
         }
-
-        // Smooth bottom fade overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.0f to Color.Transparent,
-                            0.5f to Color.Transparent,
-                            0.7f to palette.pageBackground.copy(alpha = 0.2f),
-                            0.85f to palette.pageBackground.copy(alpha = 0.6f),
-                            1.0f to palette.pageBackground,
-                        )
-                    )
-                )
-        )
     }
 }
 
