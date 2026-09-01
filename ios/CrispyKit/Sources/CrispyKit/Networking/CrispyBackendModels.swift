@@ -298,6 +298,7 @@ public struct PersonKnownForItem: Equatable, Identifiable {
     public let logoUrl: String?
     public let rating: Double?
     public let releaseYear: Int?
+    public let genres: [String]
 
     public var id: String { itemId }
 }
@@ -310,7 +311,53 @@ public let biography: String?
 public let birthday: String?
 public let placeOfBirth: String?
 public let profileUrl: String?
-public let knownFor: [PersonKnownForItem]
+public let knownForRails: [PersonKnownForRail]
+}
+
+public enum KnownForRail: String, Equatable, CaseIterable {
+    case movies = "Movies"
+    case shows = "Shows"
+    case interviews = "Interviews"
+
+    public var title: String { rawValue }
+}
+
+public struct PersonKnownForRail: Equatable {
+    public let rail: KnownForRail
+    public let items: [PersonKnownForItem]
+}
+
+enum KnownForPartitioner {
+    private static let interviewGenres: Set<String> = ["documentary", "talk"]
+
+    private static func normalizedType(_ mediaType: String) -> String {
+        switch mediaType.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "anime": return "anime"
+        case "episode": return "episode"
+        case "show", "tv": return "show"
+        default: return "movie"
+        }
+    }
+
+    private static func classify(genres: [String], type: String) -> KnownForRail {
+        let isInterview = genres.contains { interviewGenres.contains($0.trimmingCharacters(in: .whitespaces).lowercased()) }
+        if isInterview { return .interviews }
+        switch normalizedType(type) {
+        case "show", "anime", "episode": return .shows
+        default: return .movies
+        }
+    }
+
+    static func partition(items: [PersonKnownForItem]) -> [PersonKnownForRail] {
+        var buckets: [KnownForRail: [PersonKnownForItem]] = [:]
+        for item in items {
+            let rail = classify(genres: item.genres, type: item.mediaType)
+            buckets[rail, default: []].append(item)
+        }
+        return KnownForRail.allCases.compactMap { rail in
+            buckets[rail].map { PersonKnownForRail(rail: rail, items: $0) }
+        }.filter { !$0.items.isEmpty }
+    }
 }
 
 // MARK: - Accounts / settings

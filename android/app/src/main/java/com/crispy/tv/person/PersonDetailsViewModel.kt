@@ -9,6 +9,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.catalog.toCatalogItem
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Immutable
+data class PersonKnownForRail(
+    val rail: KnownForRail,
+    val items: List<CatalogItem>,
+)
+
+@Immutable
 data class PersonDetails(
     val personId: String,
     val name: String,
@@ -27,7 +34,7 @@ data class PersonDetails(
     val birthday: String?,
     val placeOfBirth: String?,
     val profileUrl: String?,
-    val knownFor: List<CatalogItem>
+    val knownForRails: List<PersonKnownForRail>,
 )
 
 @Immutable
@@ -115,6 +122,11 @@ class PersonDetailsViewModel internal constructor(
 }
 
 private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails {
+    val rails = com.crispy.tv.domain.person.KnownForPartitioner.partition(
+        items = knownFor,
+        typeOf = { it.normalizedCatalogMediaType() },
+        genresOf = { it.genres },
+    )
     return PersonDetails(
         personId = personId,
         name = name,
@@ -123,7 +135,12 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
         birthday = birthday,
         placeOfBirth = placeOfBirth,
         profileUrl = profileUrl,
-        knownFor = knownFor.mapNotNull { it.toCatalogItem() }
-            .distinctBy { "${it.type}:${it.id}" },
+        knownForRails = rails.map { (rail, cards) ->
+            PersonKnownForRail(
+                rail = rail,
+                items = cards.mapNotNull { it.toCatalogItem() }
+                    .distinctBy { "${it.type}:${it.id}" },
+            )
+        },
     )
 }

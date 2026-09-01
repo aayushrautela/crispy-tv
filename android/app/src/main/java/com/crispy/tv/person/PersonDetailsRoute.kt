@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -402,45 +403,20 @@ private fun PersonBody(
         }
 
         Spacer(modifier = Modifier.height(22.dp))
-        if (showPlaceholders) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.3f)
-                        .height(20.dp)
-                        .skeletonElement(pulse = false)
-            )
-        } else if (person?.knownFor?.isNotEmpty() == true) {
-            Text(
-                text = "Known For",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
     }
 
-    if (showPlaceholders || person?.knownFor?.isNotEmpty() == true) {
-        val knownFor = person?.knownFor.orEmpty()
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = horizontalPadding)
-        ) {
+    val rails = person?.knownForRails.orEmpty()
+    val hasRails = rails.isNotEmpty()
+    if (showPlaceholders || hasRails) {
+        Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
             if (showPlaceholders) {
-                items(count = 4, contentType = { "personKnownForSkeleton" }) {
-                    PersonPosterSkeleton()
-                }
+                PersonKnownForRailSkeleton(horizontalPadding = horizontalPadding)
             } else {
-                items(
-                    items = knownFor,
-                    key = { "${it.type}:${it.id}" },
-                    contentType = { "poster" }
-                ) { item ->
-                    val key = "person-knownFor-${item.itemId}"
-                    HomeCatalogPosterCard(
-                        item = item,
-                        sharedElementKey = key,
-                        onClick = { onItemClick(item, key) },
+                rails.forEach { rail ->
+                    PersonKnownForRailView(
+                        rail = rail,
+                        horizontalPadding = horizontalPadding,
+                        onItemClick = onItemClick,
                     )
                 }
             }
@@ -457,6 +433,61 @@ private fun PersonPosterSkeleton() {
                 .aspectRatio(CardStyle.LandscapeAspectRatio)
                 .skeletonElement(shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp), pulse = false)
     )
+}
+
+@Composable
+private fun PersonKnownForRailSkeleton(horizontalPadding: Dp) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .padding(horizontal = horizontalPadding)
+                    .fillMaxWidth(0.3f)
+                    .height(20.dp)
+                    .skeletonElement(pulse = false)
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding)
+        ) {
+            items(count = 4, contentType = { "personKnownForSkeleton" }) {
+                PersonPosterSkeleton()
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonKnownForRailView(
+    rail: PersonKnownForRail,
+    horizontalPadding: Dp,
+    onItemClick: (CatalogItem, String?) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = rail.rail.title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = horizontalPadding),
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding)
+        ) {
+            items(
+                items = rail.items,
+                key = { "${it.type}:${it.id}" },
+                contentType = { "poster" }
+            ) { item ->
+                val key = "person-knownFor-${item.itemId}"
+                HomeCatalogPosterCard(
+                    item = item,
+                    sharedElementKey = key,
+                    onClick = { onItemClick(item, key) },
+                )
+            }
+        }
+    }
 }
 
 @Composable

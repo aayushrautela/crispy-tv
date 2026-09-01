@@ -80,32 +80,34 @@ struct PersonScreen: View {
                             .padding(.horizontal, 16)
                     }
 
-                    if !detail.knownFor.isEmpty {
-                        Text("Known for")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
+                    ForEach(detail.knownForRails, id: \.rail.title) { rail in
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(rail.rail.title)
+                                .font(.headline)
+                                .padding(.horizontal, 16)
 
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(detail.knownFor) { item in
-                                NavigationLink(value: AppRoute.details(
-                                    itemId: item.itemId,
-                                    itemType: item.mediaType
-                                )) {
-                                    LandscapeCardView(
-                                        title: item.title,
-                                        artworkUrl: item.artworkUrl,
-                                        logoUrl: item.logoUrl,
-                                        ratingText: formatRating(item.rating),
-                                        yearText: item.releaseYear.map(String.init),
-                                        maturityRating: nil,
-                                        genre: nil,
-                                        width: nil
-                                    )
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(rail.items) { item in
+                                    NavigationLink(value: AppRoute.details(
+                                        itemId: item.itemId,
+                                        itemType: item.mediaType
+                                    )) {
+                                        LandscapeCardView(
+                                            title: item.title,
+                                            artworkUrl: item.artworkUrl,
+                                            logoUrl: item.logoUrl,
+                                            ratingText: formatRating(item.rating),
+                                            yearText: item.releaseYear.map(String.init),
+                                            maturityRating: nil,
+                                            genre: nil,
+                                            width: nil
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
                     }
 
                     if !viewModel.errorMessage.isEmpty {

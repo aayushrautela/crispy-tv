@@ -371,7 +371,7 @@ public func getMetadataPersonDetail(accessToken: String, personId: String) async
             birthday: json.jsonString("birthday"),
             placeOfBirth: json.jsonString("placeOfBirth"),
             profileUrl: json.jsonString("profileUrl"),
-            knownFor: json.jsonArray("knownFor").compactMap(parseKnownForItem)
+            knownForRails: KnownForPartitioner.partition(items: json.jsonArray("knownFor").compactMap(parseKnownForItem))
         )
     }
 
@@ -517,7 +517,8 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium,
             logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
             rating: json.jsonDouble("rating"),
-            releaseYear: json.jsonInt("year")
+            releaseYear: json.jsonInt("year"),
+            genres: json.jsonArray("genres").compactMap { $0 as? String }
         )
     }
 
