@@ -47,10 +47,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.keepScreenOn
@@ -129,14 +128,6 @@ internal fun HeroSection(
         val heroMaxWidth = maxWidth
         val widthPx = with(density) { heroMaxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val bottomFadeBrush = Brush.verticalGradient(
-            colorStops = arrayOf(
-                0f to Color.Transparent,
-                0.85f to Color.Transparent,
-                1f to palette.pageBackground,
-            ),
-        )
-        android.util.Log.d("HeroFade", "bottomFadeBrush created: 0.85f -> 1f, pageBackground=${palette.pageBackground}")
 
         if (details == null && imageUrl.isNullOrBlank()) {
             Box(
@@ -147,12 +138,6 @@ internal fun HeroSection(
                         color = DetailsSkeletonColors.Base
                     )
             ) {
-                // Bottom fade to merge hero into the page background.
-                HeroBottomFade(
-                    pageBackground = palette.pageBackground,
-                    heightPx = heightPx,
-                )
-
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -193,20 +178,10 @@ internal fun HeroSection(
                         )
                         .clip(RoundedCornerShape(cornerRadius))
                         .fillMaxSize()
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(brush = bottomFadeBrush)
-                        }
                 }
             } else {
-                Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(brush = bottomFadeBrush)
-                    }
+                Modifier.fillMaxSize()
             }
-            android.util.Log.d("HeroFade", "Backdrop AsyncImage rendered with backdropModifier (bottomFadeBrush)")
             AsyncImage(
                 model = heroRequest ?: imageUrl,
                 contentDescription = details?.title,
@@ -221,12 +196,7 @@ internal fun HeroSection(
             )
         } else {
             Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(brush = bottomFadeBrush)
-                    },
+                modifier = Modifier.fillMaxSize(),
                 color = palette.pillBackground
             ) {}
         }
@@ -245,7 +215,6 @@ internal fun HeroSection(
                 viewportHeightPx = heightPx.toInt(),
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
-                bottomFadeBrush = bottomFadeBrush,
                 onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
                 onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
                 onFocusLossPause = onFocusLossPause,
@@ -258,31 +227,21 @@ internal fun HeroSection(
             label = "hero_trailer_cover_alpha",
         )
 
-        android.util.Log.d("HeroFade", "coverAlpha=$coverAlpha, showTrailer=$showTrailer, hasTrailer=$hasTrailer, trailerHasRenderedFirstFrame=$trailerHasRenderedFirstFrame, isActuallyPlaying=$isActuallyPlaying")
         if (showTrailer && hasTrailer && coverAlpha > 0.001f) {
             if (!imageUrl.isNullOrBlank()) {
-                android.util.Log.d("HeroFade", "Cover AsyncImage rendered with bottomFadeBrush, coverAlpha=$coverAlpha")
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer(alpha = coverAlpha)
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(brush = bottomFadeBrush)
-                        },
+                        .graphicsLayer(alpha = coverAlpha),
                     contentScale = ContentScale.Crop,
                 )
             } else {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer(alpha = coverAlpha)
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(brush = bottomFadeBrush)
-                        },
+                        .graphicsLayer(alpha = coverAlpha),
                     color = palette.pillBackground,
                 ) {}
             }
@@ -324,7 +283,6 @@ internal fun HeroSection(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
-            android.util.Log.d("DetailsHero", "logoUrl=${details?.logoUrl}, resolved=$resolvedLogoUrl, details=${details?.title}")
             if (resolvedLogoUrl != null) {
                 val logoModel = rememberCrispyImageModel(
                     url = resolvedLogoUrl,
@@ -352,37 +310,16 @@ internal fun HeroSection(
             }
         }
 
-        // Fixed fade overlay on top of everything (backdrop, trailer, cover)
+        // Bottom blur overlay for dissolve effect
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(bottomFadeBrush)
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(120.dp)
+                .blur(60.dp)
+                .background(palette.pageBackground)
         )
     }
-}
-
-@Composable
-private fun HeroBottomFade(
-    pageBackground: Color,
-    heightPx: Float,
-) {
-    android.util.Log.d("HeroFade", "HeroBottomFade rendered: 0.66f -> 1f, heightPx=$heightPx")
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colorStops =
-                        arrayOf(
-                            0f to Color.Transparent,
-                            0.66f to Color.Transparent,
-                            1f to pageBackground
-                        ),
-                    startY = 0f,
-                    endY = heightPx
-                )
-            )
-    )
 }
 
 @OptIn(UnstableApi::class)
@@ -394,7 +331,6 @@ private fun HeroTrailerLayer(
     viewportHeightPx: Int,
     shouldPlay: Boolean,
     isMuted: Boolean,
-    bottomFadeBrush: Brush,
     onFirstFrameRendered: () -> Unit,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
     onFocusLossPause: () -> Unit,
@@ -555,14 +491,8 @@ private fun HeroTrailerLayer(
         }
     }
 
-    android.util.Log.d("HeroFade", "HeroTrailerLayer rendered, applying bottomFadeBrush")
     Box(
-        modifier = modifier
-            .clipToBounds()
-            .drawWithContent {
-                drawContent()
-                drawRect(brush = bottomFadeBrush)
-            }
+        modifier = modifier.clipToBounds()
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
