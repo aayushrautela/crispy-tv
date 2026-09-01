@@ -1,5 +1,6 @@
 package com.crispy.tv.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -25,14 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,25 +84,6 @@ fun LandscapeCard(
         )
     }
 
-    val curvedScrimShape = remember {
-        object : Shape {
-            override fun createOutline(
-                size: androidx.compose.ui.geometry.Size,
-                layoutDirection: LayoutDirection,
-                density: Density,
-            ): Outline {
-                val w = size.width
-                val h = size.height
-                val path = Path().apply {
-                    moveTo(0f, h * 0.35f)
-                    quadraticBezierTo(w * 0.6f, h * 0.35f, w * 0.75f, h)
-                    lineTo(0f, h)
-                    close()
-                }
-                return Outline.Generic(path)
-            }
-        }
-    }
     val bottomFadeBrush = remember(screenBackground) {
         Brush.verticalGradient(
             colorStops = arrayOf(
@@ -176,14 +157,31 @@ fun LandscapeCard(
             )
         }
 
-        Box(
+        Canvas(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .fillMaxHeight(0.65f)
-                .clip(curvedScrimShape)
-                .background(scrimBrush),
-        )
+                .fillMaxHeight(0.45f),
+        ) {
+            val w = size.width
+            val h = size.height
+            val path = Path().apply {
+                moveTo(0f, h * 0.2f)
+                cubicTo(w * 0.5f, h * 0.2f, w * 0.75f, h * 0.6f, w * 0.65f, h)
+                lineTo(0f, h)
+                close()
+            }
+            drawPath(
+                path = path,
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Transparent,
+                        0.4f to Color.Black.copy(alpha = 0.5f),
+                        1f to Color.Black.copy(alpha = 0.65f),
+                    ),
+                ),
+            )
+        }
 
         if (badge != null) {
             Surface(
