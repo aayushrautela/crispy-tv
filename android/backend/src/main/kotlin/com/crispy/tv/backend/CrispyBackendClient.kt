@@ -403,7 +403,17 @@ class CrispyBackendClient(
         val birthday: String?,
         val placeOfBirth: String?,
         val profileUrl: String?,
+        val socials: PersonSocials,
         val knownFor: List<ClientMediaCard>,
+    )
+
+    data class PersonSocials(
+        val imdbId: String?,
+        val instagram: String?,
+        val twitter: String?,
+        val facebook: String?,
+        val tiktok: String?,
+        val youtube: String?,
     )
 
     // --- Watch Actions ---

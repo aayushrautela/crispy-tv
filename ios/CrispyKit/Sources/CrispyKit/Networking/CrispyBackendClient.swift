@@ -371,7 +371,20 @@ public func getMetadataPersonDetail(accessToken: String, personId: String) async
             birthday: json.jsonString("birthday"),
             placeOfBirth: json.jsonString("placeOfBirth"),
             profileUrl: json.jsonString("profileUrl"),
+            socials: parsePersonSocials(json.jsonObject("socials")),
             knownForRails: KnownForPartitioner.partition(items: json.jsonArray("knownFor").compactMap(parseKnownForItem))
+        )
+    }
+
+    private func parsePersonSocials(_ json: [String: Any]?) -> PersonSocials {
+        guard let json else { return PersonSocials(imdbId: nil, instagram: nil, twitter: nil, facebook: nil, tiktok: nil, youtube: nil) }
+        return PersonSocials(
+            imdbId: json.jsonString("imdbId"),
+            instagram: json.jsonString("instagram"),
+            twitter: json.jsonString("twitter"),
+            facebook: json.jsonString("facebook"),
+            tiktok: json.jsonString("tiktok"),
+            youtube: json.jsonString("youtube")
         )
     }
 

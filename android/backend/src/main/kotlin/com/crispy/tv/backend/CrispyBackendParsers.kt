@@ -507,7 +507,22 @@ internal fun CrispyBackendClient.parseMetadataPersonDetail(json: JSONObject): Me
         birthday = json.optNullableString("birthday"),
         placeOfBirth = json.optNullableString("placeOfBirth"),
         profileUrl = json.optNullableString("profileUrl"),
+        socials = parsePersonSocials(json.optJSONObject("socials")),
         knownFor = parseClientMediaCards(json.optJSONArray("knownFor")),
+    )
+}
+
+private fun CrispyBackendClient.parsePersonSocials(json: JSONObject?): PersonSocials {
+    if (json == null) {
+        return PersonSocials(null, null, null, null, null, null)
+    }
+    return PersonSocials(
+        imdbId = json.optNullableString("imdbId"),
+        instagram = json.optNullableString("instagram"),
+        twitter = json.optNullableString("twitter"),
+        facebook = json.optNullableString("facebook"),
+        tiktok = json.optNullableString("tiktok"),
+        youtube = json.optNullableString("youtube"),
     )
 }
 

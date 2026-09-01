@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import com.crispy.tv.backend.PersonSocials
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.details.initials
@@ -310,7 +311,33 @@ private fun PersonHeader(
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                     )
                 }
+                PersonSocialsRow(socials = person?.socials)
             }
+        }
+    }
+}
+
+@Composable
+private fun PersonSocialsRow(socials: PersonSocials?) {
+    val handles = listOfNotNull(
+        socials?.twitter?.let { "twitter" to it },
+        socials?.instagram?.let { "instagram" to it },
+        socials?.facebook?.let { "facebook" to it },
+        socials?.tiktok?.let { "tiktok" to it },
+        socials?.youtube?.let { "youtube" to it },
+        socials?.imdbId?.let { "imdb" to it },
+    )
+    if (handles.isEmpty()) return
+    Row(
+        modifier = Modifier.padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        handles.forEach { (platform, handle) ->
+            Text(
+                text = "@$handle",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
         }
     }
 }

@@ -61,6 +61,7 @@ struct PersonScreen: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                            PersonSocialsRow(socials: detail.socials)
                         }
                         Spacer(minLength: 0)
                     }
@@ -134,5 +135,36 @@ struct PersonScreen: View {
         let created = PersonViewModel(personId: personId, initialProfileUrl: initialProfileUrl)
         viewModel = created
         return created
+    }
+}
+
+private struct PersonSocialsRow: View {
+    let socials: PersonSocials
+
+    private var handles: [(String, String)] {
+        [
+            socials.twitter.map { ("twitter", $0) },
+            socials.instagram.map { ("instagram", $0) },
+            socials.facebook.map { ("facebook", $0) },
+            socials.tiktok.map { ("tiktok", $0) },
+            socials.youtube.map { ("youtube", $0) },
+            socials.imdbId.map { ("imdb", $0) },
+        ].compactMap { $0 }
+    }
+
+    var body: some View {
+        if handles.isEmpty { return EmptyView() }
+        return HStack(spacing: 8) {
+            ForEach(handles, id: \.0) { handle in
+                Text("@\(handle.1)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if handle.0 != handles.last?.0 {
+                    Text("·")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }

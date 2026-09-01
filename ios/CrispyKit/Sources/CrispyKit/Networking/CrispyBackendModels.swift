@@ -311,7 +311,17 @@ public let biography: String?
 public let birthday: String?
 public let placeOfBirth: String?
 public let profileUrl: String?
+public let socials: PersonSocials
 public let knownForRails: [PersonKnownForRail]
+}
+
+public struct PersonSocials: Equatable {
+    public let imdbId: String?
+    public let instagram: String?
+    public let twitter: String?
+    public let facebook: String?
+    public let tiktok: String?
+    public let youtube: String?
 }
 
 public enum KnownForRail: String, Equatable, CaseIterable {

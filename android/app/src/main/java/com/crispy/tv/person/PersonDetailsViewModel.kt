@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.CrispyBackendClient.PersonSocials
 import com.crispy.tv.addons.mapping.normalizedCatalogMediaType
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.domain.person.KnownForRail
@@ -35,6 +36,7 @@ data class PersonDetails(
     val birthday: String?,
     val placeOfBirth: String?,
     val profileUrl: String?,
+    val socials: PersonSocials,
     val knownForRails: List<PersonKnownForRail>,
 )
 
@@ -136,6 +138,7 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
         birthday = birthday,
         placeOfBirth = placeOfBirth,
         profileUrl = profileUrl,
+        socials = socials,
         knownForRails = rails.map { (rail, cards) ->
             PersonKnownForRail(
                 rail = rail,
