@@ -1,5 +1,6 @@
 package com.crispy.tv.sync
 
+import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.registry.CloudAddonRow
@@ -10,6 +11,7 @@ internal class HouseholdAddonsCloudSync(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
     private val addonRegistry: MetadataAddonRegistry,
+    private val activeProfileStore: ActiveProfileStore,
 ) {
     suspend fun pullToLocal(): Result<Unit> {
         val session =
@@ -44,6 +46,8 @@ internal class HouseholdAddonsCloudSync(
             }
         if (session == null) return Result.success(Unit)
 
+        val profileId = activeProfileStore.getActiveProfileId(session.userId)?.trim().orEmpty()
+
         return try {
             val serverAddons = backend.listAddons(session.accessToken)
             val localRows = addonRegistry.exportCloudAddons()
@@ -53,13 +57,13 @@ internal class HouseholdAddonsCloudSync(
 
             localRows.forEach { local ->
                 if (local.manifestUrl.lowercase(Locale.US) !in serverByUrl) {
-                    backend.installAddon(session.accessToken, local.manifestUrl)
+                    backend.installAddon(session.accessToken, profileId, local.manifestUrl)
                 }
             }
 
             serverAddons.forEach { server ->
                 if (server.manifestUrl.lowercase(Locale.US) !in localByUrl) {
-                    backend.uninstallAddon(session.accessToken, server.id)
+                    backend.uninstallAddon(session.accessToken, profileId, server.id)
                 }
             }
 

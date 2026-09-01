@@ -130,10 +130,12 @@ object SupabaseServicesProvider {
         context: Context,
         addonRegistry: MetadataAddonRegistry,
     ): HouseholdAddonsCloudSync {
+        val appContext = context.applicationContext
         return HouseholdAddonsCloudSync(
-            supabase = accountClient(context.applicationContext),
-            backend = BackendServicesProvider.backendClient(context.applicationContext),
+            supabase = accountClient(appContext),
+            backend = BackendServicesProvider.backendClient(appContext),
             addonRegistry = addonRegistry,
+            activeProfileStore = activeProfileStore(appContext),
         )
     }
 }

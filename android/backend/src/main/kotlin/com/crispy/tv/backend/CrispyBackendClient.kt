@@ -604,12 +604,12 @@ class CrispyBackendClient(
         return listAddonsApi(accessToken)
     }
 
-    suspend fun installAddon(accessToken: String, manifestUrl: String): AddonDto {
-        return installAddonApi(accessToken, manifestUrl)
+    suspend fun installAddon(accessToken: String, profileId: String, manifestUrl: String): AddonDto {
+        return installAddonApi(accessToken, profileId, manifestUrl)
     }
 
-    suspend fun uninstallAddon(accessToken: String, addonId: String): Boolean {
-        return uninstallAddonApi(accessToken, addonId)
+    suspend fun uninstallAddon(accessToken: String, profileId: String, addonId: String): Boolean {
+        return uninstallAddonApi(accessToken, profileId, addonId)
     }
 
     suspend fun getAvatars(): List<Avatar> {
@@ -801,6 +801,14 @@ class CrispyBackendClient(
             .add("Content-Type", "application/json")
             .add("Accept", "application/json")
             .build()
+    }
+
+    internal fun authHeaders(accessToken: String, profileId: String): Headers {
+        val builder = authHeaders(accessToken).newBuilder()
+        if (profileId.isNotBlank()) {
+            builder.add("X-Profile-ID", profileId.trim())
+        }
+        return builder.build()
     }
 
     internal fun requireSuccess(response: CrispyHttpResponse): JSONObject {

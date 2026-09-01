@@ -295,13 +295,14 @@ internal suspend fun CrispyBackendClient.listAddonsApi(accessToken: String): Lis
 
 internal suspend fun CrispyBackendClient.installAddonApi(
     accessToken: String,
+    profileId: String,
     manifestUrl: String,
 ): AddonDto {
     checkConfigured()
     val response = httpClient.postJson(
         url = "$baseUrl/v1/account/addons".toHttpUrl(),
         jsonBody = JSONObject().put("manifestUrl", manifestUrl.trim()).toString(),
-        headers = authHeaders(accessToken),
+        headers = authHeaders(accessToken, profileId),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
@@ -311,12 +312,13 @@ internal suspend fun CrispyBackendClient.installAddonApi(
 
 internal suspend fun CrispyBackendClient.uninstallAddonApi(
     accessToken: String,
+    profileId: String,
     addonId: String,
 ): Boolean {
     checkConfigured()
     val response = httpClient.delete(
         url = "$baseUrl/v1/account/addons/${addonId.trim()}".toHttpUrl(),
-        headers = authHeaders(accessToken),
+        headers = authHeaders(accessToken, profileId),
         callTimeoutMs = callTimeoutMs,
     )
     return response.code in 200..299
