@@ -364,17 +364,9 @@ private fun CanonicalContinueWatchingItem.sectionKey(): String {
 }
 
 internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
-    val isEpisode = itemType.equals("episode", ignoreCase = true)
-    val displayTitle = if (isEpisode) {
-        val seasonPart = season?.let { String.format(Locale.US, "S%02d", it) }
-        val episodePart = episode?.let { String.format(Locale.US, "E%02d", it) }
-        listOfNotNull(seasonPart, episodePart).joinToString(":")
-    } else {
-        title
-    }
     return HomeWideRailItemUi(
         key = "${type}:${localKey}",
-        title = displayTitle,
+        title = seriesName ?: title,
         subtitle = buildHomeWatchActivitySubtitle(),
         imageUrl = stillUrl ?: artworkUrl,
         progressFraction = progressPercent?.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
