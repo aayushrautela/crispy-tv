@@ -336,7 +336,7 @@ internal fun HomeWideRailCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
                 Text(
