@@ -47,9 +47,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.keepScreenOn
@@ -310,14 +310,21 @@ internal fun HeroSection(
             }
         }
 
-        // Bottom blur overlay for dissolve effect
+        // Smooth bottom fade overlay
         Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(120.dp)
-                .blur(60.dp)
-                .background(palette.pageBackground)
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            0.7f to palette.pageBackground.copy(alpha = 0.2f),
+                            0.85f to palette.pageBackground.copy(alpha = 0.6f),
+                            1.0f to palette.pageBackground,
+                        )
+                    )
+                )
         )
     }
 }
