@@ -148,9 +148,15 @@ internal fun HeroSection(
                 ) {
                     Box(
                         modifier = Modifier
+                            .fillMaxWidth(0.4f)
+                            .height(48.dp)
+                            .skeletonElement(shape = RoundedCornerShape(8.dp), color = DetailsSkeletonColors.Elevated, pulse = false)
+                    )
+                    Box(
+                        modifier = Modifier
                             .fillMaxWidth(0.64f)
                             .height(38.dp)
-                            .skeletonElement(color = DetailsSkeletonColors.Elevated)
+                            .skeletonElement(color = DetailsSkeletonColors.Elevated, pulse = false)
                     )
                 }
 
