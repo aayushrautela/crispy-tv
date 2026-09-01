@@ -246,11 +246,14 @@ class HomeCatalogService internal constructor(
         val normalizedItemId = itemId.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
         val artwork = images.artwork
+        val logo = images.logo
         return HomeCatalogItem(
             itemId = normalizedItemId,
             title = normalizedTitle,
             artworkUrl = artwork.medium,
+            logoUrl = logo.medium,
             artwork = artwork.toDomainMap(),
+            logo = logo.toDomainMap(),
             addonId = "backend",
             type = mediaType.toCatalogType(),
             rating = formatRating(rating),
@@ -267,7 +270,9 @@ class HomeCatalogService internal constructor(
             itemId = normalizedItemId,
             title = title,
             artworkUrl = artworkUrl,
+            logoUrl = logoUrl,
             artwork = responsiveImageSetFromDomainMap(artwork),
+            logo = responsiveImageSetFromDomainMap(logo),
             addonId = addonId,
             type = type,
             rating = rating,
@@ -342,7 +347,9 @@ class HomeCatalogService internal constructor(
                                                             .put("item_id", item.itemId)
                                                             .put("title", item.title)
                                                             .put("artwork_url", item.artworkUrl)
+                                                            .put("logo_url", item.logoUrl)
                                                             .put("artwork", JSONObject(item.artwork))
+                                                            .put("logo", JSONObject(item.logo))
                                                             .put("addon_id", item.addonId)
                                                             .put("type", item.type)
                                                             .put("rating", item.rating)
@@ -419,7 +426,9 @@ class HomeCatalogService internal constructor(
             itemId = itemId,
             title = title,
             artworkUrl = json.optString("artwork_url").trim().ifBlank { null },
+            logoUrl = json.optString("logo_url").trim().ifBlank { null },
             artwork = json.optJSONObject("artwork")?.toStringMap() ?: emptyMap(),
+            logo = json.optJSONObject("logo")?.toStringMap() ?: emptyMap(),
             addonId = addonId,
             type = type,
             rating = json.optString("rating").trim().ifBlank { null },

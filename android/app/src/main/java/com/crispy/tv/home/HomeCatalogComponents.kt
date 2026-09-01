@@ -152,6 +152,8 @@ internal fun HomeCatalogPosterCard(
         title = item.title,
         artworkUrl = item.artworkUrl,
         artwork = item.artwork,
+        logoUrl = item.logoUrl,
+        logo = item.logo,
         rating = item.rating,
         year = item.year,
         genre = item.genre,
