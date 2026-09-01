@@ -36,6 +36,7 @@ data class HomeWideRailItemUi(
     val title: String,
     val subtitle: String,
     val imageUrl: String?,
+    val logoUrl: String? = null,
     val badgeLabel: String? = null,
     val progressFraction: Float? = null,
     val kind: HomeWideRailItemKind,
