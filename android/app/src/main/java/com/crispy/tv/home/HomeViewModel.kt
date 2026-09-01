@@ -366,7 +366,7 @@ private fun CanonicalContinueWatchingItem.sectionKey(): String {
 internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
     return HomeWideRailItemUi(
         key = "${type}:${localKey}",
-        title = seriesName ?: title,
+        title = title,
         subtitle = buildHomeWatchActivitySubtitle(),
         imageUrl = stillUrl ?: artworkUrl,
         progressFraction = progressPercent?.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
