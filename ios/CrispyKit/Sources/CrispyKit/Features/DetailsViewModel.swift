@@ -68,7 +68,7 @@ public func load(environment: AppEnvironment) async {
             }
 
             if isShow {
-                let targetSeason = selectedSeasonNumber ?? seasons.first?.seasonNumber ?? 1
+                let targetSeason = selectedSeasonNumber ?? seasons.first?.parent?.seasonNumber ?? 1
                 await selectSeason(targetSeason, environment: environment)
             }
         } catch {
