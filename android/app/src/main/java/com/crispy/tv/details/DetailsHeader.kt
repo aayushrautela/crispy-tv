@@ -230,7 +230,7 @@ internal fun HeaderInfoSection(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(2f),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Box(
@@ -404,7 +404,7 @@ internal fun HeaderInfoSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(2f),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     FilledTonalButton(
