@@ -53,6 +53,7 @@ internal data class DetailsPaletteColors(
     val accent: Color,
     val onAccent: Color,
     val pillBackground: Color,
+    val pillBackgroundSolid: Color,
     val onPillBackground: Color
 )
 
@@ -64,6 +65,7 @@ internal fun detailsPaletteFromScheme(scheme: ColorScheme): DetailsPaletteColors
         accent = scheme.primary,
         onAccent = scheme.onPrimary,
         pillBackground = scheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        pillBackgroundSolid = scheme.surfaceContainerHigh,
         onPillBackground = scheme.onSurface,
     )
 }

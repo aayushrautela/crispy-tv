@@ -422,9 +422,9 @@ internal fun HeaderInfoSection(
                         shape = MaterialTheme.shapes.extraLarge,
                         colors =
                             ButtonDefaults.filledTonalButtonColors(
-                                containerColor = palette.pillBackground,
+                                containerColor = palette.pillBackgroundSolid,
                                 contentColor = palette.onPillBackground,
-                                disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                                disabledContainerColor = palette.pillBackgroundSolid.copy(alpha = 0.65f),
                                 disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
                             )
                     ) {
@@ -576,9 +576,9 @@ internal fun HeaderInfoSection(
                 shape = MaterialTheme.shapes.extraLarge,
                 colors =
                     ButtonDefaults.filledTonalButtonColors(
-                        containerColor = palette.pillBackground,
+                        containerColor = palette.pillBackgroundSolid,
                         contentColor = palette.onPillBackground,
-                        disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                        disabledContainerColor = palette.pillBackgroundSolid.copy(alpha = 0.65f),
                         disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
                     )
             ) {
@@ -774,7 +774,7 @@ private fun DetailsQuickAction(
     onClick: () -> Unit
 ) {
     val accent = selectedAccent ?: palette.accent
-    val container = if (selected) lerp(palette.pillBackground, accent, 0.28f) else palette.pillBackground
+    val container = if (selected) lerp(palette.pillBackgroundSolid, accent, 0.28f) else palette.pillBackgroundSolid
     val isError = sync.status == FieldSync.ERROR
     val iconTint =
         when {
