@@ -348,7 +348,7 @@ private fun DiscoverScreen(
     ) {
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Adaptive(minSize = CardStyle.landscapeCardWidth()),
+            columns = GridCells.Adaptive(minSize = CardStyle.landscapeCardMinCell()),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,

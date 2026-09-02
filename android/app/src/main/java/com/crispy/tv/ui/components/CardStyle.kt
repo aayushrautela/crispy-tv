@@ -10,4 +10,6 @@ object CardStyle {
 
     fun landscapeCardWidth(baseWidthDp: Int = CardBaseWidthDp): Dp =
         (baseWidthDp * 180 / 110).dp
+
+    fun landscapeCardMinCell(): Dp = 150.dp
 }
