@@ -218,43 +218,65 @@ internal fun HeaderInfoSection(
                 Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).skeletonElement(color = DetailsSkeletonColors.Base))
             }
 
-            // Buttons skeleton
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            val configuration = LocalConfiguration.current
+            val isWideScreen = configuration.screenWidthDp >= 768
+
+            if (isWideScreen) {
+                // Buttons skeleton (wide)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .skeletonElement(color = DetailsSkeletonColors.Base)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .skeletonElement(color = DetailsSkeletonColors.Elevated)
+                    )
+                    repeat(4) {
+                        Box(modifier = Modifier.size(48.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                    }
+                }
+            } else {
+                // Buttons skeleton (compact)
                 Box(
                     modifier = Modifier
-                        .width(160.dp)
+                        .fillMaxWidth()
                         .height(56.dp)
                         .skeletonElement(color = DetailsSkeletonColors.Base)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+
                 Box(
                     modifier = Modifier
-                        .width(160.dp)
+                        .fillMaxWidth()
                         .height(56.dp)
                         .skeletonElement(color = DetailsSkeletonColors.Elevated)
                 )
-            }
 
-            // Quick actions skeleton
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(4) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    ) {
-                        Box(modifier = Modifier.size(48.dp).skeletonElement(color = DetailsSkeletonColors.Base))
-                        Box(modifier = Modifier.width(44.dp).height(10.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                // Quick actions skeleton
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(4) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(vertical = 6.dp)
+                        ) {
+                            Box(modifier = Modifier.size(48.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                            Box(modifier = Modifier.width(44.dp).height(10.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                        }
                     }
                 }
             }
@@ -347,12 +369,177 @@ internal fun HeaderInfoSection(
         if (aiInsightsIsLoading) showAiInsightsBorder = true
 
         val context = LocalContext.current
+        val configuration = LocalConfiguration.current
+        val isWideScreen = configuration.screenWidthDp >= 768
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        if (isWideScreen) {
+            val watchCtaSubtext =
+                when {
+                    watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
+                        val date = DateFormat.getDateFormat(context).format(Date(watchCta.lastWatchedAtEpochMs))
+                        "Last watched on $date"
+                    }
+                    watchCta.remainingMinutes != null -> {
+                        val endsAtMs = System.currentTimeMillis() + (watchCta.remainingMinutes * 60_000L)
+                        val time = DateFormat.getTimeFormat(context).format(Date(endsAtMs))
+                        "Ends at $time"
+                    }
+                    else -> null
+                }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        showAiInsightsBorder = false
+                        onAiInsightsClick()
+                    },
+                    enabled = !aiInsightsIsLoading,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .aiInsightsBorderModifier(showAiInsightsBorder),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors =
+                        ButtonDefaults.filledTonalButtonColors(
+                            containerColor = palette.pillBackground,
+                            contentColor = palette.onPillBackground,
+                            disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                            disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
+                        )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier.width(34.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text("AI insights")
+                        }
+                        Spacer(modifier = Modifier.width(34.dp))
+                    }
+                }
+
+                Button(
+                    onClick = onWatchNow,
+                    enabled = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = palette.accent,
+                            contentColor = palette.onAccent
+                        )
+                ) {
+                    val iconVector =
+                        when (watchCta.icon) {
+                            WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
+                            WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
+                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier.width(34.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = iconVector,
+                                contentDescription = null,
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = watchCta.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                            if (watchCtaSubtext != null) {
+                                Text(
+                                    text = watchCtaSubtext,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = palette.onAccent.copy(alpha = 0.85f),
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(34.dp))
+                    }
+                }
+
+                DetailsQuickAction(
+                    label = "Watchlist",
+                    selected = isInWatchlist,
+                    sync = optimisticSync.watchlist,
+                    palette = palette,
+                    icon = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                    onClick = onToggleWatchlist
+                )
+
+                DetailsQuickAction(
+                    label = "Watched",
+                    selected = isWatched,
+                    sync = optimisticSync.watched,
+                    palette = palette,
+                    icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                    onClick = onToggleWatched
+                )
+
+                val gold = Color(0xFFFFD700)
+                DetailsQuickAction(
+                    label = if (isRated) (userRating?.let { "Rated $it" } ?: "Rated") else "Rate",
+                    selected = isRated,
+                    sync = optimisticSync.rating,
+                    palette = palette,
+                    selectedAccent = gold,
+                    icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    onClick = {
+                        pendingRating = (userRating ?: 0).toFloat()
+                        showRatingDialog = true
+                    }
+                )
+
+                DetailsQuickAction(
+                    label = "Share",
+                    selected = false,
+                    sync = OptimisticSyncBadge(),
+                    palette = palette,
+                    icon = Icons.Outlined.Share,
+                    onClick = {
+                        val title = details.title
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy")
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
+                    }
+                )
+            }
+        } else {
             FilledTonalButton(
                 onClick = {
                     showAiInsightsBorder = false
@@ -361,7 +548,7 @@ internal fun HeaderInfoSection(
                 enabled = !aiInsightsIsLoading,
                 modifier =
                     Modifier
-                        .width(160.dp)
+                        .fillMaxWidth()
                         .height(56.dp)
                         .aiInsightsBorderModifier(showAiInsightsBorder),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -396,8 +583,6 @@ internal fun HeaderInfoSection(
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
             val watchCtaSubtext =
                 when {
                     watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
@@ -416,7 +601,7 @@ internal fun HeaderInfoSection(
                 onClick = onWatchNow,
                 enabled = true,
                 modifier = Modifier
-                    .width(160.dp)
+                    .fillMaxWidth()
                     .height(56.dp),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors =
@@ -467,30 +652,30 @@ internal fun HeaderInfoSection(
                     Spacer(modifier = Modifier.width(34.dp))
                 }
             }
-        }
 
-        DetailsQuickActionsRow(
-            palette = palette,
-            isInWatchlist = isInWatchlist,
-            isWatched = isWatched,
-            isRated = isRated,
-            userRating = userRating,
-            optimisticSync = optimisticSync,
-            onToggleWatchlist = onToggleWatchlist,
-            onToggleWatched = onToggleWatched,
-            onRate = {
-                pendingRating = (userRating ?: 0).toFloat()
-                showRatingDialog = true
-            },
-            onShare = {
-                val title = details.title
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy")
+            DetailsQuickActionsRow(
+                palette = palette,
+                isInWatchlist = isInWatchlist,
+                isWatched = isWatched,
+                isRated = isRated,
+                userRating = userRating,
+                optimisticSync = optimisticSync,
+                onToggleWatchlist = onToggleWatchlist,
+                onToggleWatched = onToggleWatched,
+                onRate = {
+                    pendingRating = (userRating ?: 0).toFloat()
+                    showRatingDialog = true
+                },
+                onShare = {
+                    val title = details.title
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy")
+                    }
+                    context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
                 }
-                context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
-            }
-        )
+            )
+        }
 
         Spacer(modifier = Modifier.height(2.dp))
     }
