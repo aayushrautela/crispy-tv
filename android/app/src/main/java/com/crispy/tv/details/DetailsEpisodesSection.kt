@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -36,12 +37,14 @@ import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
+import kotlin.math.roundToInt
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 internal fun EpisodeCard(
     video: MediaVideo,
     isHighlighted: Boolean,
+    watchState: EpisodeWatchState = EpisodeWatchState(),
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onLongPress: () -> Unit = {},
@@ -103,6 +106,48 @@ internal fun EpisodeCard(
                 )
             }
 
+            if (watchState.isWatched) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp),
+                    shape = MaterialTheme.shapes.small,
+                    color = Color.Black.copy(alpha = 0.65f),
+                    contentColor = Color.White,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = "Watched",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            } else if (watchState.progressPercent > 0.0) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp),
+                    shape = MaterialTheme.shapes.small,
+                    color = Color.Black.copy(alpha = 0.65f),
+                    contentColor = Color.White,
+                ) {
+                    Text(
+                        text = "${watchState.progressPercent.roundToInt()}%",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -135,6 +180,24 @@ internal fun EpisodeCard(
                         color = Color.White.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            val progressFraction = (watchState.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+            if (!watchState.isWatched && watchState.progressPercent > 0.0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(Color.White.copy(alpha = 0.25f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progressFraction)
+                            .background(MaterialTheme.colorScheme.tertiary),
                     )
                 }
             }

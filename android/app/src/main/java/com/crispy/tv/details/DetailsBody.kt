@@ -308,6 +308,7 @@ internal fun LazyListScope.detailsBodyContent(
                                     EpisodeCard(
                                         video = video,
                                         isHighlighted = video.id == uiState.highlightedEpisodeId,
+                                        watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
                                         modifier = Modifier.width(Dimensions.WideCardWidth),
                                         onClick = { onEpisodeClick(video.id) },
                                         onLongPress = { onEpisodeLongPress(video) },
