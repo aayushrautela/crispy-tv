@@ -11,12 +11,15 @@ fun CrispyBackendClient.ClientMediaCard.toCatalogItem(): CatalogItem? {
     val normalizedType = normalizedCatalogMediaType()
     val normalizedArtworkUrl = images.artwork.medium ?: images.artwork.large ?: images.artwork.small
     if (normalizedArtworkUrl.isNullOrBlank()) return null
+    val logoUrl = images.logo.medium ?: images.logo.large ?: images.logo.small
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,
         title = itemTitle,
         artworkUrl = normalizedArtworkUrl,
+        logoUrl = logoUrl,
         artwork = images.artwork.toUiResponsiveImageSet(),
+        logo = images.logo.toUiResponsiveImageSet(),
         addonId = "backend",
         type = normalizedType,
         rating = formatRating(rating),
