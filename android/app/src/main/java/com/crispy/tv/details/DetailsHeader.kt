@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
@@ -237,13 +238,13 @@ internal fun HeaderInfoSection(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
-                                .skeletonElement(color = DetailsSkeletonColors.Base)
+                                .skeletonElement(shape = RoundedCornerShape(28.dp), color = DetailsSkeletonColors.Base)
                         )
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
-                                .skeletonElement(color = DetailsSkeletonColors.Elevated)
+                                .skeletonElement(shape = RoundedCornerShape(28.dp), color = DetailsSkeletonColors.Elevated)
                         )
                     }
                     Row(
@@ -261,14 +262,14 @@ internal fun HeaderInfoSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .skeletonElement(color = DetailsSkeletonColors.Base)
+                        .skeletonElement(shape = RoundedCornerShape(28.dp), color = DetailsSkeletonColors.Base)
                 )
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .skeletonElement(color = DetailsSkeletonColors.Elevated)
+                        .skeletonElement(shape = RoundedCornerShape(28.dp), color = DetailsSkeletonColors.Elevated)
                 )
 
                 // Quick actions skeleton
