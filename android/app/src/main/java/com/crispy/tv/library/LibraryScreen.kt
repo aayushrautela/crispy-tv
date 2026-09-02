@@ -431,7 +431,9 @@ internal fun LazyListScope.historyItems(
                         LandscapeCard(
                             title = item.title,
                             artworkUrl = item.artworkUrl,
+                            logoUrl = item.logoUrl,
                             artwork = item.artwork,
+                            logo = item.logo,
                             rating = item.rating,
                             year = item.year,
                             maturityRating = item.maturityRating,
@@ -482,7 +484,9 @@ internal fun LazyListScope.ratingsItems(
                         LandscapeCard(
                             title = item.title,
                             artworkUrl = item.artworkUrl,
+                            logoUrl = item.logoUrl,
                             artwork = item.artwork,
+                            logo = item.logo,
                             rating = item.rating,
                             year = item.year,
                             maturityRating = item.maturityRating,
@@ -532,7 +536,9 @@ internal fun LazyListScope.watchlistItems(
                         LandscapeCard(
                             title = item.title,
                             artworkUrl = item.artworkUrl,
+                            logoUrl = item.logoUrl,
                             artwork = item.artwork,
+                            logo = item.logo,
                             rating = item.rating,
                             year = item.year,
                             maturityRating = item.maturityRating,
