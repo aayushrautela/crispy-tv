@@ -220,7 +220,7 @@ internal fun HeaderInfoSection(
             }
 
             val configuration = LocalConfiguration.current
-            val isWideScreen = configuration.screenWidthDp >= 768
+        val isWideScreen = configuration.screenWidthDp >= 768 && configuration.screenHeightDp < configuration.screenWidthDp
 
             if (isWideScreen) {
                 // Buttons skeleton (wide)
@@ -380,10 +380,10 @@ internal fun HeaderInfoSection(
         if (aiInsightsIsLoading) showAiInsightsBorder = true
 
         val context = LocalContext.current
-        val configuration = LocalConfiguration.current
-        val isWideScreen = configuration.screenWidthDp >= 768
+            val configuration = LocalConfiguration.current
+            val isWideScreen = configuration.screenWidthDp >= 768 && configuration.screenHeightDp < configuration.screenWidthDp
 
-        if (isWideScreen) {
+            if (isWideScreen) {
             val watchCtaSubtext =
                 when {
                     watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
