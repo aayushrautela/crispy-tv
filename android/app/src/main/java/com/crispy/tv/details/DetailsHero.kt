@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -112,7 +113,7 @@ internal fun HeroSection(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
-    val heroHeight = (configuration.screenHeightDp.dp * 0.43f).coerceIn(300.dp, 440.dp)
+    val heroHeight = (configuration.screenHeightDp.dp * 0.55f).coerceIn(300.dp, 520.dp)
 
     val hasTrailer = trailer.isNotEmpty()
     var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
@@ -332,6 +333,7 @@ internal fun HeroSection(
                     model = logoModel ?: resolvedLogoUrl,
                     contentDescription = details?.title,
                     modifier = Modifier
+                        .widthIn(max = 420.dp)
                         .fillMaxWidth(0.81f)
                         .height(104.dp),
                     contentScale = ContentScale.Fit,

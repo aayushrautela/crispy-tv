@@ -219,19 +219,25 @@ internal fun HeaderInfoSection(
             }
 
             // Buttons skeleton
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .skeletonElement(color = DetailsSkeletonColors.Base)
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .skeletonElement(color = DetailsSkeletonColors.Elevated)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(160.dp)
+                        .height(56.dp)
+                        .skeletonElement(color = DetailsSkeletonColors.Base)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .width(160.dp)
+                        .height(56.dp)
+                        .skeletonElement(color = DetailsSkeletonColors.Elevated)
+                )
+            }
 
             // Quick actions skeleton
             Row(
@@ -340,117 +346,125 @@ internal fun HeaderInfoSection(
         var showAiInsightsBorder by remember { mutableStateOf(false) }
         if (aiInsightsIsLoading) showAiInsightsBorder = true
 
-        FilledTonalButton(
-            onClick = {
-                showAiInsightsBorder = false
-                onAiInsightsClick()
-            },
-            enabled = !aiInsightsIsLoading,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .aiInsightsBorderModifier(showAiInsightsBorder),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors =
-                ButtonDefaults.filledTonalButtonColors(
-                    containerColor = palette.pillBackground,
-                    contentColor = palette.onPillBackground,
-                    disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
-                    disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            FilledTonalButton(
+                onClick = {
+                    showAiInsightsBorder = false
+                    onAiInsightsClick()
+                },
+                enabled = !aiInsightsIsLoading,
+                modifier =
+                    Modifier
+                        .width(160.dp)
+                        .height(56.dp)
+                        .aiInsightsBorderModifier(showAiInsightsBorder),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = palette.pillBackground,
+                        contentColor = palette.onPillBackground,
+                        disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                        disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
+                    )
             ) {
-                Box(
-                    modifier = Modifier.width(34.dp),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text("AI insights")
-                }
-                Spacer(modifier = Modifier.width(34.dp))
-            }
-        }
-
-        val context = LocalContext.current
-        val watchCtaSubtext =
-            when {
-                watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
-                    val date = DateFormat.getDateFormat(context).format(Date(watchCta.lastWatchedAtEpochMs))
-                    "Last watched on $date"
-                }
-                watchCta.remainingMinutes != null -> {
-                    val endsAtMs = System.currentTimeMillis() + (watchCta.remainingMinutes * 60_000L)
-                    val time = DateFormat.getTimeFormat(context).format(Date(endsAtMs))
-                    "Ends at $time"
-                }
-                else -> null
-            }
-
-        Button(
-            onClick = onWatchNow,
-            enabled = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = palette.accent,
-                    contentColor = palette.onAccent
-                )
-        ) {
-            val iconVector =
-                when (watchCta.icon) {
-                    WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
-                    WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
-                }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier.width(34.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = iconVector,
-                        contentDescription = null,
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = watchCta.label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                    )
-                    if (watchCtaSubtext != null) {
-                        Text(
-                            text = watchCtaSubtext,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = palette.onAccent.copy(alpha = 0.85f),
-                            textAlign = TextAlign.Center,
+                    Box(
+                        modifier = Modifier.width(34.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.AutoAwesome,
+                            contentDescription = null,
                         )
                     }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("AI insights")
+                    }
+                    Spacer(modifier = Modifier.width(34.dp))
                 }
-                Spacer(modifier = Modifier.width(34.dp))
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            val context = LocalContext.current
+            val watchCtaSubtext =
+                when {
+                    watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
+                        val date = DateFormat.getDateFormat(context).format(Date(watchCta.lastWatchedAtEpochMs))
+                        "Last watched on $date"
+                    }
+                    watchCta.remainingMinutes != null -> {
+                        val endsAtMs = System.currentTimeMillis() + (watchCta.remainingMinutes * 60_000L)
+                        val time = DateFormat.getTimeFormat(context).format(Date(endsAtMs))
+                        "Ends at $time"
+                    }
+                    else -> null
+                }
+
+            Button(
+                onClick = onWatchNow,
+                enabled = true,
+                modifier = Modifier
+                    .width(160.dp)
+                    .height(56.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = palette.accent,
+                        contentColor = palette.onAccent
+                    )
+            ) {
+                val iconVector =
+                    when (watchCta.icon) {
+                        WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
+                        WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
+                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier.width(34.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = iconVector,
+                            contentDescription = null,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = watchCta.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (watchCtaSubtext != null) {
+                            Text(
+                                text = watchCtaSubtext,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = palette.onAccent.copy(alpha = 0.85f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(34.dp))
+                }
             }
         }
 
