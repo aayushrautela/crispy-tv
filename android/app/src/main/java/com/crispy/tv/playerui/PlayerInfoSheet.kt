@@ -289,14 +289,9 @@ private fun EpisodeContextBlock(
     palette: DetailsPaletteColors,
 ) {
     val context = episodeContext ?: return
-    val title = context.title?.trim()?.takeIf { it.isNotBlank() }
 
     Text(
-        text =
-            buildString {
-                append("Now Playing · ${context.seasonEpisodeLabel}")
-                if (title != null) append(" — $title")
-            },
+        text = context.seasonEpisodeLabel,
         style = MaterialTheme.typography.bodyMedium,
         color = palette.onPageBackground.copy(alpha = 0.8f),
         textAlign = TextAlign.Center,

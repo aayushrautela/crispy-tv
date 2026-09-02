@@ -15,11 +15,14 @@ data class PlayerEpisodeContext(
 
 fun MediaDetails.toPlayerEpisodeContext(): PlayerEpisodeContext? {
     if (seasonNumber == null || episodeNumber == null) return null
+    val episode = videos.firstOrNull { it.season == seasonNumber && it.episode == episodeNumber }
+        ?: videos.firstOrNull()
     return PlayerEpisodeContext(
         season = seasonNumber,
         episode = episodeNumber,
-        title = title.trim().takeIf { it.isNotBlank() },
-        overview = description?.trim()?.takeIf { it.isNotBlank() },
+        title = episode?.title?.trim()?.takeIf { it.isNotBlank() },
+        overview = episode?.overview?.trim()?.takeIf { it.isNotBlank() }
+            ?: description?.trim()?.takeIf { it.isNotBlank() },
     )
 }
 
