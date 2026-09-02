@@ -59,6 +59,7 @@ import com.crispy.tv.backend.CrispyBackendClient.PersonSocials
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.details.initials
+import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
@@ -407,7 +408,9 @@ private fun PersonBody(
     if (showPlaceholders || hasRails) {
         Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
             if (showPlaceholders) {
-                PersonKnownForRailSkeleton(horizontalPadding = horizontalPadding)
+                KnownForRail.entries.forEach { _ ->
+                    PersonKnownForRailSkeleton(horizontalPadding = horizontalPadding)
+                }
             } else {
                 rails.forEach { rail ->
                     PersonKnownForRailView(
