@@ -346,6 +346,8 @@ internal fun HeaderInfoSection(
         var showAiInsightsBorder by remember { mutableStateOf(false) }
         if (aiInsightsIsLoading) showAiInsightsBorder = true
 
+        val context = LocalContext.current
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -396,7 +398,6 @@ internal fun HeaderInfoSection(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            val context = LocalContext.current
             val watchCtaSubtext =
                 when {
                     watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
