@@ -5,10 +5,7 @@ import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamBehaviorHints
 import com.crispy.tv.addons.streams.StreamSubtitle
 import com.crispy.tv.plugins.PluginStream
-import com.crispy.tv.plugins.repo.PluginCodeStore
-import com.crispy.tv.plugins.repo.PluginManifestClient
-import com.crispy.tv.plugins.repo.PluginRepositoryManager
-import com.crispy.tv.plugins.repo.PluginRepositoryStore
+import com.crispy.tv.plugins.repo.PluginRepoHolder
 import com.crispy.tv.plugins.repo.PluginScraperDescriptor
 import com.crispy.tv.plugins.runtime.HostPluginBridges
 import com.crispy.tv.plugins.runtime.PluginRuntimeProvider
@@ -81,11 +78,7 @@ object PluginStreamsServiceFactory {
     fun create(appContext: Context, okHttpClient: OkHttpClient): PluginStreamSource {
         val storage = SharedPreferencesPluginStorage(appContext)
         val bridges = HostPluginBridges(okHttpClient, storage)
-        val repositoryManager = PluginRepositoryManager(
-            manifestClient = PluginManifestClient(okHttpClient),
-            codeStore = PluginCodeStore(appContext.filesDir),
-            store = PluginRepositoryStore(appContext.filesDir),
-        )
+        val repositoryManager = PluginRepoHolder.obtain(appContext, okHttpClient)
         val service = PluginStreamsService(
             repositoryManager = repositoryManager,
             runtimeProvider = { PluginRuntimeProvider.create(bridges) },

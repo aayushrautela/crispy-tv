@@ -16,6 +16,7 @@ import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import com.crispy.tv.settings.ImageSettingsScreen
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
+import com.crispy.tv.settings.PluginsSettingsRoute
 import com.crispy.tv.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
@@ -24,6 +25,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
         SettingsScreen(
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
+            },
+            onNavigateToPluginsSettings = {
+                navController.navigate(AppRoutes.PluginsSettingsRoute)
             },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
@@ -40,6 +44,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.AddonsSettingsRoute) {
         AddonsSettingsRoute(onBack = { navController.popBackStack() })
+    }
+
+    composable(AppRoutes.PluginsSettingsRoute) {
+        PluginsSettingsRoute(onBack = { navController.popBackStack() })
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {

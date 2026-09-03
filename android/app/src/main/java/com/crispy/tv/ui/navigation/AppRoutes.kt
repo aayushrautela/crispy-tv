@@ -32,6 +32,7 @@ object AppRoutes {
     const val PlaybackSettingsRoute = "settings/playback"
     const val ImageSettingsRoute = "settings/image"
     const val AddonsSettingsRoute = "settings/addons"
+    const val PluginsSettingsRoute = "settings/plugins"
     const val AccountsProfilesRoute = "settings/accounts"
     const val AuthRoute = "auth"
     const val ProfileManagementRoute = "settings/profiles"

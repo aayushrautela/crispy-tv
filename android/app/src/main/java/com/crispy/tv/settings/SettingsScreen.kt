@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Extension
@@ -69,6 +70,7 @@ data class SettingsGroup(
 @Composable
 fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
+    onNavigateToPluginsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToImageSettings: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
@@ -121,21 +123,36 @@ fun SettingsScreen(
             SettingsGroup(
                 title = "INTEGRATIONS",
                 items =
-                    listOf(
-                        SettingsItem(
-                            label = "Addons",
-                            description = "Install and remove addon manifests",
-                            icon = Icons.Outlined.Extension,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            onClick = onNavigateToAddonsSettings
-                        ),
-                        SettingsItem(
-                            label = "Language & Region",
-                            description = "Preferred content language",
-                            icon = Icons.Outlined.Language,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+                    buildList {
+                        if (PluginsUiSupported) {
+                            add(
+                                SettingsItem(
+                                    label = "Plugins",
+                                    description = "JavaScript plugin repositories",
+                                    icon = Icons.Outlined.Build,
+                                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    onClick = onNavigateToPluginsSettings,
+                                ),
+                            )
+                        }
+                        add(
+                            SettingsItem(
+                                label = "Addons",
+                                description = "Install and remove addon manifests",
+                                icon = Icons.Outlined.Extension,
+                                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                onClick = onNavigateToAddonsSettings,
+                            ),
                         )
-                    )
+                        add(
+                            SettingsItem(
+                                label = "Language & Region",
+                                description = "Preferred content language",
+                                icon = Icons.Outlined.Language,
+                                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                    },
             ),
             SettingsGroup(
                 title = "SYSTEM",
