@@ -33,6 +33,8 @@ dependencies {
     "fossImplementation"("org.jsoup:jsoup:1.18.3")
     "fossImplementation"("com.squareup.okhttp3:okhttp:5.5.0")
     "fossImplementation"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    "fossImplementation"(project(":android:addons"))
+    "fossImplementation"(project(":android:player"))
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")

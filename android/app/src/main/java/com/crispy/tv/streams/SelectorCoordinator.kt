@@ -4,6 +4,7 @@ import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.addons.streams.StreamProviderUiState
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.streams.ProviderStreamsResult
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
@@ -25,12 +26,15 @@ import kotlinx.coroutines.launch
  * selector (Player, Details, Home). It resolves streams via [StreamResolver] and, when given
  * [open] with a non-null [itemIdForMetadata], enriches the header metadata from the backend in
  * parallel with the addon lookup. Surfaces that already hold [fallbackDetails] avoid that fetch.
+ * When [pluginStreamLoader] is set (foss builds), JS plugin providers are resolved in parallel
+ * with the addon lookup and merged through the same provider-result pipeline.
  */
 class SelectorCoordinator(
     private val scope: CoroutineScope,
     private val streamResolver: StreamResolver,
     private val getMetadataItemDetail: suspend (accessToken: String, itemId: String) -> CrispyBackendClient.MetadataTitleDetailResponse,
     private val sessionTokenProvider: suspend () -> String?,
+    private val pluginStreamLoader: PluginStreamLoader? = null,
 ) {
     private val _state = MutableStateFlow(StreamSelectorUiState())
     val state: StateFlow<StreamSelectorUiState> = _state.asStateFlow()
@@ -90,6 +94,35 @@ class SelectorCoordinator(
                 null
             }
 
+        val pluginJob =
+            pluginStreamLoader?.let { loader ->
+                scope.launch {
+                    metadataJob?.join()
+                    if (session != sessionId || currentTarget != target) return@launch
+                    val request = buildPluginRequest(target) ?: return@launch
+                    val results =
+                        runCatching { loader.load(request) }.getOrElse { error ->
+                            listOf(
+                                ProviderStreamsResult(
+                                    providerId = PLUGIN_PROVIDER_ERROR_ID,
+                                    providerName = "Plugins",
+                                    streams = emptyList(),
+                                    errorMessage = error.message ?: "Plugin stream loading failed",
+                                ),
+                            )
+                        }
+                    if (session == sessionId && currentTarget == target) {
+                        _state.update { state ->
+                            val updated =
+                                results.fold(state.providers) { providers, result ->
+                                    providers.applyProviderResult(result)
+                                }
+                            state.copy(providers = updated)
+                        }
+                    }
+                }
+            }
+
         streamResolver.resolve(
             target = target,
             onProvidersResolved = {
@@ -108,6 +141,7 @@ class SelectorCoordinator(
             }
         }
 
+        pluginJob?.join()
         metadataJob?.join()
     }
 
@@ -134,10 +168,21 @@ class SelectorCoordinator(
         }
         scope.launch {
             val result =
-                runCatching { streamResolver.loadProviderStreams(target.mediaType, target.lookupId, providerId) }
-                    .getOrNull()
+                if (providerId.startsWith(PLUGIN_PROVIDER_PREFIX, ignoreCase = true)) {
+                    val request = buildPluginRequest(target)
+                    request?.let { requestValue ->
+                        runCatching { pluginStreamLoader?.load(requestValue) }
+                            .getOrNull()
+                            ?.firstOrNull { it.providerId.equals(providerId, ignoreCase = true) }
+                    }
+                } else {
+                    runCatching { streamResolver.loadProviderStreams(target.mediaType, target.lookupId, providerId) }
+                        .getOrNull()
+                }
             if (result != null && currentTarget == target) {
                 _state.update { it.copy(providers = it.providers.applyProviderResult(result), isLoading = false) }
+            } else if (currentTarget == target) {
+                _state.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -153,5 +198,24 @@ class SelectorCoordinator(
         _state.update { it.copy(visible = false) }
         onStreamSelected = null
         currentTarget = null
+    }
+
+    private fun buildPluginRequest(target: StreamLookupTarget): PluginStreamRequest? {
+        if (pluginStreamLoader == null) return null
+        val details = _details.value
+        val episode = _headerEpisode.value
+        return PluginStreamRequest(
+            mediaType = target.mediaType,
+            lookupId = target.lookupId,
+            title = details?.title,
+            year = details?.year,
+            season = episode?.season,
+            episode = episode?.episode,
+        )
+    }
+
+    private companion object {
+        const val PLUGIN_PROVIDER_PREFIX = "plugin:"
+        const val PLUGIN_PROVIDER_ERROR_ID = "plugin:error"
     }
 }

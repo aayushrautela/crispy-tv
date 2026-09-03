@@ -149,6 +149,7 @@ dependencies {
     implementation(project(":android:backend"))
     implementation(project(":android:addons"))
     implementation(project(":android:ui-assets"))
+    "fossImplementation"(project(":android:plugins"))
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 

@@ -3,7 +3,7 @@ package com.crispy.tv.plugins.runtime
 import android.content.Context
 import android.content.SharedPreferences
 
-internal class SharedPreferencesPluginStorage(context: Context) : PluginStorage {
+class SharedPreferencesPluginStorage(context: Context) : PluginStorage {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

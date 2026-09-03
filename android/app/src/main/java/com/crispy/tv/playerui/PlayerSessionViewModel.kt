@@ -24,6 +24,7 @@ import com.crispy.tv.addons.lookup.buildPlayerSubtitle
 import com.crispy.tv.addons.lookup.findEpisodeForLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.lookup.resolveStreamLookupTargetFromIdentity
+import com.crispy.tv.streams.PluginStreamLoaderProvider
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
@@ -146,6 +147,7 @@ class PlayerSessionViewModel(
                 backendClient.getMetadataItemDetail(accessToken = token, itemId = itemId)
             },
             sessionTokenProvider = { supabase.ensureValidSession()?.accessToken },
+            pluginStreamLoader = PluginStreamLoaderProvider.get(this.appContext),
         )
     private var activeSubtitleLookupId: String? = null
     private var activeSubtitleMediaType: MetadataLabMediaType? = null
