@@ -105,6 +105,7 @@ internal fun HeroSection(
     onFocusLossPause: () -> Unit,
     itemId: String? = null,
     sharedElementKey: String? = null,
+    entranceProgress: () -> Float = { 1f },
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
@@ -318,7 +319,8 @@ internal fun HeroSection(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = horizontalPadding)
-                .padding(bottom = 18.dp),
+                .padding(bottom = 18.dp)
+                .entranceFade(entranceProgress, 0f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

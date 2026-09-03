@@ -179,6 +179,7 @@ internal fun HeaderInfoSection(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
+    entranceProgress: () -> Float = { 1f },
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
 
@@ -363,15 +364,18 @@ internal fun HeaderInfoSection(
             Text(
                 text = genre,
                 style = MaterialTheme.typography.labelLarge,
-                color = palette.onPageBackground.copy(alpha = 0.86f)
+                color = palette.onPageBackground.copy(alpha = 0.86f),
+                modifier = Modifier.entranceFade(entranceProgress, 0.12f)
             )
         }
 
-        HeaderMetaRow(details = details, palette = palette)
+        HeaderMetaRow(details = details, palette = palette, modifier = Modifier.entranceFade(entranceProgress, 0.22f))
 
         ExpandableDescription(
             text = details.description,
-            modifier = Modifier.padding(bottom = 4.dp),
+            modifier = Modifier
+                .padding(bottom = 4.dp)
+                .entranceFade(entranceProgress, 0.32f),
             textAlign = TextAlign.Center,
             textColor = palette.onPageBackground.copy(alpha = 0.9f),
             placeholderColor = Color(0xFF9E9E9E)
@@ -405,7 +409,9 @@ internal fun HeaderInfoSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    modifier = Modifier.weight(2f),
+                    modifier = Modifier
+                        .weight(2f)
+                        .entranceFade(entranceProgress, 0.42f),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     FilledTonalButton(
@@ -509,7 +515,9 @@ internal fun HeaderInfoSection(
                 }
 
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .entranceFade(entranceProgress, 0.52f),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     DetailsQuickAction(
@@ -572,7 +580,8 @@ internal fun HeaderInfoSection(
                     Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .aiInsightsBorderModifier(showAiInsightsBorder),
+                        .aiInsightsBorderModifier(showAiInsightsBorder)
+                        .entranceFade(entranceProgress, 0.42f),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors =
                     ButtonDefaults.filledTonalButtonColors(
@@ -624,7 +633,8 @@ internal fun HeaderInfoSection(
                 enabled = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .entranceFade(entranceProgress, 0.48f),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors =
                     ButtonDefaults.buttonColors(
@@ -682,6 +692,7 @@ internal fun HeaderInfoSection(
                 isRated = isRated,
                 userRating = userRating,
                 optimisticSync = optimisticSync,
+                modifier = Modifier.entranceFade(entranceProgress, 0.52f),
                 onToggleWatchlist = onToggleWatchlist,
                 onToggleWatched = onToggleWatched,
                 onRate = {
@@ -711,13 +722,14 @@ private fun DetailsQuickActionsRow(
     isRated: Boolean,
     userRating: Int?,
     optimisticSync: OptimisticSync,
+    modifier: Modifier = Modifier,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onRate: () -> Unit,
     onShare: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(top = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -818,7 +830,8 @@ private fun DetailsQuickAction(
 @Composable
 private fun HeaderMetaRow(
     details: MediaDetails,
-    palette: DetailsPaletteColors
+    palette: DetailsPaletteColors,
+    modifier: Modifier = Modifier
 ) {
     val rating = normalizeRatingText(details.rating)
     val certification = details.certification?.trim().takeIf { !it.isNullOrBlank() }
@@ -826,6 +839,7 @@ private fun HeaderMetaRow(
     val runtime = formatRuntimeForHeader(details.runtime)
 
     Row(
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {

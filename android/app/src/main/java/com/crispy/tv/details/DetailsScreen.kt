@@ -6,6 +6,9 @@
 package com.crispy.tv.details
 
 import android.content.Intent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -153,6 +156,14 @@ internal fun DetailsScreen(
     val visibleDetails = if (showPalettePlaceholder) null else details
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
 
+    var entrancePlayed by rememberSaveable { mutableStateOf(false) }
+    val entranceProgress = remember { Animatable(if (entrancePlayed) 1f else 0f) }
+    LaunchedEffect(visibleDetails != null) {
+        if (visibleDetails == null || entrancePlayed) return@LaunchedEffect
+        entranceProgress.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+        entrancePlayed = true
+    }
+
     val heroTrailerSources = remember(uiState.titleDetail) {
         val remote = uiState.titleDetail?.item?.trailerUrl
         if (!remote.isNullOrBlank()) {
@@ -275,6 +286,7 @@ internal fun DetailsScreen(
                         onFocusLossPause = { userPausedTrailer = true },
                         itemId = uiState.itemId,
                         sharedElementKey = sharedElementKey,
+                        entranceProgress = { entranceProgress.value },
                     )
                 }
 
@@ -294,6 +306,7 @@ internal fun DetailsScreen(
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
                         onSetRating = onSetRating,
+                        entranceProgress = { entranceProgress.value },
                     )
                 }
 
