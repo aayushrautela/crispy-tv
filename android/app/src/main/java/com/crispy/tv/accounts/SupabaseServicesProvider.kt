@@ -136,6 +136,7 @@ object SupabaseServicesProvider {
             backend = BackendServicesProvider.backendClient(appContext),
             addonRegistry = addonRegistry,
             activeProfileStore = activeProfileStore(appContext),
+            pluginSyncBridge = PluginSyncBridgeProvider.create(appContext, BackendServicesProvider.backendClient(appContext)),
         )
     }
 }

@@ -12,6 +12,7 @@ internal class HouseholdAddonsCloudSync(
     private val backend: CrispyBackendClient,
     private val addonRegistry: MetadataAddonRegistry,
     private val activeProfileStore: ActiveProfileStore,
+    private val pluginSyncBridge: PluginAddonsSyncBridge? = null,
 ) {
     suspend fun pullToLocal(): Result<Unit> {
         val session =
@@ -33,6 +34,7 @@ internal class HouseholdAddonsCloudSync(
                 }
             }
             addonRegistry.reconcileCloudAddons(localRows)
+            pluginSyncBridge?.reconcilePull(dtos)
             Result.success(Unit)
         } catch (t: Throwable) {
             Result.failure(t)
@@ -72,6 +74,8 @@ internal class HouseholdAddonsCloudSync(
                     backend.uninstallAddon(session.accessToken, profileId, server.id)
                 }
             }
+
+            pluginSyncBridge?.reconcilePush(session.accessToken, profileId, serverAddons)
 
             Result.success(Unit)
         } catch (t: Throwable) {
