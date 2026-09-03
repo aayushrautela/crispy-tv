@@ -91,12 +91,21 @@ public static func parse(_ json: [String: Any]?) -> ClientProgress? {
     }
 }
 
+public struct ClientParentImages: Equatable {
+    public let artwork: ResponsiveImageSetDto
+
+    public static func parse(_ json: [String: Any]?) -> ClientParentImages {
+        ClientParentImages(artwork: ResponsiveImageSetDto.parse(json?.jsonObject("artwork")))
+    }
+}
+
 public struct ClientParentRef: Equatable {
 public let seriesItemId: String?
 public let seriesTitle: String?
 public let seasonItemId: String?
 public let seasonNumber: Int?
 public let episodeNumber: Int?
+public let images: ClientParentImages?
 
 public static func parse(_ json: [String: Any]?) -> ClientParentRef? {
         guard let json, !json.isEmpty else { return nil }
@@ -105,7 +114,8 @@ public static func parse(_ json: [String: Any]?) -> ClientParentRef? {
             seriesTitle: json.jsonString("seriesTitle"),
             seasonItemId: json.jsonString("seasonItemId"),
             seasonNumber: json.jsonInt("seasonNumber"),
-            episodeNumber: json.jsonInt("episodeNumber")
+            episodeNumber: json.jsonInt("episodeNumber"),
+            images: json.jsonObject("images").map(ClientParentImages.parse)
         )
     }
 }
@@ -144,6 +154,13 @@ public var id: String { itemId }
 
 public var artworkUrl: String? { images.artwork.medium ?? images.artwork.large ?? images.artwork.small }
     public var logoUrl: String? { images.logo.medium ?? images.logo.large ?? images.logo.small }
+
+    /// The parent series' own artwork; episodes/seasons use it where the UI
+    /// should show the show image instead of the episode still.
+public var seriesArtworkUrl: String? {
+        guard let artwork = parent?.images?.artwork, !artwork.isEmpty else { return nil }
+        return artwork.medium ?? artwork.large ?? artwork.small
+    }
 
 public static func parse(_ json: [String: Any]) throws -> ClientMediaCard {
         guard let itemId = json.jsonString("itemId"),

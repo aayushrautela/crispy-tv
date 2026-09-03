@@ -100,14 +100,16 @@ private fun ClientMediaCard.toCatalogItem(
     val isEpisode = mediaType.equals("episode", ignoreCase = true)
     val showItemId = if (isEpisode) parent?.seriesItemId else null
     val showTitle = if (isEpisode) parent?.seriesTitle else null
+    val seriesArtwork = if (isEpisode) parent?.images?.artwork?.takeIf { !it.isEmpty } else null
+    val cardArtwork = seriesArtwork ?: images.artwork
     val logoUrl = images.logo.medium ?: images.logo.large ?: images.logo.small
     return CatalogItem(
         id = itemId,
         itemId = showItemId ?: itemId,
         title = showTitle ?: title,
-        artworkUrl = images.artwork.medium,
+        artworkUrl = cardArtwork.medium,
         logoUrl = logoUrl,
-        artwork = images.artwork.toUiResponsiveImageSet(),
+        artwork = cardArtwork.toUiResponsiveImageSet(),
         logo = images.logo.toUiResponsiveImageSet(),
         addonId = "backend",
         type = mediaType.toCatalogType(),

@@ -173,12 +173,17 @@ class CrispyBackendClient(
         val userRating: Double?,
     )
 
+    data class ClientParentImages(
+        val artwork: ResponsiveImageSet,
+    )
+
     data class ClientParentRef(
         val seriesItemId: String?,
         val seriesTitle: String?,
         val seasonItemId: String?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
+        val images: ClientParentImages? = null,
     )
 
     data class ClientImages(

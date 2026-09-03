@@ -9,6 +9,7 @@ import com.crispy.tv.backend.CrispyBackendClient.ClientImages
 import com.crispy.tv.backend.CrispyBackendClient.CalendarItem
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
+import com.crispy.tv.backend.CrispyBackendClient.ClientParentImages
 import com.crispy.tv.backend.CrispyBackendClient.ClientParentRef
 import com.crispy.tv.backend.CrispyBackendClient.ClientProgress
 import com.crispy.tv.backend.CrispyBackendClient.MediaExternalIds
@@ -419,6 +420,15 @@ internal fun CrispyBackendClient.parseClientParentRef(json: JSONObject?): Client
         seasonItemId = safe.optNullableString("seasonItemId"),
         seasonNumber = safe.optIntOrNull("seasonNumber"),
         episodeNumber = safe.optIntOrNull("episodeNumber"),
+        images = parseClientParentImages(safe.optJSONObject("images")),
+    )
+}
+
+internal fun CrispyBackendClient.parseClientParentImages(json: JSONObject?): ClientParentImages? {
+    val safe = json ?: return null
+    if (safe.length() == 0) return null
+    return ClientParentImages(
+        artwork = parseResponsiveImageSet(safe.optJSONObject("artwork")),
     )
 }
 

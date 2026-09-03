@@ -40,12 +40,14 @@ public func formatRating(_ value: Double?) -> String? {
 }
 
 extension MediaCard {
-public static func from(_ card: ClientMediaCard) -> MediaCard {
+/// When `preferSeriesArtwork` is set (Library), episode cards use the parent
+/// series' artwork instead of the episode still.
+public static func from(_ card: ClientMediaCard, preferSeriesArtwork: Bool = false) -> MediaCard {
         MediaCard(
             itemId: card.itemId,
             type: normalizeCatalogType(card.mediaType),
             title: card.title,
-            artworkUrl: card.artworkUrl,
+            artworkUrl: preferSeriesArtwork ? (card.seriesArtworkUrl ?? card.artworkUrl) : card.artworkUrl,
             logoUrl: card.logoUrl,
             ratingText: formatRating(card.rating),
             yearText: card.year.map(String.init),

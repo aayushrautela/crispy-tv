@@ -114,7 +114,7 @@ public func loadNextPageIfNeeded(current itemId: String, environment: AppEnviron
             case .ratings:
                 result = try await environment.backend.listRatings(accessToken: context.accessToken, profileId: context.profileId, limit: 60, cursor: nextCursor)
             }
-            items.append(contentsOf: result.items.map { MediaCard.from($0) })
+            items.append(contentsOf: result.items.map { MediaCard.from($0, preferSeriesArtwork: true) })
             nextCursor = result.nextCursor
             hasMore = result.hasMore
             statusMessage = ""
