@@ -29,24 +29,26 @@ License guardrails:
 | Engine | `quickjs-kt` | MIT, KMP, small native lib, has interrupt handler for timeouts |
 | Flavor gate | New `:android:plugins` module; play source-set ships stub (`PluginsRuntimeSupport = false`) | Mirrors `TrailerFlavorCapabilities` + `NewPipeExtractor` pattern |
 | TV module | `missingDimensionStrategy("distribution", "foss")` on the new module | `:android:tv` is always FOSS; no stub variant needed there |
-| Plugin contract | `tmdbId`-first (plus imdbId/title/year/mediaType/season/episode) | Removes the fuzzy-matching layer entirely |
+| Plugin contract | Nuvio-compatible `getStreams(tmdbId, mediaType, season, episode)` | Existing Nuvio community plugins run unmodified |
 | Storage | Plugin code + repos cached on-device; sync stores enabled-provider records, not full repos | Per-device install, per-account enablement |
 | Sync safety | Unknown addon types ignored, never deleted (Android play flavor and iOS) | Prevents the Nuvio #1190 clobber bug class |
 | Stream integration | Plugins join `SelectorCoordinator` as another provider source | Zero player/UI rework; headers via existing `PlatformPlaybackDataSourceFactory` |
 
 ## Plugin contract v1
 
-A plugin is a single JS file evaluated as a module. Required export:
+A plugin is a single JS file. It may export via `module.exports.getStreams` or a
+global `getStreams` (both resolve; `module.exports` wins). Required export:
 
 ```js
-async function getStreams(input) {
-  // input: { tmdbId, imdbId?, mediaType: "movie"|"series",
-  //          season?, episode?, title, year? }
+async function getStreams(tmdbId, mediaType, season, episode) {
+  // tmdbId: string; mediaType: "movie"|"tv"; season/episode: number|undefined
   return [{
-    name, quality?, url,
+    title?, name?, url?,           // url may be a string or { url }; infoHash allowed instead of url
+    quality?, size?,               // size: human string ("1.2 GB") or bytes number
+    language?, provider?, type?, seeders?, peers?, infoHash?,
     headers?, referer?,
-    subtitles?: [{ url, lang }],
-    size?, audio?, filename?
+    subtitles?: [{ url, language?, lang?, name?, headers? }],
+    audio?, filename?
   }];
 }
 

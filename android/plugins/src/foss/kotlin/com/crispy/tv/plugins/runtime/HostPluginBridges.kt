@@ -53,6 +53,10 @@ internal class HostPluginBridges(
         return domBridgeFor(pluginId).innerHtml(documentId, elementId)
     }
 
+    override fun domHtml(pluginId: String, documentId: String, elementId: String): String {
+        return domBridgeFor(pluginId).html(documentId, elementId)
+    }
+
     override fun domAttr(pluginId: String, documentId: String, elementId: String, name: String): String {
         return domBridgeFor(pluginId).attr(documentId, elementId, name)
     }
@@ -75,6 +79,17 @@ internal class HostPluginBridges(
 
     override fun hmacHex(pluginId: String, algorithm: String, keyHex: String, dataHex: String): String {
         return CryptoBridge.hmacHex(algorithm, keyHex, dataHex)
+    }
+
+    override fun pbkdf2Hex(
+        pluginId: String,
+        passwordHex: String,
+        saltHex: String,
+        iterations: Int,
+        keySizeBits: Int,
+        hash: String,
+    ): String {
+        return CryptoBridge.pbkdf2Hex(passwordHex, saltHex, iterations, keySizeBits, hash)
     }
 
     override fun aesEncryptHex(pluginId: String, mode: String, keyHex: String, ivHex: String, dataHex: String): String {
@@ -120,6 +135,8 @@ internal class HostPluginBridges(
     private fun writeFetchFailure(message: String): String {
         return org.json.JSONObject()
             .put("status", 0)
+            .put("statusText", message)
+            .put("url", "")
             .put("headers", org.json.JSONObject())
             .put("bodyBase64", "")
             .put("body", "")

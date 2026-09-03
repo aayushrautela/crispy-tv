@@ -97,7 +97,8 @@ class SelectorCoordinator(
         val pluginJob =
             pluginStreamLoader?.let { loader ->
                 scope.launch {
-                    metadataJob?.join()
+                    // No metadata join: plugins receive only tmdbId/mediaType/season/episode,
+                    // so waiting for title/year would add latency for nothing.
                     if (session != sessionId || currentTarget != target) return@launch
                     val request = buildPluginRequest(target) ?: return@launch
                     val results =

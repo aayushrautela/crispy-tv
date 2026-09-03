@@ -45,26 +45,30 @@ internal fun parseLookupComponents(rawLookupId: String): ParsedPluginLookupId {
 }
 
 internal fun PluginStream.toAddonStream(scraper: PluginScraperDescriptor): AddonStream {
-    val normalizedUrl = url.trim()
+    val normalizedUrl = url?.trim()?.takeIf { it.isNotEmpty() }
     val headers = buildMap {
         putAll(this@toAddonStream.headers)
         referer?.trim()?.takeIf { it.isNotEmpty() }?.let { referer -> putIfAbsent("Referer", referer) }
     }
     val providerKey = providerId(scraper)
+    val seedersLabel = seeders?.let { count ->
+        peers?.let { "$count seeders • $it peers" } ?: "$count seeders"
+    }
     return AddonStream(
         providerId = providerKey,
         providerName = scraper.displayName,
         name = name,
-        title = name,
-        description = listOfNotNull(quality, sizeBytes?.toSizeLabel(), audio)
+        title = title ?: name,
+        description = listOfNotNull(quality, sizeLabel ?: sizeBytes?.toSizeLabel(), language, audio, seedersLabel)
             .joinToString(separator = " • ")
             .takeIf { it.isNotBlank() },
         url = normalizedUrl,
+        infoHash = infoHash?.trim()?.takeIf { it.isNotEmpty() },
         requestHeaders = headers,
-        stableKey = "$providerKey-${(normalizedUrl + headers.entries.joinToString("|") { "${it.key}=${it.value}" })
+        stableKey = "$providerKey-${(normalizedUrl.orEmpty() + infoHash.orEmpty() + headers.entries.joinToString("|") { "${it.key}=${it.value}" })
             .hashCode().toUInt().toString(16)}",
-        subtitles = subtitles.map { StreamSubtitle(url = it.url, lang = it.lang, name = it.lang) },
-        behaviorHints = StreamBehaviorHints(filename = filename),
+        subtitles = subtitles.map { StreamSubtitle(url = it.url, lang = it.lang, name = it.name ?: it.lang) },
+        behaviorHints = StreamBehaviorHints(filename = filename, videoSize = sizeBytes),
     )
 }
 

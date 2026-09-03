@@ -14,20 +14,36 @@ internal object PluginResultMapper {
 
     private fun mapStream(value: Any?): PluginStream? {
         if (value !is Map<*, *>) return null
-        val url = stringOrNull(value["url"]) ?: return null
-        if (url.isBlank()) return null
+        val url = extractUrl(value["url"])
+        val infoHash = stringOrNull(value["infoHash"])
+        if (url.isNullOrBlank() && infoHash.isNullOrBlank()) return null
 
+        val title = stringOrNull(value["title"])
         return PluginStream(
-            name = stringOrNull(value["name"]) ?: "Unknown",
-            url = url,
+            name = stringOrNull(value["name"]) ?: title ?: "Unknown",
+            title = title,
+            url = url?.takeIf { it.isNotBlank() },
             quality = stringOrNull(value["quality"]),
             headers = mapStrings(value["headers"]),
             referer = stringOrNull(value["referer"]),
             subtitles = mapSubtitles(value["subtitles"]),
             sizeBytes = (value["size"] as? Number)?.toLong(),
+            sizeLabel = (value["size"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            language = stringOrNull(value["language"]),
+            provider = stringOrNull(value["provider"]),
+            type = stringOrNull(value["type"]),
+            seeders = (value["seeders"] as? Number)?.toInt(),
+            peers = (value["peers"] as? Number)?.toInt(),
+            infoHash = infoHash,
             audio = stringOrNull(value["audio"]),
             filename = stringOrNull(value["filename"]),
         )
+    }
+
+    private fun extractUrl(value: Any?): String? {
+        stringOrNull(value)?.let { return it }
+        if (value is Map<*, *>) return stringOrNull(value["url"])
+        return null
     }
 
     private fun mapSubtitles(value: Any?): List<PluginSubtitle> {
@@ -35,9 +51,12 @@ internal object PluginResultMapper {
         return value.mapNotNull { entry ->
             if (entry !is Map<*, *>) return@mapNotNull null
             val url = stringOrNull(entry["url"])?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val lang = stringOrNull(entry["language"]) ?: stringOrNull(entry["lang"]) ?: "Unknown"
             PluginSubtitle(
                 url = url,
-                lang = stringOrNull(entry["lang"]) ?: "Unknown",
+                lang = lang,
+                name = stringOrNull(entry["name"]),
+                headers = mapStrings(entry["headers"]),
             )
         }
     }

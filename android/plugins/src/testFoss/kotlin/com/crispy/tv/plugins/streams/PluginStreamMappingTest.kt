@@ -40,12 +40,20 @@ class PluginStreamMappingTest {
     fun `mapping produces provider-scoped AddonStream with merged headers`() {
         val stream = PluginStream(
             name = "Demo 1080p",
+            title = null,
             url = "https://cdn.example.com/video.mp4",
             quality = "1080p",
             headers = mapOf("User-Agent" to "demo-agent"),
             referer = "https://example.com",
-            subtitles = listOf(PluginSubtitle(url = "https://example.com/sub.vtt", lang = "en")),
+            subtitles = listOf(PluginSubtitle(url = "https://example.com/sub.vtt", lang = "en", name = null, headers = emptyMap())),
             sizeBytes = 1_500_000_000L,
+            sizeLabel = null,
+            language = null,
+            provider = null,
+            type = null,
+            seeders = null,
+            peers = null,
+            infoHash = null,
             audio = "AAC 2.0",
             filename = "demo.mp4",
         ).toAddonStream(scraper)
@@ -66,17 +74,55 @@ class PluginStreamMappingTest {
     fun `mapping without referer leaves headers untouched`() {
         val stream = PluginStream(
             name = "plain",
+            title = null,
             url = "https://cdn.example.com/v.mp4",
             quality = null,
             headers = emptyMap(),
             referer = null,
             subtitles = emptyList(),
             sizeBytes = null,
+            sizeLabel = null,
+            language = null,
+            provider = null,
+            type = null,
+            seeders = null,
+            peers = null,
+            infoHash = null,
             audio = null,
             filename = null,
         ).toAddonStream(scraper)
         assertTrue(stream.requestHeaders.isEmpty())
         assertNull(stream.description)
+    }
+
+    @Test
+    fun `mapping keeps torrent-only stream playable via infoHash`() {
+        val stream = PluginStream(
+            name = "Torrent 2160p",
+            title = "Torrent Title",
+            url = null,
+            quality = "2160p",
+            headers = emptyMap(),
+            referer = null,
+            subtitles = emptyList(),
+            sizeBytes = null,
+            sizeLabel = "8.4 GB",
+            language = "English",
+            provider = "demo",
+            type = "torrent",
+            seeders = 12,
+            peers = 3,
+            infoHash = "ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+            audio = null,
+            filename = null,
+        ).toAddonStream(scraper)
+
+        assertNull(stream.url)
+        assertEquals("ABCDEF1234567890ABCDEF1234567890ABCDEF12", stream.infoHash)
+        assertTrue(stream.hasPlayableSource)
+        assertTrue(stream.isTorrentStream)
+        assertEquals("Torrent Title", stream.title)
+        assertEquals("2160p • 8.4 GB • English • 12 seeders • 3 peers", stream.description)
     }
 
     @Test

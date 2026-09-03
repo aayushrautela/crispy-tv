@@ -1,7 +1,9 @@
 package com.crispy.tv.plugins.bridge
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class BridgeUnitTest {
@@ -36,6 +38,20 @@ class BridgeUnitTest {
         assertEquals(
             "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
             CryptoBridge.hmacHex("SHA256", CryptoBridge.utf8ToHex("key"), CryptoBridge.utf8ToHex("The quick brown fox jumps over the lazy dog")),
+        )
+    }
+
+    @Test
+    fun `crypto pbkdf2 matches known vector`() {
+        assertEquals(
+            "0c60c80f961f0e71f3a9b524af6012062fe037a6",
+            CryptoBridge.pbkdf2Hex(
+                CryptoBridge.utf8ToHex("password"),
+                CryptoBridge.utf8ToHex("salt"),
+                1,
+                160,
+                "SHA1",
+            ),
         )
     }
 
@@ -113,6 +129,13 @@ class BridgeUnitTest {
         assertEquals("GET", request.method)
         assertEquals(0, request.headers.size)
         assertEquals("", request.bodyText)
+        assertTrue(request.followRedirects)
+    }
+
+    @Test
+    fun `request json parser honors manual redirect`() {
+        val request = PluginRequestJson.parse("""{"url":"https://example.com","followRedirects":false}""")
+        assertFalse(request.followRedirects)
     }
 
     @Test

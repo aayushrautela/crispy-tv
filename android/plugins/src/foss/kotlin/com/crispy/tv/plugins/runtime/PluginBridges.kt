@@ -28,6 +28,10 @@ internal open class PluginBridges {
         throw UnsupportedOperationException("dom is unavailable")
     }
 
+    open fun domHtml(pluginId: String, documentId: String, elementId: String): String {
+        throw UnsupportedOperationException("dom is unavailable")
+    }
+
     open fun domAttr(pluginId: String, documentId: String, elementId: String, name: String): String {
         throw UnsupportedOperationException("dom is unavailable")
     }
@@ -47,6 +51,17 @@ internal open class PluginBridges {
     }
 
     open fun hmacHex(pluginId: String, algorithm: String, keyHex: String, dataHex: String): String {
+        throw UnsupportedOperationException("crypto is unavailable")
+    }
+
+    open fun pbkdf2Hex(
+        pluginId: String,
+        passwordHex: String,
+        saltHex: String,
+        iterations: Int,
+        keySizeBits: Int,
+        hash: String,
+    ): String {
         throw UnsupportedOperationException("crypto is unavailable")
     }
 

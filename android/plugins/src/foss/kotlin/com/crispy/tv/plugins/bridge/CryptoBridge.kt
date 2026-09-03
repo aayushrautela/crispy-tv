@@ -19,15 +19,28 @@ internal object CryptoBridge {
         return mac.doFinal(HexCodec.decode(dataHex)).toHex()
     }
 
+    fun pbkdf2Hex(passwordHex: String, saltHex: String, iterations: Int, keySizeBits: Int, hash: String): String {
+        require(iterations > 0) { "PBKDF2 iterations must be positive" }
+        require(keySizeBits > 0 && keySizeBits % 8 == 0) { "PBKDF2 key size must be byte-aligned" }
+        val factory = javax.crypto.SecretKeyFactory.getInstance(pbkdf2Algorithm(hash))
+        val spec = javax.crypto.spec.PBEKeySpec(
+            HexCodec.decode(passwordHex).map { it.toInt().and(0xFF).toChar() }.toCharArray(),
+            HexCodec.decode(saltHex),
+            iterations,
+            keySizeBits,
+        )
+        return factory.generateSecret(spec).encoded.toHex()
+    }
+
     fun aesEncryptHex(mode: String, keyHex: String, ivHex: String, dataHex: String): String {
         val cipher = Cipher.getInstance(cipherTransformation(mode))
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey(keyHex), ivParameter(ivHex))
+        initAes(cipher, Cipher.ENCRYPT_MODE, mode, keyHex, ivHex)
         return cipher.doFinal(HexCodec.decode(dataHex)).toHex()
     }
 
     fun aesDecryptHex(mode: String, keyHex: String, ivHex: String, dataHex: String): String {
         val cipher = Cipher.getInstance(cipherTransformation(mode))
-        cipher.init(Cipher.DECRYPT_MODE, secretKey(keyHex), ivParameter(ivHex))
+        initAes(cipher, Cipher.DECRYPT_MODE, mode, keyHex, ivHex)
         return cipher.doFinal(HexCodec.decode(dataHex)).toHex()
     }
 
@@ -57,6 +70,17 @@ internal object CryptoBridge {
     private fun secretKey(keyHex: String): SecretKeySpec =
         SecretKeySpec(HexCodec.decode(keyHex), "AES")
 
+    private fun initAes(cipher: Cipher, opmode: Int, mode: String, keyHex: String, ivHex: String) {
+        val key = secretKey(keyHex)
+        if (mode.uppercase().contains("GCM")) {
+            cipher.init(opmode, key, javax.crypto.spec.GCMParameterSpec(128, HexCodec.decode(ivHex)))
+        } else if (mode.uppercase().contains("ECB")) {
+            cipher.init(opmode, key)
+        } else {
+            cipher.init(opmode, key, ivParameter(ivHex))
+        }
+    }
+
     private fun ivParameter(ivHex: String): IvParameterSpec =
         IvParameterSpec(HexCodec.decode(ivHex))
 
@@ -73,8 +97,18 @@ internal object CryptoBridge {
         return transformation
     }
 
-    private fun normalizeHash(algorithm: String): String {
-        val name = algorithm.uppercase().replace("-", "").replace("/", "")
+    private fun pbkdf2Algorithm(hash: String): String {
+        val name = hash.uppercase().replace("-", "").replace("/", "")
+        return when (name) {
+            "SHA1" -> "PBKDF2WithHmacSHA1"
+            "SHA256" -> "PBKDF2WithHmacSHA256"
+            "SHA384" -> "PBKDF2WithHmacSHA384"
+            "SHA512" -> "PBKDF2WithHmacSHA512"
+            else -> throw PluginExecutionBlockedException("Unsupported PBKDF2 hash: $hash")
+        }
+    }
+
+    private fun normalizeHash(algorithm: String): String {        val name = algorithm.uppercase().replace("-", "").replace("/", "")
         return when (name) {
             "SHA1" -> "SHA-1"
             "SHA256" -> "SHA-256"

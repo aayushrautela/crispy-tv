@@ -4,6 +4,7 @@ import com.crispy.tv.addons.streams.ProviderStreamsResult
 import com.crispy.tv.addons.streams.StreamProviderDescriptor
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.plugins.PluginStreamInput
+import com.crispy.tv.plugins.normalizePluginMediaType
 import com.crispy.tv.plugins.repo.PluginRepositoryManager
 import com.crispy.tv.plugins.repo.PluginScraperDescriptor
 import com.crispy.tv.plugins.runtime.PluginRuntime
@@ -49,19 +50,31 @@ internal class PluginStreamsService(
         onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)?,
         onProviderResult: ((ProviderStreamsResult) -> Unit)?,
     ): List<ProviderStreamsResult> {
-        if (refreshReposOnLoad) {
-            runCatching { repositoryManager.refreshDueRepositories(nowEpochMs()) }
-        }
-        val scrapers = repositoryManager.getEnabledScrapers()
-            .filter { it.supports(mediaType) }
-            .sortedBy { it.scraperId }
-        onProvidersResolved?.invoke(scrapers.map { it.toDescriptor() })
-        if (scrapers.isEmpty()) return emptyList()
-
-        val runtime = runtimeProvider() ?: return emptyList()
-        val input = buildInput(mediaType, lookupId, title, year, season, episode)
-
         return coroutineScope {
+            // Refresh runs alongside stream resolution instead of blocking it: manifest
+            // fetches must never gate playback lookup. The scraper snapshot below may
+            // miss repos that finish refreshing mid-load; they appear on the next load.
+            val refreshJob = launch {
+                if (refreshReposOnLoad) {
+                    runCatching { repositoryManager.refreshDueRepositories(nowEpochMs()) }
+                }
+            }
+            val scrapers = repositoryManager.getEnabledScrapers()
+                .filter { it.supports(mediaType) }
+                .sortedBy { it.scraperId }
+            onProvidersResolved?.invoke(scrapers.map { it.toDescriptor() })
+            if (scrapers.isEmpty()) {
+                refreshJob.join()
+                return@coroutineScope emptyList()
+            }
+
+            val runtime = runtimeProvider()
+            if (runtime == null) {
+                refreshJob.join()
+                return@coroutineScope emptyList()
+            }
+            val input = buildInput(mediaType, lookupId, season, episode)
+
             val semaphore = Semaphore(MAX_CONCURRENT_SCRAPERS)
             val channel = Channel<ProviderStreamsResult>(capacity = scrapers.size)
             scrapers.forEach { scraper ->
@@ -87,6 +100,7 @@ internal class PluginStreamsService(
                 onProviderResult?.invoke(result)
             }
             channel.close()
+            refreshJob.join()
             results
         }
     }
@@ -111,23 +125,20 @@ internal class PluginStreamsService(
     private fun buildInput(
         mediaType: MetadataLabMediaType,
         lookupId: String,
-        title: String,
-        year: Int?,
         season: Int?,
         episode: Int?,
     ): PluginStreamInput {
+        // Title/year stay app-side: the plugin contract exposes only
+        // tmdbId/mediaType/season/episode, like Nuvio.
         val parsed = parseLookupComponents(lookupId)
         return PluginStreamInput(
-            tmdbId = parsed.tmdbId ?: 0,
-            imdbId = parsed.imdbId,
+            tmdbId = parsed.tmdbId?.toString().orEmpty(),
             mediaType = when (mediaType) {
                 MetadataLabMediaType.MOVIE -> "movie"
-                MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME -> "series"
+                MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME -> "tv"
             },
             season = season ?: parsed.season,
             episode = episode ?: parsed.episode,
-            title = title,
-            year = year,
         )
     }
 
@@ -142,9 +153,9 @@ internal fun PluginScraperDescriptor.supports(mediaType: MetadataLabMediaType): 
     if (supportedTypes.isEmpty()) return true
     val canonical = when (mediaType) {
         MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME -> "series"
+        MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME -> "tv"
     }
-    return supportedTypes.any { it.equals(canonical, ignoreCase = true) }
+    return supportedTypes.any { normalizePluginMediaType(it) == canonical }
 }
 
 internal fun PluginScraperDescriptor.toDescriptor(): StreamProviderDescriptor =

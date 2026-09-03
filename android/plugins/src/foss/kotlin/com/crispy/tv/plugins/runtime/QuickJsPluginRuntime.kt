@@ -1,7 +1,7 @@
 package com.crispy.tv.plugins.runtime
 
 import com.crispy.tv.plugins.PluginExecutionResult
-import com.crispy.tv.plugins.PluginInputJson
+import com.crispy.tv.plugins.PluginJsArgs
 import com.crispy.tv.plugins.PluginStreamInput
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.asyncFunction
@@ -12,7 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import org.json.JSONObject
 
 internal class QuickJsPluginRuntime(
     private val bridges: PluginBridges,
@@ -98,6 +97,13 @@ internal class QuickJsPluginRuntime(
                 args.getOrNull(1)?.toString().orEmpty(),
             )
         }
+        function("__crispyDomHtml") { args ->
+            bridges.domHtml(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
         function("__crispyDomAttr") { args ->
             bridges.domAttr(
                 pluginId,
@@ -133,6 +139,16 @@ internal class QuickJsPluginRuntime(
                 args.getOrNull(0)?.toString().orEmpty(),
                 args.getOrNull(1)?.toString().orEmpty(),
                 args.getOrNull(2)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyPbkdf2Hex") { args ->
+            bridges.pbkdf2Hex(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+                (args.getOrNull(2) as? Number)?.toInt() ?: 0,
+                (args.getOrNull(3) as? Number)?.toInt() ?: 0,
+                args.getOrNull(4)?.toString().orEmpty(),
             )
         }
         function("__crispyAesEncryptHex") { args ->
@@ -197,20 +213,27 @@ internal class QuickJsPluginRuntime(
         code: String,
         input: PluginStreamInput,
     ): String {
-        val inputJson = PluginInputJson.encode(input)
+        val args = PluginJsArgs.callArguments(input)
         val facade = PluginJsFacade.build(
-            scraperIdJson = JSONObject().put("id", pluginId).toString(),
+            scraperIdJson = PluginJsArgs.string(pluginId),
             settingsJson = "{}",
         )
         return """
             |$facade
             |
+            |var module = { exports: {} };
+            |var exports = module.exports;
+            |(function() {
             |$code
+            |})();
             |
-            |if (typeof getStreams !== 'function') {
-            |  throw new Error('Plugin must define getStreams()');
+            |var __getStreams = module.exports.getStreams || globalThis.getStreams;
+            |var __result = [];
+            |if (typeof __getStreams === 'function') {
+            |  __result = await __getStreams($args);
+            |} else {
+            |  __crispyLog('getStreams function not found on module.exports or globalThis');
             |}
-            |const __result = await getStreams($inputJson);
             |__result;
         """.trimMargin()
     }
