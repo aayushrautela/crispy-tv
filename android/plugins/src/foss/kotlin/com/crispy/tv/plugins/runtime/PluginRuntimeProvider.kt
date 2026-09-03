@@ -1,5 +1,5 @@
 package com.crispy.tv.plugins.runtime
 
-object PluginRuntimeProvider {
+internal object PluginRuntimeProvider {
     fun create(bridges: PluginBridges): PluginRuntime = QuickJsPluginRuntime(bridges)
 }

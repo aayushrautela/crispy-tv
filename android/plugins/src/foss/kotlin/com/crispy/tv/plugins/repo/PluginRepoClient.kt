@@ -47,14 +47,18 @@ class PluginRepoClient(
 ) {
     private val manager = PluginRepoHolder.obtain(appContext.applicationContext, okHttpClient)
 
-    fun repos(): List<PluginRepoInfo> = manager.getStoredRepos().map { it.toInfo() }
+    fun repos(): List<PluginRepoInfo> = manager.getStoredRepos().map { repo -> repo.toInfo() }
 
     suspend fun install(url: String): Result<List<PluginScraperInfo>> = runCatching {
         val normalized = url.trim()
         val scheme = runCatching { Uri.parse(normalized).scheme }.getOrNull()
         require(scheme == "http" || scheme == "https") { "Enter a valid repository URL." }
-        val scrapers = manager.install(normalized, System.currentTimeMillis())
-        scrapers.map { it.toInfo() }
+        val repoUrl = normalized
+        manager.install(repoUrl, System.currentTimeMillis())
+        manager.getStoredRepos().firstOrNull { it.url == repoUrl }
+            ?.scrapers
+            ?.map { scraper -> scraper.toInfo() }
+            ?: emptyList()
     }
 
     suspend fun remove(url: String): Result<Unit> = runCatching {

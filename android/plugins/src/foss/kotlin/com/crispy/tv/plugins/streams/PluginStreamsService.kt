@@ -51,7 +51,8 @@ internal class PluginStreamsService(
     ): List<ProviderStreamsResult> {
         if (refreshReposOnLoad) {
             runCatching { repositoryManager.refreshDueRepositories(nowEpochMs()) }
-        }        val scrapers = repositoryManager.getEnabledScrapers()
+        }
+        val scrapers = repositoryManager.getEnabledScrapers()
             .filter { it.supports(mediaType) }
             .sortedBy { it.scraperId }
         onProvidersResolved?.invoke(scrapers.map { it.toDescriptor() })

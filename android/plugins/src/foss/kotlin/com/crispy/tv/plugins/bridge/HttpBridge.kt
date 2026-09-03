@@ -76,32 +76,32 @@ internal data class PluginRequestJson(
             .firstOrNull { it.key.equals("content-type", ignoreCase = true) }
             ?.value
             ?.toMediaTypeOrNull()
-}
 
-internal object PluginRequestJson {
-    fun parse(json: String): PluginRequestJson {
-        val root =
-            try {
-                org.json.JSONObject(json)
-            } catch (error: Exception) {
-                throw PluginExecutionBlockedException("Invalid fetch request JSON")
+    companion object {
+        fun parse(json: String): PluginRequestJson {
+            val root =
+                try {
+                    org.json.JSONObject(json)
+                } catch (error: Exception) {
+                    throw PluginExecutionBlockedException("Invalid fetch request JSON")
+                }
+            val url = root.optString("url").trim()
+            if (url.isEmpty()) {
+                throw PluginExecutionBlockedException("fetch url is required")
             }
-        val url = root.optString("url").trim()
-        if (url.isEmpty()) {
-            throw PluginExecutionBlockedException("fetch url is required")
-        }
-        val headers = LinkedHashMap<String, String>()
-        root.optJSONObject("headers")?.let { headersJson ->
-            headersJson.keys().forEach { key ->
-                headersJson.optString(key).takeIf { it.isNotEmpty() }?.let { headers[key] = it }
+            val headers = LinkedHashMap<String, String>()
+            root.optJSONObject("headers")?.let { headersJson ->
+                headersJson.keys().forEach { key ->
+                    headersJson.optString(key).takeIf { it.isNotEmpty() }?.let { headers[key] = it }
+                }
             }
+            return PluginRequestJson(
+                url = url,
+                method = root.optString("method", "GET").trim().ifEmpty { "GET" },
+                headers = headers,
+                bodyText = root.optString("body"),
+            )
         }
-        return PluginRequestJson(
-            url = url,
-            method = root.optString("method", "GET").trim().ifEmpty { "GET" },
-            headers = headers,
-            bodyText = root.optString("body"),
-        )
     }
 }
 

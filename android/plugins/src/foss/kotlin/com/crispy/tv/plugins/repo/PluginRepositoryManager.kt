@@ -59,6 +59,8 @@ internal class PluginRepositoryManager(
         codeStore.deleteRepo(url)
     }
 
+    fun getStoredRepos(): List<StoredRepo> = store.getStoredRepos()
+
     private suspend fun ensureCodeCached(url: String, scraperId: String, nowEpochMs: Long) {
         if (codeStore.readCode(url, scraperId) != null) return
         val manifest = runCatching { manifestClient.fetchManifest(url) }.getOrNull() ?: return

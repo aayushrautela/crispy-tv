@@ -1,6 +1,7 @@
 package com.crispy.tv.plugins.runtime
 
 import com.crispy.tv.plugins.PluginExecutionResult
+import com.crispy.tv.plugins.PluginInputJson
 import com.crispy.tv.plugins.PluginStreamInput
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.asyncFunction
