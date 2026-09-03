@@ -157,11 +157,16 @@ internal fun DetailsScreen(
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
 
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
-    val entranceProgress = remember { Animatable(if (entrancePlayed) 1f else 0f) }
+    val entranceAlpha = remember { Animatable(if (entrancePlayed) 1f else 0f) }
     LaunchedEffect(visibleDetails != null) {
         if (visibleDetails == null || entrancePlayed) return@LaunchedEffect
-        entranceProgress.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+        entranceAlpha.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
         entrancePlayed = true
+    }
+    val softFade: Modifier = if (entrancePlayed) {
+        Modifier
+    } else {
+        Modifier.graphicsLayer(alpha = entranceAlpha.value)
     }
 
     val heroTrailerSources = remember(uiState.titleDetail) {
@@ -286,7 +291,7 @@ internal fun DetailsScreen(
                         onFocusLossPause = { userPausedTrailer = true },
                         itemId = uiState.itemId,
                         sharedElementKey = sharedElementKey,
-                        entranceProgress = { entranceProgress.value },
+                        softFade = softFade,
                     )
                 }
 
@@ -306,7 +311,7 @@ internal fun DetailsScreen(
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
                         onSetRating = onSetRating,
-                        entranceProgress = { entranceProgress.value },
+                        softFade = softFade,
                     )
                 }
 

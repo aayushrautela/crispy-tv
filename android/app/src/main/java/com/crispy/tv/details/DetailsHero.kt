@@ -105,7 +105,7 @@ internal fun HeroSection(
     onFocusLossPause: () -> Unit,
     itemId: String? = null,
     sharedElementKey: String? = null,
-    entranceProgress: () -> Float = { 1f },
+    softFade: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
@@ -298,29 +298,35 @@ internal fun HeroSection(
             }
         }
 
-        // Smooth bottom fade overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.0f to Color.Transparent,
-                            0.5f to Color.Transparent,
-                            0.7f to palette.pageBackground.copy(alpha = 0.2f),
-                            0.85f to palette.pageBackground.copy(alpha = 0.6f),
-                            1.0f to palette.pageBackground,
+        val scrimAlpha by animateFloatAsState(
+            targetValue = if (details == null) 0f else 1f,
+            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+            label = "hero_scrim_alpha",
+        )
+        if (scrimAlpha > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(alpha = scrimAlpha)
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.5f to Color.Transparent,
+                                0.7f to palette.pageBackground.copy(alpha = 0.2f),
+                                0.85f to palette.pageBackground.copy(alpha = 0.6f),
+                                1.0f to palette.pageBackground,
+                            )
                         )
                     )
-                )
-        )
+            )
+        }
 
         Column(
-            modifier = Modifier
+            modifier = softFade
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = horizontalPadding)
-                .padding(bottom = 18.dp)
-                .entranceFade(entranceProgress, 0f),
+                .padding(bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

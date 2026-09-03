@@ -179,7 +179,7 @@ internal fun HeaderInfoSection(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
-    entranceProgress: () -> Float = { 1f },
+    softFade: Modifier = Modifier,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
 
@@ -353,7 +353,7 @@ internal fun HeaderInfoSection(
     }
 
     Column(
-        modifier = Modifier
+        modifier = softFade
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
             .padding(top = 10.dp),
@@ -365,17 +365,14 @@ internal fun HeaderInfoSection(
                 text = genre,
                 style = MaterialTheme.typography.labelLarge,
                 color = palette.onPageBackground.copy(alpha = 0.86f),
-                modifier = Modifier.entranceFade(entranceProgress, 0.12f)
             )
         }
 
-        HeaderMetaRow(details = details, palette = palette, modifier = Modifier.entranceFade(entranceProgress, 0.22f))
+        HeaderMetaRow(details = details, palette = palette)
 
         ExpandableDescription(
             text = details.description,
-            modifier = Modifier
-                .padding(bottom = 4.dp)
-                .entranceFade(entranceProgress, 0.32f),
+            modifier = Modifier.padding(bottom = 4.dp),
             textAlign = TextAlign.Center,
             textColor = palette.onPageBackground.copy(alpha = 0.9f),
             placeholderColor = Color(0xFF9E9E9E)
@@ -410,8 +407,7 @@ internal fun HeaderInfoSection(
             ) {
                 Row(
                     modifier = Modifier
-                        .weight(2f)
-                        .entranceFade(entranceProgress, 0.42f),
+                        .weight(2f),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     FilledTonalButton(
@@ -516,8 +512,7 @@ internal fun HeaderInfoSection(
 
                 Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .entranceFade(entranceProgress, 0.52f),
+                        .weight(1f),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     DetailsQuickAction(
@@ -580,8 +575,7 @@ internal fun HeaderInfoSection(
                     Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .aiInsightsBorderModifier(showAiInsightsBorder)
-                        .entranceFade(entranceProgress, 0.42f),
+                        .aiInsightsBorderModifier(showAiInsightsBorder),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors =
                     ButtonDefaults.filledTonalButtonColors(
@@ -633,8 +627,7 @@ internal fun HeaderInfoSection(
                 enabled = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .entranceFade(entranceProgress, 0.48f),
+                    .height(56.dp),
                 shape = MaterialTheme.shapes.extraLarge,
                 colors =
                     ButtonDefaults.buttonColors(
@@ -692,7 +685,6 @@ internal fun HeaderInfoSection(
                 isRated = isRated,
                 userRating = userRating,
                 optimisticSync = optimisticSync,
-                modifier = Modifier.entranceFade(entranceProgress, 0.52f),
                 onToggleWatchlist = onToggleWatchlist,
                 onToggleWatched = onToggleWatched,
                 onRate = {
