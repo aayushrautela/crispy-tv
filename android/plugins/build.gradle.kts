@@ -32,6 +32,7 @@ dependencies {
     "fossImplementation"("io.github.dokar3:quickjs-kt:1.0.14")
     "fossImplementation"("org.jsoup:jsoup:1.18.3")
     "fossImplementation"("com.squareup.okhttp3:okhttp:5.5.0")
+    "fossImplementation"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
