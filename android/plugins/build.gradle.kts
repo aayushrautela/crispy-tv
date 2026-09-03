@@ -30,9 +30,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     "fossImplementation"("io.github.dokar3:quickjs-kt:1.0.14")
+    "fossImplementation"("org.jsoup:jsoup:1.18.3")
+    "fossImplementation"("com.squareup.okhttp3:okhttp:5.5.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testImplementation("org.json:json:20240303")
     "testFossImplementation"("io.github.dokar3:quickjs-kt-jvm:1.0.14")
 
     configurations.matching {

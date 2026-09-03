@@ -2,8 +2,8 @@ package com.crispy.tv.plugins.runtime
 
 import com.crispy.tv.plugins.PluginExecutionResult
 import com.crispy.tv.plugins.PluginStreamInput
+import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.asyncFunction
-import com.dokar.quickjs.binding.define
 import com.dokar.quickjs.binding.function
 import com.dokar.quickjs.evaluate
 import com.dokar.quickjs.quickJs
@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 
 internal class QuickJsPluginRuntime(
     private val bridges: PluginBridges,
@@ -45,26 +46,148 @@ internal class QuickJsPluginRuntime(
         }
     }
 
-    private fun com.dokar.quickjs.QuickJs.installHostBindings(pluginId: String) {
-        define("crispy") {
-            function("__log") { args ->
-                bridges.log(pluginId, args.firstOrNull()?.toString().orEmpty())
+    private fun QuickJs.installHostBindings(pluginId: String) {
+        function("__crispyLog") { args ->
+            bridges.log(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        asyncFunction("__crispyFetch") { args ->
+            bridges.fetch(args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyStorageGet") { args ->
+            bridges.storageGet(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyStorageSet") { args ->
+            if (args.size >= 2) {
+                bridges.storageSet(
+                    pluginId,
+                    args[0]?.toString().orEmpty(),
+                    args[1]?.toString().orEmpty(),
+                )
             }
-            asyncFunction("__fetch") { args ->
-                bridges.fetch(args.firstOrNull()?.toString().orEmpty())
-            }
-            function("__storageGet") { args ->
-                bridges.storageGet(pluginId, args.firstOrNull()?.toString().orEmpty())
-            }
-            function("__storageSet") { args ->
-                if (args.size >= 2) {
-                    bridges.storageSet(
-                        pluginId,
-                        args[0]?.toString().orEmpty(),
-                        args[1]?.toString().orEmpty(),
-                    )
-                }
-            }
+        }
+        function("__crispyDomLoad") { args ->
+            bridges.domLoad(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyDomSelect") { args ->
+            bridges.domSelect(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDomFind") { args ->
+            bridges.domFind(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+                args.getOrNull(2)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDomText") { args ->
+            bridges.domText(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDomInnerHtml") { args ->
+            bridges.domInnerHtml(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDomAttr") { args ->
+            bridges.domAttr(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+                args.getOrNull(2)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDomNext") { args ->
+            bridges.domNext(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDomPrev") { args ->
+            bridges.domPrev(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyDigestHex") { args ->
+            bridges.digestHex(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyHmacHex") { args ->
+            bridges.hmacHex(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+                args.getOrNull(2)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyAesEncryptHex") { args ->
+            bridges.aesEncryptHex(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+                args.getOrNull(2)?.toString().orEmpty(),
+                args.getOrNull(3)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyAesDecryptHex") { args ->
+            bridges.aesDecryptHex(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+                args.getOrNull(2)?.toString().orEmpty(),
+                args.getOrNull(3)?.toString().orEmpty(),
+            )
+        }
+        function("__crispyUtf8ToHex") { args ->
+            bridges.utf8ToHex(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyUtf8ToBytesJson") { args ->
+            bridges.utf8BytesJson(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyBytesToUtf8") { args ->
+            bridges.hexToUtf8(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyRandomHex") { args ->
+            bridges.randomHex(
+                pluginId,
+                (args.firstOrNull() as? Number)?.toInt() ?: 0,
+            )
+        }
+        function("__crispyBase64EncodeHex") { args ->
+            bridges.base64EncodeHex(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyBase64DecodeHex") { args ->
+            bridges.base64DecodeHex(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyBase64EncodeText") { args ->
+            bridges.base64EncodeText(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyBase64DecodeText") { args ->
+            bridges.base64DecodeText(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyParseUrl") { args ->
+            bridges.parseUrl(pluginId, args.firstOrNull()?.toString().orEmpty())
+        }
+        function("__crispyResolve") { args ->
+            bridges.resolveUrl(
+                pluginId,
+                args.getOrNull(0)?.toString().orEmpty(),
+                args.getOrNull(1)?.toString().orEmpty(),
+            )
         }
     }
 
@@ -74,17 +197,15 @@ internal class QuickJsPluginRuntime(
         input: PluginStreamInput,
     ): String {
         val inputJson = PluginInputJson.encode(input)
+        val facade = PluginJsFacade.build(
+            scraperIdJson = JSONObject().put("id", pluginId).toString(),
+            settingsJson = "{}",
+        )
         return """
-            |const __crispyHost = {
-            |  log: (...messages) => crispy.__log(messages.map(String).join(' ')),
-            |  fetch: async (input) => {
-            |    const options = typeof input === 'string' ? { url: input } : input;
-            |    return JSON.parse(await crispy.__fetch(JSON.stringify(options)));
-            |  },
-            |  storageGet: (key) => crispy.__storageGet(key),
-            |  storageSet: (key, value) => crispy.__storageSet(key, String(value)),
-            |};
+            |$facade
+            |
             |$code
+            |
             |if (typeof getStreams !== 'function') {
             |  throw new Error('Plugin must define getStreams()');
             |}
