@@ -27,19 +27,28 @@ internal class PluginManifestClient(private val okHttpClient: OkHttpClient) {
     private suspend fun fetch(url: String): String {
         SsrfGuard.validate(url)
         return withContext(Dispatchers.IO) {
-            okHttpClient
-                .newCall(Request.Builder().url(url).get().build())
-                .execute()
-                .use { response ->
-                    if (!response.isSuccessful) {
-                        throw PluginRepositoryException("HTTP ${response.code} fetching $url")
+            try {
+                okHttpClient
+                    .newCall(Request.Builder().url(url).get().build())
+                    .execute()
+                    .use { response ->
+                        if (!response.isSuccessful) {
+                            throw PluginRepositoryException("HTTP ${response.code} fetching $url")
+                        }
+                        val bytes = response.body.bytes()
+                        if (bytes.size > MAX_FETCH_BYTES) {
+                            throw PluginRepositoryException("Manifest/code too large: ${bytes.size} bytes")
+                        }
+                        bytes.toString(Charsets.UTF_8)
                     }
-                    val bytes = response.body.bytes()
-                    if (bytes.size > MAX_FETCH_BYTES) {
-                        throw PluginRepositoryException("Manifest/code too large: ${bytes.size} bytes")
-                    }
-                    bytes.toString(Charsets.UTF_8)
-                }
+            } catch (error: java.net.UnknownHostException) {
+                throw PluginRepositoryException(
+                    "Could not resolve host \"${error.message?.substringAfter('"')?.substringBefore('"') ?: url}\". " +
+                        "Check the URL and the device's internet connection.",
+                )
+            } catch (error: java.io.IOException) {
+                throw PluginRepositoryException("Network error fetching $url: ${error.message}")
+            }
         }
     }
 
