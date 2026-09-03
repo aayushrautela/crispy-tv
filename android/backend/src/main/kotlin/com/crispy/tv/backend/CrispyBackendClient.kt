@@ -98,6 +98,8 @@ class CrispyBackendClient(
         val id: String,
         val manifestUrl: String,
         val createdAt: String,
+        val type: String = "stremio",
+        val payload: Map<String, String> = emptyMap(),
     )
 
     data class Avatar(
@@ -604,8 +606,14 @@ class CrispyBackendClient(
         return listAddonsApi(accessToken)
     }
 
-    suspend fun installAddon(accessToken: String, profileId: String, manifestUrl: String): AddonDto {
-        return installAddonApi(accessToken, profileId, manifestUrl)
+    suspend fun installAddon(
+        accessToken: String,
+        profileId: String,
+        manifestUrl: String,
+        type: String = "stremio",
+        payload: Map<String, String> = emptyMap(),
+    ): AddonDto {
+        return installAddonApi(accessToken, profileId, manifestUrl, type, payload)
     }
 
     suspend fun uninstallAddon(accessToken: String, profileId: String, addonId: String): Boolean {

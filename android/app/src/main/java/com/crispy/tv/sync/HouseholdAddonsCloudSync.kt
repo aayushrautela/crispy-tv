@@ -24,11 +24,13 @@ internal class HouseholdAddonsCloudSync(
 
         return try {
             val dtos = backend.listAddons(session.accessToken)
-            val localRows = dtos.mapIndexed { index, dto ->
-                CloudAddonRow(
-                    manifestUrl = dto.manifestUrl,
-                    sortOrder = index,
-                )
+            val localRows = dtos.mapIndexedNotNull { index, dto ->
+                toLocalRow(dto)?.let { row ->
+                    CloudAddonRow(
+                        manifestUrl = row.manifestUrl,
+                        sortOrder = index,
+                    )
+                }
             }
             addonRegistry.reconcileCloudAddons(localRows)
             Result.success(Unit)
@@ -52,7 +54,11 @@ internal class HouseholdAddonsCloudSync(
             val serverAddons = backend.listAddons(session.accessToken)
             val localRows = addonRegistry.exportCloudAddons()
 
-            val serverByUrl = serverAddons.associateBy { it.manifestUrl.lowercase(Locale.US) }
+            // Only reconcile addons this client knows about. Rows of other or
+            // unknown types (e.g. jsplugin) must never be touched here.
+            val knownStremio = serverAddons.filter { it.type == ADDON_TYPE_STREMIO }
+
+            val serverByUrl = knownStremio.associateBy { it.manifestUrl.lowercase(Locale.US) }
             val localByUrl = localRows.associateBy { it.manifestUrl.lowercase(Locale.US) }
 
             localRows.forEach { local ->
@@ -61,7 +67,7 @@ internal class HouseholdAddonsCloudSync(
                 }
             }
 
-            serverAddons.forEach { server ->
+            knownStremio.forEach { server ->
                 if (server.manifestUrl.lowercase(Locale.US) !in localByUrl) {
                     backend.uninstallAddon(session.accessToken, profileId, server.id)
                 }
@@ -71,5 +77,22 @@ internal class HouseholdAddonsCloudSync(
         } catch (t: Throwable) {
             Result.failure(t)
         }
+    }
+
+    private fun toLocalRow(dto: CrispyBackendClient.AddonDto): CloudAddonRow? {
+        if (dto.type != ADDON_TYPE_STREMIO) {
+            return null
+        }
+        if (dto.manifestUrl.isBlank()) {
+            return null
+        }
+        return CloudAddonRow(
+            manifestUrl = dto.manifestUrl,
+            sortOrder = 0,
+        )
+    }
+
+    private companion object {
+        const val ADDON_TYPE_STREMIO = "stremio"
     }
 }

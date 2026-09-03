@@ -297,11 +297,21 @@ internal suspend fun CrispyBackendClient.installAddonApi(
     accessToken: String,
     profileId: String,
     manifestUrl: String,
+    type: String = "stremio",
+    payload: Map<String, String> = emptyMap(),
 ): AddonDto {
     checkConfigured()
+    val jsonBody = JSONObject()
+        .put("manifestUrl", manifestUrl.trim())
+        .put("type", type)
+    if (payload.isNotEmpty()) {
+        val payloadJson = JSONObject()
+        payload.forEach { (key, value) -> payloadJson.put(key, value) }
+        jsonBody.put("payload", payloadJson)
+    }
     val response = httpClient.postJson(
         url = "$baseUrl/v1/account/addons".toHttpUrl(),
-        jsonBody = JSONObject().put("manifestUrl", manifestUrl.trim()).toString(),
+        jsonBody = jsonBody.toString(),
         headers = authHeaders(accessToken, profileId),
         callTimeoutMs = callTimeoutMs,
     )

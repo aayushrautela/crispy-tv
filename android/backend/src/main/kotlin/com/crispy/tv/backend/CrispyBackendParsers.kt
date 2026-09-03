@@ -150,16 +150,7 @@ internal fun CrispyBackendClient.parseAddons(value: Any?): List<AddonDto> {
     return buildList {
         for (index in 0 until safeArray.length()) {
             val obj = safeArray.optJSONObject(index) ?: continue
-            val id = obj.optString("id").trim()
-            val manifestUrl = obj.optString("manifestUrl").trim()
-            if (id.isBlank() || manifestUrl.isBlank()) continue
-            add(
-                AddonDto(
-                    id = id,
-                    manifestUrl = manifestUrl,
-                    createdAt = obj.optString("createdAt").trim(),
-                ),
-            )
+            parseAddonDto(obj)?.let(::add)
         }
     }
 }
@@ -169,13 +160,26 @@ internal fun CrispyBackendClient.parseAddon(value: Any?): AddonDto? {
         is JSONObject -> value
         else -> null
     } ?: return null
+    return parseAddonDto(obj)
+}
+
+private fun parseAddonDto(obj: JSONObject): AddonDto? {
     val id = obj.optString("id").trim()
     val manifestUrl = obj.optString("manifestUrl").trim()
     if (id.isBlank() || manifestUrl.isBlank()) return null
+    val payload = obj.optJSONObject("payload")
     return AddonDto(
         id = id,
         manifestUrl = manifestUrl,
         createdAt = obj.optString("createdAt").trim(),
+        type = obj.optString("type", "stremio").trim().ifBlank { "stremio" },
+        payload = payload?.let { json ->
+            buildMap {
+                json.keys().forEachRemaining { key ->
+                    json.optString(key).takeIf { it.isNotBlank() }?.let { put(key, it) }
+                }
+            }
+        } ?: emptyMap(),
     )
 }
 
