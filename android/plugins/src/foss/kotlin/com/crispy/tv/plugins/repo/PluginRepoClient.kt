@@ -2,6 +2,7 @@ package com.crispy.tv.plugins.repo
 
 import android.content.Context
 import android.net.Uri
+import com.crispy.tv.plugins.bridge.PluginHttpClient
 import okhttp3.OkHttpClient
 
 internal object PluginRepoHolder {
@@ -13,7 +14,7 @@ internal object PluginRepoHolder {
         return synchronized(this) {
             manager?.let { it }
                 ?: PluginRepositoryManager(
-                    manifestClient = PluginManifestClient(okHttpClient),
+                    manifestClient = PluginManifestClient(PluginHttpClient.configure(okHttpClient)),
                     codeStore = PluginCodeStore(appContext.filesDir),
                     store = PluginRepositoryStore(appContext.filesDir),
                 ).also { manager = it }

@@ -5,6 +5,7 @@ import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamBehaviorHints
 import com.crispy.tv.addons.streams.StreamSubtitle
 import com.crispy.tv.plugins.PluginStream
+import com.crispy.tv.plugins.bridge.PluginHttpClient
 import com.crispy.tv.plugins.repo.PluginRepoHolder
 import com.crispy.tv.plugins.repo.PluginScraperDescriptor
 import com.crispy.tv.plugins.runtime.HostPluginBridges
@@ -76,9 +77,10 @@ private fun Long.toSizeLabel(): String {
 
 object PluginStreamsServiceFactory {
     fun create(appContext: Context, okHttpClient: OkHttpClient): PluginStreamSource {
+        val pluginHttp = PluginHttpClient.configure(okHttpClient)
         val storage = SharedPreferencesPluginStorage(appContext)
-        val bridges = HostPluginBridges(okHttpClient, storage)
-        val repositoryManager = PluginRepoHolder.obtain(appContext, okHttpClient)
+        val bridges = HostPluginBridges(pluginHttp, storage)
+        val repositoryManager = PluginRepoHolder.obtain(appContext, pluginHttp)
         val service = PluginStreamsService(
             repositoryManager = repositoryManager,
             runtimeProvider = { PluginRuntimeProvider.create(bridges) },
