@@ -10,6 +10,7 @@ import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
+import com.crispy.tv.sync.PluginSyncBridgeProvider
 import com.crispy.tv.sync.ProfileDataCloudSync
 
 object SupabaseServicesProvider {
