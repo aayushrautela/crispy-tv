@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -298,16 +299,15 @@ internal fun HeroSection(
             }
         }
 
-        val scrimAlpha by animateFloatAsState(
-            targetValue = if (details == null) 0f else 1f,
-            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
-            label = "hero_scrim_alpha",
-        )
-        if (scrimAlpha > 0.001f) {
+        val scrimAlpha = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            scrimAlpha.animateTo(1f, tween(durationMillis = 200, easing = FastOutSlowInEasing))
+        }
+        if (scrimAlpha.value > 0.001f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer(alpha = scrimAlpha)
+                    .graphicsLayer(alpha = scrimAlpha.value)
                     .background(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
@@ -337,15 +337,23 @@ internal fun HeroSection(
                     width = heroMaxWidth * 0.81f,
                     height = 104.dp,
                 )
+                var logoLoaded by remember(resolvedLogoUrl) { mutableStateOf(false) }
+                val logoAlpha by animateFloatAsState(
+                    targetValue = if (logoLoaded) 1f else 0f,
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                    label = "hero_logo_alpha",
+                )
                 AsyncImage(
                     model = logoModel ?: resolvedLogoUrl,
                     contentDescription = details?.title,
                     modifier = Modifier
                         .widthIn(max = 420.dp)
                         .fillMaxWidth(0.81f)
-                        .height(104.dp),
+                        .height(104.dp)
+                        .graphicsLayer(alpha = logoAlpha),
                     contentScale = ContentScale.Fit,
-                    alignment = Alignment.Center
+                    alignment = Alignment.Center,
+                    onSuccess = { logoLoaded = true },
                 )
             } else {
                 Text(
