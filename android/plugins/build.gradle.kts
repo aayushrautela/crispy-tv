@@ -46,6 +46,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testImplementation("org.json:json:20240303")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     "testFossImplementation"("io.github.dokar3:quickjs-kt-jvm:1.0.14")
 
     configurations.matching {
