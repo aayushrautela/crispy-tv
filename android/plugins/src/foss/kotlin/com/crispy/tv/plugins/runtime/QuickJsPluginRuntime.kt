@@ -34,14 +34,25 @@ internal class QuickJsPluginRuntime(
                 }
             }
             PluginResultMapper.result(
-                streams = PluginResultMapper.mapStreams(raw),
+                streams = PluginResultMapper.mapStreams(raw).also { mapped ->
+                    val rawCount = (raw as? List<*>)?.size ?: 0
+                    android.util.Log.i(
+                        LOG_TAG,
+                        "[plugin:$pluginId] script returned $rawCount raw row(s), ${mapped.size} mapped stream(s)",
+                    )
+                },
                 settings = emptyList(),
             )
         } catch (error: TimeoutCancellationException) {
+            android.util.Log.w(LOG_TAG, "[plugin:$pluginId] timed out after $executionTimeoutMs ms")
             failure(pluginId, "Timed out after $executionTimeoutMs ms")
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
+            android.util.Log.w(
+                LOG_TAG,
+                "[plugin:$pluginId] script failed: ${error::class.simpleName}: ${error.message}",
+            )
             failure(pluginId, "Script error: ${error.message}")
         }
     }
@@ -248,5 +259,6 @@ internal class QuickJsPluginRuntime(
 
     private companion object {
         const val DEFAULT_EXECUTION_TIMEOUT_MS = 60_000L
+        const val LOG_TAG = "CrispyPlugins"
     }
 }

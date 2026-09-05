@@ -57,23 +57,36 @@ internal class PluginStreamsService(
             val refreshJob = launch {
                 if (refreshReposOnLoad) {
                     runCatching { repositoryManager.refreshDueRepositories(nowEpochMs()) }
+                        .onFailure { error -> android.util.Log.w(LOG_TAG, "repo refresh failed: ${error.message}") }
                 }
             }
-            val scrapers = repositoryManager.getEnabledScrapers()
+            val enabled = repositoryManager.getEnabledScrapers()
+            val scrapers = enabled
                 .filter { it.supports(mediaType) }
                 .sortedBy { it.scraperId }
+            android.util.Log.i(
+                LOG_TAG,
+                "load mediaType=$mediaType lookupId=$lookupId season=$season episode=$episode: " +
+                    "${enabled.size} enabled, ${scrapers.size} match (${scrapers.joinToString { it.scraperId }})",
+            )
             onProvidersResolved?.invoke(scrapers.map { it.toDescriptor() })
             if (scrapers.isEmpty()) {
                 refreshJob.join()
+                android.util.Log.w(LOG_TAG, "load aborted: no matching scrapers")
                 return@coroutineScope emptyList()
             }
 
             val runtime = runtimeProvider()
             if (runtime == null) {
                 refreshJob.join()
+                android.util.Log.w(LOG_TAG, "load aborted: runtime unavailable")
                 return@coroutineScope emptyList()
             }
             val input = buildInput(mediaType, lookupId, season, episode)
+            android.util.Log.i(
+                LOG_TAG,
+                "plugin input tmdbId='${input.tmdbId}' mediaType='${input.mediaType}' season=${input.season} episode=${input.episode}",
+            )
 
             val semaphore = Semaphore(MAX_CONCURRENT_SCRAPERS)
             val channel = Channel<ProviderStreamsResult>(capacity = scrapers.size)
@@ -96,9 +109,15 @@ internal class PluginStreamsService(
             val results = ArrayList<ProviderStreamsResult>(scrapers.size)
             repeat(scrapers.size) {
                 val result = channel.receive()
+                android.util.Log.i(
+                    LOG_TAG,
+                    "provider ${result.providerId} -> ${result.streams.size} stream(s)" +
+                        (result.errorMessage?.let { " error=$it" } ?: ""),
+                )
                 results += result
                 onProviderResult?.invoke(result)
             }
+            android.util.Log.i(LOG_TAG, "load done: ${results.sumOf { it.streams.size }} stream(s) from ${results.size} provider(s)")
             channel.close()
             refreshJob.join()
             results
@@ -144,6 +163,7 @@ internal class PluginStreamsService(
 
     private companion object {
         const val MAX_CONCURRENT_SCRAPERS = 4
+        const val LOG_TAG = "CrispyPlugins"
     }
 }
 

@@ -8,15 +8,30 @@ import com.crispy.tv.plugins.PluginSubtitle
 internal object PluginResultMapper {
 
     fun mapStreams(value: Any?): List<PluginStream> {
-        if (value !is List<*>) return emptyList()
+        if (value !is List<*>) {
+            android.util.Log.w(
+                LOG_TAG,
+                "unexpected getStreams result type: ${value?.let { it::class.simpleName } ?: "null"}",
+            )
+            return emptyList()
+        }
         return value.mapNotNull { entry -> mapStream(entry) }
     }
 
     private fun mapStream(value: Any?): PluginStream? {
-        if (value !is Map<*, *>) return null
+        if (value !is Map<*, *>) {
+            android.util.Log.w(LOG_TAG, "dropped non-object result row")
+            return null
+        }
         val url = extractUrl(value["url"])
         val infoHash = stringOrNull(value["infoHash"])
-        if (url.isNullOrBlank() && infoHash.isNullOrBlank()) return null
+        if (url.isNullOrBlank() && infoHash.isNullOrBlank()) {
+            android.util.Log.w(
+                LOG_TAG,
+                "dropped row without url/infoHash: name=${stringOrNull(value["name"])} title=${stringOrNull(value["title"])}",
+            )
+            return null
+        }
 
         val title = stringOrNull(value["title"])
         return PluginStream(
@@ -76,4 +91,6 @@ internal object PluginResultMapper {
 
     fun result(streams: List<PluginStream>, settings: List<PluginSetting>) =
         PluginExecutionResult(streams = streams, settings = settings)
+
+    private const val LOG_TAG = "CrispyPlugins"
 }

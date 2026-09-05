@@ -24,11 +24,25 @@ internal class HostPluginBridges(
     }
 
     override suspend fun fetch(requestJson: String): String {
+        val url = runCatching {
+            org.json.JSONObject(requestJson).optString("url")
+        }.getOrDefault("")
         return try {
-            httpBridge.fetch(requestJson)
+            val response = httpBridge.fetch(requestJson)
+            val status = runCatching {
+                org.json.JSONObject(response).optInt("status")
+            }.getOrDefault(0)
+            if (status >= 400 || status == 0) {
+                android.util.Log.w(LOG_TAG, "fetch $url -> HTTP $status")
+            } else {
+                android.util.Log.i(LOG_TAG, "fetch $url -> $status")
+            }
+            response
         } catch (error: PluginExecutionBlockedException) {
+            android.util.Log.w(LOG_TAG, "fetch $url blocked: ${error.message}")
             throw error
         } catch (error: Exception) {
+            android.util.Log.w(LOG_TAG, "fetch $url failed: ${error::class.simpleName}: ${error.message}")
             writeFetchFailure(error.message ?: "fetch failed")
         }
     }
