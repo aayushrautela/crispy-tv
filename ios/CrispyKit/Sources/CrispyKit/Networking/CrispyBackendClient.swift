@@ -319,7 +319,7 @@ public func getMetadataItemDetail(accessToken: String, itemId: String) async thr
             creators: parsePersonRefs(json.jsonArray("Creators")),
             videos: json.jsonArray("Videos").compactMap(parseMetadataVideo),
             production: production.compactMap(parseMetadataCompany),
-            backdrops: json.jsonArray("Backdrops").compactMap { $0 as? String },
+            backdrops: json.jsonStringList("Backdrops"),
             nextEpisode: json.jsonObject("NextEpisode").flatMap { try? ClientMediaCard.parse($0) }
         )
     }
@@ -531,7 +531,7 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
             rating: json.jsonDouble("rating"),
             releaseYear: json.jsonInt("year"),
-            genres: json.jsonArray("genres").compactMap { $0 as? String }
+            genres: json.jsonStringList("genres")
         )
     }
 
