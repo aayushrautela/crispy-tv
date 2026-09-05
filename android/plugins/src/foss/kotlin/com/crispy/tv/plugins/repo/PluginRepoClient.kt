@@ -51,10 +51,9 @@ class PluginRepoClient(
     fun repos(): List<PluginRepoInfo> = manager.getStoredRepos().map { repo -> repo.toInfo() }
 
     suspend fun install(url: String): Result<List<PluginScraperInfo>> = runCatching {
-        val normalized = url.trim()
-        val scheme = runCatching { Uri.parse(normalized).scheme }.getOrNull()
+        val repoUrl = url.trim()
+        val scheme = runCatching { Uri.parse(repoUrl).scheme }.getOrNull()
         require(scheme == "http" || scheme == "https") { "Enter a valid repository URL." }
-        val repoUrl = normalized
         manager.install(repoUrl, System.currentTimeMillis())
         manager.getStoredRepos().firstOrNull { it.url == repoUrl }
             ?.scrapers

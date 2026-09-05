@@ -26,15 +26,10 @@ internal class PluginManifestClient(private val okHttpClient: OkHttpClient) {
     }
 
     private suspend fun fetch(url: String): String {
-        try {
-            SsrfGuard.validate(url)
-        } catch (error: PluginExecutionBlockedException) {
-            Log.w(TAG, "SSRF guard blocked $url: ${error.message}")
-            throw error
-        }
-        Log.i(TAG, "Fetching $url")
         return withContext(Dispatchers.IO) {
             try {
+                SsrfGuard.validate(url)
+                Log.i(TAG, "Fetching $url")
                 okHttpClient
                     .newCall(Request.Builder().url(url).get().build())
                     .execute()
@@ -49,6 +44,9 @@ internal class PluginManifestClient(private val okHttpClient: OkHttpClient) {
                         }
                         bytes.toString(Charsets.UTF_8)
                     }
+            } catch (error: PluginExecutionBlockedException) {
+                Log.w(TAG, "Request blocked for $url: ${error.message}")
+                throw error
             } catch (error: java.net.UnknownHostException) {
                 Log.w(TAG, "DNS failed for $url", error)
                 throw PluginRepositoryException(

@@ -12,7 +12,6 @@ internal fun interface HostResolver {
 internal object SsrfGuard {
 
     private val defaultResolver = HostResolver { host -> PluginHttpClient.dns.lookup(host).toTypedArray() }
-
     fun validate(url: String, resolver: HostResolver = defaultResolver) {
         val trimmed = url.trim()
         val scheme = schemeOf(trimmed)

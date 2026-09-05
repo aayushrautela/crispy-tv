@@ -25,11 +25,20 @@ internal class PluginDns(
 ) : Dns {
 
     override fun lookup(hostname: String): List<InetAddress> {
-        val system = runCatching { delegate.lookup(hostname) }.getOrNull()
+        val system = try {
+            delegate.lookup(hostname)
+        } catch (error: Exception) {
+            Log.w(TAG, "System DNS failed for $hostname: ${error.javaClass.simpleName}: ${error.message}", error)
+            null
+        }
         if (!system.isNullOrEmpty()) return system.sortV4First()
 
-        Log.w(TAG, "System DNS failed for $hostname, trying DoH")
-        val fallback = runCatching { dohLookup(hostname) }.getOrNull().orEmpty()
+        val fallback = try {
+            dohLookup(hostname)
+        } catch (error: Exception) {
+            Log.w(TAG, "DoH failed for $hostname: ${error.javaClass.simpleName}: ${error.message}", error)
+            null
+        }.orEmpty()
         if (fallback.isNotEmpty()) {
             Log.i(TAG, "DoH resolved $hostname -> ${fallback.joinToString() { it.hostAddress ?: "?" }}")
             return fallback.sortV4First()

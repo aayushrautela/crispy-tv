@@ -18,7 +18,7 @@ internal data class PluginFetchResponse(
 
 internal class HttpBridge(private val okHttpClient: OkHttpClient) {
 
-    suspend fun fetch(requestJson: String): String {
+    suspend fun fetch(requestJson: String): String = withContext(Dispatchers.IO) {
         val request = PluginRequestJson.parse(requestJson)
         SsrfGuard.validate(request.url)
         val client = if (request.followRedirects) {
@@ -31,30 +31,28 @@ internal class HttpBridge(private val okHttpClient: OkHttpClient) {
         }
 
         val response =
-            withContext(Dispatchers.IO) {
-                client
-                    .newCall(buildRequest(request))
-                    .execute()
-                    .use { httpResponse ->
-                        val bytes = httpResponse.body.bytes()
-                        if (bytes.size > MAX_RESPONSE_BYTES) {
-                            throw PluginExecutionBlockedException("Response too large: ${bytes.size} bytes")
-                        }
-                        PluginFetchResponse(
-                            status = httpResponse.code,
-                            statusText = httpResponse.message,
-                            url = httpResponse.request.url.toString(),
-                            headers = buildMap {
-                                for (name in httpResponse.headers.names()) {
-                                    httpResponse.headers[name]?.let { put(name.lowercase(), truncate(it)) }
-                                }
-                            },
-                            bodyBase64 = Base64Codec.encode(bytes),
-                            bodyText = bytes.toString(Charsets.UTF_8),
-                        )
+            client
+                .newCall(buildRequest(request))
+                .execute()
+                .use { httpResponse ->
+                    val bytes = httpResponse.body.bytes()
+                    if (bytes.size > MAX_RESPONSE_BYTES) {
+                        throw PluginExecutionBlockedException("Response too large: ${bytes.size} bytes")
                     }
-            }
-        return PluginResponseJson.write(response)
+                    PluginFetchResponse(
+                        status = httpResponse.code,
+                        statusText = httpResponse.message,
+                        url = httpResponse.request.url.toString(),
+                        headers = buildMap {
+                            for (name in httpResponse.headers.names()) {
+                                httpResponse.headers[name]?.let { put(name.lowercase(), truncate(it)) }
+                            }
+                        },
+                        bodyBase64 = Base64Codec.encode(bytes),
+                        bodyText = bytes.toString(Charsets.UTF_8),
+                    )
+                }
+        PluginResponseJson.write(response)
     }
 
     private fun truncate(value: String): String {
