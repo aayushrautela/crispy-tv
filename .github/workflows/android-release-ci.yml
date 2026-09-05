@@ -75,6 +75,9 @@ jobs:
       - name: Run JVM contract tests
         run: gradle :android:contract-tests:test
 
+      - name: Run plugins module unit tests
+        run: gradle :android:plugins:testFossUnitTest
+
       - name: Build Play bundle
         run: gradle :android:app:bundlePlayRelease
 
