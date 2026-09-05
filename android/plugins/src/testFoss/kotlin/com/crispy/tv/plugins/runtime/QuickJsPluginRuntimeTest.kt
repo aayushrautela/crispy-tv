@@ -57,7 +57,9 @@ class QuickJsPluginRuntimeTest {
             iterations: Int,
             keySizeBits: Int,
             hash: String,
-        ): String = CryptoBridge.pbkdf2Hex(passwordHex, saltHex, iterations, keySizeBits, hash)        override fun utf8ToHex(pluginId: String, text: String): String = CryptoBridge.utf8ToHex(text)
+        ): String = CryptoBridge.pbkdf2Hex(passwordHex, saltHex, iterations, keySizeBits, hash)
+
+        override fun utf8ToHex(pluginId: String, text: String): String = CryptoBridge.utf8ToHex(text)
 
         override fun utf8BytesJson(pluginId: String, text: String): String = CryptoBridge.utf8BytesJson(text)
 
