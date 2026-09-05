@@ -17,7 +17,9 @@ public final class SearchViewModel {
     private var suggestionsTask: Task<Void, Never>?
     private let historyStore = SearchHistoryStore()
 
-public func loadHistoryIfNeeded() {
+    public init() {}
+
+    public func loadHistoryIfNeeded() {
         if history.isEmpty {
             history = historyStore.recentQueries()
         }
