@@ -153,16 +153,19 @@ private struct PersonSocialsRow: View {
     }
 
     var body: some View {
-        if handles.isEmpty { return EmptyView() }
-        return HStack(spacing: 8) {
-            ForEach(handles, id: \.0) { handle in
-                Text("@\(handle.1)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                if handle.0 != handles.last?.0 {
-                    Text("·")
+        if handles.isEmpty {
+            EmptyView()
+        } else {
+            HStack(spacing: 8) {
+                ForEach(handles, id: \.0) { handle in
+                    Text("@\(handle.1)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                    if handle.0 != handles.last?.0 {
+                        Text("·")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

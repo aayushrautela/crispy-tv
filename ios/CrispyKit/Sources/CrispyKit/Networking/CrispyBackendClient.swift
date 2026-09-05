@@ -336,7 +336,7 @@ public func getMetadataItemExtras(accessToken: String, itemId: String) async thr
         )
     }
 
-    func getMetadataItemRatings(accessToken: String, profileId: String, itemId: String) async throws -> TitleRatings {
+    public func getMetadataItemRatings(accessToken: String, profileId: String, itemId: String) async throws -> TitleRatings {
         let json = try await getJson(path: "/v1/profiles/\(profileId)/metadata/items/\(itemId)/ratings", accessToken: accessToken)
         let r = json.jsonObject("Ratings")
         return TitleRatings(

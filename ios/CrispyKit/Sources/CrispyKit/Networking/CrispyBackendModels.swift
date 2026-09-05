@@ -391,12 +391,12 @@ enum KnownForPartitioner {
 
 public struct ProviderState: Equatable, Identifiable {
     public let provider: String
-    let connectionState: String
-    let primaryAction: String
-    let canDisconnect: Bool
-    let externalUsername: String?
-    let statusLabel: String
-    let statusMessage: String?
+    public let connectionState: String
+    public let primaryAction: String
+    public let canDisconnect: Bool
+    public let externalUsername: String?
+    public let statusLabel: String
+    public let statusMessage: String?
 
     public var id: String { provider }
 }

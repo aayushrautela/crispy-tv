@@ -96,17 +96,13 @@ struct AccountSettingsScreen: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        do {
-            guard let context = await environment.backendContext() else { return }
-            email = environment.supabase.currentSession()?.email
-            providers = (try? await environment.backend.listImportConnections(
-                accessToken: context.accessToken,
-                profileId: context.profileId
-            )) ?? []
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        guard let context = await environment.backendContext() else { return }
+        email = environment.supabase.currentSession()?.email
+        providers = (try? await environment.backend.listImportConnections(
+            accessToken: context.accessToken,
+            profileId: context.profileId
+        )) ?? []
+        errorMessage = nil
     }
 
     private func disconnect(_ provider: ProviderState) async {
