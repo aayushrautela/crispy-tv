@@ -18,7 +18,7 @@ internal object UrlBridge {
             .put("host", if (port.isEmpty()) host else "$host:$port")
             .put("hostname", host)
             .put("port", port)
-            .put("pathname", url.rawSchemeSpecificPart?.substringBefore('?')?.ifEmpty { "/" } ?: "/")
+            .put("pathname", url.rawPath?.ifEmpty { "/" } ?: "/")
             .put("search", url.rawQuery?.let { "?$it" } ?: "")
             .put("hash", url.rawFragment?.let { "#$it" } ?: "")
             .toString()

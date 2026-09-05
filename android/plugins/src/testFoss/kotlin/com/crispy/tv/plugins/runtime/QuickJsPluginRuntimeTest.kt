@@ -69,6 +69,10 @@ class QuickJsPluginRuntimeTest {
 
         override fun base64DecodeText(pluginId: String, base64: String): String = CryptoBridge.base64DecodeText(base64)
 
+        override fun base64EncodeHex(pluginId: String, hex: String): String = CryptoBridge.base64EncodeHex(hex)
+
+        override fun base64DecodeHex(pluginId: String, base64: String): String = CryptoBridge.base64DecodeHex(base64)
+
         override fun parseUrl(pluginId: String, urlString: String): String = UrlBridge.parseJson(urlString)
 
         override fun resolveUrl(pluginId: String, base: String, relative: String): String =
@@ -78,6 +82,9 @@ class QuickJsPluginRuntimeTest {
 
         override fun domSelect(pluginId: String, documentId: String, selector: String): String =
             domBridge.select(documentId, selector)
+
+        override fun domFind(pluginId: String, documentId: String, elementId: String, selector: String): String =
+            domBridge.find(documentId, elementId, selector)
 
         override fun domText(pluginId: String, documentId: String, elementIdsJson: String): String =
             domBridge.text(documentId, parseIds(elementIdsJson))

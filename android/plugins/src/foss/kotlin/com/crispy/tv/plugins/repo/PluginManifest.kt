@@ -32,13 +32,16 @@ internal class PluginRepositoryException(message: String) : Exception(message)
 internal object PluginManifestParser {
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
-    fun parse(payload: String): PluginManifest {
-        val manifest = json.decodeFromString<PluginManifest>(payload)
-        require(manifest.name.isNotBlank()) { "Manifest name is missing" }
-        require(manifest.version.isNotBlank()) { "Manifest version is missing" }
-        require(manifest.scrapers.isNotEmpty()) { "Manifest has no scrapers" }
-        return manifest
-    }
+    fun parse(payload: String): PluginManifest =
+        try {
+            val manifest = json.decodeFromString<PluginManifest>(payload)
+            require(manifest.name.isNotBlank()) { "Manifest name is missing" }
+            require(manifest.version.isNotBlank()) { "Manifest version is missing" }
+            require(manifest.scrapers.isNotEmpty()) { "Manifest has no scrapers" }
+            manifest
+        } catch (error: IllegalArgumentException) {
+            throw PluginRepositoryException(error.message ?: "Invalid manifest")
+        }
 
     fun write(manifest: PluginManifest): String = json.encodeToString(manifest)
 }

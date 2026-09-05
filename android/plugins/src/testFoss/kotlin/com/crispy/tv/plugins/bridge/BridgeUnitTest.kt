@@ -14,7 +14,7 @@ class BridgeUnitTest {
         val hex = HexCodec.encode(bytes)
         assertEquals("000f7f80ff", hex)
         assertTrue(HexCodec.decode(hex).contentEquals(bytes))
-        assertEquals(0xff.toByte(), HexCodec.decode("f")[0])
+        assertEquals(0x0f.toByte(), HexCodec.decode("f")[0])
     }
 
     @Test
@@ -37,7 +37,11 @@ class BridgeUnitTest {
     fun `crypto hmac matches known vector`() {
         assertEquals(
             "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
-            CryptoBridge.hmacHex("SHA256", CryptoBridge.utf8ToHex("key"), CryptoBridge.utf8ToHex("The quick brown fox jumps over the lazy dog")),
+            CryptoBridge.hmacHex(
+                "SHA256",
+                CryptoBridge.utf8ToHex("Jefe"),
+                CryptoBridge.utf8ToHex("what do ya want for nothing?"),
+            ),
         )
     }
 

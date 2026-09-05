@@ -78,6 +78,14 @@ jobs:
       - name: Run plugins module unit tests
         run: gradle :android:plugins:testFossUnitTest
 
+      - name: Upload plugins test reports
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: plugins-test-reports
+          path: android/plugins/build/reports/tests/
+          if-no-files-found: warn
+
       - name: Build Play bundle
         run: gradle :android:app:bundlePlayRelease
 

@@ -225,6 +225,9 @@ internal class QuickJsPluginRuntime(
             |var exports = module.exports;
             |(function() {
             |$code
+            |if (typeof getStreams !== 'undefined' && module.exports.getStreams === undefined) {
+            |  module.exports.getStreams = getStreams;
+            |}
             |})();
             |
             |var __getStreams = module.exports.getStreams || globalThis.getStreams;
