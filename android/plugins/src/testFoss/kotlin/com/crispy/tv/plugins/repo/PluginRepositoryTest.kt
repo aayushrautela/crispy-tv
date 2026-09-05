@@ -56,7 +56,7 @@ class PluginRepositoryTest {
     fun `store installs and exposes enabled scrapers`() = runBlockingTest {
         val dir = tempDir()
         val store = PluginRepositoryStore(dir)
-        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", now = 1000L)
+        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
         val enabled = store.getEnabledScrapers()
         assertEquals(1, enabled.size)
         assertEquals("yt", enabled[0].scraperId)
@@ -73,7 +73,7 @@ class PluginRepositoryTest {
     fun `store toggles scraper enabled state and persists`() = runBlockingTest {
         val dir = tempDir()
         val store = PluginRepositoryStore(dir)
-        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", now = 1000L)
+        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
         store.setEnabled("https://example.com/plugins.json", "tg", enabled = true)
 
         val enabled = store.getEnabledScrapers()
@@ -88,7 +88,7 @@ class PluginRepositoryTest {
     fun `store refresh updates manifest and preserves enabled flags`() = runBlockingTest {
         val dir = tempDir()
         val store = PluginRepositoryStore(dir)
-        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", now = 1000L)
+        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
         store.setEnabled("https://example.com/plugins.json", "yt", enabled = false)
         store.setEnabled("https://example.com/plugins.json", "tg", enabled = true)
 
@@ -118,7 +118,7 @@ class PluginRepositoryTest {
     fun `store removal deletes repo record`() = runBlockingTest {
         val dir = tempDir()
         val store = PluginRepositoryStore(dir)
-        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", now = 1000L)
+        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
         store.removeRepository("https://example.com/plugins.json")
         assertTrue(store.getStoredRepos().isEmpty())
     }
