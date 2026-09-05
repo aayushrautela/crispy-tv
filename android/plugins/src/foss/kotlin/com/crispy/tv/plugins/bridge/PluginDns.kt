@@ -3,6 +3,7 @@ package com.crispy.tv.plugins.bridge
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import android.util.Log
 import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -27,8 +28,12 @@ internal class PluginDns(
         val system = runCatching { delegate.lookup(hostname) }.getOrNull()
         if (!system.isNullOrEmpty()) return system.sortV4First()
 
+        Log.w(TAG, "System DNS failed for $hostname, trying DoH")
         val fallback = runCatching { dohLookup(hostname) }.getOrNull().orEmpty()
-        if (fallback.isNotEmpty()) return fallback.sortV4First()
+        if (fallback.isNotEmpty()) {
+            Log.i(TAG, "DoH resolved $hostname -> ${fallback.joinToString() { it.hostAddress ?: "?" }}")
+            return fallback.sortV4First()
+        }
 
         throw UnknownHostException("Unable to resolve host \"$hostname\": system and secure DNS both failed")
     }
@@ -37,6 +42,8 @@ internal class PluginDns(
         sortedBy { if (it is Inet4Address) 0 else 1 }
 
     companion object {
+        private const val TAG = "CrispyPlugins"
+
         private val dohClient: OkHttpClient by lazy {
             OkHttpClient.Builder()
                 .connectTimeout(5, TimeUnit.SECONDS)
