@@ -228,6 +228,7 @@ internal class QuickJsPluginRuntime(
         val facade = PluginJsFacade.build(
             scraperIdJson = PluginJsArgs.string(pluginId),
             settingsJson = "{}",
+            lookupJson = PluginJsArgs.lookupObjectJson(input),
         )
         return """
             |$facade

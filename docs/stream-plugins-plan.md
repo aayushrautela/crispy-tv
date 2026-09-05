@@ -31,7 +31,7 @@ License guardrails:
 | TV module | `missingDimensionStrategy("distribution", "foss")` on the new module | `:android:tv` is always FOSS; no stub variant needed there |
 | Plugin contract | Nuvio-compatible `getStreams(tmdbId, mediaType, season, episode)` | Existing Nuvio community plugins run unmodified |
 | Storage | Plugin code + repos cached on-device; sync stores enabled-provider records, not full repos | Per-device install, per-account enablement |
-| Sync safety | Unknown addon types ignored, never deleted (Android play flavor and iOS) | Prevents the Nuvio #1190 clobber bug class |
+| Sync safety | Unknown addon types ignored, never deleted; pull reconciles only repos the server tracks, never disables locals for fresh installs (Android play flavor and iOS) | Prevents the Nuvio #1190 clobber bug class |
 | Stream integration | Plugins join `SelectorCoordinator` as another provider source | Zero player/UI rework; headers via existing `PlatformPlaybackDataSourceFactory` |
 
 ## Plugin contract v1
@@ -42,6 +42,10 @@ global `getStreams` (both resolve; `module.exports` wins). Required export:
 ```js
 async function getStreams(tmdbId, mediaType, season, episode) {
   // tmdbId: string; mediaType: "movie"|"tv"; season/episode: number|undefined
+  // Lookup ids: crispy.lookup = { tmdbId, imdbId, mediaType, season, episode }.
+  // tmdb and imdb ids are equal citizens — whichever the in-app lookup carried is
+  // populated, the other is "". No imdb<->tmdb resolution happens app-side; a
+  // plugin that needs the other id must resolve it itself.
   return [{
     title?, name?, url?,           // url may be a string or { url }; infoHash allowed instead of url
     quality?, size?,               // size: human string ("1.2 GB") or bytes number
@@ -66,6 +70,7 @@ async function onSettings() { /* returns settings layout JSON */ }
 | `storage.get/set/delete` | per-plugin key/value | DataStore, scoped prefix |
 | `url` | parse / encode / resolve | java.net.URI |
 | `log(msg)` | Logcat `[plugin:id]` tag | — |
+| `crispy.lookup` | `{ tmdbId, imdbId, mediaType, season, episode }` on the `crispy` global; ids passed through as-is, no conversion | — |
 | settings | `onSettings()` layout schema (text/toggle/select) | persisted per plugin |
 
 Hard limits:

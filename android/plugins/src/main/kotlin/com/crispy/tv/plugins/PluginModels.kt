@@ -1,16 +1,20 @@
 package com.crispy.tv.plugins
 
 /**
- * Exactly what crosses into plugin JS. Mirrors the Nuvio contract:
+ * Exactly what crosses into plugin JS. Mirrors the Nuvio positional contract:
  * `getStreams(tmdbId, mediaType, season, episode)` — tmdbId is a string,
  * mediaType is "movie" or "tv", season/episode are numbers or undefined.
- * App-side metadata (title, year, imdbId) is intentionally NOT exposed.
+ * `imdbId` rides along on the `crispy` global (never a positional argument, so
+ * existing Nuvio plugins keep their parameter mapping). tmdb and imdb ids are
+ * equal citizens: whichever the lookup carried is populated, the other is empty.
+ * No imdb<->tmdb resolution happens app-side. Title/year stay app-side.
  */
 data class PluginStreamInput(
     val tmdbId: String,
     val mediaType: String,
     val season: Int?,
     val episode: Int?,
+    val imdbId: String = "",
 )
 
 /**

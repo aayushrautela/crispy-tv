@@ -60,6 +60,12 @@ internal class PluginRepositoryManager(
         return store.getEnabledScrapers().mapNotNull { descriptor ->
             codeStore.readCode(descriptor.repoUrl, descriptor.scraperId)?.let { code ->
                 descriptor.copy(code = code)
+            } ?: run {
+                android.util.Log.w(
+                    "CrispyPlugins",
+                    "enabled scraper ${descriptor.scraperId} has no cached code; skipping (re-enable or refresh its repo to re-fetch)",
+                )
+                null
             }
         }
     }

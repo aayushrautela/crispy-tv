@@ -15,9 +15,19 @@ internal object PluginJsArgs {
         return "$tmdbId, $mediaType, $season, $episode"
     }
 
+    /** Lookup context exposed on the `crispy` global: both ids, equal citizens. */
+    fun lookupObjectJson(input: PluginStreamInput): String {
+        val tmdbId = string(input.tmdbId)
+        val imdbId = string(input.imdbId)
+        val mediaType = string(input.mediaType)
+        return """{"tmdbId":$tmdbId,"imdbId":$imdbId,"mediaType":$mediaType,"season":${jsonNumberOrNull(input.season)},"episode":${jsonNumberOrNull(input.episode)}}"""
+    }
+
     fun string(value: String): String = quote(value)
 
     fun numberOrUndefined(value: Int?): String = value?.toString() ?: "undefined"
+
+    private fun jsonNumberOrNull(value: Int?): String = value?.toString() ?: "null"
 
     private fun quote(value: String): String = buildString {
         append('"')

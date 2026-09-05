@@ -2,7 +2,7 @@ package com.crispy.tv.plugins.runtime
 
 internal object PluginJsFacade {
 
-    fun build(scraperIdJson: String, settingsJson: String): String {
+    fun build(scraperIdJson: String, settingsJson: String, lookupJson: String): String {
         return """
             globalThis.SCRAPER_ID = $scraperIdJson;
             globalThis.SCRAPER_SETTINGS = $settingsJson;
@@ -24,6 +24,7 @@ internal object PluginJsFacade {
             ${cryptoPolyfill()}
             ${domPolyfill()}
             ${storagePolyfill()}
+            ${lookupPolyfill(lookupJson)}
             ${requirePolyfill()}
             ${languagePolyfill()}
         """.trimIndent()
@@ -652,6 +653,10 @@ internal object PluginJsFacade {
             set: function(key, value) { __crispyStorageSet(String(key), String(value)); }
           }
         };
+    """.trimIndent()
+
+    private fun lookupPolyfill(lookupJson: String) = """
+        globalThis.crispy.lookup = $lookupJson;
     """.trimIndent()
 
     private fun requirePolyfill() = """

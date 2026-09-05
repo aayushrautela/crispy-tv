@@ -146,8 +146,11 @@ internal class PluginRepositoryStore(rootDir: File) {
     )
 
     private fun load(): PluginRepoState {
-        val fileContent = runCatching { file.readText(Charsets.UTF_8) }.getOrNull() ?: return PluginRepoState()
+        val fileContent = runCatching { file.readText(Charsets.UTF_8) }
+            .onFailure { android.util.Log.w(LOG_TAG, "repos load failed (${file.path}): ${it.message}") }
+            .getOrNull() ?: return PluginRepoState()
         return runCatching { json.decodeFromString<PluginRepoState>(fileContent) }
+            .onFailure { android.util.Log.w(LOG_TAG, "repos parse failed (${file.path}): ${it.message}") }
             .getOrElse { PluginRepoState() }
     }
 
@@ -155,6 +158,10 @@ internal class PluginRepositoryStore(rootDir: File) {
         runCatching {
             file.parentFile?.mkdirs()
             file.writeText(json.encodeToString(state), Charsets.UTF_8)
-        }
+        }.onFailure { android.util.Log.w(LOG_TAG, "repos persist failed (${file.path}): ${it.message}") }
+    }
+
+    private companion object {
+        const val LOG_TAG = "CrispyPlugins"
     }
 }

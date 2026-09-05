@@ -107,11 +107,13 @@ class QuickJsPluginRuntimeTest {
 
     private fun input(
         tmdbId: String = "42",
+        imdbId: String = "",
         mediaType: String = "movie",
         season: Int? = null,
         episode: Int? = null,
     ) = PluginStreamInput(
         tmdbId = tmdbId,
+        imdbId = imdbId,
         mediaType = mediaType,
         season = season,
         episode = episode,
@@ -447,5 +449,32 @@ class QuickJsPluginRuntimeTest {
             input(tmdbId = "6\"03", mediaType = "tv", season = 1, episode = null),
         )
         assertEquals("\"6\\\"03\", \"tv\", 1, undefined", args)
+    }
+
+    @Test
+    fun `lookup ids exposed on crispy global for imdb lookups`() = runBlocking {
+        val bridges = FakeBridges()
+        val runtime = QuickJsPluginRuntime(bridges, executionTimeoutMs = 15_000)
+        val code = """
+            async function getStreams() {
+              var l = crispy.lookup;
+              return [{ name: l.tmdbId + '|' + l.imdbId + '|' + l.mediaType + '|' + l.season + '|' + l.episode, url: 'https://example.com/s' }];
+            }
+        """.trimIndent()
+        val result = runtime.getStreams(
+            "example",
+            code,
+            input(tmdbId = "", imdbId = "tt0427340", mediaType = "movie"),
+        )
+        assertEquals(1, result.streams.size)
+        assertEquals("|tt0427340|movie|null|null", result.streams.first().name)
+    }
+
+    @Test
+    fun `lookup json escapes ids and omits unknown season episode`() {
+        val json = com.crispy.tv.plugins.PluginJsArgs.lookupObjectJson(
+            input(tmdbId = "6\"03", imdbId = "tt0427340", mediaType = "tv", season = 1, episode = null),
+        )
+        assertEquals("""{"tmdbId":"6\"03","imdbId":"tt0427340","mediaType":"tv","season":1,"episode":null}""", json)
     }
 }

@@ -85,7 +85,8 @@ internal class PluginStreamsService(
             val input = buildInput(mediaType, lookupId, season, episode)
             android.util.Log.i(
                 LOG_TAG,
-                "plugin input tmdbId='${input.tmdbId}' mediaType='${input.mediaType}' season=${input.season} episode=${input.episode}",
+                "plugin input tmdbId='${input.tmdbId}' imdbId='${input.imdbId}' mediaType='${input.mediaType}' " +
+                    "season=${input.season} episode=${input.episode}",
             )
 
             val semaphore = Semaphore(MAX_CONCURRENT_SCRAPERS)
@@ -147,11 +148,12 @@ internal class PluginStreamsService(
         season: Int?,
         episode: Int?,
     ): PluginStreamInput {
-        // Title/year stay app-side: the plugin contract exposes only
-        // tmdbId/mediaType/season/episode, like Nuvio.
+        // Title/year stay app-side: the plugin contract exposes only the lookup ids
+        // (tmdb/imdb, whichever the lookup carried), mediaType, season and episode.
         val parsed = parseLookupComponents(lookupId)
         return PluginStreamInput(
             tmdbId = parsed.tmdbId?.toString().orEmpty(),
+            imdbId = parsed.imdbId.orEmpty(),
             mediaType = when (mediaType) {
                 MetadataLabMediaType.MOVIE -> "movie"
                 MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME -> "tv"
