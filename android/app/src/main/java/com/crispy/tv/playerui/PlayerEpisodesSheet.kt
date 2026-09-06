@@ -75,14 +75,13 @@ internal fun PlayerEpisodesSheet(
             visible = visible,
             enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(220)) { it },
             exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(animationSpec = tween(180)) { it },
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp),
         ) {
             Column(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (seasons.isNotEmpty()) {
