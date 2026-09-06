@@ -73,16 +73,6 @@ internal class HomeSelectorViewModel(
         val target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
         lastLookupId = lookupId
 
-        val current = coordinator.state.value
-        if (
-            current.lookupId == target.lookupId &&
-            current.mediaType == target.mediaType &&
-            current.providers.isNotEmpty()
-        ) {
-            coordinator.reshow(headerEpisode)
-            return
-        }
-
         val headerEpisode =
             MediaVideo(
                 id = item.id,
@@ -95,6 +85,16 @@ internal class HomeSelectorViewModel(
                 lookupId = lookupId,
                 absoluteEpisodeNumber = item.absoluteEpisodeNumber,
             )
+
+        val current = coordinator.state.value
+        if (
+            current.lookupId == target.lookupId &&
+            current.mediaType == target.mediaType &&
+            current.providers.isNotEmpty()
+        ) {
+            coordinator.reshow(headerEpisode)
+            return
+        }
 
         val fallbackDetails =
             MediaDetails(
