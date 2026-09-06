@@ -2,9 +2,8 @@ package com.crispy.tv.streams
 
 import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.addons.streams.StreamProviderUiState
-import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.addons.streams.AddonStream
-import com.crispy.tv.addons.streams.ProviderStreamsResult
+import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.addons.streams.seedProviders
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.model.MediaDetails
@@ -14,11 +13,12 @@ import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.lookup.applyProviderResult
 import com.crispy.tv.addons.lookup.finalizeFrom
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -82,10 +82,10 @@ class SelectorCoordinator(
         session: Long,
         target: StreamLookupTarget,
         itemIdForMetadata: String?,
-    ) {
+    ) = coroutineScope {
         val metadataJob =
             if (itemIdForMetadata != null) {
-                scope.launch {
+                launch {
                     val token = runCatching { sessionTokenProvider() }.getOrNull() ?: return@launch
                     runCatching { getMetadataItemDetail(token, itemIdForMetadata) }
                         .onSuccess { response ->
@@ -98,7 +98,7 @@ class SelectorCoordinator(
 
         val pluginJob =
             pluginStreamLoader?.let { loader ->
-                scope.launch {
+                launch {
                     if (session != sessionId || currentTarget != target) return@launch
                     // Plugins key on the tmdb id. Surfaces without one on hand (home
                     // continue-watching) wait for the metadata fetch already in flight
@@ -115,14 +115,7 @@ class SelectorCoordinator(
                     val request = buildPluginRequest(resolvedTarget) ?: return@launch
                     loader.stream(request)
                         .catch { error ->
-                            emit(
-                                ProviderStreamsResult(
-                                    providerId = PLUGIN_PROVIDER_ERROR_ID,
-                                    providerName = "Plugins",
-                                    streams = emptyList(),
-                                    errorMessage = error.message ?: "Plugin stream loading failed",
-                                ),
-                            )
+                            android.util.Log.w("CrispyPlugins", "plugin stream flow failed: ${error.message}")
                         }
                         .collect { result ->
                             if (session == sessionId && currentTarget == target) {
@@ -178,10 +171,16 @@ class SelectorCoordinator(
         ++sessionId
         resolveJob?.cancel()
         resolveJob = null
-        _state.update { it.copy(visible = false) }
-        onStreamSelected = null
-        // currentTarget is intentionally kept so reshow() can re-reveal
-        // already-resolved results without refetching.
+        _state.update { cur ->
+            cur.copy(
+                visible = false,
+                pluginsPending = false,
+                providers = cur.providers.map { provider -> provider.copy(isLoading = false) },
+            )
+        }
+        // onStreamSelected is kept so reshow() can re-reveal results for the same
+        // target and stream taps still route to the surface that opened last;
+        // open() always overwrites it. currentTarget is kept for the same reason.
     }
 
     private fun buildPluginRequest(target: StreamLookupTarget): PluginStreamRequest? {
@@ -194,10 +193,5 @@ class SelectorCoordinator(
             season = episode?.season,
             episode = episode?.episode,
         )
-    }
-
-    private companion object {
-        const val PLUGIN_PROVIDER_PREFIX = "plugin:"
-        const val PLUGIN_PROVIDER_ERROR_ID = "plugin:error"
     }
 }

@@ -522,6 +522,18 @@ class PlayerSessionViewModel(
             _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
             return
         }
+
+        val current = selectorCoordinator.state.value
+        if (
+            current.lookupId == target.lookupId &&
+            current.mediaType == target.mediaType &&
+            current.providers.isNotEmpty()
+        ) {
+            selectorCoordinator.reshow(null)
+            _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
+            return
+        }
+
         _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
         selectorCoordinator.open(
             target = target,
