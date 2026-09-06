@@ -42,7 +42,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
@@ -84,7 +83,6 @@ fun StreamSelectorSheet(
     scrimColor: Color? = null,
     onDismiss: () -> Unit,
     onProviderSelected: (String?) -> Unit,
-    onRetryProvider: (String) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
 ) {
     if (!visible) return
@@ -114,7 +112,6 @@ fun StreamSelectorSheet(
                     onAccentColor = onAccentColor,
                     useCrispyImageModel = useCrispyImageModel,
                     onProviderSelected = onProviderSelected,
-                    onRetryProvider = onRetryProvider,
                     onStreamSelected = onStreamSelected,
                 )
             }
@@ -131,7 +128,6 @@ fun StreamSelectorContent(
     onAccentColor: Color,
     useCrispyImageModel: Boolean,
     onProviderSelected: (String?) -> Unit,
-    onRetryProvider: (String) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
 ) {
     val effectiveEpisode =
@@ -187,10 +183,7 @@ fun StreamSelectorContent(
             )
         }
 
-        if (
-            !state.isFetching &&
-            filteredProviders.none { provider -> provider.streams.isNotEmpty() || provider.errorMessage != null }
-        ) {
+        if (!state.isFetching && filteredProviders.isEmpty()) {
             item {
                 ElevatedCard {
                     Text(
@@ -203,15 +196,6 @@ fun StreamSelectorContent(
         }
 
         filteredProviders.forEach { provider ->
-            if (provider.errorMessage != null) {
-                item(key = "provider_error_${provider.providerId}") {
-                    ProviderErrorRow(
-                        provider = provider,
-                        onRetry = onRetryProvider,
-                    )
-                }
-            }
-
             if (provider.streams.isNotEmpty()) {
                 items(items = provider.streams, key = { stream -> stream.stableKey }) { stream ->
                     StreamRow(
@@ -410,29 +394,6 @@ private fun ProviderChipsRow(
 
         if (state.isFetching) {
             FetchingPill()
-        }
-    }
-}
-
-@Composable
-private fun ProviderErrorRow(
-    provider: StreamProviderUiState,
-    onRetry: (String) -> Unit,
-) {
-    ElevatedCard {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${provider.providerName}: ${provider.errorMessage}",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            TextButton(onClick = { onRetry(provider.providerId) }) {
-                Text("Retry")
-            }
         }
     }
 }

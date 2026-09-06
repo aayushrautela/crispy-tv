@@ -566,10 +566,6 @@ class PlayerSessionViewModel(
         selectorCoordinator.onProviderSelected(providerId?.trim()?.takeIf { it.isNotBlank() })
     }
 
-    fun onRetryProvider(providerId: String) {
-        selectorCoordinator.onRetryProvider(providerId.trim())
-    }
-
     fun onStreamSelected(stream: AddonStream) {
         selectorCoordinator.onStreamSelected(stream)
     }

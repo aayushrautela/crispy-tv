@@ -21,7 +21,6 @@ internal fun HomeStreamSelector(viewModel: HomeSelectorViewModel) {
         onAccentColor = Color(0xFF141414),
         onDismiss = viewModel::dismiss,
         onProviderSelected = viewModel.coordinator::onProviderSelected,
-        onRetryProvider = viewModel.coordinator::onRetryProvider,
         onStreamSelected = viewModel.coordinator::onStreamSelected,
     )
 }

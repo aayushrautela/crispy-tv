@@ -110,7 +110,6 @@ internal fun DetailsScreen(
     onToggleSeasonWatched: (String, Int) -> Unit,
     onDismissStreamSelector: () -> Unit,
     onProviderSelected: (String?) -> Unit,
-    onRetryProvider: (String) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
@@ -395,7 +394,6 @@ internal fun DetailsScreen(
                 onAccentColor = palette.onAccent,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
-                onRetryProvider = onRetryProvider,
                 onStreamSelected = onStreamSelected,
             )
 

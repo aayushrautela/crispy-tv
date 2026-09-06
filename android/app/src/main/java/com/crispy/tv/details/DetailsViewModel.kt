@@ -866,12 +866,6 @@ class DetailsViewModel internal constructor(
         coordinator.onProviderSelected(providerId?.trim()?.takeIf { it.isNotBlank() })
     }
 
-    fun onRetryProvider(providerId: String) {
-        val normalizedProviderId = providerId.trim()
-        if (normalizedProviderId.isBlank()) return
-        coordinator.onRetryProvider(normalizedProviderId)
-    }
-
     fun onStreamSelected(stream: AddonStream) {
         if (!stream.hasPlayableSource) {
             Log.w("DetailsViewModel", "stream selected without playable source provider=${stream.providerId} stableKey=${stream.stableKey}")

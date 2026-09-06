@@ -169,8 +169,4 @@ fun List<StreamProviderUiState>.finalizeFrom(results: List<ProviderStreamsResult
     return this + appended
 }
 
-fun StreamSelectorUiState.matchesTarget(target: StreamLookupTarget): Boolean {
-    return mediaType == target.mediaType && lookupId == target.lookupId
-}
-
 

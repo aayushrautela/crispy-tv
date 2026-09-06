@@ -109,7 +109,6 @@ fun DetailsRoute(
         onToggleSeasonWatched = viewModel::toggleSeasonWatched,
         onDismissStreamSelector = viewModel::onDismissStreamSelector,
         onProviderSelected = viewModel::onProviderSelected,
-        onRetryProvider = viewModel::onRetryProvider,
         onStreamSelected = viewModel::onStreamSelected,
         onToggleWatchlist = viewModel::toggleWatchlist,
         onToggleWatched = viewModel::toggleWatched,

@@ -13,7 +13,6 @@ import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.lookup.applyProviderResult
 import com.crispy.tv.addons.lookup.finalizeFrom
-import com.crispy.tv.addons.lookup.matchesTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -169,55 +168,6 @@ class SelectorCoordinator(
         if (currentTarget == null) return
         if (headerEpisode != null) _headerEpisode.value = headerEpisode
         _state.update { it.copy(visible = true, headerEpisode = headerEpisode ?: it.headerEpisode) }
-    }
-
-    fun onRetryProvider(providerId: String) {
-        val target = currentTarget ?: return
-        val cur = _state.value
-        if (!cur.matchesTarget(target)) return
-        _state.update {
-            it.copy(
-                providers =
-                    it.providers.map { p ->
-                        if (p.providerId.equals(providerId, ignoreCase = true)) {
-                            p.copy(isLoading = true, errorMessage = null)
-                        } else {
-                            p
-                        }
-                    },
-            )
-        }
-        scope.launch {
-            val result =
-                if (providerId.startsWith(PLUGIN_PROVIDER_PREFIX, ignoreCase = true)) {
-                    val request = buildPluginRequest(target)
-                    request?.let { requestValue ->
-                        runCatching {
-                            pluginStreamLoader?.stream(requestValue)
-                                ?.first { it.providerId.equals(providerId, ignoreCase = true) }
-                        }.getOrNull()
-                    }
-                } else {
-                    runCatching { streamResolver.loadProviderStreams(target.mediaType, target.lookupId, providerId) }
-                        .getOrNull()
-                }
-            if (result != null && currentTarget == target) {
-                _state.update { it.copy(providers = it.providers.applyProviderResult(result)) }
-            } else if (currentTarget == target) {
-                _state.update { cur ->
-                    cur.copy(
-                        providers =
-                            cur.providers.map { p ->
-                                if (p.providerId.equals(providerId, ignoreCase = true)) {
-                                    p.copy(isLoading = false)
-                                } else {
-                                    p
-                                }
-                            },
-                    )
-                }
-            }
-        }
     }
 
     fun onStreamSelected(stream: AddonStream) {

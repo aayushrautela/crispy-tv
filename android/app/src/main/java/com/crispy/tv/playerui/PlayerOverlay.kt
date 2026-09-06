@@ -59,7 +59,6 @@ internal fun PlayerOverlay(
     onShowSubtitles: () -> Unit,
     onCloseSurface: () -> Unit,
     onProviderSelected: (String?) -> Unit,
-    onRetryProvider: (String) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
     onRetryPlayback: () -> Unit,
     onSelectAudioTrack: (String?) -> Unit,
@@ -323,10 +322,6 @@ internal fun PlayerOverlay(
             onProviderSelected = {
                 resetControlsTimer()
                 onProviderSelected(it)
-            },
-            onRetryProvider = {
-                resetControlsTimer()
-                onRetryProvider(it)
             },
             onStreamSelected = { stream ->
                 resetControlsTimer()
