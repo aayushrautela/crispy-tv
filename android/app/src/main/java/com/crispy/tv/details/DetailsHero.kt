@@ -330,7 +330,7 @@ internal fun HeroSection(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
+            val resolvedLogoUrl = details.logoUrl?.trim()?.takeIf { it.isNotEmpty() }
             if (resolvedLogoUrl != null) {
                 val logoModel = rememberCrispyImageModel(
                     url = resolvedLogoUrl,
@@ -345,7 +345,7 @@ internal fun HeroSection(
                 )
                 AsyncImage(
                     model = logoModel ?: resolvedLogoUrl,
-                    contentDescription = details?.title,
+                    contentDescription = details.title,
                     modifier = Modifier
                         .widthIn(max = 420.dp)
                         .fillMaxWidth(0.81f)
@@ -357,7 +357,7 @@ internal fun HeroSection(
                 )
             } else {
                 Text(
-                    text = details?.title ?: "",
+                    text = details.title ?: "",
                     style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
                     maxLines = 2,
