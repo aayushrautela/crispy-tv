@@ -60,7 +60,7 @@ internal fun HomeRoute(
     onCatalogItemClick: (CatalogItem, String?) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
-    onOpenPlayer: (PlaybackIdentity, Long, String?, String?) -> Unit,
+    onOpenPlayer: (PlaybackIdentity, Long, String?, String?, String?) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -83,6 +83,7 @@ internal fun HomeRoute(
                 selection.resumePositionMs,
                 selection.chosenStreamStableKey,
                 selection.chosenProviderId,
+                selection.chosenStreamHandoffKey,
             )
             selectorViewModel.dismiss()
         }

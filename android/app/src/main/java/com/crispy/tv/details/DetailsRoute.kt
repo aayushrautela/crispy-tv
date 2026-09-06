@@ -61,6 +61,9 @@ fun DetailsRoute(
     }
     val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val selectorState by viewModel.coordinator.state.collectAsStateWithLifecycle()
+    val selectorDetails by viewModel.coordinator.details.collectAsStateWithLifecycle()
+    val selectorHeaderEpisode by viewModel.coordinator.headerEpisode.collectAsStateWithLifecycle()
 
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
 
@@ -89,6 +92,9 @@ fun DetailsRoute(
 
     DetailsScreen(
         uiState = uiState,
+        selectorState = selectorState,
+        selectorDetails = selectorDetails,
+        selectorHeaderEpisode = selectorHeaderEpisode,
         playbackSettings = playbackSettings,
         initialArtworkUrl = initialArtworkUrl,
         sharedElementKey = sharedElementKey,

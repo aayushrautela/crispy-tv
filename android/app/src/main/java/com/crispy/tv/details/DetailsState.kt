@@ -8,7 +8,6 @@ import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.addons.streams.StreamSelectorUiState
 
 @Immutable
 data class EpisodeWatchState(
@@ -65,7 +64,6 @@ data class DetailsUiState(
     val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
     val episodesIsLoading: Boolean = false,
     val episodesStatusMessage: String = "",
-    val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
 ) {
     val selectedSeasonOrFirst: Int?
         get() = selectedSeason ?: seasons.firstOrNull()

@@ -4,7 +4,9 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import android.content.Context
 import android.util.Log
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.domain.optimistic.EpisodeWatchedMutation
 import com.crispy.tv.domain.optimistic.FieldSync
 import com.crispy.tv.domain.optimistic.MutationStatus
@@ -23,17 +25,15 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.addons.streams.AddonStream
-import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.streams.PluginStreamLoaderProvider
+import com.crispy.tv.streams.SelectorCoordinator
+import com.crispy.tv.streams.StreamResolverProvider
+import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.lookup.findEpisodeForLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.lookup.parseLookupId
-import com.crispy.tv.addons.lookup.matchesTarget
-import com.crispy.tv.addons.lookup.toUiState
-import com.crispy.tv.addons.lookup.applyProviderResult
-import com.crispy.tv.addons.lookup.finalizeFrom
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -53,7 +53,22 @@ class DetailsViewModel internal constructor(
     private val runtimeEntry: RuntimeDetailsEntry?,
     private val detailsUseCases: DetailsUseCases,
     private val outbox: UserMutationOutbox,
+    appContext: Context,
 ) : ViewModel() {
+
+    val coordinator =
+        SelectorCoordinator(
+            scope = viewModelScope,
+            streamResolver = StreamResolverProvider.get(appContext),
+            getMetadataItemDetail = { token, metadataItemId ->
+                BackendServicesProvider.backendClient(appContext)
+                    .getMetadataItemDetail(accessToken = token, itemId = metadataItemId)
+            },
+            sessionTokenProvider = {
+                SupabaseServicesProvider.accountClient(appContext).ensureValidSession()?.accessToken
+            },
+            pluginStreamLoader = PluginStreamLoaderProvider.get(appContext),
+        )
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
@@ -64,8 +79,6 @@ class DetailsViewModel internal constructor(
         checkNotNull(itemType.toMetadataLabMediaTypeOrNull()) { "Unsupported itemType: $itemType" }
 
     private var aiJob: Job? = null
-    private var streamLoadJob: Job? = null
-    private var streamSelectorSession = 0L
     private var episodesJob: Job? = null
     private var reloadJob: Job? = null
     private var extrasJob: Job? = null
@@ -189,8 +202,7 @@ class DetailsViewModel internal constructor(
             val nowMs = System.currentTimeMillis()
 
             aiJob?.cancel()
-            streamLoadJob?.cancel()
-            streamSelectorSession++
+            coordinator.dismiss()
             episodesJob?.cancel()
             extrasJob?.cancel()
             ratingsJob?.cancel()
@@ -221,7 +233,6 @@ class DetailsViewModel internal constructor(
                     episodeWatchStates = emptyMap(),
                     episodesIsLoading = false,
                     episodesStatusMessage = "",
-                    streamSelector = StreamSelectorUiState(),
                 )
             }
 
@@ -819,210 +830,46 @@ class DetailsViewModel internal constructor(
             return
         }
 
-        val current = _uiState.value.streamSelector
+        val current = coordinator.state.value
         if (
             current.lookupId == target.lookupId &&
             current.mediaType == target.mediaType &&
             current.providers.isNotEmpty()
         ) {
-            _uiState.update {
-                it.copy(
-                    streamSelector = current.copy(visible = true, headerEpisode = headerEpisode ?: current.headerEpisode),
-                    statusMessage = "",
-                )
-            }
+            coordinator.reshow(headerEpisode)
+            _uiState.update { it.copy(statusMessage = "") }
             return
         }
 
-        streamLoadJob?.cancel()
-        val session = ++streamSelectorSession
-        _uiState.update {
-            it.copy(
-                streamSelector =
-                    StreamSelectorUiState(
-                        visible = true,
-                        mediaType = target.mediaType,
-                        lookupId = target.lookupId,
-                        headerEpisode = headerEpisode,
-                        isLoading = true,
-                    ),
-                statusMessage = "",
-            )
-        }
-
-        streamLoadJob =
-            viewModelScope.launch {
-                runCatching {
-                    detailsUseCases.loadStreams(
-                        mediaType = target.mediaType,
-                        lookupId = target.lookupId,
-                        tmdbId = target.tmdbId,
-                        onProvidersResolved = {
-                            updateStreamSelector(session, target) {
-                                it.copy(providers = emptyList(), isLoading = true)
-                            }
-                        },
-                        onProviderResult = { result ->
-                            updateStreamSelector(session, target) {
-                                it.copy(providers = it.providers.applyProviderResult(result))
-                            }
-                        },
-                    )
-                }.onSuccess { results ->
-                    updateStreamSelector(session, target) {
-                        it.copy(providers = it.providers.finalizeFrom(results), isLoading = false)
-                    }
-                }.onFailure { error ->
-                    if (error is CancellationException) return@onFailure
-                    if (session != streamSelectorSession) return@onFailure
-                    _uiState.update { previous ->
-                        previous.copy(
-                            streamSelector =
-                                previous.streamSelector.copy(
-                                    providers =
-                                        previous.streamSelector.providers.map { provider ->
-                                            provider.copy(isLoading = false)
-                                        },
-                                    isLoading = false,
-                                ),
-                            statusMessage = error.message ?: "Failed to fetch streams.",
-                        )
-                    }
-                }
-            }
-    }
-
-    private fun updateStreamSelector(
-        session: Long,
-        target: StreamLookupTarget,
-        transform: (StreamSelectorUiState) -> StreamSelectorUiState,
-    ) {
-        _uiState.update { previous ->
-            if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
-            previous.copy(
-                streamSelector = transform(previous.streamSelector),
-                statusMessage = "",
-            )
-        }
+        Log.d(
+            "DetailsViewModel",
+            "stream selector open mediaType=${target.mediaType} lookupId=${target.lookupId} tmdbId=${target.tmdbId}",
+        )
+        _uiState.update { it.copy(statusMessage = "") }
+        coordinator.open(
+            target = target,
+            headerEpisode = headerEpisode,
+            fallbackDetails = _uiState.value.details,
+            itemIdForMetadata = null,
+            onStreamSelected = ::onStreamSelected,
+        )
     }
 
     fun onDismissStreamSelector() {
-        ++streamSelectorSession
-        streamLoadJob?.cancel()
-        streamLoadJob = null
+        coordinator.dismiss()
         _uiState.update { state ->
-            state.copy(
-                streamSelector = state.streamSelector.copy(visible = false),
-                statusMessage = "",
-            )
+            state.copy(statusMessage = "")
         }
     }
 
     fun onProviderSelected(providerId: String?) {
-        _uiState.update { state ->
-            state.copy(
-                streamSelector =
-                    state.streamSelector.copy(
-                        selectedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() },
-                    )
-            )
-        }
+        coordinator.onProviderSelected(providerId?.trim()?.takeIf { it.isNotBlank() })
     }
 
     fun onRetryProvider(providerId: String) {
         val normalizedProviderId = providerId.trim()
         if (normalizedProviderId.isBlank()) return
-
-        val selectorState = _uiState.value.streamSelector
-        val mediaType = selectorState.mediaType ?: return
-        val lookupId = selectorState.lookupId ?: return
-        val session = streamSelectorSession
-
-        _uiState.update { state ->
-            val providers =
-                state.streamSelector.providers.map { provider ->
-                    if (provider.providerId.equals(normalizedProviderId, ignoreCase = true)) {
-                        provider.copy(
-                            isLoading = true,
-                            errorMessage = null,
-                        )
-                    } else {
-                        provider
-                    }
-                }
-            state.copy(
-                streamSelector = state.streamSelector.copy(providers = providers),
-                statusMessage = "",
-            )
-        }
-
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.loadProviderStreams(
-                        mediaType = mediaType,
-                        lookupId = lookupId,
-                        providerId = normalizedProviderId,
-                    )
-                }
-            }.onSuccess { result ->
-                if (session != streamSelectorSession) return@onSuccess
-                _uiState.update { state ->
-                    val providers =
-                        state.streamSelector.providers.map { provider ->
-                            if (provider.providerId.equals(normalizedProviderId, ignoreCase = true)) {
-                                val updated = result?.toUiState()
-                                if (updated != null) {
-                                    updated
-                                } else {
-                                    provider.copy(
-                                        isLoading = false,
-                                        errorMessage = "Provider no longer available.",
-                                        streams = emptyList(),
-                                        attemptedUrl = null,
-                                    )
-                                }
-                            } else {
-                                provider
-                            }
-                        }
-
-                    val updatedProvider =
-                        providers.firstOrNull { provider ->
-                            provider.providerId.equals(normalizedProviderId, ignoreCase = true)
-                        }
-                    state.copy(
-                        streamSelector = state.streamSelector.copy(providers = providers),
-                        statusMessage =
-                            when {
-                                updatedProvider == null -> "Provider no longer available."
-                                updatedProvider.errorMessage != null -> updatedProvider.errorMessage ?: "" 
-                                else -> ""
-                            },
-                    )
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) return@onFailure
-                if (session != streamSelectorSession) return@onFailure
-                _uiState.update { state ->
-                    val providers =
-                        state.streamSelector.providers.map { provider ->
-                            if (provider.providerId.equals(normalizedProviderId, ignoreCase = true)) {
-                                provider.copy(
-                                    isLoading = false,
-                                    errorMessage = error.message ?: "Failed to reload provider.",
-                                )
-                            } else {
-                                provider
-                            }
-                        }
-                    state.copy(
-                        streamSelector = state.streamSelector.copy(providers = providers),
-                        statusMessage = error.message ?: "Failed to reload provider.",
-                    )
-                }
-            }
-        }
+        coordinator.onRetryProvider(normalizedProviderId)
     }
 
     fun onStreamSelected(stream: AddonStream) {
@@ -1033,17 +880,16 @@ class DetailsViewModel internal constructor(
         }
 
         val currentState = _uiState.value
+        val selectorState = coordinator.state.value
         val selectedEpisodeTitle =
-            currentState.streamSelector.headerEpisode
+            selectorState.headerEpisode
                 ?.title
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
 
+        coordinator.dismiss()
         _uiState.update { state ->
-            state.copy(
-                streamSelector = state.streamSelector.copy(visible = false),
-                statusMessage = "",
-            )
+            state.copy(statusMessage = "")
         }
 
         val initialDetails = currentState.details
@@ -1065,13 +911,13 @@ class DetailsViewModel internal constructor(
 
             val resolvedMediaType = enriched.itemType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
             val targetEpisode =
-                currentState.streamSelector.headerEpisode
+                selectorState.headerEpisode
                     ?: findEpisodeForLookupId(
-                        lookupId = currentState.streamSelector.lookupId.orEmpty(),
+                        lookupId = selectorState.lookupId.orEmpty(),
                         currentEpisodes = currentState.seasonEpisodes,
                     )
             val resolvedLookupId =
-                currentState.streamSelector.lookupId
+                selectorState.lookupId
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
                     ?: targetEpisode?.lookupId?.trim()?.takeIf { it.isNotBlank() }
@@ -1271,6 +1117,7 @@ class DetailsViewModel internal constructor(
             runtimeEntry: RuntimeDetailsEntry?,
             detailsUseCases: DetailsUseCases,
             outbox: UserMutationOutbox,
+            appContext: Context,
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -1281,6 +1128,7 @@ class DetailsViewModel internal constructor(
                         runtimeEntry = runtimeEntry,
                         detailsUseCases = detailsUseCases,
                         outbox = outbox,
+                        appContext = appContext.applicationContext,
                     ) as T
                 }
             }

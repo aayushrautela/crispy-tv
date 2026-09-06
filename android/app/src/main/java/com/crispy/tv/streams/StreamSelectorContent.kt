@@ -377,6 +377,29 @@ private fun ProviderChipsRow(
     onAccentColor: Color,
     onProviderSelected: (String?) -> Unit,
 ) {
+    if (state.isLoading && state.providers.isEmpty()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .testTag("stream_provider_chips"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SKELETON_CHIP_WIDTHS.forEach { chipWidth ->
+                Box(
+                    modifier =
+                        Modifier
+                            .width(chipWidth)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .skeletonElement(color = DetailsSkeletonColors.Base),
+                )
+            }
+        }
+        return
+    }
+
     Row(
         modifier =
             Modifier
@@ -418,16 +441,14 @@ private fun ProviderChipsRow(
         }
 
         if (state.isLoading) {
-            SKELETON_CHIP_WIDTHS.forEach { chipWidth ->
-                Box(
-                    modifier =
-                        Modifier
-                            .width(chipWidth)
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .skeletonElement(color = DetailsSkeletonColors.Base),
-                )
-            }
+            Box(
+                modifier =
+                    Modifier
+                        .width(84.dp)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .skeletonElement(color = DetailsSkeletonColors.Base),
+            )
         }
     }
 }

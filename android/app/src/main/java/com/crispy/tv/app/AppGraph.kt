@@ -21,7 +21,6 @@ import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.optimistic.FileBackedPendingMutationStore
 import com.crispy.tv.optimistic.UserMediaMutationExecutor
 import com.crispy.tv.optimistic.UserMutationOutbox
-import com.crispy.tv.streams.StreamResolverProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,10 +47,6 @@ class AppGraph(
         AiInsightsRepository.create(appContext)
     }
 
-    private val streamResolver by lazy {
-        StreamResolverProvider.get(appContext)
-    }
-
     private val detailsUseCases: DetailsUseCases by lazy {
         DetailsUseCases(
             sessionRepository = sessionRepository,
@@ -59,7 +54,6 @@ class AppGraph(
             userMediaRepository = userMediaRepository,
             crispyBackendClient = BackendServicesProvider.backendClient(appContext),
             aiRepository = aiInsightsRepository,
-            streamResolver = streamResolver,
             backendContextResolver = BackendContextResolverProvider.get(appContext),
         )
     }
@@ -75,6 +69,7 @@ class AppGraph(
             runtimeEntry = runtimeEntry,
             detailsUseCases = detailsUseCases,
             outbox = userMutationOutbox,
+            appContext = appContext,
         )
     }
 

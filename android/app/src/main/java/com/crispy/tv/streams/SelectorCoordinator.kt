@@ -160,6 +160,13 @@ class SelectorCoordinator(
         _state.update { it.copy(selectedProviderId = providerId) }
     }
 
+    /** Re-reveals already-resolved results without refetching (same title reopen). */
+    fun reshow(headerEpisode: MediaVideo?) {
+        if (currentTarget == null) return
+        if (headerEpisode != null) _headerEpisode.value = headerEpisode
+        _state.update { it.copy(visible = true, headerEpisode = headerEpisode ?: it.headerEpisode) }
+    }
+
     fun onRetryProvider(providerId: String) {
         val target = currentTarget ?: return
         val cur = _state.value
@@ -208,7 +215,8 @@ class SelectorCoordinator(
         resolveJob = null
         _state.update { it.copy(visible = false) }
         onStreamSelected = null
-        currentTarget = null
+        // currentTarget is intentionally kept so reshow() can re-reveal
+        // already-resolved results without refetching.
     }
 
     private fun buildPluginRequest(target: StreamLookupTarget): PluginStreamRequest? {

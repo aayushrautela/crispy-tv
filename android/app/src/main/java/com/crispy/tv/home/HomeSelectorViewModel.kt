@@ -18,6 +18,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.streams.PluginStreamLoaderProvider
 import com.crispy.tv.streams.StreamResolverProvider
@@ -33,6 +34,7 @@ data class HomeStreamSelection(
     val resumePositionMs: Long,
     val chosenStreamStableKey: String?,
     val chosenProviderId: String?,
+    val chosenStreamHandoffKey: String?,
 )
 
 internal class HomeSelectorViewModel(
@@ -57,6 +59,8 @@ internal class HomeSelectorViewModel(
     private val _playStream = MutableSharedFlow<HomeStreamSelection>(extraBufferCapacity = 1)
     val playStream: SharedFlow<HomeStreamSelection> = _playStream.asSharedFlow()
 
+    private var lastLookupId: String = ""
+
     fun openFor(item: CanonicalContinueWatchingItem) {
         val mediaType = item.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
         val lookupId =
@@ -67,6 +71,7 @@ internal class HomeSelectorViewModel(
                         ?: item.titleItemId
             }
         val target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
+        lastLookupId = lookupId
 
         val headerEpisode =
             MediaVideo(
@@ -140,6 +145,7 @@ internal class HomeSelectorViewModel(
                 resumePositionMs = resumePositionMs,
                 chosenStreamStableKey = stream.stableKey,
                 chosenProviderId = stream.providerId,
+                chosenStreamHandoffKey = PlayerStreamHandoff.stash(stream, lastLookupId),
             ),
         )
     }

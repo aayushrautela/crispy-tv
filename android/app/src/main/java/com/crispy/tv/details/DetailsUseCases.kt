@@ -13,11 +13,7 @@ import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.mapping.toMediaVideo
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.addons.streams.StreamResolver
-import com.crispy.tv.addons.streams.ProviderStreamsResult
-import com.crispy.tv.addons.streams.StreamProviderDescriptor
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -63,7 +59,6 @@ internal class DetailsUseCases(
     private val catalogRepository: CatalogRepository,
     internal val userMediaRepository: UserMediaRepository,
     private val aiRepository: AiInsightsRepository,
-    private val streamResolver: StreamResolver,
     private val backendContextResolver: BackendContextResolver,
     private val crispyBackendClient: CrispyBackendClient,
 ) {
@@ -364,32 +359,6 @@ internal class DetailsUseCases(
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
         return aiRepository.generate(itemId, locale)
-    }
-
-    suspend fun loadStreams(
-        mediaType: MetadataLabMediaType,
-        lookupId: String,
-        tmdbId: Int? = null,
-        onProvidersResolved: (List<StreamProviderDescriptor>) -> Unit,
-        onProviderResult: (ProviderStreamsResult) -> Unit,
-    ): List<ProviderStreamsResult> {
-        return streamResolver.resolve(
-            target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId, tmdbId = tmdbId),
-            onProvidersResolved = onProvidersResolved,
-            onProviderResult = onProviderResult,
-        )
-    }
-
-    suspend fun loadProviderStreams(
-        mediaType: MetadataLabMediaType,
-        lookupId: String,
-        providerId: String,
-    ): ProviderStreamsResult? {
-        return streamResolver.loadProviderStreams(
-            mediaType = mediaType,
-            lookupId = lookupId,
-            providerId = providerId,
-        )
     }
 
     private companion object {

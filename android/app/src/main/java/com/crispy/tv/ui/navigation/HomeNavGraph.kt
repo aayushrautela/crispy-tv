@@ -73,13 +73,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         launchSingleTop = true
                     }
                 },
-                onOpenPlayer = { identity, resumePositionMs, chosenStreamStableKey, chosenProviderId ->
+                onOpenPlayer = { identity, resumePositionMs, chosenStreamStableKey, chosenProviderId, chosenStreamHandoffKey ->
                     navController.navigate(
                         AppRoutes.playerRoute(
                             identity = identity,
                             resumePositionMs = resumePositionMs,
                             chosenStreamStableKey = chosenStreamStableKey,
                             chosenProviderId = chosenProviderId,
+                            chosenStreamHandoffKey = chosenStreamHandoffKey,
                         )
                     )
                 },

@@ -72,6 +72,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
@@ -91,6 +93,9 @@ private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 @Composable
 internal fun DetailsScreen(
     uiState: DetailsUiState,
+    selectorState: StreamSelectorUiState,
+    selectorDetails: MediaDetails?,
+    selectorHeaderEpisode: MediaVideo?,
     playbackSettings: PlaybackSettings,
     initialArtworkUrl: String? = null,
     sharedElementKey: String? = null,
@@ -219,7 +224,7 @@ internal fun DetailsScreen(
     }
 
     val trailerPlaybackBlocked =
-        visibleUiState.streamSelector.visible || visibleUiState.aiStoryVisible || !isScreenResumed
+        selectorState.visible || visibleUiState.aiStoryVisible || !isScreenResumed
 
     val isTrailerPlaying =
         showTrailer &&
@@ -382,10 +387,10 @@ internal fun DetailsScreen(
             )
 
             StreamSelectorSheet(
-                visible = visibleUiState.streamSelector.visible,
-                state = visibleUiState.streamSelector,
-                details = visibleDetails,
-                headerEpisode = visibleUiState.streamSelector.headerEpisode,
+                visible = selectorState.visible,
+                state = selectorState,
+                details = selectorDetails,
+                headerEpisode = selectorHeaderEpisode,
                 accentColor = palette.accent,
                 onAccentColor = palette.onAccent,
                 onDismiss = onDismissStreamSelector,
