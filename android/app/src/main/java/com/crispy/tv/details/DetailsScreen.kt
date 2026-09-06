@@ -75,7 +75,7 @@ import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
-import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.streams.StreamSelectorSheet
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource

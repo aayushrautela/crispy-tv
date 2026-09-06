@@ -893,7 +893,7 @@ class DetailsViewModel internal constructor(
     }
 
     private fun updateStreamSelector(
-        session: Int,
+        session: Long,
         target: StreamLookupTarget,
         transform: (StreamSelectorUiState) -> StreamSelectorUiState,
     ) {
