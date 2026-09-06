@@ -29,6 +29,7 @@ object PluginStreamLoaderProvider {
             source.load(
                 mediaType = request.mediaType,
                 lookupId = request.lookupId,
+                tmdbId = request.tmdbId,
                 title = request.title.orEmpty(),
                 year = request.year.toYearInt(),
                 season = request.season,

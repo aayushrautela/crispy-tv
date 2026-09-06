@@ -556,6 +556,7 @@ class DetailsViewModel internal constructor(
                     StreamLookupTarget(
                         mediaType = requestedMediaType,
                         lookupId = videoId,
+                        tmdbId = details.tmdbId,
                     )
                 }
                 ?: resolveStreamLookupTarget(
@@ -793,6 +794,7 @@ class DetailsViewModel internal constructor(
             StreamLookupTarget(
                 mediaType = requestedMediaType,
                 lookupId = episode?.lookupId?.trim().orEmpty(),
+                tmdbId = details.tmdbId,
             )
         openStreamSelectorWithTarget(
             target = target,
@@ -848,6 +850,7 @@ class DetailsViewModel internal constructor(
                     detailsUseCases.loadStreams(
                         mediaType = target.mediaType,
                         lookupId = target.lookupId,
+                        tmdbId = target.tmdbId,
                         onProvidersResolved = {
                             _uiState.update { previous ->
                                 if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
@@ -1113,8 +1116,9 @@ class DetailsViewModel internal constructor(
                 PlaybackIdentity(
                     itemId = playbackItemId,
                     seriesItemId = enriched.itemId,
-                imdbId = enriched.imdbId,
-                contentType = resolvedMediaType,
+                    imdbId = enriched.imdbId,
+                    tmdbId = enriched.tmdbId,
+                    contentType = resolvedMediaType,
                 season = season,
                 episode = episode,
                 title = title,

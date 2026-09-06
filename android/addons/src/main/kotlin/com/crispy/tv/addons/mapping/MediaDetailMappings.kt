@@ -30,6 +30,7 @@ fun CrispyBackendClient.ClientMediaCard.toMediaDetails(): MediaDetails {
         id = itemId,
         itemId = itemId,
         imdbId = providerIds?.imdb,
+        tmdbId = providerIds?.tmdb,
         itemType = normalizedCatalogMediaType(),
         title = title.trim().takeIf { it.isNotBlank() } ?: itemId,
         artworkUrl = images.artwork.medium,

@@ -97,10 +97,20 @@ class SelectorCoordinator(
         val pluginJob =
             pluginStreamLoader?.let { loader ->
                 scope.launch {
-                    // No metadata join: plugins receive only tmdbId/mediaType/season/episode,
-                    // so waiting for title/year would add latency for nothing.
                     if (session != sessionId || currentTarget != target) return@launch
-                    val request = buildPluginRequest(target) ?: return@launch
+                    // Plugins key on the tmdb id. Surfaces without one on hand (home
+                    // continue-watching) wait for the metadata fetch already in flight
+                    // rather than calling plugins with an empty id.
+                    val resolvedTarget =
+                        if (target.tmdbId == null && metadataJob != null) {
+                            metadataJob.join()
+                            if (session != sessionId || currentTarget != target) return@launch
+                            val enrichedTmdbId = _details.value?.tmdbId
+                            if (enrichedTmdbId != null) target.copy(tmdbId = enrichedTmdbId) else target
+                        } else {
+                            target
+                        }
+                    val request = buildPluginRequest(resolvedTarget) ?: return@launch
                     val results =
                         runCatching { loader.load(request) }.getOrElse { error ->
                             listOf(
@@ -208,6 +218,7 @@ class SelectorCoordinator(
         return PluginStreamRequest(
             mediaType = target.mediaType,
             lookupId = target.lookupId,
+            tmdbId = target.tmdbId,
             title = details?.title,
             year = details?.year,
             season = episode?.season,

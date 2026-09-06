@@ -145,4 +145,12 @@ class PluginStreamMappingTest {
         assertNull(empty.imdbId)
         assertNull(empty.tmdbId)
     }
+
+    @Test
+    fun `plugin tmdb id prefers server id over lookup parsing`() {
+        assertEquals("603", resolvePluginTmdbId(requestTmdbId = 603, rawLookupId = "tt0113243"))
+        assertEquals("550", resolvePluginTmdbId(requestTmdbId = null, rawLookupId = "550"))
+        assertEquals("", resolvePluginTmdbId(requestTmdbId = null, rawLookupId = "tt0113243"))
+        assertEquals("", resolvePluginTmdbId(requestTmdbId = 0, rawLookupId = "tt0113243"))
+    }
 }

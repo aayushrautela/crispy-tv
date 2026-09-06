@@ -4,6 +4,7 @@ data class MediaDetails(
     val id: String,
     val itemId: String? = null,
     val imdbId: String?,
+    val tmdbId: Int? = null,
     val itemType: String,
     val title: String,
     val artworkUrl: String?,

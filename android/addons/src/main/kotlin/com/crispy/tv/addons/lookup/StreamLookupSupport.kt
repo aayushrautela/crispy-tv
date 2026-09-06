@@ -16,6 +16,7 @@ import java.util.Locale
 data class StreamLookupTarget(
     val mediaType: MetadataLabMediaType,
     val lookupId: String,
+    val tmdbId: Int? = null,
 )
 
 typealias PlayerStreamLookupTarget = StreamLookupTarget
@@ -41,7 +42,7 @@ fun resolveStreamLookupTarget(
             }
         }
 
-    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
+    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId, tmdbId = details.tmdbId)
 }
 
 fun resolveStreamLookupTargetFromIdentity(identity: PlaybackIdentity): StreamLookupTarget {
@@ -56,7 +57,7 @@ fun resolveStreamLookupTargetFromIdentity(identity: PlaybackIdentity): StreamLoo
             MetadataLabMediaType.ANIME ->
                 buildAddonEpisodeLookupId(baseId, identity.season, identity.episode) ?: baseId.orEmpty()
         }
-    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
+    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId, tmdbId = identity.tmdbId)
 }
 
 fun findEpisodeForLookupId(

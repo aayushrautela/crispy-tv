@@ -48,6 +48,7 @@ object AppRoutes {
     const val PlayerItemIdArg = "itemId"
     const val PlayerSeriesItemIdArg = "seriesItemId"
     const val PlayerImdbIdArg = "imdbId"
+    const val PlayerTmdbIdArg = "tmdbId"
     const val PlayerSeasonArg = "season"
     const val PlayerEpisodeArg = "episode"
     const val PlayerYearArg = "year"
@@ -108,6 +109,7 @@ object AppRoutes {
             "&$PlayerItemIdArg={$PlayerItemIdArg}" +
             "&$PlayerSeriesItemIdArg={$PlayerSeriesItemIdArg}" +
             "&$PlayerImdbIdArg={$PlayerImdbIdArg}" +
+            "&$PlayerTmdbIdArg={$PlayerTmdbIdArg}" +
             "&$PlayerSeasonArg={$PlayerSeasonArg}" +
             "&$PlayerEpisodeArg={$PlayerEpisodeArg}" +
             "&$PlayerYearArg={$PlayerYearArg}" +
@@ -135,6 +137,7 @@ object AppRoutes {
             "&$PlayerItemIdArg=${Uri.encode(identity.itemId.orEmpty())}" +
             "&$PlayerSeriesItemIdArg=${Uri.encode(identity.seriesItemId.orEmpty())}" +
             "&$PlayerImdbIdArg=${Uri.encode(identity.imdbId.orEmpty())}" +
+            "&$PlayerTmdbIdArg=${identity.tmdbId?.toString().orEmpty()}" +
             "&$PlayerSeasonArg=${identity.season?.toString().orEmpty()}" +
             "&$PlayerEpisodeArg=${identity.episode?.toString().orEmpty()}" +
             "&$PlayerYearArg=${identity.year?.toString().orEmpty()}" +

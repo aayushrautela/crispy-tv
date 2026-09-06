@@ -43,7 +43,8 @@ global `getStreams` (both resolve; `module.exports` wins). Required export:
 async function getStreams(tmdbId, mediaType, season, episode) {
   // tmdbId: string; mediaType: "movie"|"tv"; season/episode: number|undefined
   // Lookup ids: crispy.lookup = { tmdbId, imdbId, mediaType, season, episode }.
-  // tmdb and imdb ids are equal citizens — whichever the in-app lookup carried is
+  // tmdb and imdb ids are equal citizens, both taken from the backend's
+  // providerIds on the title — whichever id the in-app lookup carried is
   // populated, the other is "". No imdb<->tmdb resolution happens app-side; a
   // plugin that needs the other id must resolve it itself.
   return [{
@@ -124,7 +125,7 @@ com.crispy.tv.plugins
 
 ### Stream pipeline integration
 
-- `PluginStreamsService.load(tmdbId, imdbId, mediaType, season, episode, title, year)` runs enabled plugins concurrently (cap 4, same semaphore discipline as `AddonStreamsService`), maps each result into `AddonStream` with `providerId = "plugin:<scraperId>"`, merged `headers+referer`, `stableKey = hash(url+headers)`
+- `PluginStreamsService.load(tmdbId, imdbId, mediaType, season, episode, title, year)` runs enabled plugins concurrently (cap 4, same semaphore discipline as `AddonStreamsService`), maps each result into `AddonStream` with `providerId = "plugin:<scraperId>"`, merged `headers+referer`, `stableKey = hash(url+headers)`. `tmdbId` comes from the backend's `providerIds.tmdb` (carried on `MediaDetails`/`StreamLookupTarget`), falling back to parsing a numeric lookup id; `imdbId` comes from the lookup id (`tt…`).
 - Registered as an additional provider source inside `SelectorCoordinator.resolve()` alongside `StreamResolver`; results flow through existing `onProviderResult` and stream list UI
 - Cancellation: `SelectorCoordinator.dismiss()` cancels coroutine scope → interrupts isolates
 

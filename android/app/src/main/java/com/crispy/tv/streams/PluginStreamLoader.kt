@@ -6,6 +6,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 data class PluginStreamRequest(
     val mediaType: MetadataLabMediaType,
     val lookupId: String,
+    val tmdbId: Int? = null,
     val title: String?,
     val year: String?,
     val season: Int?,

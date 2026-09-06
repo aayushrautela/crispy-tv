@@ -100,6 +100,7 @@ data class PlaybackIdentity(
     val itemId: String?,
     val seriesItemId: String? = null,
     val imdbId: String? = null,
+    val tmdbId: Int? = null,
     val contentType: MetadataLabMediaType,
     val season: Int? = null,
     val episode: Int? = null,

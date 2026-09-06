@@ -369,11 +369,12 @@ internal class DetailsUseCases(
     suspend fun loadStreams(
         mediaType: MetadataLabMediaType,
         lookupId: String,
+        tmdbId: Int? = null,
         onProvidersResolved: (List<StreamProviderDescriptor>) -> Unit,
         onProviderResult: (ProviderStreamsResult) -> Unit,
     ): List<ProviderStreamsResult> {
         return streamResolver.resolve(
-            target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId),
+            target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId, tmdbId = tmdbId),
             onProvidersResolved = onProvidersResolved,
             onProviderResult = onProviderResult,
         )

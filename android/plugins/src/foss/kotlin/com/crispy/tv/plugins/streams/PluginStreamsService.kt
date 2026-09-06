@@ -24,6 +24,7 @@ fun interface PluginStreamSource {
     suspend fun load(
         mediaType: MetadataLabMediaType,
         lookupId: String,
+        tmdbId: Int?,
         title: String,
         year: Int?,
         season: Int?,
@@ -43,6 +44,7 @@ internal class PluginStreamsService(
     suspend fun load(
         mediaType: MetadataLabMediaType,
         lookupId: String,
+        tmdbId: Int?,
         title: String,
         year: Int?,
         season: Int?,
@@ -82,7 +84,7 @@ internal class PluginStreamsService(
                 android.util.Log.w(LOG_TAG, "load aborted: runtime unavailable")
                 return@coroutineScope emptyList()
             }
-            val input = buildInput(mediaType, lookupId, season, episode)
+            val input = buildInput(mediaType, lookupId, tmdbId, season, episode)
             android.util.Log.i(
                 LOG_TAG,
                 "plugin input tmdbId='${input.tmdbId}' imdbId='${input.imdbId}' mediaType='${input.mediaType}' " +
@@ -145,6 +147,7 @@ internal class PluginStreamsService(
     private fun buildInput(
         mediaType: MetadataLabMediaType,
         lookupId: String,
+        tmdbId: Int?,
         season: Int?,
         episode: Int?,
     ): PluginStreamInput {
@@ -152,7 +155,7 @@ internal class PluginStreamsService(
         // (tmdb/imdb, whichever the lookup carried), mediaType, season and episode.
         val parsed = parseLookupComponents(lookupId)
         return PluginStreamInput(
-            tmdbId = parsed.tmdbId?.toString().orEmpty(),
+            tmdbId = resolvePluginTmdbId(tmdbId, lookupId),
             imdbId = parsed.imdbId.orEmpty(),
             mediaType = when (mediaType) {
                 MetadataLabMediaType.MOVIE -> "movie"

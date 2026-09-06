@@ -532,6 +532,7 @@ class PlayerSessionViewModel(
             PlayerStreamLookupTarget(
                 mediaType = identity.contentType,
                 lookupId = episode?.lookupId?.trim().orEmpty(),
+                tmdbId = identity.tmdbId,
             )
         val headerEpisode =
             episode ?: findEpisodeForLookupId(
@@ -575,6 +576,7 @@ class PlayerSessionViewModel(
                     id = id.itemId ?: rawPlaybackId ?: "",
                     itemId = id.itemId,
                     imdbId = id.imdbId,
+                    tmdbId = id.tmdbId,
                     itemType =
                         when (id.contentType) {
                             MetadataLabMediaType.SERIES -> "show"
@@ -639,6 +641,7 @@ class PlayerSessionViewModel(
         val nextIdentity =
             PlaybackIdentity(
                 itemId = details.itemId,
+                tmdbId = details.tmdbId,
                 contentType = nextMediaType,
                 season = nextSeason,
                 episode = nextEpisodeNumber,

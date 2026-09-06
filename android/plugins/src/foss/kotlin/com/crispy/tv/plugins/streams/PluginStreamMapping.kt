@@ -21,6 +21,11 @@ internal data class ParsedPluginLookupId(
     val episode: Int?,
 )
 
+internal fun resolvePluginTmdbId(requestTmdbId: Int?, rawLookupId: String): String {
+    requestTmdbId?.takeIf { it > 0 }?.let { return it.toString() }
+    return parseLookupComponents(rawLookupId).tmdbId?.toString().orEmpty()
+}
+
 internal fun parseLookupComponents(rawLookupId: String): ParsedPluginLookupId {
     val trimmed = rawLookupId.trim()
     if (trimmed.isEmpty()) return ParsedPluginLookupId(tmdbId = null, imdbId = null, season = null, episode = null)
@@ -89,10 +94,11 @@ object PluginStreamsServiceFactory {
             repositoryManager = repositoryManager,
             runtimeProvider = { PluginRuntimeProvider.create(bridges) },
         )
-        return PluginStreamSource { mediaType, lookupId, title, year, season, episode, onProvidersResolved, onProviderResult ->
+        return PluginStreamSource { mediaType, lookupId, tmdbId, title, year, season, episode, onProvidersResolved, onProviderResult ->
             service.load(
                 mediaType = mediaType,
                 lookupId = lookupId,
+                tmdbId = tmdbId,
                 title = title,
                 year = year,
                 season = season,
