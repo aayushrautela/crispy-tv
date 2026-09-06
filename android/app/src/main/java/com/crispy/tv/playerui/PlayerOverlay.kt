@@ -214,7 +214,7 @@ internal fun PlayerOverlay(
                         colors =
                             IconButtonDefaults.filledIconButtonColors(
                                 containerColor = palette.accent,
-                                contentColor = Color.White,
+                                contentColor = palette.onAccent,
                             ),
                         modifier =
                             Modifier
