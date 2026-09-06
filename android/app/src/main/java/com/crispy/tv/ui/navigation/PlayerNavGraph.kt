@@ -91,6 +91,15 @@ internal fun NavGraphBuilder.addPlayerDestination(navController: NavHostControll
             isInPictureInPictureMode = host.isInPictureInPictureMode.value,
             onPictureInPictureConfigChanged = host::updatePictureInPictureConfig,
             onBack = { navController.popBackStack() },
+            onOpenTitle = { item ->
+                navController.popBackStack()
+                navController.navigate(
+                    AppRoutes.homeDetailsRoute(
+                        itemId = item.itemId,
+                        itemType = item.type,
+                    ),
+                )
+            },
         )
     }
 }

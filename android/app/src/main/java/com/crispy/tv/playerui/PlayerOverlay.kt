@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
@@ -67,6 +68,9 @@ internal fun PlayerOverlay(
     onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
     onSelectEpisode: (String) -> Unit,
     onSeasonSelected: (Int) -> Unit,
+    onShowMoreCollection: () -> Unit,
+    onShowMoreRecommended: () -> Unit,
+    onOpenTitle: (CatalogItem) -> Unit,
     onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
 ) {
@@ -230,19 +234,50 @@ internal fun PlayerOverlay(
                 }
 
                 val isSeries = uiState.details?.itemType?.equals("movie", ignoreCase = true) == false
-                val episodesThumbUrl =
-                    remember(uiState.seasonEpisodes, uiState.activeIdentity, uiState.artworkUrl) {
-                        val active = uiState.activeIdentity
-                        val sorted = uiState.seasonEpisodes.sortedBy { it.episode ?: Int.MAX_VALUE }
-                        val currentIdx = sorted.indexOfFirst { it.episode == active?.episode && it.season == active?.season }
-                        val thumb =
-                            when {
-                                currentIdx >= 0 && currentIdx + 1 < sorted.size -> sorted[currentIdx + 1].thumbnailUrl
-                                currentIdx >= 0 -> sorted[currentIdx].thumbnailUrl
-                                sorted.isNotEmpty() -> sorted.firstOrNull()?.thumbnailUrl
-                                else -> null
+                val pills =
+                    if (isSeries) {
+                        val episodesThumbUrl =
+                            remember(uiState.seasonEpisodes, uiState.activeIdentity, uiState.artworkUrl) {
+                                val active = uiState.activeIdentity
+                                val sorted = uiState.seasonEpisodes.sortedBy { it.episode ?: Int.MAX_VALUE }
+                                val currentIdx = sorted.indexOfFirst { it.episode == active?.episode && it.season == active?.season }
+                                val thumb =
+                                    when {
+                                        currentIdx >= 0 && currentIdx + 1 < sorted.size -> sorted[currentIdx + 1].thumbnailUrl
+                                        currentIdx >= 0 -> sorted[currentIdx].thumbnailUrl
+                                        sorted.isNotEmpty() -> sorted.firstOrNull()?.thumbnailUrl
+                                        else -> null
+                                    }
+                                thumb?.trim()?.takeIf { it.isNotBlank() } ?: uiState.artworkUrl
                             }
-                        thumb?.trim()?.takeIf { it.isNotBlank() } ?: uiState.artworkUrl
+                        listOf(
+                            PlayerActionPill(
+                                label = "Episodes",
+                                thumbUrl = episodesThumbUrl,
+                                onClick = { openSurface(onShowEpisodes) },
+                            ),
+                        )
+                    } else {
+                        buildList {
+                            if (uiState.collectionItems.isNotEmpty()) {
+                                add(
+                                    PlayerActionPill(
+                                        label = "Collection",
+                                        thumbUrl = uiState.collectionItems.first().artworkUrl,
+                                        onClick = { openSurface(onShowMoreCollection) },
+                                    ),
+                                )
+                            }
+                            if (uiState.recommendedItems.isNotEmpty()) {
+                                add(
+                                    PlayerActionPill(
+                                        label = "More like this",
+                                        thumbUrl = uiState.recommendedItems.first().artworkUrl,
+                                        onClick = { openSurface(onShowMoreRecommended) },
+                                    ),
+                                )
+                            }
+                        }
                     }
 
                 PlayerBottomControls(
@@ -263,10 +298,7 @@ internal fun PlayerOverlay(
                     },
                     resizeMode = uiState.resizeMode,
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    showEpisodesPill = isSeries,
-                    episodesThumbUrl = episodesThumbUrl,
-                    episodesLabel = "Episodes",
-                    onShowEpisodes = { openSurface(onShowEpisodes) },
+                    pills = pills,
                 )
             }
         }
@@ -306,6 +338,18 @@ internal fun PlayerOverlay(
                 resetControlsTimer()
                 onSelectEpisode(it)
             },
+            onClose = onCloseSurface,
+        )
+
+        PlayerMoreSheet(
+            visible = uiState.activeSurface == PlayerSurface.MORE,
+            section = uiState.moreSection,
+            collectionName = uiState.collectionName,
+            collectionItems = uiState.collectionItems,
+            recommendedItems = uiState.recommendedItems,
+            moreIsLoading = uiState.moreIsLoading,
+            palette = palette,
+            onItemSelected = onOpenTitle,
             onClose = onCloseSurface,
         )
 

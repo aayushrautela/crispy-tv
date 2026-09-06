@@ -28,6 +28,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.rememberSeedColor
 import com.crispy.tv.details.detailsPaletteFromScheme
 import com.crispy.tv.details.rememberDetailsColorScheme
@@ -42,6 +43,7 @@ fun PlayerRoute(
     isInPictureInPictureMode: Boolean,
     onPictureInPictureConfigChanged: (PictureInPictureConfig) -> Unit,
     onBack: () -> Unit,
+    onOpenTitle: (CatalogItem) -> Unit = {},
 ) {
     val uiState by session.uiState.collectAsStateWithLifecycle()
     // Passed down unread so a 500ms position tick only recomposes the seekbar/time-pill
@@ -217,6 +219,9 @@ fun PlayerRoute(
                 onSelectAddonSubtitle = session::selectAddonSubtitle,
                 onSelectEpisode = session::showStreamsForEpisode,
                 onSeasonSelected = session::onSeasonSelected,
+                onShowMoreCollection = session::showMoreCollection,
+                onShowMoreRecommended = session::showMoreRecommended,
+                onOpenTitle = onOpenTitle,
                 onCycleResizeMode = {
                     val next = uiState.resizeMode.next()
                     session.setResizeMode(next)

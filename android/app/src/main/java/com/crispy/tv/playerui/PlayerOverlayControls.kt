@@ -155,6 +155,12 @@ private fun PlayerTextSkeleton(
     )
 }
 
+data class PlayerActionPill(
+    val label: String,
+    val thumbUrl: String? = null,
+    val onClick: () -> Unit,
+)
+
 @Composable
 internal fun PlayerBottomControls(
     positionMsState: State<Long>,
@@ -168,45 +174,45 @@ internal fun PlayerBottomControls(
     onCycleResizeMode: () -> Unit,
     resizeMode: PlayerResizeMode,
     modifier: Modifier = Modifier,
-    showEpisodesPill: Boolean = false,
-    episodesThumbUrl: String? = null,
-    episodesLabel: String = "Episodes",
-    onShowEpisodes: (() -> Unit)? = null,
+    pills: List<PlayerActionPill> = emptyList(),
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (showEpisodesPill && onShowEpisodes != null) {
+        if (pills.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = palette.pillBackground,
-                    contentColor = palette.onPillBackground,
-                    modifier = Modifier.clickable(onClick = onShowEpisodes),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                pills.forEach { pill ->
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = palette.pillBackground,
+                        contentColor = palette.onPillBackground,
+                        modifier = Modifier.clickable(onClick = pill.onClick),
                     ) {
-                        Text(
-                            text = episodesLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                        if (episodesThumbUrl != null) {
-                            AsyncImage(
-                                model = episodesThumbUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier =
-                                    Modifier
-                                        .size(width = 56.dp, height = 32.dp)
-                                        .clip(RoundedCornerShape(10.dp)),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                        ) {
+                            Text(
+                                text = pill.label,
+                                style = MaterialTheme.typography.labelLarge,
                             )
+                            if (pill.thumbUrl != null) {
+                                AsyncImage(
+                                    model = pill.thumbUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier =
+                                        Modifier
+                                            .size(width = 56.dp, height = 32.dp)
+                                            .clip(RoundedCornerShape(10.dp)),
+                                )
+                            }
                         }
                     }
                 }

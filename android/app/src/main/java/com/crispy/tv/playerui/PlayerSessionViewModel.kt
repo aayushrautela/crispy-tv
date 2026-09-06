@@ -30,6 +30,7 @@ import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
@@ -42,6 +43,7 @@ import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.TorrentResolver
+import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.settings.PlaybackSettingsRepository
@@ -70,9 +72,15 @@ enum class PlayerSurface {
     NONE,
     INFO,
     EPISODES,
+    MORE,
     STREAMS,
     AUDIO,
     SUBTITLES,
+}
+
+enum class MoreSection {
+    COLLECTION,
+    RECOMMENDED,
 }
 
 @Immutable
@@ -97,6 +105,11 @@ data class PlayerUiState(
     val seasonEpisodes: List<MediaVideo> = emptyList(),
     val episodesIsLoading: Boolean = false,
     val episodesStatusMessage: String = "",
+    val moreSection: MoreSection = MoreSection.RECOMMENDED,
+    val collectionName: String? = null,
+    val collectionItems: List<CatalogItem> = emptyList(),
+    val recommendedItems: List<CatalogItem> = emptyList(),
+    val moreIsLoading: Boolean = false,
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
     val currentPlaybackUrl: String? = null,
     val audioTracks: List<NativeTrack> = emptyList(),
@@ -159,6 +172,7 @@ class PlayerSessionViewModel(
 
     private val rawPlaybackId = buildPlaybackRawId(identity = identity)
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
+    private var titleExtrasFetched = false
     private var activePlaybackSource = PlaybackSource(url = "")
     private var activeIdentity: PlaybackIdentity? = identity
     private var activeSubtitle: String? = null
@@ -369,6 +383,23 @@ class PlayerSessionViewModel(
         selectorCoordinator.dismiss()
         _uiState.update { state ->
             state.copy(activeSurface = PlayerSurface.EPISODES)
+        }
+    }
+
+    fun showMoreCollection() {
+        showMore(MoreSection.COLLECTION)
+    }
+
+    fun showMoreRecommended() {
+        showMore(MoreSection.RECOMMENDED)
+    }
+
+    private fun showMore(section: MoreSection) {
+        val details = _uiState.value.details ?: return
+        if (!details.itemType.equals("movie", ignoreCase = true)) return
+        selectorCoordinator.dismiss()
+        _uiState.update { state ->
+            state.copy(activeSurface = PlayerSurface.MORE, moreSection = section)
         }
     }
 
@@ -750,6 +781,8 @@ class PlayerSessionViewModel(
 
         if (isSeries) {
             fetchSeasonsForDetails(details.itemId)
+        } else {
+            fetchTitleExtras(details.itemId)
         }
 
         val seasonToLoad = _uiState.value.selectedSeason
@@ -809,6 +842,64 @@ class PlayerSessionViewModel(
                 if (current.seasons.size == numbers.size && current.seasons.containsAll(numbers)) current
                 else current.copy(seasons = numbers)
             }
+        }
+    }
+
+    private fun fetchTitleExtras(itemId: String?) {
+        val id = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return
+        if (titleExtrasFetched) return
+        titleExtrasFetched = true
+        _uiState.update {
+            it.copy(moreIsLoading = true)
+        }
+        viewModelScope.launch {
+            val session = runCatching { withContext(Dispatchers.IO) { supabase.ensureValidSession() } }.getOrNull()
+            val extras =
+                if (session == null) {
+                    null
+                } else {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            backendClient.getMetadataItemExtras(accessToken = session.accessToken, itemId = id)
+                        }
+                    }.getOrNull()
+                }
+            if (extras == null) {
+                _uiState.update { it.copy(moreIsLoading = false) }
+                return@launch
+            }
+
+            val currentKeys =
+                buildSet {
+                    add(id)
+                    detailsIdKeys()?.let(::addAll)
+                }
+            val collection =
+                extras.collection.orEmpty()
+                    .mapNotNull { it.toCatalogItem() }
+                    .filter { it.itemId !in currentKeys }
+            val collectionKeys = collection.map { "${it.type}:${it.id}" }.toHashSet()
+            val recommended =
+                extras.similar
+                    .mapNotNull { it.toCatalogItem() }
+                    .filter { it.itemId !in currentKeys && "${it.type}:${it.id}" !in collectionKeys }
+                    .distinctBy { "${it.type}:${it.id}" }
+            _uiState.update {
+                it.copy(
+                    moreIsLoading = false,
+                    collectionName = extras.collectionName?.trim()?.takeIf { name -> name.isNotBlank() },
+                    collectionItems = collection,
+                    recommendedItems = recommended,
+                )
+            }
+        }
+    }
+
+    private fun detailsIdKeys(): Set<String>? {
+        val details = _uiState.value.details ?: return null
+        return buildSet {
+            details.itemId?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+            details.id.trim().takeIf { it.isNotBlank() }?.let(::add)
         }
     }
 
