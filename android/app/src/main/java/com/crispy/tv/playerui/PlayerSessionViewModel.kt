@@ -752,7 +752,7 @@ class PlayerSessionViewModel(
 
     private fun onCoordinatorStateChanged(state: StreamSelectorUiState) {
         _uiState.update { it.copy(streamSelector = state) }
-        if (!autoSelectPending || state.isLoading) return
+        if (!autoSelectPending || state.isFetching) return
         autoSelectPending = false
         val target = initialTarget ?: return
         val providers = state.providers

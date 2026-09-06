@@ -5,6 +5,7 @@ import com.crispy.tv.addons.streams.StreamProviderUiState
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.ProviderStreamsResult
+import com.crispy.tv.addons.streams.seedProviders
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
@@ -72,7 +73,7 @@ class SelectorCoordinator(
                 headerEpisode = headerEpisode,
                 selectedProviderId = null,
                 providers = emptyList(),
-                isLoading = true,
+                pluginsPending = pluginStreamLoader != null,
             )
         resolveJob?.cancel()
         resolveJob = scope.launch { resolve(session, target, itemIdForMetadata) }
@@ -131,14 +132,17 @@ class SelectorCoordinator(
                                 }
                             }
                         }
+                    if (session == sessionId && currentTarget == target) {
+                        _state.update { it.copy(pluginsPending = false) }
+                    }
                 }
             }
 
         streamResolver.resolve(
             target = target,
-            onProvidersResolved = {
+            onProvidersResolved = { descriptors ->
                 if (session == sessionId && currentTarget == target) {
-                    _state.update { it.copy(providers = emptyList(), isLoading = true) }
+                    _state.update { it.copy(providers = it.providers.seedProviders(descriptors)) }
                 }
             },
             onProviderResult = { result ->
@@ -148,7 +152,7 @@ class SelectorCoordinator(
             },
         ).also { results ->
             if (session == sessionId && currentTarget == target) {
-                _state.update { it.copy(providers = it.providers.finalizeFrom(results), isLoading = false) }
+                _state.update { it.copy(providers = it.providers.finalizeFrom(results)) }
             }
         }
 
@@ -173,7 +177,6 @@ class SelectorCoordinator(
         if (!cur.matchesTarget(target)) return
         _state.update {
             it.copy(
-                isLoading = true,
                 providers =
                     it.providers.map { p ->
                         if (p.providerId.equals(providerId, ignoreCase = true)) {
@@ -199,9 +202,20 @@ class SelectorCoordinator(
                         .getOrNull()
                 }
             if (result != null && currentTarget == target) {
-                _state.update { it.copy(providers = it.providers.applyProviderResult(result), isLoading = false) }
+                _state.update { it.copy(providers = it.providers.applyProviderResult(result)) }
             } else if (currentTarget == target) {
-                _state.update { it.copy(isLoading = false) }
+                _state.update { cur ->
+                    cur.copy(
+                        providers =
+                            cur.providers.map { p ->
+                                if (p.providerId.equals(providerId, ignoreCase = true)) {
+                                    p.copy(isLoading = false)
+                                } else {
+                                    p
+                                }
+                            },
+                    )
+                }
             }
         }
     }

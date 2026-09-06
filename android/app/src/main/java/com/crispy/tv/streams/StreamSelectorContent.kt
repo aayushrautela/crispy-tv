@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,11 +60,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.details.DetailsSkeletonColors
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.ui.components.rememberCrispyImageModel
-import com.crispy.tv.ui.components.skeletonElement
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -73,8 +70,6 @@ import java.util.Locale
 internal const val SHEET_HEIGHT_FRACTION = 0.92f
 
 internal val SHEET_MAX_WIDTH = 420.dp
-
-private val SKELETON_CHIP_WIDTHS = listOf(68.dp, 92.dp, 84.dp, 100.dp)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -193,8 +188,8 @@ fun StreamSelectorContent(
         }
 
         if (
-            !state.isLoading &&
-            filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null }
+            !state.isFetching &&
+            filteredProviders.none { provider -> provider.streams.isNotEmpty() || provider.errorMessage != null }
         ) {
             item {
                 ElevatedCard {
@@ -226,11 +221,17 @@ fun StreamSelectorContent(
                     )
                 }
             }
+
+            if (provider.isLoading) {
+                item(key = "provider_loading_${provider.providerId}") {
+                    ProviderLoadingRow(providerName = provider.providerName)
+                }
+            }
         }
 
-        if (state.isLoading) {
+        if (state.pluginsPending) {
             item {
-                LoadingMoreStreamsRow()
+                ProviderLoadingRow(providerName = "Plugins")
             }
         }
     }
@@ -377,29 +378,6 @@ private fun ProviderChipsRow(
     onAccentColor: Color,
     onProviderSelected: (String?) -> Unit,
 ) {
-    if (state.isLoading && state.providers.isEmpty()) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .testTag("stream_provider_chips"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SKELETON_CHIP_WIDTHS.forEach { chipWidth ->
-                Box(
-                    modifier =
-                        Modifier
-                            .width(chipWidth)
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .skeletonElement(color = DetailsSkeletonColors.Base),
-                )
-            }
-        }
-        return
-    }
-
     Row(
         modifier =
             Modifier
@@ -427,7 +405,15 @@ private fun ProviderChipsRow(
             FilterChip(
                 selected = provider.providerId.equals(state.selectedProviderId, ignoreCase = true),
                 onClick = { onProviderSelected(provider.providerId) },
-                label = { Text("${provider.providerName} ${provider.streams.size}") },
+                label = {
+                    Text(
+                        if (provider.isLoading && provider.streams.isEmpty()) {
+                            provider.providerName
+                        } else {
+                            "${provider.providerName} ${provider.streams.size}"
+                        },
+                    )
+                },
                 shape = RoundedCornerShape(16.dp),
                 border = null,
                 colors =
@@ -437,17 +423,6 @@ private fun ProviderChipsRow(
                         selectedContainerColor = accentColor,
                         selectedLabelColor = onAccentColor,
                     ),
-            )
-        }
-
-        if (state.isLoading) {
-            Box(
-                modifier =
-                    Modifier
-                        .width(84.dp)
-                        .height(32.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .skeletonElement(color = DetailsSkeletonColors.Base),
             )
         }
     }
@@ -477,16 +452,23 @@ private fun ProviderErrorRow(
 }
 
 @Composable
-private fun LoadingMoreStreamsRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LoadingIndicator(
-            modifier = Modifier.size(32.dp),
-            color = Color.White,
-        )
+private fun ProviderLoadingRow(providerName: String) {
+    ElevatedCard {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = providerName,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LoadingIndicator(
+                modifier = Modifier.size(24.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
