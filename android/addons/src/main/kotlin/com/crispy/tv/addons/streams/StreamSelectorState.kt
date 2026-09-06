@@ -30,9 +30,9 @@ data class StreamSelectorUiState(
         get() = pluginsPending || providers.any { provider -> provider.isLoading }
 }
 
-/** Providers worth rendering: results, errors, and providers still fetching. */
+/** Providers worth rendering: finished providers must have streams or an error. */
 fun List<StreamProviderUiState>.visibleProviders(): List<StreamProviderUiState> =
-    filter { it.streams.isNotEmpty() || it.errorMessage != null || it.isLoading }
+    filter { it.streams.isNotEmpty() || it.errorMessage != null }
 
 /**
  * Merges expected providers in as loading placeholders, keeping already-arrived

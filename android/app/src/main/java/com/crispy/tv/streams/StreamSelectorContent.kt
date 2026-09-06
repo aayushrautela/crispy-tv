@@ -14,6 +14,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -221,18 +223,6 @@ fun StreamSelectorContent(
                     )
                 }
             }
-
-            if (provider.isLoading) {
-                item(key = "provider_loading_${provider.providerId}") {
-                    ProviderLoadingRow(providerName = provider.providerName)
-                }
-            }
-        }
-
-        if (state.pluginsPending) {
-            item {
-                ProviderLoadingRow(providerName = "Plugins")
-            }
         }
     }
 }
@@ -406,13 +396,7 @@ private fun ProviderChipsRow(
                 selected = provider.providerId.equals(state.selectedProviderId, ignoreCase = true),
                 onClick = { onProviderSelected(provider.providerId) },
                 label = {
-                    Text(
-                        if (provider.isLoading && provider.streams.isEmpty()) {
-                            provider.providerName
-                        } else {
-                            "${provider.providerName} ${provider.streams.size}"
-                        },
-                    )
+                    Text("${provider.providerName} ${provider.streams.size}")
                 },
                 shape = RoundedCornerShape(16.dp),
                 border = null,
@@ -424,6 +408,10 @@ private fun ProviderChipsRow(
                         selectedLabelColor = onAccentColor,
                     ),
             )
+        }
+
+        if (state.isFetching) {
+            FetchingPill()
         }
     }
 }
@@ -452,23 +440,20 @@ private fun ProviderErrorRow(
 }
 
 @Composable
-private fun ProviderLoadingRow(providerName: String) {
-    ElevatedCard {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = providerName,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LoadingIndicator(
-                modifier = Modifier.size(24.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+private fun FetchingPill() {
+    Box(
+        modifier =
+            Modifier
+                .width(64.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        LoadingIndicator(
+            modifier = Modifier.size(20.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
