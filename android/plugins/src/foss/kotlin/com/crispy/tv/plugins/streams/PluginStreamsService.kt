@@ -1,5 +1,6 @@
 package com.crispy.tv.plugins.streams
 
+import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.ProviderStreamsResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.plugins.PluginStreamInput
@@ -119,10 +120,17 @@ internal class PluginStreamsService(
             code = scraper.code,
             input = input,
         )
+        // Same dedupe treatment as the addon parser: rows that repeat the same
+        // url/infoHash/name/title collapse into one, keyed by stableKey.
+        val deduped = LinkedHashMap<String, AddonStream>()
+        execution.streams.forEach { stream ->
+            val addon = stream.toAddonStream(scraper)
+            deduped.putIfAbsent(addon.stableKey, addon)
+        }
         return ProviderStreamsResult(
             providerId = providerId(scraper),
             providerName = scraper.displayName,
-            streams = execution.streams.map { stream -> stream.toAddonStream(scraper) },
+            streams = deduped.values.toList(),
         )
     }
 

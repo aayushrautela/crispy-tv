@@ -4,6 +4,8 @@ import android.content.Context
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamBehaviorHints
 import com.crispy.tv.addons.streams.StreamSubtitle
+import com.crispy.tv.addons.streams.buildStreamDedupeKey
+import com.crispy.tv.addons.streams.buildStreamStableKey
 import com.crispy.tv.plugins.PluginStream
 import com.crispy.tv.plugins.bridge.PluginHttpClient
 import com.crispy.tv.plugins.repo.PluginRepoHolder
@@ -56,6 +58,8 @@ internal fun PluginStream.toAddonStream(scraper: PluginScraperDescriptor): Addon
         referer?.trim()?.takeIf { it.isNotEmpty() }?.let { referer -> putIfAbsent("Referer", referer) }
     }
     val providerKey = providerId(scraper)
+    val normalizedInfoHash = infoHash?.trim()?.takeIf { it.isNotEmpty() }
+    val resolvedTitle = title ?: name
     val seedersLabel = seeders?.let { count ->
         peers?.let { "$count seeders • $it peers" } ?: "$count seeders"
     }
@@ -63,15 +67,18 @@ internal fun PluginStream.toAddonStream(scraper: PluginScraperDescriptor): Addon
         providerId = providerKey,
         providerName = scraper.displayName,
         name = name,
-        title = title ?: name,
+        title = resolvedTitle,
         description = listOfNotNull(quality, sizeLabel ?: sizeBytes?.toSizeLabel(), language, audio, seedersLabel)
             .joinToString(separator = " • ")
             .takeIf { it.isNotBlank() },
         url = normalizedUrl,
-        infoHash = infoHash?.trim()?.takeIf { it.isNotEmpty() },
+        infoHash = normalizedInfoHash,
         requestHeaders = headers,
-        stableKey = "$providerKey-${(normalizedUrl.orEmpty() + infoHash.orEmpty() + headers.entries.joinToString("|") { "${it.key}=${it.value}" })
-            .hashCode().toUInt().toString(16)}",
+        stableKey =
+            buildStreamStableKey(
+                providerId = providerKey,
+                dedupeKey = buildStreamDedupeKey(normalizedUrl, normalizedInfoHash, name, resolvedTitle),
+            ),
         subtitles = subtitles.map { StreamSubtitle(url = it.url, lang = it.lang, name = it.name ?: it.lang) },
         behaviorHints = StreamBehaviorHints(filename = filename, videoSize = sizeBytes),
     )

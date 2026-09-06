@@ -507,13 +507,13 @@ class AddonStreamsService(
             if (url == null && infoHash == null && externalUrl == null && clientResolveObject == null) continue
 
             val dedupeKey =
-                listOf(
-                    url.orEmpty(),
-                    externalUrl.orEmpty(),
-                    infoHash.orEmpty(),
-                    name.orEmpty(),
-                    title.orEmpty(),
-                ).joinToString("|")
+                buildStreamDedupeKey(
+                    url,
+                    externalUrl,
+                    infoHash,
+                    name,
+                    title,
+                )
             if (!dedupe.add(dedupeKey)) continue
 
             val hintsObj = streamObject.optJSONObject("behaviorHints")
@@ -528,7 +528,7 @@ class AddonStreamsService(
                     filename = nonBlank(hintsObj?.optString("filename")),
                     proxyRequestHeaders = requestHeaders.ifEmpty { null },
                 )
-            val stableKey = buildStableKey(providerId, dedupeKey)
+            val stableKey = buildStreamStableKey(providerId, dedupeKey)
             val subtitles = parseStreamSubtitles(streamObject.optJSONArray("subtitles"))
             val clientResolve = parseClientResolve(clientResolveObject)
 
@@ -813,11 +813,6 @@ class AddonStreamsService(
                 onSuccess = { JsonFetchResult.Success(it) },
                 onFailure = { JsonFetchResult.ParseFailure },
             )
-    }
-
-    private fun buildStableKey(providerId: String, dedupeKey: String): String {
-        val hash = dedupeKey.hashCode().toUInt().toString(16)
-        return "$providerId-$hash"
     }
 
     suspend fun fetchAddonSubtitles(
