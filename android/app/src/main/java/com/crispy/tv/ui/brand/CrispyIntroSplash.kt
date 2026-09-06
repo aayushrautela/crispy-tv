@@ -60,10 +60,14 @@ fun CrispyIntroSplash(
     playIntro: Boolean = true,
     onFinished: () -> Unit = {},
 ) {
-    val markWidth: Dp = brandHeight * (57f / 69f)
+    // Unit-matched to the original lockup: text slices use a 72-unit-tall
+    // frame, so the mark box uses the same units-per-dp (57x69 art).
+    val markWidth: Dp = brandHeight * (57f / 72f)
+    val markBoxHeight: Dp = brandHeight * (69f / 72f)
     val crispyWidth: Dp = brandHeight * (176f / 72f)
     val tvWidth: Dp = brandHeight * (53f / 72f)
-    val markGap: Dp = brandHeight * (22f / 72f)
+    // Gaps measured art-edge to art-edge in the original outlines.
+    val markGap: Dp = brandHeight * (18.9f / 72f)
     val wordGap: Dp = brandHeight * (17.3f / 72f)
 
     val progress = remember { Animatable(0f) }
@@ -100,9 +104,10 @@ fun CrispyIntroSplash(
     val pushSettle = SettleEasing.transform(((pushRaw - 0.9f) / 0.1f).coerceIn(0f, 1f))
     val push = lerp(lerp(0f, 1.02f, pushArrive), 1f, pushSettle)
 
-    // Morph from the system splash: open with the mark at splash size, then
-    // shrink into the final lockup as the wordmark wipes in.
-    val rowScale = lerp(3f, 1f, EmphasizedDecelerateEasing.transform(pushRaw))
+    // Morph from the system splash: open with the mark at splash size
+    // (168dp art), then shrink into the final lockup as the wordmark wipes.
+    val openScale = 168f / markBoxHeight.value
+    val rowScale = lerp(openScale, 1f, EmphasizedDecelerateEasing.transform(pushRaw))
 
     val wipe = WipeEasing.transform(segment(p, 0.33f, 0.87f))
     val wipeTv = WipeEasing.transform(segment(p, 0.42f, 0.92f))
@@ -130,7 +135,7 @@ fun CrispyIntroSplash(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .width(markWidth)
-                    .height(brandHeight)
+                    .height(markBoxHeight)
                     .graphicsLayer {
                         alpha = markAlpha
                         scaleX = markScale

@@ -1,11 +1,11 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="432dp"
-    android:height="432dp"
-    android:viewportWidth="432"
-    android:viewportHeight="432">
-    <group android:name="mark" android:pivotX="216" android:pivotY="216">
-        <path android:name="markFill" android:fillColor="#E11D48" android:pathData="M146.61,132V253.74L251.3,192.87L146.61,132Z"/>
-        <path android:name="markStroke" android:strokeColor="#FFFFFF" android:strokeWidth="19.48"
-            android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M170.96,168.52V290.26L275.65,229.39L170.96,168.52Z"/>
+    android:width="57dp"
+    android:height="69dp"
+    android:viewportWidth="57"
+    android:viewportHeight="69">
+    <group android:name="mark" android:pivotX="28.5" android:pivotY="34.5">
+        <path android:name="markFill" android:fillColor="#E11D48" android:pathData="M0 0V50L43 25L0 0Z"/>
+        <path android:name="markStroke" android:strokeColor="#FFFFFF" android:strokeWidth="8"
+            android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M10 15V65L53 40L10 15Z"/>
     </group>
 </vector>
