@@ -4,8 +4,8 @@
     android:viewportWidth="432"
     android:viewportHeight="432">
     <group android:name="mark" android:pivotX="216" android:pivotY="216">
-        <path android:name="markFill" android:fillColor="#E11D48" android:pathData="M97.04,72V280.7L276.52,176.35L97.04,72Z"/>
-        <path android:name="markStroke" android:strokeColor="#FFFFFF" android:strokeWidth="33.39"
-            android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M138.78,134.61V343.3L318.26,238.96L138.78,134.61Z"/>
+        <path android:name="markFill" android:fillColor="#E11D48" android:pathData="M146.61,132V253.74L251.3,192.87L146.61,132Z"/>
+        <path android:name="markStroke" android:strokeColor="#FFFFFF" android:strokeWidth="19.48"
+            android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M170.96,168.52V290.26L275.65,229.39L170.96,168.52Z"/>
     </group>
 </vector>

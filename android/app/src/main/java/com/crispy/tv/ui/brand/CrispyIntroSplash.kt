@@ -56,7 +56,7 @@ private fun lerp(start: Float, end: Float, fraction: Float): Float {
 @Composable
 fun CrispyIntroSplash(
     modifier: Modifier = Modifier,
-    brandHeight: Dp = 48.dp,
+    brandHeight: Dp = 56.dp,
     playIntro: Boolean = true,
     onFinished: () -> Unit = {},
 ) {
@@ -100,6 +100,10 @@ fun CrispyIntroSplash(
     val pushSettle = SettleEasing.transform(((pushRaw - 0.9f) / 0.1f).coerceIn(0f, 1f))
     val push = lerp(lerp(0f, 1.02f, pushArrive), 1f, pushSettle)
 
+    // Morph from the system splash: open with the mark at splash size, then
+    // shrink into the final lockup as the wordmark wipes in.
+    val rowScale = lerp(3f, 1f, EmphasizedDecelerateEasing.transform(pushRaw))
+
     val wipe = WipeEasing.transform(segment(p, 0.33f, 0.87f))
     val wipeTv = WipeEasing.transform(segment(p, 0.42f, 0.92f))
     val crispyAlpha = (wipe * 1.6f).coerceIn(0f, 1f)
@@ -115,6 +119,10 @@ fun CrispyIntroSplash(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.graphicsLayer {
+                scaleX = rowScale
+                scaleY = rowScale
+            },
         ) {
             Image(
                 painter = painterResource(R.drawable.brand_mark),
