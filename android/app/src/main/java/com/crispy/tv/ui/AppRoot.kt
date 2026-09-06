@@ -9,6 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
 import com.crispy.tv.accounts.AppBootstrapViewModel
 import com.crispy.tv.accounts.AuthRoute
 import com.crispy.tv.accounts.BootstrapState
@@ -36,6 +38,8 @@ import com.crispy.tv.ui.navigation.FloatingBarHeight
 import com.crispy.tv.ui.navigation.FloatingBottomBar
 import com.crispy.tv.ui.navigation.TopLevelDestination
 
+private const val IntroTimeoutMs = 3_000L
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppRoot() {
@@ -44,25 +48,32 @@ fun AppRoot() {
     val bootstrapViewModel: AppBootstrapViewModel =
         viewModel(factory = remember(appContext) { AppBootstrapViewModel.factory(appContext) })
     val state by bootstrapViewModel.state.collectAsStateWithLifecycle()
-    var introPlayed by rememberSaveable { mutableStateOf(false) }
+    var introDone by rememberSaveable { mutableStateOf(false) }
 
-    when (state) {
-        BootstrapState.Loading -> {
+    LaunchedEffect(Unit) {
+        delay(IntroTimeoutMs)
+        introDone = true
+    }
+
+    // Hold the splash until the intro has played through even if bootstrap
+    // resolves first; afterwards the finished frame holds until data arrives.
+    when {
+        state == BootstrapState.Loading || !introDone -> {
             CrispyIntroSplash(
-                playIntro = !introPlayed,
-                onFinished = { introPlayed = true },
+                playIntro = !introDone,
+                onFinished = { introDone = true },
             )
         }
-        BootstrapState.NeedsAuth -> {
+        state == BootstrapState.NeedsAuth -> {
             AuthRoute(onSignedIn = { bootstrapViewModel.refresh() })
         }
-        BootstrapState.NeedsProfileSelection -> {
+        state == BootstrapState.NeedsProfileSelection -> {
             ProfileSelectorRoute(
                 onComplete = { bootstrapViewModel.refresh() },
                 onBack = { bootstrapViewModel.onSignedOut() },
             )
         }
-        BootstrapState.Ready -> {
+        state == BootstrapState.Ready -> {
             MainAppShell(onSignedOut = { bootstrapViewModel.onSignedOut() })
         }
     }
