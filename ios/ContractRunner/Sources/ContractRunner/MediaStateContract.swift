@@ -84,7 +84,7 @@ private func normalizeBaseItemDto(_ payload: [String: Any]) -> MediaStateNormali
         itemId: itemId,
         mediaType: mediaType,
         title: title,
-        artworkUrl: imageSetMedium(images, "artwork") ?? imageTagMedium(imageTags, "Primary"),
+        artworkUrl: imageSetMedium(images, "artwork") ?? backdropMedium(imageTags) ?? imageTagMedium(imageTags, "Primary"),
         subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "overview") ?? nullableStringValue(payload, "Overview")
     )
 }
@@ -102,7 +102,7 @@ private func normalizeClientMediaCard(_ payload: [String: Any]) -> MediaStateNor
         itemId: itemId,
         mediaType: mediaType,
         title: title,
-        artworkUrl: imageSetMedium(images, "artwork"),
+        artworkUrl: imageSetMedium(images, "artwork") ?? imageSetMedium(images, "backdrop"),
         subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "overview"),
         progressPercent: doubleValue(progress, "percent")
     )
@@ -252,5 +252,12 @@ private func imageTagMedium(_ tags: [String: Any]?, _ key: String) -> String? {
     guard let tag = tags?[key] else { return nil }
     if let string = tag as? String { return string }
     if let dict = tag as? [String: Any] { return nullableStringValue(dict, "medium") }
+    return nil
+}
+
+private func backdropMedium(_ tags: [String: Any]?) -> String? {
+    guard let backdrops = tags?["Backdrop"] as? [Any], let first = backdrops.first else { return nil }
+    if let string = first as? String { return string }
+    if let dict = first as? [String: Any] { return nullableStringValue(dict, "medium") }
     return nil
 }
