@@ -13,29 +13,50 @@ internal class FossPluginAddonsSyncBridge(
 ) : PluginAddonsSyncBridge {
 
     /**
-     * Pull applies the server's enablement only for repositories the server actually
-     * tracks. Repos with no server rows are device-local installs (or never pushed);
-     * treating their absence as "disabled" clobbered local state on every pull when
-     * the server had no jsplugin rows yet. Mirrors the Nuvio empty-remote guard.
+     * Pull applies the server's enablement for repositories the server tracks,
+     * installs server-tracked repos missing locally (skipping repos the user
+     * explicitly removed here), and removes local repos that were previously
+     * installed by sync but the server no longer tracks. Repos with no server
+     * rows that were installed manually on this device are never touched:
+     * another device may still own them. Mirrors the Nuvio empty-remote guard.
      */
-    override suspend fun reconcilePull(serverAddons: List<CrispyBackendClient.AddonDto>): Result<Unit> = runCatching {
+    override suspend fun reconcilePull(serverAddons: List<CrispyBackendClient.AddonDto>): Result<Unit> {
+        val errors = mutableListOf<String>()
         val serverRowsByRepo = serverAddons
             .filter { it.type == ADDON_TYPE_JSPLUGIN }
-            .groupBy({ it.manifestUrl.lowercase(Locale.US) }) { it.payload[KEY_PROVIDER_ID].orEmpty() }
+            .groupBy({ it.manifestUrl.trim() }) { it.payload[KEY_PROVIDER_ID].orEmpty() }
+
+        serverRowsByRepo.keys.forEach { repoUrl ->
+            val installed = repoClient.repos().any { it.url.equals(repoUrl, ignoreCase = true) }
+            if (!installed && !repoClient.isRemoved(repoUrl)) {
+                repoClient.installSynced(repoUrl)
+                    .onFailure { errors.add("install $repoUrl: ${it.message.orEmpty()}") }
+                    .onSuccess { Log.i(LOG_TAG, "sync pull: installed repo $repoUrl") }
+            }
+        }
+
+        val localRepos = repoClient.repos()
         var changed = 0
         var preservedRepos = 0
-        repoClient.repos().forEach { repo ->
-            val serverProviderIds = serverRowsByRepo[repo.url.lowercase(Locale.US)]
+        localRepos.forEach { repo ->
+            val serverProviderIds = serverRowsByRepo[repo.url]
+                ?: serverRowsByRepo.entries.firstOrNull { it.key.equals(repo.url, ignoreCase = true) }?.value
             if (serverProviderIds == null) {
-                preservedRepos++
+                if (repo.syncedFromServer) {
+                    repoClient.removeSynced(repo.url)
+                        .onFailure { errors.add("remove ${repo.url}: ${it.message.orEmpty()}") }
+                        .onSuccess { Log.i(LOG_TAG, "sync pull: removed repo no longer tracked by server: ${repo.url}") }
+                } else {
+                    preservedRepos++
+                }
                 return@forEach
             }
             repo.scrapers.forEach { scraper ->
                 val shouldEnable = scraper.id in serverProviderIds
                 if (scraper.enabled != shouldEnable) {
                     repoClient.setScraperEnabled(repo.url, scraper.id, shouldEnable)
-                        .onFailure { throw it }
-                    changed++
+                        .onFailure { errors.add("enable ${scraper.id}: ${it.message.orEmpty()}") }
+                        .onSuccess { changed++ }
                 }
             }
         }
@@ -43,18 +64,21 @@ internal class FossPluginAddonsSyncBridge(
             LOG_TAG,
             "sync pull: ${serverRowsByRepo.size} server repo(s), $preservedRepos local repo(s) preserved, $changed scraper(s) reconciled",
         )
+        return aggregate(errors)
     }
 
     /**
-     * Push only registers local enabled scrapers server-side and disables server rows
-     * whose scraper is locally disabled. Rows belonging to repositories this device
+     * Push only registers local enabled scrapers server-side and uninstalls
+     * server rows whose scraper is locally disabled or whose repo the user
+     * removed here (tombstoned). Rows belonging to repositories this device
      * has never installed are left alone: another device may own them.
      */
     override suspend fun reconcilePush(
         accessToken: String,
         profileId: String,
         serverAddons: List<CrispyBackendClient.AddonDto>,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> {
+        val errors = mutableListOf<String>()
         val serverPlugins = serverAddons.filter { it.type == ADDON_TYPE_JSPLUGIN }
         val installedRepoUrls = repoClient.repos().mapTo(mutableSetOf()) { it.url.lowercase(Locale.US) }
         val localEnabled = repoClient.repos().flatMap { repo ->
@@ -74,31 +98,53 @@ internal class FossPluginAddonsSyncBridge(
                     dto.payload[KEY_PROVIDER_ID] == local.providerId
             }
             if (!exists) {
-                backend.installAddon(
-                    accessToken = accessToken,
-                    profileId = profileId,
-                    manifestUrl = local.repoUrl,
-                    type = ADDON_TYPE_JSPLUGIN,
-                    payload = mapOf(
-                        KEY_PROVIDER_ID to local.providerId,
-                        KEY_NAME to local.name,
-                        KEY_VERSION to local.version,
-                    ),
-                )
+                runCatching {
+                    backend.installAddon(
+                        accessToken = accessToken,
+                        profileId = profileId,
+                        manifestUrl = local.repoUrl,
+                        type = ADDON_TYPE_JSPLUGIN,
+                        payload = mapOf(
+                            KEY_PROVIDER_ID to local.providerId,
+                            KEY_NAME to local.name,
+                            KEY_VERSION to local.version,
+                        ),
+                    )
+                }.onFailure { errors.add("install ${local.providerId}: ${it.message.orEmpty()}") }
             }
         }
 
         serverPlugins.forEach { dto ->
             val providerId = dto.payload[KEY_PROVIDER_ID].orEmpty()
+            val repoTombstoned = repoClient.isRemoved(dto.manifestUrl)
             val repoKnownLocally = dto.manifestUrl.lowercase(Locale.US) in installedRepoUrls
             val stillEnabled = localEnabled.any { local ->
                 local.repoUrl.equals(dto.manifestUrl, ignoreCase = true) && local.providerId == providerId
             }
-            if (repoKnownLocally && !stillEnabled) {
-                backend.uninstallAddon(accessToken, profileId, dto.id)
+            if (repoTombstoned || (repoKnownLocally && !stillEnabled)) {
+                val removed = runCatching {
+                    backend.uninstallAddon(accessToken, profileId, dto.id)
+                }
+                removed
+                    .onFailure { errors.add("uninstall $providerId: ${it.message.orEmpty()}") }
+                    .onSuccess { deleted ->
+                        if (deleted) {
+                            Log.i(LOG_TAG, "sync push: uninstalled ${if (repoTombstoned) "tombstoned" else "disabled"} row $providerId")
+                        } else {
+                            errors.add("uninstall $providerId: server did not delete the row")
+                        }
+                    }
             }
         }
+        return aggregate(errors)
     }
+
+    private fun aggregate(errors: List<String>): Result<Unit> =
+        if (errors.isEmpty()) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalStateException(errors.joinToString("; ")))
+        }
 
     private data class PluginProviderRecord(
         val repoUrl: String,

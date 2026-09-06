@@ -20,7 +20,10 @@ object AppStartup {
         scope.launch {
             val registry = MetadataAddonRegistry(appContext)
             val sync = SupabaseServicesProvider.createHouseholdAddonsCloudSync(appContext, registry)
-            runCatching { sync.pullToLocal() }
+            sync.pullToLocal()
+                .onFailure {
+                    android.util.Log.w("CrispyStartup", "addon pull failed: ${it.message.orEmpty()}")
+                }
         }
     }
 }

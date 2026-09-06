@@ -35,6 +35,7 @@ data class PluginRepoInfo(
     val name: String,
     val version: String?,
     val scrapers: List<PluginScraperInfo>,
+    val syncedFromServer: Boolean = false,
 )
 
 /**
@@ -50,11 +51,20 @@ class PluginRepoClient(
 
     fun repos(): List<PluginRepoInfo> = manager.getStoredRepos().map { repo -> repo.toInfo() }
 
-    suspend fun install(url: String): Result<List<PluginScraperInfo>> = runCatching {
+    suspend fun install(url: String): Result<List<PluginScraperInfo>> = installInternal(url, syncedFromServer = false)
+
+    /** Install on behalf of cloud sync; the repo is removed automatically when the server stops tracking it. */
+    suspend fun installSynced(url: String): Result<List<PluginScraperInfo>> = installInternal(url, syncedFromServer = true)
+
+    private suspend fun installInternal(url: String, syncedFromServer: Boolean): Result<List<PluginScraperInfo>> = runCatching {
         val repoUrl = url.trim()
         val scheme = runCatching { Uri.parse(repoUrl).scheme }.getOrNull()
         require(scheme == "http" || scheme == "https") { "Enter a valid repository URL." }
-        manager.install(repoUrl, System.currentTimeMillis())
+        if (syncedFromServer) {
+            manager.installSynced(repoUrl, System.currentTimeMillis())
+        } else {
+            manager.install(repoUrl, System.currentTimeMillis())
+        }
         manager.getStoredRepos().firstOrNull { it.url == repoUrl }
             ?.scrapers
             ?.map { scraper -> scraper.toInfo() }
@@ -64,6 +74,12 @@ class PluginRepoClient(
     suspend fun remove(url: String): Result<Unit> = runCatching {
         manager.removeRepository(url.trim())
     }
+
+    suspend fun removeSynced(url: String): Result<Unit> = runCatching {
+        manager.removeSyncedRepository(url.trim())
+    }
+
+    fun isRemoved(url: String): Boolean = manager.isRemoved(url.trim())
 
     suspend fun setScraperEnabled(url: String, scraperId: String, enabled: Boolean): Result<Unit> = runCatching {
         manager.enableScraper(url.trim(), scraperId, enabled, System.currentTimeMillis())
@@ -80,6 +96,7 @@ private fun StoredRepo.toInfo(): PluginRepoInfo =
         name = name,
         version = version,
         scrapers = scrapers.map { it.toInfo() },
+        syncedFromServer = syncedFromServer,
     )
 
 private fun StoredScraper.toInfo(): PluginScraperInfo =

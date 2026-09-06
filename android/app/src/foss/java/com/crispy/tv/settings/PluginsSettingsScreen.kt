@@ -45,9 +45,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.plugins.repo.PluginRepoClient
 import com.crispy.tv.plugins.repo.PluginRepoInfo
+import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
@@ -70,6 +73,7 @@ internal data class PluginsSettingsUiState(
 
 internal class PluginsSettingsViewModel(
     private val repoClient: PluginRepoClient,
+    private val cloudSync: HouseholdAddonsCloudSync,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PluginsSettingsUiState())
@@ -77,7 +81,19 @@ internal class PluginsSettingsViewModel(
 
     init {
         reload(statusMessage = null)
+        viewModelScope.launch {
+            val result = cloudSync.pullToLocal()
+            if (result.isFailure) {
+                _uiState.update { state ->
+                    state.copy(errorMessage = "Addons sync failed: ${result.exceptionOrNull()?.message.orEmpty()}")
+                }
+            }
+            reload(statusMessage = null)
+        }
     }
+
+    private suspend fun pushToServer(): String? =
+        cloudSync.pushFromLocal().exceptionOrNull()?.message
 
     fun setDraftUrl(value: String) {
         _uiState.update { state ->
@@ -94,13 +110,17 @@ internal class PluginsSettingsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isInstalling = true, errorMessage = null, statusMessage = null) }
             val result = repoClient.install(draft)
+            val syncError = if (result.isSuccess) pushToServer() else null
             _uiState.update { state ->
                 result.fold(
                     onSuccess = { scrapers ->
                         state.copy(
                             isInstalling = false,
                             draftUrl = "",
-                            statusMessage = "Installed ${scrapers.size} scraper(s).",
+                            statusMessage = when {
+                                syncError.isNullOrBlank() -> "Installed ${scrapers.size} scraper(s)."
+                                else -> "Installed ${scrapers.size} scraper(s) (sync failed)."
+                            },
                             repos = repoClient.repos(),
                         )
                     },
@@ -115,7 +135,14 @@ internal class PluginsSettingsViewModel(
     fun removeRepo(url: String) {
         viewModelScope.launch {
             repoClient.remove(url)
-            reload(statusMessage = "Repository removed.")
+            val syncError = pushToServer()
+            reload(
+                statusMessage = when {
+                    syncError.isNullOrBlank() -> "Repository removed."
+                    else -> "Repository removed (sync failed)."
+                },
+                errorMessage = syncError,
+            )
         }
     }
 
@@ -132,10 +159,12 @@ internal class PluginsSettingsViewModel(
     fun toggleScraper(url: String, scraperId: String, enabled: Boolean) {
         viewModelScope.launch {
             val result = repoClient.setScraperEnabled(url, scraperId, enabled)
-            if (result.isFailure) {
-                _uiState.update { it.copy(errorMessage = result.exceptionOrNull()?.message ?: "Update failed.") }
-            }
-            reload(statusMessage = null)
+            val syncError = if (result.isSuccess) pushToServer() else null
+            val error = result.exceptionOrNull()?.message ?: syncError
+            reload(
+                statusMessage = null,
+                errorMessage = error,
+            )
         }
     }
 
@@ -159,6 +188,10 @@ internal class PluginsSettingsViewModel(
                     if (modelClass.isAssignableFrom(PluginsSettingsViewModel::class.java)) {
                         return PluginsSettingsViewModel(
                             repoClient = PluginRepoClient(appContext, AppHttp.okHttp(appContext)),
+                            cloudSync = SupabaseServicesProvider.createHouseholdAddonsCloudSync(
+                                appContext,
+                                MetadataAddonRegistry(appContext),
+                            ),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

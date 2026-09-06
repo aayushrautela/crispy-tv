@@ -121,6 +121,57 @@ class PluginRepositoryTest {
         store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
         store.removeRepository("https://example.com/plugins.json")
         assertTrue(store.getStoredRepos().isEmpty())
+        assertTrue(store.isRemoved("https://example.com/plugins.json"))
+    }
+
+    @Test
+    fun `tombstone survives store reopen and blocks reinstall flag`() = runBlockingTest {
+        val dir = tempDir()
+        val store = PluginRepositoryStore(dir)
+        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
+        store.removeRepository("https://example.com/plugins.json")
+        val reopened = PluginRepositoryStore(dir)
+        assertTrue(reopened.isRemoved("https://example.com/plugins.json"))
+    }
+
+    @Test
+    fun `user install clears tombstone`() = runBlockingTest {
+        val dir = tempDir()
+        val store = PluginRepositoryStore(dir)
+        store.removeRepository("https://example.com/plugins.json")
+        assertTrue(store.isRemoved("https://example.com/plugins.json"))
+        store.installRepository(PluginManifestParser.parse(validManifest), "https://example.com/plugins.json", nowEpochMs = 1000L)
+        assertFalse(store.isRemoved("https://example.com/plugins.json"))
+    }
+
+    @Test
+    fun `sync install marks syncedFromServer and sync removal leaves no tombstone`() = runBlockingTest {
+        val dir = tempDir()
+        val store = PluginRepositoryStore(dir)
+        store.installRepository(
+            PluginManifestParser.parse(validManifest),
+            "https://example.com/plugins.json",
+            nowEpochMs = 1000L,
+            syncedFromServer = true,
+        )
+        assertTrue(store.getStoredRepos().single().syncedFromServer)
+        store.removeSyncedRepository("https://example.com/plugins.json")
+        assertTrue(store.getStoredRepos().isEmpty())
+        assertFalse(store.isRemoved("https://example.com/plugins.json"))
+    }
+
+    @Test
+    fun `user removal tombstones synced repo`() = runBlockingTest {
+        val dir = tempDir()
+        val store = PluginRepositoryStore(dir)
+        store.installRepository(
+            PluginManifestParser.parse(validManifest),
+            "https://example.com/plugins.json",
+            nowEpochMs = 1000L,
+            syncedFromServer = true,
+        )
+        store.removeRepository("https://example.com/plugins.json")
+        assertTrue(store.isRemoved("https://example.com/plugins.json"))
     }
 
     @Test

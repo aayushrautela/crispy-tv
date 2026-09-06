@@ -34,8 +34,7 @@ internal class HouseholdAddonsCloudSync(
                 }
             }
             addonRegistry.reconcileCloudAddons(localRows)
-            pluginSyncBridge?.reconcilePull(dtos)
-            Result.success(Unit)
+            merge(pluginSyncBridge?.reconcilePull(dtos))
         } catch (t: Throwable) {
             Result.failure(t)
         }
@@ -75,12 +74,15 @@ internal class HouseholdAddonsCloudSync(
                 }
             }
 
-            pluginSyncBridge?.reconcilePush(session.accessToken, profileId, serverAddons)
-
-            Result.success(Unit)
+            merge(pluginSyncBridge?.reconcilePush(session.accessToken, profileId, serverAddons))
         } catch (t: Throwable) {
             Result.failure(t)
         }
+    }
+
+    private fun merge(pluginResult: Result<Unit>?): Result<Unit> = when {
+        pluginResult == null || pluginResult.isSuccess -> Result.success(Unit)
+        else -> pluginResult
     }
 
     private fun toLocalRow(dto: CrispyBackendClient.AddonDto): CloudAddonRow? {

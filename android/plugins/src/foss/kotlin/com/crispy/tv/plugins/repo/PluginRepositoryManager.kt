@@ -15,7 +15,17 @@ internal class PluginRepositoryManager(
     private val store: PluginRepositoryStore,
 ) {
 
-    suspend fun install(url: String, nowEpochMs: Long): List<StoredScraper> = withContext(Dispatchers.IO) {
+    suspend fun install(url: String, nowEpochMs: Long): List<StoredScraper> {
+        store.installRepository(fetchAndCacheManifest(url, nowEpochMs), url, nowEpochMs)
+        return store.getStoredRepos().firstOrNull { it.url == url }?.scrapers ?: emptyList()
+    }
+
+    suspend fun installSynced(url: String, nowEpochMs: Long): List<StoredScraper> {
+        store.installRepository(fetchAndCacheManifest(url, nowEpochMs), url, nowEpochMs, syncedFromServer = true)
+        return store.getStoredRepos().firstOrNull { it.url == url }?.scrapers ?: emptyList()
+    }
+
+    private suspend fun fetchAndCacheManifest(url: String, nowEpochMs: Long): PluginManifest = withContext(Dispatchers.IO) {
         val manifest = manifestClient.fetchManifest(url)
         manifest.scrapers
             .filter { it.enabled }
@@ -23,8 +33,7 @@ internal class PluginRepositoryManager(
                 val code = manifestClient.fetchCode(manifestClient.resolveScraperUrl(url, scraper.filename))
                 codeStore.writeCode(url, scraper.id, code)
             }
-        store.installRepository(manifest, url, nowEpochMs)
-        store.getStoredRepos().firstOrNull { it.url == url }?.scrapers ?: emptyList()
+        manifest
     }
 
     suspend fun enableScraper(url: String, scraperId: String, enabled: Boolean, nowEpochMs: Long) =
@@ -74,6 +83,13 @@ internal class PluginRepositoryManager(
         store.removeRepository(url)
         codeStore.deleteRepo(url)
     }
+
+    suspend fun removeSyncedRepository(url: String) = withContext(Dispatchers.IO) {
+        store.removeSyncedRepository(url)
+        codeStore.deleteRepo(url)
+    }
+
+    fun isRemoved(url: String): Boolean = store.isRemoved(url)
 
     fun getStoredRepos(): List<StoredRepo> = store.getStoredRepos()
 

@@ -6,6 +6,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.Locale
 
 internal const val REPOSITORY_REFRESH_INTERVAL_MS: Long = 6 * 60 * 60 * 1000L
 
@@ -29,11 +30,19 @@ internal data class StoredRepo(
     val version: String? = null,
     val lastRefreshedEpochMs: Long = 0,
     val scrapers: List<StoredScraper> = emptyList(),
+    val syncedFromServer: Boolean = false,
 )
 
 @Serializable
 internal data class PluginRepoState(
     val repos: List<StoredRepo> = emptyList(),
+    /**
+     * Lowercased repo URLs the user explicitly removed on this device.
+     * Tombstones keep pull from re-installing removed repos and let push
+     * uninstall their server rows. Sync-driven removals (server deleted the
+     * repo) are not tombstoned so a later server re-install re-propagates.
+     */
+    val removedRepoUrls: List<String> = emptyList(),
 )
 
 internal data class PluginScraperDescriptor(
@@ -53,7 +62,12 @@ internal class PluginRepositoryStore(rootDir: File) {
 
     private var state: PluginRepoState = load()
 
-    suspend fun installRepository(manifest: PluginManifest, repoUrl: String, nowEpochMs: Long) {
+    suspend fun installRepository(
+        manifest: PluginManifest,
+        repoUrl: String,
+        nowEpochMs: Long,
+        syncedFromServer: Boolean = false,
+    ) {
         mutex.withLock {
             val scrapers = manifest.scrapers.map { toStored(it) }
             state = state.copy(
@@ -63,11 +77,15 @@ internal class PluginRepositoryStore(rootDir: File) {
                     version = manifest.version,
                     lastRefreshedEpochMs = nowEpochMs,
                     scrapers = scrapers,
+                    syncedFromServer = syncedFromServer,
                 ),
+                removedRepoUrls = state.removedRepoUrls.filterNot { it == repoUrl.lowercase(Locale.US) },
             )
             persistLocked()
         }
     }
+
+    fun isRemoved(repoUrl: String): Boolean = repoUrl.lowercase(Locale.US) in state.removedRepoUrls
 
     suspend fun setEnabled(repoUrl: String, scraperId: String, enabled: Boolean) {
         mutex.withLock {
@@ -109,7 +127,21 @@ internal class PluginRepositoryStore(rootDir: File) {
 
     suspend fun removeRepository(repoUrl: String) {
         mutex.withLock {
-            state = state.copy(repos = state.repos.filterNot { it.url == repoUrl })
+            state = state.copy(
+                repos = state.repos.filterNot { it.url == repoUrl },
+                removedRepoUrls = (state.removedRepoUrls + repoUrl.lowercase(Locale.US)).distinct(),
+            )
+            persistLocked()
+        }
+    }
+
+    /** Sync-driven removal: drop the repo without a tombstone so a future server re-install re-propagates. */
+    suspend fun removeSyncedRepository(repoUrl: String) {
+        mutex.withLock {
+            state = state.copy(
+                repos = state.repos.filterNot { it.url == repoUrl },
+                removedRepoUrls = state.removedRepoUrls.filterNot { it == repoUrl.lowercase(Locale.US) },
+            )
             persistLocked()
         }
     }
