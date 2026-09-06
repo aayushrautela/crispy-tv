@@ -46,6 +46,9 @@ fun PlayerRoute(
     onOpenTitle: (CatalogItem) -> Unit = {},
 ) {
     val uiState by session.uiState.collectAsStateWithLifecycle()
+    // Selector state is read by the sheet only, so per-provider emissions
+    // recompose the sheet without touching the rest of the player tree.
+    val selectorState by session.selectorState.collectAsStateWithLifecycle()
     // Passed down unread so a 500ms position tick only recomposes the seekbar/time-pill
     // leaves, not the whole overlay tree.
     val positionMsState = session.playbackPositionMs.collectAsStateWithLifecycle()
@@ -192,6 +195,7 @@ fun PlayerRoute(
         if (!isInPictureInPictureMode) {
             PlayerOverlay(
                 uiState = uiState,
+                selectorState = selectorState,
                 positionMsState = positionMsState,
                 palette = palette,
                 onBack = {

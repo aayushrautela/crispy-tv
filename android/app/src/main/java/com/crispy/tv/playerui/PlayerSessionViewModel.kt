@@ -110,7 +110,6 @@ data class PlayerUiState(
     val collectionItems: List<CatalogItem> = emptyList(),
     val recommendedItems: List<CatalogItem> = emptyList(),
     val moreIsLoading: Boolean = false,
-    val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
     val currentPlaybackUrl: String? = null,
     val audioTracks: List<NativeTrack> = emptyList(),
     val selectedAudioTrackId: String? = null,
@@ -162,6 +161,7 @@ class PlayerSessionViewModel(
             sessionTokenProvider = { supabase.ensureValidSession()?.accessToken },
             pluginStreamLoader = PluginStreamLoaderProvider.get(this.appContext),
         )
+    val selectorState: StateFlow<StreamSelectorUiState> = selectorCoordinator.state
     private var activeSubtitleLookupId: String? = null
     private var activeSubtitleMediaType: MetadataLabMediaType? = null
     private val mediaSessionManager =
@@ -655,15 +655,16 @@ class PlayerSessionViewModel(
                     absoluteEpisodeNumber = id.absoluteEpisodeNumber,
                 )
             }
+        val selectorSnapshot = selectorCoordinator.state.value
         val selectedEpisode =
-            state.streamSelector.headerEpisode
+            selectorSnapshot.headerEpisode
                 ?: findEpisodeForLookupId(
-                    lookupId = state.streamSelector.lookupId.orEmpty(),
+                    lookupId = selectorSnapshot.lookupId.orEmpty(),
                     currentEpisodes = state.seasonEpisodes,
                     cachedEpisodes = seasonEpisodesCache.values,
                 )
         val lookupId =
-            state.streamSelector.lookupId
+            selectorSnapshot.lookupId
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
                 ?: selectedEpisode?.lookupId?.trim()?.takeIf { it.isNotBlank() }
@@ -674,7 +675,7 @@ class PlayerSessionViewModel(
                     fallbackMediaType = activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE,
                 ).lookupId
         val parsedLookupId = com.crispy.tv.addons.lookup.parseLookupId(lookupId)
-        val nextMediaType = state.streamSelector.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
+        val nextMediaType = selectorSnapshot.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
         activeSubtitleLookupId = lookupId
         activeSubtitleMediaType = nextMediaType
         val nextEpisode =
@@ -713,7 +714,7 @@ class PlayerSessionViewModel(
         val resumePositionMs = if (sameEpisode) _playbackPositionMs.value else 0L
 
         viewModelScope.launch {
-            val source = resolvePlaybackSource(stream, state.streamSelector.lookupId) ?: return@launch
+            val source = resolvePlaybackSource(stream, selectorSnapshot.lookupId) ?: return@launch
             switchPlayback(
                 source = source,
                 identity = nextIdentity,
@@ -792,7 +793,6 @@ class PlayerSessionViewModel(
     }
 
     private fun onCoordinatorStateChanged(state: StreamSelectorUiState) {
-        _uiState.update { it.copy(streamSelector = state) }
         if (!autoSelectPending || state.isFetching) return
         autoSelectPending = false
         val target = initialTarget ?: return

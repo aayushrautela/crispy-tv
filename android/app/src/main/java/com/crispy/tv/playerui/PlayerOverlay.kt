@@ -42,12 +42,14 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
+import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.streams.StreamSelectorSheet
 import kotlinx.coroutines.delay
 
 @Composable
 internal fun PlayerOverlay(
     uiState: PlayerUiState,
+    selectorState: StreamSelectorUiState,
     positionMsState: State<Long>,
     palette: DetailsPaletteColors,
     onBack: () -> Unit,
@@ -104,7 +106,7 @@ internal fun PlayerOverlay(
         resetControlsTimer()
     }
 
-    val isSurfaceOpen = uiState.activeSurface != PlayerSurface.NONE || uiState.streamSelector.visible
+    val isSurfaceOpen = uiState.activeSurface != PlayerSurface.NONE || selectorState.visible
 
     var layoutWidthPx by remember { mutableIntStateOf(0) }
 
@@ -317,7 +319,7 @@ internal fun PlayerOverlay(
             details = uiState.details,
             palette = palette,
             onClose = onCloseSurface,
-            headerEpisode = uiState.streamSelector.headerEpisode,
+            headerEpisode = selectorState.headerEpisode,
         )
 
         PlayerEpisodesSheet(
@@ -355,9 +357,9 @@ internal fun PlayerOverlay(
 
         StreamSelectorSheet(
             visible = uiState.activeSurface == PlayerSurface.STREAMS,
-            state = uiState.streamSelector,
+            state = selectorState,
             details = uiState.details,
-            headerEpisode = uiState.streamSelector.headerEpisode,
+            headerEpisode = selectorState.headerEpisode,
             accentColor = palette.accent,
             onAccentColor = palette.onAccent,
             useCrispyImageModel = true,
