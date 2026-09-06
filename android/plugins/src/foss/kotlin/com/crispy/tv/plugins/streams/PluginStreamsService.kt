@@ -1,15 +1,14 @@
 package com.crispy.tv.plugins.streams
 
 import com.crispy.tv.addons.streams.ProviderStreamsResult
-import com.crispy.tv.addons.streams.StreamProviderDescriptor
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.plugins.PluginStreamInput
 import com.crispy.tv.plugins.normalizePluginMediaType
 import com.crispy.tv.plugins.repo.PluginRepositoryManager
 import com.crispy.tv.plugins.repo.PluginScraperDescriptor
 import com.crispy.tv.plugins.runtime.PluginRuntime
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -17,21 +16,19 @@ import kotlinx.coroutines.sync.withPermit
 internal const val PLUGIN_PROVIDER_PREFIX = "plugin:"
 
 /**
- * Public entry point the app consumes. Signature uses only public types so the
- * internal [PluginStreamsService] plumbing stays encapsulated.
+ * Public entry point the app consumes. Each provider result is emitted as its
+ * scraper finishes, so surfaces render rows progressively instead of waiting
+ * for the slowest scraper. Signature uses only public types so the internal
+ * [PluginStreamsService] plumbing stays encapsulated.
  */
 fun interface PluginStreamSource {
-    suspend fun load(
+    fun stream(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         tmdbId: Int?,
-        title: String,
-        year: Int?,
         season: Int?,
         episode: Int?,
-        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)?,
-        onProviderResult: ((ProviderStreamsResult) -> Unit)?,
-    ): List<ProviderStreamsResult>
+    ): Flow<ProviderStreamsResult>
 }
 
 internal class PluginStreamsService(
@@ -41,22 +38,23 @@ internal class PluginStreamsService(
     private val nowEpochMs: () -> Long = System::currentTimeMillis,
 ) {
 
-    suspend fun load(
+    /**
+     * Emits one [ProviderStreamsResult] per matching scraper as it finishes.
+     * Repo refresh runs alongside and never gates emissions; the flow completes
+     * once every scraper (and the refresh) is done.
+     */
+    fun stream(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         tmdbId: Int?,
-        title: String,
-        year: Int?,
         season: Int?,
         episode: Int?,
-        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)?,
-        onProviderResult: ((ProviderStreamsResult) -> Unit)?,
-    ): List<ProviderStreamsResult> {
-        return coroutineScope {
+    ): Flow<ProviderStreamsResult> =
+        channelFlow {
             // Refresh runs alongside stream resolution instead of blocking it: manifest
             // fetches must never gate playback lookup. The scraper snapshot below may
             // miss repos that finish refreshing mid-load; they appear on the next load.
-            val refreshJob = launch {
+            launch {
                 if (refreshReposOnLoad) {
                     runCatching { repositoryManager.refreshDueRepositories(nowEpochMs()) }
                         .onFailure { error -> android.util.Log.w(LOG_TAG, "repo refresh failed: ${error.message}") }
@@ -68,21 +66,18 @@ internal class PluginStreamsService(
                 .sortedBy { it.scraperId }
             android.util.Log.i(
                 LOG_TAG,
-                "load mediaType=$mediaType lookupId=$lookupId season=$season episode=$episode: " +
+                "stream mediaType=$mediaType lookupId=$lookupId season=$season episode=$episode: " +
                     "${enabled.size} enabled, ${scrapers.size} match (${scrapers.joinToString { it.scraperId }})",
             )
-            onProvidersResolved?.invoke(scrapers.map { it.toDescriptor() })
             if (scrapers.isEmpty()) {
-                refreshJob.join()
-                android.util.Log.w(LOG_TAG, "load aborted: no matching scrapers")
-                return@coroutineScope emptyList()
+                android.util.Log.w(LOG_TAG, "stream aborted: no matching scrapers")
+                return@channelFlow
             }
 
             val runtime = runtimeProvider()
             if (runtime == null) {
-                refreshJob.join()
-                android.util.Log.w(LOG_TAG, "load aborted: runtime unavailable")
-                return@coroutineScope emptyList()
+                android.util.Log.w(LOG_TAG, "stream aborted: runtime unavailable")
+                return@channelFlow
             }
             val input = buildInput(mediaType, lookupId, tmdbId, season, episode)
             android.util.Log.i(
@@ -92,7 +87,6 @@ internal class PluginStreamsService(
             )
 
             val semaphore = Semaphore(MAX_CONCURRENT_SCRAPERS)
-            val channel = Channel<ProviderStreamsResult>(capacity = scrapers.size)
             scrapers.forEach { scraper ->
                 launch {
                     val result = semaphore.withPermit {
@@ -105,27 +99,15 @@ internal class PluginStreamsService(
                             )
                         }
                     }
-                    channel.send(result)
+                    android.util.Log.i(
+                        LOG_TAG,
+                        "provider ${result.providerId} -> ${result.streams.size} stream(s)" +
+                            (result.errorMessage?.let { " error=$it" } ?: ""),
+                    )
+                    send(result)
                 }
             }
-
-            val results = ArrayList<ProviderStreamsResult>(scrapers.size)
-            repeat(scrapers.size) {
-                val result = channel.receive()
-                android.util.Log.i(
-                    LOG_TAG,
-                    "provider ${result.providerId} -> ${result.streams.size} stream(s)" +
-                        (result.errorMessage?.let { " error=$it" } ?: ""),
-                )
-                results += result
-                onProviderResult?.invoke(result)
-            }
-            android.util.Log.i(LOG_TAG, "load done: ${results.sumOf { it.streams.size }} stream(s) from ${results.size} provider(s)")
-            channel.close()
-            refreshJob.join()
-            results
         }
-    }
 
     private suspend fun execute(
         runtime: PluginRuntime,
@@ -182,9 +164,3 @@ internal fun PluginScraperDescriptor.supports(mediaType: MetadataLabMediaType): 
     }
     return supportedTypes.any { normalizePluginMediaType(it) == canonical }
 }
-
-internal fun PluginScraperDescriptor.toDescriptor(): StreamProviderDescriptor =
-    StreamProviderDescriptor(
-        providerId = providerId(this),
-        providerName = displayName,
-    )

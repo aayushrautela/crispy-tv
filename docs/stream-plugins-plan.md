@@ -125,8 +125,8 @@ com.crispy.tv.plugins
 
 ### Stream pipeline integration
 
-- `PluginStreamsService.load(tmdbId, imdbId, mediaType, season, episode, title, year)` runs enabled plugins concurrently (cap 4, same semaphore discipline as `AddonStreamsService`), maps each result into `AddonStream` with `providerId = "plugin:<scraperId>"`, merged `headers+referer`, `stableKey = hash(url+headers)`. `tmdbId` comes from the backend's `providerIds.tmdb` (carried on `MediaDetails`/`StreamLookupTarget`), falling back to parsing a numeric lookup id; `imdbId` comes from the lookup id (`tt…`).
-- Registered as an additional provider source inside `SelectorCoordinator.resolve()` alongside `StreamResolver`; results flow through existing `onProviderResult` and stream list UI
+- `PluginStreamsService.stream(tmdbId, imdbId, mediaType, season, episode)` runs enabled plugins concurrently (cap 4, same semaphore discipline as `AddonStreamsService`) and emits one `ProviderStreamsResult` per scraper as it finishes (Nuvio-style progressive `Flow`), mapping each result into `AddonStream` with `providerId = "plugin:<scraperId>"`, merged `headers+referer`, `stableKey = hash(url+headers)`. `tmdbId` comes from the backend's `providerIds.tmdb` (carried on `MediaDetails`/`StreamLookupTarget`), falling back to parsing a numeric lookup id; `imdbId` comes from the lookup id (`tt…`).
+- Registered as an additional provider source inside `SelectorCoordinator.resolve()` alongside `StreamResolver`; each emitted result is folded into selector state on arrival so rows render progressively
 - Cancellation: `SelectorCoordinator.dismiss()` cancels coroutine scope → interrupts isolates
 
 ### Settings UI (foss-only)

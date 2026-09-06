@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -111,9 +113,9 @@ class SelectorCoordinator(
                             target
                         }
                     val request = buildPluginRequest(resolvedTarget) ?: return@launch
-                    val results =
-                        runCatching { loader.load(request) }.getOrElse { error ->
-                            listOf(
+                    loader.stream(request)
+                        .catch { error ->
+                            emit(
                                 ProviderStreamsResult(
                                     providerId = PLUGIN_PROVIDER_ERROR_ID,
                                     providerName = "Plugins",
@@ -122,15 +124,13 @@ class SelectorCoordinator(
                                 ),
                             )
                         }
-                    if (session == sessionId && currentTarget == target) {
-                        _state.update { state ->
-                            val updated =
-                                results.fold(state.providers) { providers, result ->
-                                    providers.applyProviderResult(result)
+                        .collect { result ->
+                            if (session == sessionId && currentTarget == target) {
+                                _state.update { state ->
+                                    state.copy(providers = state.providers.applyProviderResult(result))
                                 }
-                            state.copy(providers = updated)
+                            }
                         }
-                    }
                 }
             }
 
@@ -189,9 +189,10 @@ class SelectorCoordinator(
                 if (providerId.startsWith(PLUGIN_PROVIDER_PREFIX, ignoreCase = true)) {
                     val request = buildPluginRequest(target)
                     request?.let { requestValue ->
-                        runCatching { pluginStreamLoader?.load(requestValue) }
-                            .getOrNull()
-                            ?.firstOrNull { it.providerId.equals(providerId, ignoreCase = true) }
+                        runCatching {
+                            pluginStreamLoader?.stream(requestValue)
+                                ?.first { it.providerId.equals(providerId, ignoreCase = true) }
+                        }.getOrNull()
                     }
                 } else {
                     runCatching { streamResolver.loadProviderStreams(target.mediaType, target.lookupId, providerId) }
@@ -221,14 +222,11 @@ class SelectorCoordinator(
 
     private fun buildPluginRequest(target: StreamLookupTarget): PluginStreamRequest? {
         if (pluginStreamLoader == null) return null
-        val details = _details.value
         val episode = _headerEpisode.value
         return PluginStreamRequest(
             mediaType = target.mediaType,
             lookupId = target.lookupId,
             tmdbId = target.tmdbId,
-            title = details?.title,
-            year = details?.year,
             season = episode?.season,
             episode = episode?.episode,
         )

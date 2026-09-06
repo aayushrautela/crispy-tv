@@ -94,17 +94,13 @@ object PluginStreamsServiceFactory {
             repositoryManager = repositoryManager,
             runtimeProvider = { PluginRuntimeProvider.create(bridges) },
         )
-        return PluginStreamSource { mediaType, lookupId, tmdbId, title, year, season, episode, onProvidersResolved, onProviderResult ->
-            service.load(
+        return PluginStreamSource { mediaType, lookupId, tmdbId, season, episode ->
+            service.stream(
                 mediaType = mediaType,
                 lookupId = lookupId,
                 tmdbId = tmdbId,
-                title = title,
-                year = year,
                 season = season,
                 episode = episode,
-                onProvidersResolved = onProvidersResolved,
-                onProviderResult = onProviderResult,
             )
         }
     }

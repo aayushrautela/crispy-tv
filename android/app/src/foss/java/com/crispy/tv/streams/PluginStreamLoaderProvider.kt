@@ -26,20 +26,13 @@ object PluginStreamLoaderProvider {
     private fun create(appContext: Context): PluginStreamLoader {
         val source = PluginStreamsServiceFactory.create(appContext, AppHttp.okHttp(appContext))
         return PluginStreamLoader { request ->
-            source.load(
+            source.stream(
                 mediaType = request.mediaType,
                 lookupId = request.lookupId,
                 tmdbId = request.tmdbId,
-                title = request.title.orEmpty(),
-                year = request.year.toYearInt(),
                 season = request.season,
                 episode = request.episode,
-                onProvidersResolved = null,
-                onProviderResult = null,
             )
         }
     }
-
-    private fun String?.toYearInt(): Int? =
-        this?.trim()?.take(4)?.toIntOrNull()?.takeIf { it > 1800 }
 }
