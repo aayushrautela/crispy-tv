@@ -394,8 +394,8 @@ private fun ProviderChipsRow(
                 selected = false,
                 onClick = {},
                 enabled = false,
-                label = { Text("") },
-                modifier = Modifier.width(64.dp),
+                label = { Text("Loading") },
+                modifier = Modifier.width(84.dp),
                 shape = RoundedCornerShape(16.dp),
                 border = null,
                 colors =
