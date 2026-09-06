@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +27,7 @@ import com.crispy.tv.accounts.AppBootstrapViewModel
 import com.crispy.tv.accounts.AuthRoute
 import com.crispy.tv.accounts.BootstrapState
 import com.crispy.tv.accounts.ProfileSelectorRoute
+import com.crispy.tv.ui.brand.CrispyIntroSplash
 import com.crispy.tv.ui.edge_to_edge.LocalBottomBarOverlayPadding
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppRoutes
@@ -41,12 +44,14 @@ fun AppRoot() {
     val bootstrapViewModel: AppBootstrapViewModel =
         viewModel(factory = remember(appContext) { AppBootstrapViewModel.factory(appContext) })
     val state by bootstrapViewModel.state.collectAsStateWithLifecycle()
+    var introPlayed by rememberSaveable { mutableStateOf(false) }
 
     when (state) {
         BootstrapState.Loading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
-            }
+            CrispyIntroSplash(
+                playIntro = !introPlayed,
+                onFinished = { introPlayed = true },
+            )
         }
         BootstrapState.NeedsAuth -> {
             AuthRoute(onSignedIn = { bootstrapViewModel.refresh() })
