@@ -19,8 +19,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,6 +88,16 @@ internal fun PlayerEpisodesSheet(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = Color.White,
+                    )
+                }
                 if (seasons.isNotEmpty()) {
                     val selected = selectedSeason ?: seasons.firstOrNull()
                     LazyRow(

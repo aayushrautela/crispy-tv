@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
@@ -104,12 +103,7 @@ internal fun PlayerInfoSheet(
 
                         IconButton(
                             onClick = onClose,
-                            modifier =
-                                Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .background(palette.pageBackground.copy(alpha = 0.55f), CircleShape)
-                                    .padding(4.dp),
+                            modifier = Modifier.align(Alignment.TopEnd),
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
