@@ -72,7 +72,18 @@ internal fun PlayerEpisodesSheet(
                             interactionSource = remember { MutableInteractionSource() },
                             onClick = onClose,
                         ),
-            )
+            ) {
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = Color.White,
+                    )
+                }
+            }
         }
 
         AnimatedVisibility(
@@ -88,16 +99,6 @@ internal fun PlayerEpisodesSheet(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                    )
-                }
                 if (seasons.isNotEmpty()) {
                     val selected = selectedSeason ?: seasons.firstOrNull()
                     LazyRow(
