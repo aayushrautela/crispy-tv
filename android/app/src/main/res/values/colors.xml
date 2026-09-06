@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Must match CrispyRewriteTheme background so the system splash hands
+        off to the Compose intro without a color pop. -->
+    <color name="splash_background">#141414</color>
+</resources>

@@ -1,15 +1,17 @@
 package com.crispy.tv.ui.brand
 
-import androidx.annotation.RawRes
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import com.crispy.tv.ui.assets.R
 
 @Composable
 fun CrispyMark(modifier: Modifier = Modifier) {
     CrispyBrandAsset(
-        resId = R.raw.logo,
+        resId = R.drawable.brand_mark,
         modifier = modifier,
     )
 }
@@ -17,19 +19,20 @@ fun CrispyMark(modifier: Modifier = Modifier) {
 @Composable
 fun CrispyWordmark(modifier: Modifier = Modifier) {
     CrispyBrandAsset(
-        resId = R.raw.logo_wordmark,
+        resId = R.drawable.brand_wordmark,
         modifier = modifier,
     )
 }
 
 @Composable
 private fun CrispyBrandAsset(
-    @RawRes resId: Int,
+    @DrawableRes resId: Int,
     modifier: Modifier = Modifier,
 ) {
-    AsyncImage(
-        model = resId,
+    Image(
+        painter = painterResource(resId),
         contentDescription = null,
+        contentScale = ContentScale.Fit,
         modifier = modifier,
     )
 }

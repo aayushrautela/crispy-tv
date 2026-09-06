@@ -5,6 +5,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -22,9 +23,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.crispy.tv.ui.assets.R
 
 private const val IntroDurationMs = 1200
@@ -115,8 +116,8 @@ fun CrispyIntroSplash(
         Row(
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AsyncImage(
-                model = R.raw.logo,
+            Image(
+                painter = painterResource(R.drawable.brand_mark),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
@@ -142,8 +143,8 @@ fun CrispyIntroSplash(
                                 translationX = driftPx
                             },
                     ) {
-                        AsyncImage(
-                            model = R.raw.logo_wordmark_crispy,
+                        Image(
+                            painter = painterResource(R.drawable.brand_wordmark_crispy),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
@@ -165,8 +166,8 @@ fun CrispyIntroSplash(
                                 translationX = driftPx
                             },
                     ) {
-                        AsyncImage(
-                            model = R.raw.logo_wordmark_tv,
+                        Image(
+                            painter = painterResource(R.drawable.brand_wordmark_tv),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
