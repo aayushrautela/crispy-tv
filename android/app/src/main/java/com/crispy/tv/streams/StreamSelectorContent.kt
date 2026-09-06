@@ -9,6 +9,7 @@ package com.crispy.tv.streams
 import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.addons.streams.StreamProviderUiState
 import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.streams.visibleProviders
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll
@@ -69,36 +70,38 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-data class SelectorCallbacks(
-    val onDismiss: () -> Unit,
-    val onProviderSelected: (String?) -> Unit,
-    val onRetryProvider: (String) -> Unit,
-    val onStreamSelected: (AddonStream) -> Unit,
-)
-
 internal const val SHEET_HEIGHT_FRACTION = 0.92f
 
 internal val SHEET_MAX_WIDTH = 420.dp
 
+private val SKELETON_CHIP_WIDTHS = listOf(68.dp, 92.dp, 84.dp, 100.dp)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun StreamSelectorModal(
+fun StreamSelectorSheet(
+    visible: Boolean,
     state: StreamSelectorUiState,
     details: MediaDetails?,
     headerEpisode: MediaVideo?,
-    chrome: SelectorChrome,
-    callbacks: SelectorCallbacks,
+    accentColor: Color,
+    onAccentColor: Color,
+    useCrispyImageModel: Boolean = false,
+    scrimColor: Color? = null,
+    onDismiss: () -> Unit,
+    onProviderSelected: (String?) -> Unit,
+    onRetryProvider: (String) -> Unit,
+    onStreamSelected: (AddonStream) -> Unit,
 ) {
-    if (!state.visible) return
+    if (!visible) return
 
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 600
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     ModalBottomSheet(
-        onDismissRequest = callbacks.onDismiss,
+        onDismissRequest = onDismiss,
         sheetState = sheetState,
         sheetMaxWidth = if (isCompact) Dp.Infinity else SHEET_MAX_WIDTH,
-        scrimColor = chrome.scrimColor ?: BottomSheetDefaults.ScrimColor,
+        scrimColor = scrimColor ?: BottomSheetDefaults.ScrimColor,
         modifier = Modifier.testTag("stream_sheet"),
     ) {
         CompositionLocalProvider(LocalOverscrollFactory provides null) {
@@ -112,8 +115,12 @@ fun StreamSelectorModal(
                     state = state,
                     details = details,
                     headerEpisode = headerEpisode,
-                    chrome = chrome,
-                    callbacks = callbacks,
+                    accentColor = accentColor,
+                    onAccentColor = onAccentColor,
+                    useCrispyImageModel = useCrispyImageModel,
+                    onProviderSelected = onProviderSelected,
+                    onRetryProvider = onRetryProvider,
+                    onStreamSelected = onStreamSelected,
                 )
             }
         }
@@ -125,8 +132,12 @@ fun StreamSelectorContent(
     state: StreamSelectorUiState,
     details: MediaDetails?,
     headerEpisode: MediaVideo?,
-    chrome: SelectorChrome,
-    callbacks: SelectorCallbacks,
+    accentColor: Color,
+    onAccentColor: Color,
+    useCrispyImageModel: Boolean,
+    onProviderSelected: (String?) -> Unit,
+    onRetryProvider: (String) -> Unit,
+    onStreamSelected: (AddonStream) -> Unit,
 ) {
     val effectiveEpisode =
         headerEpisode
@@ -141,13 +152,14 @@ fun StreamSelectorContent(
                 }
             }
 
+    val visibleProviders = remember(state.providers) { state.providers.visibleProviders() }
     val filteredProviders =
-        remember(state.providers, state.selectedProviderId) {
+        remember(visibleProviders, state.selectedProviderId) {
             val selectedProvider = state.selectedProviderId
             if (selectedProvider.isNullOrBlank()) {
-                state.providers
+                visibleProviders
             } else {
-                state.providers.filter { provider ->
+                visibleProviders.filter { provider ->
                     provider.providerId.equals(selectedProvider, ignoreCase = true)
                 }
             }
@@ -165,15 +177,18 @@ fun StreamSelectorContent(
             StreamSheetHeader(
                 details = details,
                 episode = effectiveEpisode,
-                chrome = chrome,
+                accentColor = accentColor,
+                onAccentColor = onAccentColor,
+                useCrispyImageModel = useCrispyImageModel,
             )
         }
 
         item {
             ProviderChipsRow(
                 state = state,
-                chrome = chrome,
-                onProviderSelected = callbacks.onProviderSelected,
+                accentColor = accentColor,
+                onAccentColor = onAccentColor,
+                onProviderSelected = onProviderSelected,
             )
         }
 
@@ -197,7 +212,7 @@ fun StreamSelectorContent(
                 item(key = "provider_error_${provider.providerId}") {
                     ProviderErrorRow(
                         provider = provider,
-                        onRetry = callbacks.onRetryProvider,
+                        onRetry = onRetryProvider,
                     )
                 }
             }
@@ -207,7 +222,7 @@ fun StreamSelectorContent(
                     StreamRow(
                         stream = stream,
                         providerName = provider.providerName,
-                        onClick = { callbacks.onStreamSelected(stream) },
+                        onClick = { onStreamSelected(stream) },
                     )
                 }
             }
@@ -215,7 +230,7 @@ fun StreamSelectorContent(
 
         if (state.isLoading) {
             item {
-                LoadingMoreStreamsRow(chrome.loadingIndicatorSize)
+                LoadingMoreStreamsRow()
             }
         }
     }
@@ -225,7 +240,9 @@ fun StreamSelectorContent(
 private fun StreamSheetHeader(
     details: MediaDetails?,
     episode: MediaVideo?,
-    chrome: SelectorChrome,
+    accentColor: Color,
+    onAccentColor: Color,
+    useCrispyImageModel: Boolean,
 ) {
     if (details == null && episode == null) return
 
@@ -251,13 +268,13 @@ private fun StreamSheetHeader(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                 ) {
                     val imageModel =
-                        if (chrome.useCrispyImageModel && imageUrl != null) {
+                        if (useCrispyImageModel && imageUrl != null) {
                             rememberCrispyImageModel(url = imageUrl, width = 96.dp, height = 56.dp)
                         } else {
                             null
                         }
                     val imageModifier =
-                        if (chrome.useCrispyImageModel) {
+                        if (useCrispyImageModel) {
                             Modifier.size(width = 96.dp, height = 56.dp)
                         } else {
                             Modifier.size(width = 96.dp, height = 56.dp).clip(RoundedCornerShape(14.dp))
@@ -356,39 +373,10 @@ fun formatEpisodeReleaseDate(date: String?): String? {
 @Composable
 private fun ProviderChipsRow(
     state: StreamSelectorUiState,
-    chrome: SelectorChrome,
+    accentColor: Color,
+    onAccentColor: Color,
     onProviderSelected: (String?) -> Unit,
 ) {
-    if (chrome.showSkeletonChips && state.isLoading && state.providers.isEmpty()) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .testTag("stream_provider_chips"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            repeat(4) { index ->
-                val chipWidth =
-                    when (index) {
-                        0 -> 68.dp
-                        1 -> 92.dp
-                        2 -> 84.dp
-                        else -> 100.dp
-                    }
-                Box(
-                    modifier =
-                        Modifier
-                            .width(chipWidth)
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .skeletonElement(color = DetailsSkeletonColors.Base),
-                )
-            }
-        }
-        return
-    }
-
     Row(
         modifier =
             Modifier
@@ -407,12 +395,12 @@ private fun ProviderChipsRow(
                 FilterChipDefaults.filterChipColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedContainerColor = chrome.accentColor,
-                    selectedLabelColor = chrome.onAccentColor,
+                    selectedContainerColor = accentColor,
+                    selectedLabelColor = onAccentColor,
                 ),
         )
 
-        state.providers.forEach { provider ->
+        state.providers.visibleProviders().forEach { provider ->
             FilterChip(
                 selected = provider.providerId.equals(state.selectedProviderId, ignoreCase = true),
                 onClick = { onProviderSelected(provider.providerId) },
@@ -423,10 +411,23 @@ private fun ProviderChipsRow(
                     FilterChipDefaults.filterChipColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         labelColor = MaterialTheme.colorScheme.onSurface,
-                        selectedContainerColor = chrome.accentColor,
-                        selectedLabelColor = chrome.onAccentColor,
+                        selectedContainerColor = accentColor,
+                        selectedLabelColor = onAccentColor,
                     ),
             )
+        }
+
+        if (state.isLoading) {
+            SKELETON_CHIP_WIDTHS.forEach { chipWidth ->
+                Box(
+                    modifier =
+                        Modifier
+                            .width(chipWidth)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .skeletonElement(color = DetailsSkeletonColors.Base),
+                )
+            }
         }
     }
 }
@@ -455,14 +456,14 @@ private fun ProviderErrorRow(
 }
 
 @Composable
-private fun LoadingMoreStreamsRow(indicatorSize: androidx.compose.ui.unit.Dp) {
+private fun LoadingMoreStreamsRow() {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LoadingIndicator(
-            modifier = Modifier.size(indicatorSize),
+            modifier = Modifier.size(32.dp),
             color = Color.White,
         )
     }

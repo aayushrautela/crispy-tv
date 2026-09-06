@@ -416,10 +416,17 @@ class PlayerSessionViewModel(
         }
         val target = resolveStreamLookupTargetFromIdentity(identity)
         if (target.lookupId.isBlank()) {
+            Log.w(TAG, "startPlayback aborted: blank lookupId identity(itemId=${identity.itemId} imdbId=${identity.imdbId} tmdbId=${identity.tmdbId})")
             _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
             return
         }
 
+        Log.d(
+            TAG,
+            "startPlayback identity(itemId=${identity.itemId} imdbId=${identity.imdbId} tmdbId=${identity.tmdbId} " +
+                "type=${identity.contentType}) target(lookupId=${target.lookupId} mediaType=${target.mediaType}) " +
+                "handoffKey=${chosenStreamHandoffKey != null} stableKey=${chosenStreamStableKey != null}",
+        )
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
         initialTarget = target
@@ -427,6 +434,7 @@ class PlayerSessionViewModel(
         val handoff = PlayerStreamHandoff.consume(chosenStreamHandoffKey)
         if (handoff != null) {
             val (stream, lookupId) = handoff
+            Log.d(TAG, "handoff consumed provider=${stream.providerId} stableKey=${stream.stableKey} lookupId=$lookupId")
             autoSelectPending = false
             viewModelScope.launch { fetchMetadata(identity.itemId) }
             viewModelScope.launch {
@@ -435,6 +443,7 @@ class PlayerSessionViewModel(
             return
         }
 
+        Log.d(TAG, "handoff unavailable; selector opens for auto-select")
         autoSelectPending = true
         selectorCoordinator.open(
             target = target,
@@ -459,7 +468,10 @@ class PlayerSessionViewModel(
         try {
             val source = stream.toPlaybackSource(torrentResolver, lookupId)
             if (source == null) {
+                Log.w(TAG, "playable source missing provider=${stream.providerId} stableKey=${stream.stableKey} lookupId=$lookupId")
                 _uiState.update { it.copy(isBuffering = false, statusMessage = "Selected stream has no playable source.") }
+            } else {
+                Log.d(TAG, "playback source ready provider=${stream.providerId} stableKey=${stream.stableKey} url=${source.url.take(96)}")
             }
             source
         } catch (error: CancellationException) {
@@ -564,9 +576,11 @@ class PlayerSessionViewModel(
 
     private fun handleChosenStream(stream: AddonStream) {
         if (!stream.hasPlayableSource) {
+            Log.w(TAG, "stream chosen without playable source provider=${stream.providerId} stableKey=${stream.stableKey}")
             _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
+        Log.d(TAG, "stream chosen from selector provider=${stream.providerId} stableKey=${stream.stableKey}")
 
         val state = uiState.value
         val details =
@@ -760,8 +774,14 @@ class PlayerSessionViewModel(
                     null
                 }
         if (top != null) {
+            Log.d(
+                TAG,
+                "auto-select providers=${providers.size} chosenMatch=${chosen?.stableKey ?: "none"} " +
+                    "autoSelect=${playbackSettingsRepository.settings.value.autoSelectStream} picked=${top.stableKey}",
+            )
             viewModelScope.launch { playResolvedStream(top, target) }
         } else {
+            Log.d(TAG, "auto-select found nothing; showing streams sheet providers=${providers.size}")
             _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
         }
     }

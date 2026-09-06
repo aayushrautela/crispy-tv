@@ -24,3 +24,7 @@ data class StreamSelectorUiState(
     val totalStreamCount: Int
         get() = providers.sumOf { provider -> provider.streams.size }
 }
+
+/** Providers worth rendering: finished providers must have streams or an error. */
+fun List<StreamProviderUiState>.visibleProviders(): List<StreamProviderUiState> =
+    filter { it.streams.isNotEmpty() || it.errorMessage != null }

@@ -41,6 +41,7 @@ import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
+import com.crispy.tv.streams.StreamSelectorSheet
 import kotlinx.coroutines.delay
 
 @Composable
@@ -309,11 +310,15 @@ internal fun PlayerOverlay(
             onClose = onCloseSurface,
         )
 
-        PlayerStreamsSheet(
+        StreamSelectorSheet(
             visible = uiState.activeSurface == PlayerSurface.STREAMS,
-            details = uiState.details,
             state = uiState.streamSelector,
-            palette = palette,
+            details = uiState.details,
+            headerEpisode = uiState.streamSelector.headerEpisode,
+            accentColor = palette.accent,
+            onAccentColor = palette.onAccent,
+            useCrispyImageModel = true,
+            scrimColor = Color.Transparent,
             onDismiss = onCloseSurface,
             onProviderSelected = {
                 resetControlsTimer()

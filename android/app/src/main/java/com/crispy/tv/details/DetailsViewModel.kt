@@ -568,6 +568,12 @@ class DetailsViewModel internal constructor(
 
         val headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes)
 
+        Log.d(
+            "DetailsViewModel",
+            "stream selector target mediaType=${target.mediaType} lookupId=${target.lookupId} " +
+                "tmdbId=${target.tmdbId} source=${if (state.continueVideoId.isNullOrBlank()) "resolved" else "continueVideoId"}",
+        )
+
         openStreamSelectorWithTarget(
             target = target,
             headerEpisode = headerEpisode,
@@ -852,54 +858,19 @@ class DetailsViewModel internal constructor(
                         lookupId = target.lookupId,
                         tmdbId = target.tmdbId,
                         onProvidersResolved = {
-                            _uiState.update { previous ->
-                                if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
-                                previous.copy(
-                                    streamSelector =
-                                        previous.streamSelector.copy(
-                                            visible = previous.streamSelector.visible,
-                                            mediaType = target.mediaType,
-                                            lookupId = target.lookupId,
-                                            providers = emptyList(),
-                                            isLoading = true,
-                                        ),
-                                    statusMessage = "",
-                                )
+                            updateStreamSelector(session, target) {
+                                it.copy(providers = emptyList(), isLoading = true)
                             }
                         },
                         onProviderResult = { result ->
-                            _uiState.update { previous ->
-                                if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
-                                val updatedProviders = previous.streamSelector.providers.applyProviderResult(result)
-
-                                previous.copy(
-                                    streamSelector =
-                                        previous.streamSelector.copy(
-                                            providers = updatedProviders,
-                                ),
-                            statusMessage = "",
-                                )
+                            updateStreamSelector(session, target) {
+                                it.copy(providers = it.providers.applyProviderResult(result))
                             }
                         },
                     )
                 }.onSuccess { results ->
-                    _uiState.update { previous ->
-                        if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
-                        val finalizedProviders =
-                            previous.streamSelector.providers
-                                .finalizeFrom(results)
-
-                        previous.copy(
-                            streamSelector =
-                                previous.streamSelector.copy(
-                                    visible = previous.streamSelector.visible,
-                                    mediaType = target.mediaType,
-                                    lookupId = target.lookupId,
-                                    providers = finalizedProviders,
-                                    isLoading = false,
-                                ),
-                            statusMessage = "",
-                        )
+                    updateStreamSelector(session, target) {
+                        it.copy(providers = it.providers.finalizeFrom(results), isLoading = false)
                     }
                 }.onFailure { error ->
                     if (error is CancellationException) return@onFailure
@@ -919,6 +890,20 @@ class DetailsViewModel internal constructor(
                     }
                 }
             }
+    }
+
+    private fun updateStreamSelector(
+        session: Int,
+        target: StreamLookupTarget,
+        transform: (StreamSelectorUiState) -> StreamSelectorUiState,
+    ) {
+        _uiState.update { previous ->
+            if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
+            previous.copy(
+                streamSelector = transform(previous.streamSelector),
+                statusMessage = "",
+            )
+        }
     }
 
     fun onDismissStreamSelector() {
@@ -1042,6 +1027,7 @@ class DetailsViewModel internal constructor(
 
     fun onStreamSelected(stream: AddonStream) {
         if (!stream.hasPlayableSource) {
+            Log.w("DetailsViewModel", "stream selected without playable source provider=${stream.providerId} stableKey=${stream.stableKey}")
             _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
@@ -1064,7 +1050,10 @@ class DetailsViewModel internal constructor(
 
         viewModelScope.launch {
             val details = initialDetails
-                ?: return@launch
+                ?: run {
+                    Log.w("DetailsViewModel", "stream selected but details are missing; aborting playback")
+                    return@launch
+                }
 
             val enriched =
                 withContext(Dispatchers.IO) {
@@ -1136,13 +1125,21 @@ class DetailsViewModel internal constructor(
                     ?: 0L
             }
 
+            val chosenStreamHandoffKey = PlayerStreamHandoff.stash(stream, resolvedLookupId)
+            Log.d(
+                "DetailsViewModel",
+                "stream selected provider=${stream.providerId} name=${stream.name} stableKey=${stream.stableKey} " +
+                    "url=${stream.url?.take(96)} lookupId=$resolvedLookupId handoffKey=$chosenStreamHandoffKey " +
+                    "identity(itemId=${identity.itemId} imdbId=${identity.imdbId} tmdbId=${identity.tmdbId} " +
+                    "type=${identity.contentType} s=$season e=$episode)",
+            )
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
                     identity = identity,
                     resumePositionMs = resumePositionMs,
                     chosenStreamStableKey = stream.stableKey,
                     chosenProviderId = stream.providerId,
-                    chosenStreamHandoffKey = PlayerStreamHandoff.stash(stream, resolvedLookupId),
+                    chosenStreamHandoffKey = chosenStreamHandoffKey,
                 )
             )
         }

@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
@@ -380,10 +381,13 @@ internal fun DetailsScreen(
                 onDismiss = { selectedTrailerEmbed = null },
             )
 
-            StreamSelectorBottomSheet(
-                details = visibleDetails,
+            StreamSelectorSheet(
+                visible = visibleUiState.streamSelector.visible,
                 state = visibleUiState.streamSelector,
-                palette = palette,
+                details = visibleDetails,
+                headerEpisode = visibleUiState.streamSelector.headerEpisode,
+                accentColor = palette.accent,
+                onAccentColor = palette.onAccent,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
                 onRetryProvider = onRetryProvider,
