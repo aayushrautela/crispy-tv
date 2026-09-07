@@ -58,11 +58,12 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.backend.CrispyBackendClient.PersonSocials
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.ExpandableDescription
-import com.crispy.tv.details.initials
 import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
+import com.crispy.tv.ui.components.initials
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
@@ -75,7 +76,6 @@ import java.util.Locale
 
 private val PersonAvatarSize = 120.dp
 private val TopAppBarClearanceHeight = 64.dp
-private const val PERSON_PROFILE_KEY_PREFIX = "backdrop-personProfile-"
 
 @Composable
 fun PersonDetailsRoute(
@@ -215,7 +215,7 @@ private fun PersonHeader(
     val horizontalPadding = responsivePageHorizontalPadding()
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val profileKey = "$PERSON_PROFILE_KEY_PREFIX$personId"
+    val profileKey = PersonProfileSharedKeys.forPerson(personId)
     val displayName = person?.name?.trim().orEmpty()
     val displayProfileUrl = person?.profileUrl?.trim()?.takeIf { it.isNotEmpty() } ?: initialProfileUrl
     val profileModel = rememberCrispyImageModel(

@@ -67,6 +67,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyShelfSection
 import com.crispy.tv.ui.components.LandscapeCard
+import com.crispy.tv.ui.components.PersonCircleCard
+import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.theme.Dimensions
@@ -366,7 +368,7 @@ private fun SearchResultsContent(
                 }
                 if (buckets.people.isNotEmpty()) {
                     item(key = "people") {
-                        SearchSectionRow(title = "People", items = buckets.people, onItemClick = onItemClick, isPersonRow = true)
+                        SearchPeopleRow(items = buckets.people, onItemClick = onItemClick)
                     }
                 }
             }
@@ -379,7 +381,6 @@ private fun SearchSectionRow(
     title: String,
     items: List<CatalogItem>,
     onItemClick: (CatalogItem, String?) -> Unit,
-    isPersonRow: Boolean = false,
 ) {
     CrispyShelfSection(
         title = title,
@@ -387,11 +388,7 @@ private fun SearchSectionRow(
         itemSpacing = 12.dp,
         key = { "${it.type}:${it.id}" },
         itemContent = { item ->
-            val sharedElementKey = if (isPersonRow) {
-                "personProfile-${item.itemId}"
-            } else {
-                "search-${title}-${item.itemId}"
-            }
+            val sharedElementKey = "search-${title}-${item.itemId}"
             LandscapeCard(
                 title = item.title,
                 artworkUrl = item.artworkUrl,
@@ -405,6 +402,29 @@ private fun SearchSectionRow(
                 onClick = { onItemClick(item, sharedElementKey) },
                 itemId = item.itemId,
                 sharedElementKey = sharedElementKey,
+            )
+        },
+    )
+}
+
+@Composable
+private fun SearchPeopleRow(
+    items: List<CatalogItem>,
+    onItemClick: (CatalogItem, String?) -> Unit,
+) {
+    CrispyShelfSection(
+        title = "People",
+        entries = items,
+        itemSpacing = 12.dp,
+        key = { "${it.type}:${it.id}" },
+        itemContent = { item ->
+            val sharedElementKey = PersonProfileSharedKeys.forPerson(item.itemId)
+            PersonCircleCard(
+                name = item.title,
+                profileUrl = item.artworkUrl,
+                onClick = { onItemClick(item, sharedElementKey) },
+                sharedElementKey = sharedElementKey,
+                subtitle = item.genre,
             )
         },
     )

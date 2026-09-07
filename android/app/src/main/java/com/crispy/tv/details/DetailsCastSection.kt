@@ -1,8 +1,6 @@
 package com.crispy.tv.details
 
 import com.crispy.tv.backend.CrispyBackendClient
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -38,8 +35,10 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.util.formatRatingOutOfTen
+import com.crispy.tv.ui.components.PersonCircleCard
+import com.crispy.tv.ui.components.PersonProfileSharedKeys
+import com.crispy.tv.ui.components.initials
 import com.crispy.tv.ui.components.rememberCrispyImageModel
-import com.crispy.tv.ui.components.SharedImageMemoryKeys
 
 @Composable
 internal fun SimpleCastItem(
@@ -79,106 +78,20 @@ internal fun SimpleCastItem(
     }
 }
 
-internal fun initials(name: String): String {
-    val parts =
-        name
-            .trim()
-            .split("\\s+".toRegex())
-            .filter { it.isNotBlank() }
-
-    if (parts.isEmpty()) return "?"
-    if (parts.size == 1) return parts[0].take(1).uppercase()
-    return (parts[0].take(1) + parts[1].take(1)).uppercase()
-}
-
 @Composable
 internal fun MetadataCastCard(
     member: CrispyBackendClient.MetadataPersonRefView,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Column(
-        modifier = modifier.width(100.dp).clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        val profileUrl = member.profileUrl?.trim().orEmpty()
-        val sharedTransitionScope = com.crispy.tv.ui.navigation.LocalSharedTransitionScope.current
-        val animatedVisibilityScope = com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope.current
-        val profileKey = "backdrop-personProfile-${member.personId}"
-
-        Surface(
-            modifier = Modifier.size(80.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
-            if (profileUrl.isNotBlank()) {
-                val profileModel = rememberCrispyImageModel(url = profileUrl, width = 80.dp, height = 80.dp, memoryCacheKey = profileKey)
-                if (profileModel != null) {
-                    val imageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier
-                                .sharedElement(
-                                    rememberSharedContentState(key = profileKey),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                )
-                                .clip(CircleShape)
-                                .fillMaxSize()
-                        }
-                    } else {
-                        Modifier
-                            .clip(CircleShape)
-                            .fillMaxSize()
-                    }
-                    AsyncImage(
-                        model = profileModel,
-                        contentDescription = null,
-                        modifier = imageModifier,
-                        contentScale = ContentScale.Crop,
-                        onSuccess = { result ->
-                            result.result.memoryCacheKey?.let { cacheKey ->
-                                SharedImageMemoryKeys.putCardKey(profileKey, cacheKey)
-                            }
-                        },
-                    )
-                }
-            } else {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = initials(member.name),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
-        Text(
-            text = member.name,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-
-        member.role?.takeIf { it.isNotBlank() }?.let { role ->
-            Text(
-                text = role,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
-                    textAlign = TextAlign.Center,
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    PersonCircleCard(
+        name = member.name,
+        profileUrl = member.profileUrl,
+        onClick = onClick,
+        modifier = modifier,
+        sharedElementKey = PersonProfileSharedKeys.forPerson(member.personId),
+        subtitle = member.role?.takeIf { it.isNotBlank() },
+    )
 }
 
 @Composable
