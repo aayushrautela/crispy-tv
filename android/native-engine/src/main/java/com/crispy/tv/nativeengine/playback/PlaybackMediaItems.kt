@@ -37,6 +37,7 @@ private fun toSubtitleConfiguration(subtitle: PlaybackExternalSubtitle): MediaIt
     val mimeType = inferSubtitleMimeType(subtitle.url)
     val builder =
         MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
+            .setId(externalSubtitleTrackId(subtitle.url))
             .setMimeType(mimeType)
             .setRoleFlags(C.ROLE_FLAG_SUBTITLE)
     subtitle.language?.let(builder::setLanguage)

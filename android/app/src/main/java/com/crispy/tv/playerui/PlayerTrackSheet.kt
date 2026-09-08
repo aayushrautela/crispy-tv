@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.addons.streams.AddonSubtitle
+import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
 import com.crispy.tv.streams.SHEET_HEIGHT_FRACTION
 import com.crispy.tv.streams.SHEET_MAX_WIDTH
 import java.util.Locale
@@ -125,25 +126,31 @@ private sealed interface SubtitleOption {
     val key: String
     val label: String
     val language: String?
+    val subtitle: String?
     val isSelected: Boolean
+    val trackId: String
 }
 
-private data class EmbeddedSubtitleOption(
+private data class EngineSubtitleOption(
     val track: NativeTrack,
     override val isSelected: Boolean,
 ) : SubtitleOption {
     override val key = track.id
-    override val label = track.title ?: languageLabelForCode(track.language)
+    override val label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language)
     override val language = track.language
+    override val subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language) }
+    override val trackId = track.id
 }
 
-private data class AddonSubtitleOption(
-    val subtitle: AddonSubtitle,
-    override val isSelected: Boolean,
+private data class CatalogSubtitleOption(
+    val addonSubtitle: AddonSubtitle,
 ) : SubtitleOption {
-    override val key = subtitle.id
-    override val label = subtitle.display.ifBlank { languageLabelForCode(subtitle.language) }
-    override val language = subtitle.language
+    override val key = externalSubtitleTrackId(addonSubtitle.url)
+    override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language) }
+    override val language = addonSubtitle.language
+    override val subtitle = addonSubtitle.addonName?.takeIf { it.isNotBlank() }
+    override val isSelected = false
+    override val trackId = key
 }
 
 private fun groupSubtitlesByLanguage(options: List<SubtitleOption>): List<LanguageGroup<SubtitleOption>> {
@@ -220,25 +227,25 @@ internal fun PlayerSubtitleSheet(
     addonSubtitles: List<AddonSubtitle>,
     addonSubtitlesLoading: Boolean,
     addonSubtitlesError: String?,
-    selectedAddonSubtitleId: String?,
     palette: DetailsPaletteColors,
     onSelectSubtitleTrack: (String?) -> Unit,
     onRefreshAddonSubtitles: () -> Unit = {},
-    onSelectAddonSubtitle: (AddonSubtitle) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
 
+    val engineTrackIds = subtitleTracks.mapTo(HashSet()) { it.id }
     val options =
         buildList<SubtitleOption> {
             subtitleTracks.forEach { track ->
-                add(EmbeddedSubtitleOption(track, isSelected = track.id == selectedSubtitleTrackId))
+                add(EngineSubtitleOption(track, isSelected = track.id == selectedSubtitleTrackId))
             }
-            addonSubtitles.forEach { subtitle ->
-                add(AddonSubtitleOption(subtitle, isSelected = subtitle.id == selectedAddonSubtitleId))
-            }
+            addonSubtitles
+                .distinctBy { externalSubtitleTrackId(it.url) }
+                .filter { externalSubtitleTrackId(it.url) !in engineTrackIds }
+                .forEach { subtitle -> add(CatalogSubtitleOption(subtitle)) }
         }
     val groups = groupSubtitlesByLanguage(options)
     val languagePills = groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) }
@@ -249,7 +256,7 @@ internal fun PlayerSubtitleSheet(
         } else {
             options.filter { normalizeLang(it.language) == selectedLang }
         }
-    val offSelected = selectedSubtitleTrackId == null && addonSubtitles.none { it.id == selectedAddonSubtitleId }
+    val offSelected = selectedSubtitleTrackId == null
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -318,28 +325,14 @@ internal fun PlayerSubtitleSheet(
                 }
 
                 items(visibleOptions, key = { it.key }) { option ->
-                    when (option) {
-                        is EmbeddedSubtitleOption -> {
-                            TrackRow(
-                                label = option.label,
-                                subtitle = option.track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(option.track.language) },
-                                isSelected = option.isSelected,
-                                palette = palette,
-                                leadingIcon = Icons.Filled.Subtitles,
-                                onClick = { onSelectSubtitleTrack(option.track.id) },
-                            )
-                        }
-                        is AddonSubtitleOption -> {
-                            TrackRow(
-                                label = option.label,
-                                subtitle = option.subtitle.addonName?.takeIf { it.isNotBlank() },
-                                isSelected = option.isSelected,
-                                palette = palette,
-                                leadingIcon = Icons.Filled.Subtitles,
-                                onClick = { onSelectAddonSubtitle(option.subtitle) },
-                            )
-                        }
-                    }
+                    TrackRow(
+                        label = option.label,
+                        subtitle = option.subtitle,
+                        isSelected = option.isSelected,
+                        palette = palette,
+                        leadingIcon = Icons.Filled.Subtitles,
+                        onClick = { onSelectSubtitleTrack(option.trackId) },
+                    )
                 }
             }
         }

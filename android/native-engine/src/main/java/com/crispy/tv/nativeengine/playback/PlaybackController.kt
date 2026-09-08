@@ -91,6 +91,17 @@ data class PlaybackExternalSubtitle(
     val headers: Map<String, String> = emptyMap(),
 )
 
+const val EXTERNAL_SUBTITLE_TRACK_ID_PREFIX = "ext:"
+
+/**
+ * Stable engine-agnostic track id for an externally attached subtitle, derived from
+ * its URL so the sheet can match catalog entries against engine tracks by id alone.
+ */
+fun externalSubtitleTrackId(url: String): String {
+    val normalized = url.trim().substringBefore('#')
+    return "$EXTERNAL_SUBTITLE_TRACK_ID_PREFIX${normalized.hashCode().toUInt().toString(16)}"
+}
+
 data class NativeTrack(
     val id: String,
     val index: Int,

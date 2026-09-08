@@ -84,6 +84,7 @@ class NativePlaybackController(
     private var exoMuted: Boolean = false
     private var exoSubtitleDelayMs: Int = 0
     private var lastPlaybackSource: PlaybackSource? = null
+    private var activeExternalSubtitle: PlaybackExternalSubtitle? = null
     private var lastExoPositionMs: Long = 0L
     private var pendingAudioTrackId: String? = null
     private var pendingSubtitleTrackId: String? = null
@@ -137,13 +138,15 @@ class NativePlaybackController(
                 }
                 if (pendingAudioTrackId != null && tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
                     val id = pendingAudioTrackId
-                    pendingAudioTrackId = null
-                    applyExoTrackOverride(C.TRACK_TYPE_AUDIO, id)
+                    if (applyExoTrackOverride(C.TRACK_TYPE_AUDIO, id)) {
+                        pendingAudioTrackId = null
+                    }
                 }
                 if (pendingSubtitleTrackId != null && tracks.groups.any { it.type == C.TRACK_TYPE_TEXT }) {
                     val id = pendingSubtitleTrackId
-                    pendingSubtitleTrackId = null
-                    applyExoTrackOverride(C.TRACK_TYPE_TEXT, id)
+                    if (applyExoTrackOverride(C.TRACK_TYPE_TEXT, id)) {
+                        pendingSubtitleTrackId = null
+                    }
                 }
                 Log.d(
                     TAG,
@@ -203,6 +206,22 @@ class NativePlaybackController(
             TAG,
             "play requested engine=$engine previousEngine=$currentEngine url=${debugUrl(url)}",
         )
+        // A replay of the same media (retry, decoder escalation) keeps the user-chosen
+        // external subtitle; a different media starts fresh without it.
+        val sameMedia = lastPlaybackSource?.url == source.url
+        val carriedExternal = activeExternalSubtitle?.takeIf { sameMedia }
+        if (!sameMedia) {
+            activeExternalSubtitle = null
+        }
+        val effectiveSource =
+            carriedExternal
+                ?.let { carried ->
+                    source.copy(
+                        externalSubtitles =
+                            (listOfNotNull(carried) + source.externalSubtitles).distinctBy { it.url },
+                    )
+                }
+                ?: source
         currentEngine = engine
         when (engine) {
             NativePlaybackEngine.EXO -> {
@@ -212,21 +231,17 @@ class NativePlaybackController(
                 decoderPriorityEscalated = false
                 lastExoPositionMs = 0L
                 mpvRuntime.stop()
-                exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
+                exoHttpDataSourceFactory.setDefaultRequestProperties(effectiveSource.headers)
                 val mediaItem =
                     playbackMediaItemFromUrl(
-                        url = url,
-                        streamType = source.streamType,
-                        externalSubtitles = source.externalSubtitles,
+                        url = effectiveSource.url,
+                        streamType = effectiveSource.streamType,
+                        externalSubtitles = effectiveSource.externalSubtitles,
                     )
                 exoPlayer.setMediaItem(mediaItem)
-                source.externalSubtitles.firstOrNull()?.language?.let { language ->
-                    exoPlayer.trackSelectionParameters =
-                        exoPlayer.trackSelectionParameters
-                            .buildUpon()
-                            .setPreferredTextLanguage(language)
-                            .build()
-                }
+                pendingSubtitleTrackId =
+                    carriedExternal?.let { externalSubtitleTrackId(it.url) }
+                        ?: effectiveSource.externalSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
                 applyPersistedExoSettings()
@@ -235,10 +250,10 @@ class NativePlaybackController(
             NativePlaybackEngine.MPV -> {
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
-                mpvRuntime.play(source)
+                mpvRuntime.play(effectiveSource)
             }
         }
-        lastPlaybackSource = source
+        lastPlaybackSource = effectiveSource
     }
 
     override fun setPlaybackSpeed(speed: Float) {
@@ -283,6 +298,8 @@ class NativePlaybackController(
     }
 
     override fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?) {
+        Log.d(TAG, "setExternalSubtitle engine=$currentEngine url=${subtitle?.url != null}")
+        activeExternalSubtitle = subtitle
         if (currentEngine != NativePlaybackEngine.EXO) {
             mpvRuntime.setExternalSubtitle(subtitle)
             return
@@ -292,22 +309,19 @@ class NativePlaybackController(
         exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
         val audioIdToPreserve = pendingAudioTrackId ?: selectedExoTrackId(C.TRACK_TYPE_AUDIO)
         if (audioIdToPreserve != null) pendingAudioTrackId = audioIdToPreserve
-        pendingSubtitleTrackId = null
+        // Hard selection of the attached external track; Exo's default text selection
+        // must never pick an embedded track instead.
+        pendingSubtitleTrackId = subtitle?.let { externalSubtitleTrackId(it.url) }
+        val externalSubtitles =
+            (listOfNotNull(subtitle) + source.externalSubtitles).distinctBy { it.url }
+        lastPlaybackSource = source.copy(externalSubtitles = externalSubtitles)
         val mediaItem =
             playbackMediaItemFromUrl(
                 url = source.url,
                 streamType = source.streamType,
-                externalSubtitles =
-                    listOfNotNull(subtitle) + source.externalSubtitles.distinctBy { it.url },
+                externalSubtitles = externalSubtitles,
             )
         exoPlayer.setMediaItem(mediaItem, resumeMs)
-        subtitle?.language?.let { language ->
-            exoPlayer.trackSelectionParameters =
-                exoPlayer.trackSelectionParameters
-                    .buildUpon()
-                    .setPreferredTextLanguage(language)
-                    .build()
-        }
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
@@ -334,7 +348,7 @@ class NativePlaybackController(
         }
     }
 
-    private fun applyExoTrackOverride(trackType: Int, trackId: String?) {
+    private fun applyExoTrackOverride(trackType: Int, trackId: String?): Boolean {
         val groups = exoPlayer.currentTracks.groups
         if (trackId == null) {
             Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} action=disable")
@@ -343,40 +357,64 @@ class NativePlaybackController(
                     .buildUpon()
                     .setTrackTypeDisabled(trackType, true)
                     .build()
-            return
+            return true
+        }
+        if (trackId.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)) {
+            val target = findExoTrackByStableId(trackType, trackId)
+            if (target == null) {
+                Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=external-group-missing")
+                return false
+            }
+            applyExoOverride(target.first, target.second)
+            return true
         }
         val (groupIndex, formatIndex) = parseTrackId(trackId) ?: run {
             Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=unparseable-id")
-            return
+            return false
         }
         val group = groups.getOrNull(groupIndex) ?: run {
             Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=group-missing")
-            return
+            return false
         }
         if (group.type != trackType) {
             Log.d(TAG, "applyExoTrackOverride id=$trackId rejected=type-mismatch group=${trackTypeName(group.type)}")
-            return
+            return false
         }
         if (formatIndex < 0 || formatIndex >= group.length) {
             Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=index-out-of-bounds")
-            return
+            return false
         }
         if (!group.isTrackSupported(formatIndex)) {
             Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=unsupported")
-            return
+            return false
         }
+        applyExoOverride(group, formatIndex)
+        return true
+    }
+
+    private fun applyExoOverride(group: Tracks.Group, formatIndex: Int) {
         val override = TrackSelectionOverride(group.mediaTrackGroup, formatIndex)
         exoPlayer.trackSelectionParameters =
             exoPlayer.trackSelectionParameters
                 .buildUpon()
-                .setTrackTypeDisabled(trackType, false)
+                .setTrackTypeDisabled(group.type, false)
                 .setOverrideForType(override)
                 .build()
         Log.d(
             TAG,
-            "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId applied" +
-                " language=${group.getTrackFormat(formatIndex).language}",
+            "applyExoTrackOverride type=${trackTypeName(group.type)} group=${group.mediaTrackGroup}" +
+                " index=$formatIndex applied language=${group.getTrackFormat(formatIndex).language}",
         )
+    }
+
+    private fun findExoTrackByStableId(trackType: Int, stableId: String): Pair<Tracks.Group, Int>? {
+        for (group in exoPlayer.currentTracks.groups) {
+            if (group.type != trackType) continue
+            for (i in 0 until group.length) {
+                if (group.getTrackFormat(i).id == stableId) return group to i
+            }
+        }
+        return null
     }
 
     private fun parseTrackId(trackId: String): Pair<Int, Int>? {
@@ -578,8 +616,12 @@ class NativePlaybackController(
                 url = source.url,
                 streamType = source.streamType,
                 mimeTypeOverride = mimeType,
+                externalSubtitles = source.externalSubtitles,
             )
         exoPlayer.setMediaItem(mediaItem)
+        pendingSubtitleTrackId =
+            activeExternalSubtitle?.let { externalSubtitleTrackId(it.url) }
+                ?: source.externalSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
         exoPlayer.prepare()
         if (lastExoPositionMs > 0L) {
             exoPlayer.seekTo(lastExoPositionMs)
@@ -609,8 +651,12 @@ class NativePlaybackController(
                     url = source.url,
                     streamType = source.streamType,
                     mimeTypeOverride = null,
+                    externalSubtitles = source.externalSubtitles,
                 )
             exoPlayer.setMediaItem(mediaItem)
+            pendingSubtitleTrackId =
+                activeExternalSubtitle?.let { externalSubtitleTrackId(it.url) }
+                    ?: source.externalSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
             exoPlayer.prepare()
             if (resumeMs > 0L) {
                 exoPlayer.seekTo(resumeMs)
@@ -685,13 +731,16 @@ class NativePlaybackController(
             for (formatIndex in 0 until group.length) {
                 if (!group.isTrackSupported(formatIndex)) continue
                 val format = group.getTrackFormat(formatIndex)
+                val isExternal = format.id?.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX) == true
                 tracks.add(
                     NativeTrack(
-                        id = "$groupIndex:$formatIndex",
+                        // Only our own ext: ids are stable across rebuilds; anything else
+                        // (embedded, in-band manifest ids) keeps positional identity.
+                        id = if (isExternal) format.id else "$groupIndex:$formatIndex",
                         index = groupIndex,
                         language = format.language?.takeIf { it.isNotBlank() },
                         title = format.label?.takeIf { it.isNotBlank() },
-                        isExternal = false,
+                        isExternal = isExternal,
                     )
                 )
             }

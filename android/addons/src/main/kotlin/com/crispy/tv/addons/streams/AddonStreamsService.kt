@@ -225,7 +225,6 @@ data class AddonSubtitle(
     val language: String,
     val display: String,
     val addonName: String? = null,
-    val isSelected: Boolean = false,
 )
 
 data class ProviderStreamsResult(

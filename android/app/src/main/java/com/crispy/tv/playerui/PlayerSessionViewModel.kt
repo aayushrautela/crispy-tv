@@ -31,6 +31,7 @@ import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.nativeengine.playback.EXTERNAL_SUBTITLE_TRACK_ID_PREFIX
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
@@ -42,6 +43,7 @@ import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
+import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
 import com.crispy.tv.TorrentResolver
 import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.player.MetadataLabMediaType
@@ -113,7 +115,6 @@ data class PlayerUiState(
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,
     val addonSubtitlesError: String? = null,
-    val selectedAddonSubtitleId: String? = null,
 )
 
 class PlayerSessionViewModel(
@@ -309,17 +310,29 @@ class PlayerSessionViewModel(
     fun selectSubtitleTrack(trackId: String?) {
         val language = trackId?.let(::languageFromTrack)
         Log.d(TAG, "selectSubtitleTrack id=$trackId language=$language")
+        if (trackId != null && trackId.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)) {
+            val attached = uiState.value.subtitleTracks.any { it.id == trackId }
+            if (!attached) {
+                // Catalog entry not attached yet: resolve it and attach + select in one step.
+                val subtitle =
+                    uiState.value.addonSubtitles.firstOrNull { externalSubtitleTrackId(it.url) == trackId }
+                if (subtitle != null) {
+                    playbackController.setExternalSubtitle(
+                        PlaybackExternalSubtitle(url = subtitle.url, language = subtitle.language, name = subtitle.display),
+                    )
+                    syncPlaybackSnapshot(playbackController.snapshot())
+                    return
+                }
+            }
+            // Addon subtitle selection is session-scoped; never persist as default language.
+            playbackController.selectSubtitleTrack(trackId)
+            syncPlaybackSnapshot(playbackController.snapshot())
+            return
+        }
         playbackController.selectSubtitleTrack(trackId)
         if (language != null) {
             playbackSettingsRepository.setDefaultSubtitleLanguage(language)
         }
-        syncPlaybackSnapshot(playbackController.snapshot())
-    }
-
-    fun setExternalSubtitle(url: String, language: String? = null, name: String? = null) {
-        playbackController.setExternalSubtitle(
-            PlaybackExternalSubtitle(url = url, language = language, name = name),
-        )
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
@@ -341,21 +354,6 @@ class PlayerSessionViewModel(
 
     fun refreshAddonSubtitles() {
         fetchAddonSubtitles(force = true)
-    }
-
-    fun selectAddonSubtitle(subtitle: AddonSubtitle) {
-        clearSelectedAddonSubtitle()
-        playbackController.setExternalSubtitle(
-            PlaybackExternalSubtitle(url = subtitle.url, language = subtitle.language, name = subtitle.display),
-        )
-        _uiState.update { it.copy(selectedAddonSubtitleId = subtitle.id) }
-        syncPlaybackSnapshot(playbackController.snapshot())
-    }
-
-    fun clearSelectedAddonSubtitle() {
-        if (uiState.value.selectedAddonSubtitleId != null) {
-            _uiState.update { it.copy(selectedAddonSubtitleId = null) }
-        }
     }
 
     private fun languageFromTrack(trackId: String): String? {
@@ -445,6 +443,7 @@ class PlayerSessionViewModel(
         )
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
+        fetchAddonSubtitles()
         initialTarget = target
 
         val handoff = PlayerStreamHandoff.consume(chosenStreamHandoffKey)
@@ -509,6 +508,7 @@ class PlayerSessionViewModel(
         activePlaybackSource = source
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
+        fetchAddonSubtitles()
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
         resetPlaybackPosition()
         _uiState.update { state ->
@@ -663,6 +663,7 @@ class PlayerSessionViewModel(
         val nextMediaType = selectorSnapshot.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
         activeSubtitleLookupId = lookupId
         activeSubtitleMediaType = nextMediaType
+        fetchAddonSubtitles()
         val nextEpisode =
             selectedEpisode
         val isEpisodic = nextMediaType != MetadataLabMediaType.MOVIE

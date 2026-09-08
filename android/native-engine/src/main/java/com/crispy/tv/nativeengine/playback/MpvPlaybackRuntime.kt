@@ -32,7 +32,6 @@ internal class MpvPlaybackRuntime(
     private var selectedAudioTrackId: String? = null
     private var subtitleTracks: List<NativeTrack> = emptyList()
     private var selectedSubtitleTrackId: String? = null
-    private var externalSubtitleUrl: String? = null
     private var hasStartedPlayback: Boolean = false
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
@@ -67,11 +66,11 @@ internal class MpvPlaybackRuntime(
                     if (value <= 0L) {
                         selectedSubtitleTrackId = null
                     } else {
-                        selectedSubtitleTrackId = value.toString()
                         val current = mpv
-                        if (current != null && subtitleTracks.none { it.id == value.toString() }) {
+                        if (current != null && subtitleTracks.none { it.index == value.toInt() }) {
                             subtitleTracks = readTrackList(current, "sub")
                         }
+                        selectedSubtitleTrackId = resolveSelectedSubtitleTrackId(value.toString())
                     }
                 }
             }
@@ -334,13 +333,18 @@ internal class MpvPlaybackRuntime(
     fun selectSubtitleTrack(trackId: String?) {
         val language = trackId?.let { id -> subtitleTracks.firstOrNull { it.id == id }?.language }
         Log.d(TAG, "selectSubtitleTrack id=$trackId language=$language")
+        val mpv = mpv ?: return
         if (trackId == null) {
-            runCatching { mpv?.setPropertyString("sid", "no") }
+            runCatching { mpv.setPropertyString("sid", "no") }
             selectedSubtitleTrackId = null
             return
         }
-        val id = trackId.toIntOrNull() ?: return
-        runCatching { mpv?.setPropertyInt("sid", id) }
+        val track = subtitleTracks.firstOrNull { it.id == trackId }
+        if (track == null) {
+            Log.d(TAG, "selectSubtitleTrack id=$trackId rejected=track-missing")
+            return
+        }
+        runCatching { mpv.setPropertyInt("sid", track.index) }
         selectedSubtitleTrackId = trackId
     }
 
@@ -349,9 +353,8 @@ internal class MpvPlaybackRuntime(
         if (mpv == null) return
         runCatching {
             removeExternalSubtitleTracks(mpv)
-            externalSubtitleUrl = subtitle?.url
             if (subtitle != null) {
-                mpv.command(arrayOf("sub-add", subtitle.url, "select"))
+                mpv.command(arrayOf("sub-add", subtitle.url, "select", subtitle.name ?: "", subtitle.language ?: ""))
                 applySubtitleStyle()
             }
         }
@@ -406,14 +409,23 @@ internal class MpvPlaybackRuntime(
         subtitleTracks = readTrackList(mpv, "sub")
         val aid = runCatching { mpv.getPropertyString("aid") }.getOrNull()
         selectedAudioTrackId = aid?.takeIf { it.isNotBlank() && it != "0" }
-        val sid = runCatching { mpv.getPropertyString("sid") }.getOrNull()
-        selectedSubtitleTrackId = sid?.takeIf { it.isNotBlank() && it != "0" }
+        selectedSubtitleTrackId = resolveSelectedSubtitleTrackId(
+            runCatching { mpv.getPropertyString("sid") }.getOrNull(),
+        )
         Log.d(
             TAG,
             "refreshTrackLists audio=${audioTracks.joinToString { "${it.id}:${it.language}" }}" +
                 " subtitle=${subtitleTracks.joinToString { "${it.id}:${it.language}" }}" +
                 " selectedAudioId=$selectedAudioTrackId selectedSubtitleId=$selectedSubtitleTrackId",
         )
+    }
+
+    /** mpv reports the numeric track id; the snapshot exposes the stable NativeTrack id. */
+    private fun resolveSelectedSubtitleTrackId(sid: String?): String? {
+        if (sid.isNullOrBlank() || sid == "0") return null
+        return sid.toIntOrNull()
+            ?.let { sidInt -> subtitleTracks.firstOrNull { it.index == sidInt }?.id }
+            ?: sid
     }
 
     private fun readTrackList(mpv: MPVLib, trackType: String): List<NativeTrack> {
@@ -427,9 +439,13 @@ internal class MpvPlaybackRuntime(
             val lang = runCatching { mpv.getPropertyString("track-list/$i/lang") }.getOrNull()?.takeIf { it.isNotBlank() }
             val title = runCatching { mpv.getPropertyString("track-list/$i/title") }.getOrNull()?.takeIf { it.isNotBlank() }
             val external = runCatching { mpv.getPropertyString("track-list/$i/external") }.getOrNull().equals("yes", true)
+            val externalFilename =
+                runCatching { mpv.getPropertyString("track-list/$i/external-filename") }.getOrNull()?.takeIf { it.isNotBlank() }
             tracks.add(
                 NativeTrack(
-                    id = id.toString(),
+                    // Externals keep the same stable ext:<hash(url)> identity Exo uses so
+                    // the sheet matches catalog entries against engine tracks by id alone.
+                    id = if (external && externalFilename != null) externalSubtitleTrackId(externalFilename) else id.toString(),
                     index = id,
                     language = lang,
                     title = title,
@@ -487,12 +503,14 @@ internal class MpvPlaybackRuntime(
         if (source.externalSubtitles.isNotEmpty()) {
             val mpv = mpv
             if (mpv != null) {
-                source.externalSubtitles.forEach { subtitle ->
+                // First external is the default selection, matching the Exo path.
+                source.externalSubtitles.forEachIndexed { index, subtitle ->
                     runCatching {
-                        mpv.command(arrayOf("sub-add", subtitle.url, "select"))
+                        mpv.command(
+                            arrayOf("sub-add", subtitle.url, if (index == 0) "select" else "auto", subtitle.name ?: "", subtitle.language ?: ""),
+                        )
                     }
                 }
-                externalSubtitleUrl = source.externalSubtitles.firstOrNull()?.url
                 applySubtitleStyle()
             }
         }
@@ -554,7 +572,6 @@ internal class MpvPlaybackRuntime(
         subtitleTracks = emptyList()
         selectedAudioTrackId = null
         selectedSubtitleTrackId = null
-        externalSubtitleUrl = null
     }
 
     private fun debugUrl(url: String): String {
