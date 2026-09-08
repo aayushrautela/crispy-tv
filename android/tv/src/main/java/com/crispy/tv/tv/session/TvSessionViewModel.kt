@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.accounts.Session
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.network.AppHttp
+import com.crispy.tv.tv.BuildConfig
 import com.crispy.tv.tv.di.TvServices
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +21,20 @@ sealed interface TvSessionState {
     data class SignedIn(val context: BackendContext) : TvSessionState
 }
 
+sealed interface DeviceLoginState {
+    data object Idle : DeviceLoginState
+    data object Requesting : DeviceLoginState
+    data class AwaitingApproval(
+        val userCode: String,
+        val verificationUri: String,
+        val verificationUriComplete: String,
+        val expiresAtMs: Long,
+    ) : DeviceLoginState
+    data class Failed(val message: String) : DeviceLoginState
+    data object Denied : DeviceLoginState
+    data object Expired : DeviceLoginState
+}
+
 class TvSessionViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow<TvSessionState>(TvSessionState.Loading)
@@ -27,7 +43,15 @@ class TvSessionViewModel(app: Application) : AndroidViewModel(app) {
     val signInInFlight = MutableStateFlow(false)
     val signInError = MutableStateFlow<String?>(null)
 
+    private val _deviceLoginState = MutableStateFlow<DeviceLoginState>(DeviceLoginState.Idle)
+    val deviceLoginState: StateFlow<DeviceLoginState> = _deviceLoginState.asStateFlow()
+
     private var pendingSession: Session? = null
+    private var deviceLoginJob: kotlinx.coroutines.Job? = null
+
+    val isDeviceLoginAvailable: Boolean = runCatching {
+        TvServices.backendClient(app).isConfigured()
+    }.getOrDefault(false)
 
     init {
         restoreSession()
@@ -67,6 +91,99 @@ class TvSessionViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 signInInFlight.value = false
             }
+        }
+    }
+
+    fun startDeviceLogin() {
+        if (deviceLoginJob?.isActive == true) return
+        val appContext = getApplication<Application>()
+        val client = deviceLoginClient(appContext) ?: run {
+            _deviceLoginState.value = DeviceLoginState.Failed("Backend URL is not configured.")
+            return
+        }
+        deviceLoginJob = viewModelScope.launch {
+            _deviceLoginState.value = DeviceLoginState.Requesting
+            try {
+                val authorization = client.authorize()
+                _deviceLoginState.value = DeviceLoginState.AwaitingApproval(
+                    userCode = formatUserCode(authorization.userCode),
+                    verificationUri = authorization.verificationUri,
+                    verificationUriComplete = authorization.verificationUriComplete,
+                    expiresAtMs = System.currentTimeMillis() + authorization.expiresInSec * 1000L,
+                )
+                pollForApproval(appContext, client, authorization.deviceCode, authorization.intervalSec)
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                _deviceLoginState.value = DeviceLoginState.Failed(t.message ?: "Device sign-in failed")
+            }
+        }
+    }
+
+    fun retryDeviceLogin() {
+        cancelDeviceLogin()
+        startDeviceLogin()
+    }
+
+    fun cancelDeviceLogin() {
+        deviceLoginJob?.cancel()
+        deviceLoginJob = null
+        _deviceLoginState.value = DeviceLoginState.Idle
+    }
+
+    private suspend fun pollForApproval(
+        appContext: Application,
+        client: DeviceLoginClient,
+        deviceCode: String,
+        initialIntervalSec: Long,
+    ) {
+        var intervalSec = initialIntervalSec
+        while (true) {
+            kotlinx.coroutines.delay(intervalSec * 1000L)
+            val result = try {
+                client.poll(deviceCode)
+            } catch (io: java.io.IOException) {
+                continue
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                _deviceLoginState.value = DeviceLoginState.Failed(t.message ?: "Device sign-in failed")
+                return
+            }
+            when (result) {
+                is DeviceLoginClient.PollResult.Pending -> Unit
+                is DeviceLoginClient.PollResult.SlowDown -> intervalSec = result.intervalSec
+                is DeviceLoginClient.PollResult.Approved -> {
+                    _deviceLoginState.value = DeviceLoginState.Idle
+                    TvServices.secureTokenStore(appContext).save(result.session)
+                    proceedWithSession(result.session)
+                    return
+                }
+                is DeviceLoginClient.PollResult.Denied -> {
+                    _deviceLoginState.value = DeviceLoginState.Denied
+                    return
+                }
+                is DeviceLoginClient.PollResult.Expired -> {
+                    _deviceLoginState.value = DeviceLoginState.Expired
+                    return
+                }
+            }
+        }
+    }
+
+    private fun deviceLoginClient(appContext: Application): DeviceLoginClient? {
+        if (!TvServices.backendClient(appContext).isConfigured()) return null
+        return DeviceLoginClient(
+            httpClient = AppHttp.client(appContext),
+            backendUrl = BuildConfig.CRISPY_BACKEND_URL.trim().trimEnd('/'),
+            context = appContext,
+        )
+    }
+
+    private fun formatUserCode(raw: String): String {
+        val compact = raw.trim().replace("-", "").uppercase()
+        return if (compact.length == 8) {
+            "${compact.substring(0, 4)}-${compact.substring(4)}"
+        } else {
+            raw.trim().uppercase()
         }
     }
 

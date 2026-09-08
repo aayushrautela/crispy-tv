@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,11 +61,19 @@ fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
         is TvSessionState.SignedOut -> {
             val signInInFlight by sessionViewModel.signInInFlight.collectAsStateWithLifecycle()
             val signInError by sessionViewModel.signInError.collectAsStateWithLifecycle()
+            val deviceLogin by sessionViewModel.deviceLoginState.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) {
+                sessionViewModel.startDeviceLogin()
+            }
             SignInScreen(
                 configError = s.configError,
                 inFlight = signInInFlight,
                 error = signInError,
                 onSignIn = sessionViewModel::signIn,
+                deviceLogin = deviceLogin,
+                deviceLoginAvailable = sessionViewModel.isDeviceLoginAvailable,
+                onStartDeviceLogin = sessionViewModel::startDeviceLogin,
+                onCancelDeviceLogin = sessionViewModel::cancelDeviceLogin,
             )
         }
         is TvSessionState.NeedsProfile -> {

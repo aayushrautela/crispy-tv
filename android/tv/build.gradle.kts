@@ -165,6 +165,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
+    implementation("com.google.zxing:core:3.5.3")
+
     implementation("androidx.media3:media3-common:1.11.0")
     implementation("androidx.media3:media3-exoplayer:1.11.0")
     implementation("androidx.media3:media3-ui:1.11.0")

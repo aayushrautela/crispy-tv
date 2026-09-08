@@ -140,6 +140,7 @@ object TvServices {
 
     suspend fun signOut(context: Context) {
         accountClient(context).signOut()
+        secureTokenStore(context).clear()
         contextResolver(context).clear()
     }
 }
