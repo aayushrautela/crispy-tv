@@ -163,7 +163,7 @@ internal fun SeekRippleOverlay(
                 Row(
                     modifier = Modifier.graphicsLayer { translationX = slide.value },
                 ) {
-                    repeat(3) {
+                    repeat(2) {
                         Icon(
                             imageVector =
                                 if (ripple.isForward) {
