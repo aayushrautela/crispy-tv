@@ -145,7 +145,7 @@ internal fun SeekRippleOverlay(
         modifier = modifier,
     ) {
         val ripple = state ?: return@AnimatedVisibility
-        val targetWidth = (SEEK_RIPPLE_BASE_WIDTH + (ripple.tapCount - 1) * SEEK_RIPPLE_STEP_WIDTH)
+        val targetWidth = (SEEK_RIPPLE_BASE_WIDTH + SEEK_RIPPLE_STEP_WIDTH * (ripple.tapCount - 1))
             .coerceAtMost(SEEK_RIPPLE_MAX_WIDTH)
         val width by animateDpAsState(targetWidth, label = "seekRippleWidth")
         val gradient = if (ripple.isForward) {
