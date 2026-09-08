@@ -165,10 +165,10 @@ internal fun PlayerOverlay(
                                     TapSeekEvent.RevertControls -> controlsVisible = !controlsVisible
                                     is TapSeekEvent.ChainStarted -> {
                                         controlsVisible = false
-                                        seekRipple = SeekRippleState(event.side, event.pendingDeltaMs)
+                                        seekRipple = SeekRippleState(event.side, event.pendingDeltaMs, event.count)
                                     }
                                     is TapSeekEvent.ChainExtended -> {
-                                        seekRipple = SeekRippleState(event.side, event.pendingDeltaMs)
+                                        seekRipple = SeekRippleState(event.side, event.pendingDeltaMs, event.count)
                                     }
                                     is TapSeekEvent.ChainCommitted -> {
                                         seekRipple = null

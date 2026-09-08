@@ -1,32 +1,38 @@
 package com.crispy.tv.playerui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.domain.player.TapZone
@@ -115,7 +121,10 @@ internal data class GestureFeedbackMessage(
 internal data class SeekRippleState(
     val side: TapZone,
     val totalDeltaMs: Long,
-)
+    val tapCount: Int,
+) {
+    val isForward: Boolean get() = totalDeltaMs >= 0
+}
 
 @Composable
 internal fun SeekRippleOverlay(
@@ -129,24 +138,41 @@ internal fun SeekRippleOverlay(
         modifier = modifier,
     ) {
         val ripple = state ?: return@AnimatedVisibility
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val zoneInset = maxWidth * 0.10f
+            val pulse = remember { Animatable(1f) }
+            LaunchedEffect(ripple.tapCount) {
+                pulse.snapTo(0.55f)
+                pulse.animateTo(1f, tween(durationMillis = 250))
+            }
+            val litArrows = ripple.tapCount.coerceIn(1, 3)
             Column(
                 modifier =
                     Modifier
-                        .align(
-                            when (ripple.side) {
-                                TapZone.LEFT -> Alignment.CenterStart
-                                TapZone.RIGHT -> Alignment.CenterEnd
-                                TapZone.CENTER -> Alignment.Center
-                            },
-                        )
-                        .padding(horizontal = 24.dp),
+                        .align(if (ripple.side == TapZone.LEFT) Alignment.CenterStart else Alignment.CenterEnd)
+                        .padding(horizontal = zoneInset)
+                        .graphicsLayer { alpha = pulse.value },
                 horizontalAlignment =
                     if (ripple.side == TapZone.LEFT) Alignment.Start else Alignment.End,
             ) {
+                Row {
+                    repeat(3) { index ->
+                        Icon(
+                            imageVector =
+                                if (ripple.isForward) {
+                                    Icons.Filled.ChevronRight
+                                } else {
+                                    Icons.Filled.ChevronLeft
+                                },
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = if (index < litArrows) 1f else 0.35f),
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                }
                 Text(
                     text = playbackSeekDeltaLabel(ripple.totalDeltaMs),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                 )
             }
@@ -158,8 +184,6 @@ internal object GestureIcons {
     val Brightness = Icons.Filled.Brightness6
     val VolumeUp = Icons.AutoMirrored.Filled.VolumeUp
     val VolumeMuted = Icons.AutoMirrored.Filled.VolumeOff
-    val Forward10 = Icons.Filled.Forward10
-    val Backward10 = Icons.Filled.Replay10
     val Resize = Icons.Filled.Crop
 }
 
