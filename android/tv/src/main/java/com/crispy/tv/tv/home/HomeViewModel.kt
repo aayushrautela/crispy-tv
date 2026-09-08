@@ -95,7 +95,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 thisWeek.await()?.let { response ->
-                    val mapped = response.items.map { it.toCardItem() }
+                    val mapped = response.items.map { it.card.toCardItem() }
                     if (mapped.isNotEmpty()) {
                         add(HomeRailUi(key = "this_week", title = "This Week", items = mapped))
                     }
