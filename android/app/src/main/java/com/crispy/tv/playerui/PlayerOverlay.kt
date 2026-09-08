@@ -1,5 +1,6 @@
 package com.crispy.tv.playerui
 
+import android.view.ViewConfiguration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -32,7 +33,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
@@ -90,8 +90,8 @@ internal fun PlayerOverlay(
     var showLoadingCurtain by remember { mutableStateOf(uiState.isBuffering) }
     var seekRipple by remember { mutableStateOf<SeekRippleState?>(null) }
 
-    val doubleTapTimeoutMs = LocalView.current.viewConfiguration.doubleTapTimeoutMillis
-    val seekChain = remember(doubleTapTimeoutMs) { TapSeekChain(doubleTapWindowMs = doubleTapTimeoutMs) }
+    val doubleTapTimeoutMs = ViewConfiguration.getDoubleTapTimeout()
+    val seekChain = remember(doubleTapTimeoutMs) { TapSeekChain(doubleTapWindowMs = doubleTapTimeoutMs.toLong()) }
     val tapGestureScope = rememberCoroutineScope()
 
     val latestOnBack by rememberUpdatedState(onBack)

@@ -39,14 +39,7 @@ class TapSeekChain(
         return events
     }
 
-    fun commit(durationMs: Long): List<TapSeekEvent> {
-        val chain = pending ?: return emptyList()
-        pending = null
-        lastStandaloneTapMs = null
-        val totalDeltaMs = pendingDeltaMs(chain)
-        val targetMs = clampTarget(chain.anchorMs + totalDeltaMs, durationMs)
-        return listOf(TapSeekEvent.ChainCommitted(chain.side, totalDeltaMs, targetMs))
-    }
+    fun commit(durationMs: Long): List<TapSeekEvent> = listOfNotNull(commitPending(durationMs))
 
     fun reset() {
         lastStandaloneTapMs = null
@@ -62,12 +55,22 @@ class TapSeekChain(
                 listOf(TapSeekEvent.ChainExtended(chain.side, chain.count, pendingDeltaMs(chain)))
             }
             zone != TapZone.CENTER -> {
-                val committed = commit(durationMs)
-                pending = Pending(zone, committed.first().targetMs, 1, nowMs)
-                committed + listOf(TapSeekEvent.ChainStarted(zone, 1, pendingDeltaMs(pending!!)))
+                val committed = commitPending(durationMs) ?: return emptyList()
+                val next = Pending(zone, committed.targetMs, 1, nowMs)
+                pending = next
+                listOf(committed, TapSeekEvent.ChainStarted(zone, 1, pendingDeltaMs(next)))
             }
             else -> emptyList()
         }
+    }
+
+    private fun commitPending(durationMs: Long): TapSeekEvent.ChainCommitted? {
+        val chain = pending ?: return null
+        pending = null
+        lastStandaloneTapMs = null
+        val totalDeltaMs = pendingDeltaMs(chain)
+        val targetMs = clampTarget(chain.anchorMs + totalDeltaMs, durationMs)
+        return TapSeekEvent.ChainCommitted(chain.side, totalDeltaMs, targetMs)
     }
 
     private fun onTapOutsideChain(zone: TapZone, positionMs: Long, nowMs: Long): TapSeekEvent? {
