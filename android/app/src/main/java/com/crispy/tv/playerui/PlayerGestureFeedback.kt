@@ -2,6 +2,7 @@ package com.crispy.tv.playerui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -141,12 +142,15 @@ internal fun SeekRippleOverlay(
         val ripple = state ?: return@AnimatedVisibility
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val zoneInset = maxWidth * 0.10f
+            val chevronStepPx = 32.dp.toPx()
+            val slide = remember { Animatable(0f) }
             val pulse = remember { Animatable(1f) }
             LaunchedEffect(ripple.tapCount) {
-                pulse.snapTo(0.55f)
-                pulse.animateTo(1f, tween(durationMillis = 250))
+                slide.snapTo(if (ripple.isForward) -chevronStepPx else chevronStepPx)
+                slide.animateTo(0f, tween(durationMillis = 250, easing = FastOutSlowInEasing))
+                pulse.snapTo(0.6f)
+                pulse.animateTo(1f, tween(durationMillis = 200))
             }
-            val litArrows = ripple.tapCount.coerceIn(1, 3)
             Column(
                 modifier =
                     Modifier
@@ -156,8 +160,10 @@ internal fun SeekRippleOverlay(
                 horizontalAlignment =
                     if (ripple.side == TapZone.LEFT) Alignment.Start else Alignment.End,
             ) {
-                Row {
-                    repeat(3) { index ->
+                Row(
+                    modifier = Modifier.graphicsLayer { translationX = slide.value },
+                ) {
+                    repeat(3) {
                         Icon(
                             imageVector =
                                 if (ripple.isForward) {
@@ -166,7 +172,7 @@ internal fun SeekRippleOverlay(
                                     Icons.Filled.ChevronLeft
                                 },
                             contentDescription = null,
-                            tint = Color.White.copy(alpha = if (index < litArrows) 1f else 0.35f),
+                            tint = Color.White,
                             modifier = Modifier.size(32.dp),
                         )
                     }
