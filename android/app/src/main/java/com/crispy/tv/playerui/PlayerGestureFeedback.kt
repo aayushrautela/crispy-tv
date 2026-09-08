@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.domain.player.TapZone
 import kotlinx.coroutines.CoroutineScope
@@ -140,9 +141,10 @@ internal fun SeekRippleOverlay(
         modifier = modifier,
     ) {
         val ripple = state ?: return@AnimatedVisibility
+        val density = LocalDensity.current
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val zoneInset = maxWidth * 0.10f
-            val chevronStepPx = 32.dp.toPx()
+            val chevronStepPx = with(density) { 32.dp.toPx() }
             val slide = remember { Animatable(0f) }
             val pulse = remember { Animatable(1f) }
             LaunchedEffect(ripple.tapCount) {
