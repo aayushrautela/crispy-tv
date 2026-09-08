@@ -731,16 +731,16 @@ class NativePlaybackController(
             for (formatIndex in 0 until group.length) {
                 if (!group.isTrackSupported(formatIndex)) continue
                 val format = group.getTrackFormat(formatIndex)
-                val isExternal = format.id?.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX) == true
+                val stableId = format.id?.takeIf { it.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX) }
                 tracks.add(
                     NativeTrack(
                         // Only our own ext: ids are stable across rebuilds; anything else
                         // (embedded, in-band manifest ids) keeps positional identity.
-                        id = if (isExternal) format.id else "$groupIndex:$formatIndex",
+                        id = stableId ?: "$groupIndex:$formatIndex",
                         index = groupIndex,
                         language = format.language?.takeIf { it.isNotBlank() },
                         title = format.label?.takeIf { it.isNotBlank() },
-                        isExternal = isExternal,
+                        isExternal = stableId != null,
                     )
                 )
             }
