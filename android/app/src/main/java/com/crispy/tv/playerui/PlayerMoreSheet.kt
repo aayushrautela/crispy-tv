@@ -38,8 +38,6 @@ import com.crispy.tv.home.HomeCatalogPosterCard
 @Composable
 internal fun PlayerMoreSheet(
     visible: Boolean,
-    section: MoreSection,
-    collectionName: String?,
     collectionItems: List<CatalogItem>,
     recommendedItems: List<CatalogItem>,
     moreIsLoading: Boolean,
@@ -90,22 +88,14 @@ internal fun PlayerMoreSheet(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                val header =
-                    when (section) {
-                        MoreSection.COLLECTION -> collectionName ?: "Franchise Collection"
-                        MoreSection.RECOMMENDED -> "More like this"
-                    }
                 Text(
-                    text = header,
+                    text = "More",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                 )
 
-                val items =
-                    when (section) {
-                        MoreSection.COLLECTION -> collectionItems
-                        MoreSection.RECOMMENDED -> recommendedItems
-                    }
+                val collectionIds = collectionItems.mapTo(HashSet()) { "${it.type}:${it.id}" }
+                val items = collectionItems + recommendedItems.filter { "${it.type}:${it.id}" !in collectionIds }
                 when {
                     moreIsLoading && items.isEmpty() -> {
                         Text(

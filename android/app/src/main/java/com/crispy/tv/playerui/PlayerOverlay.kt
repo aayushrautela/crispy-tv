@@ -70,8 +70,7 @@ internal fun PlayerOverlay(
     onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
     onSelectEpisode: (String) -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onShowMoreCollection: () -> Unit,
-    onShowMoreRecommended: () -> Unit,
+    onShowMore: () -> Unit,
     onOpenTitle: (CatalogItem) -> Unit,
     onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
@@ -259,27 +258,16 @@ internal fun PlayerOverlay(
                                 onClick = { openSurface(onShowEpisodes) },
                             ),
                         )
-                    } else {
-                        buildList {
-                            if (uiState.collectionItems.isNotEmpty()) {
-                                add(
-                                    PlayerActionPill(
-                                        label = "Collection",
-                                        thumbUrl = uiState.collectionItems.first().artworkUrl,
-                                        onClick = { openSurface(onShowMoreCollection) },
-                                    ),
-                                )
-                            }
-                            if (uiState.recommendedItems.isNotEmpty()) {
-                                add(
-                                    PlayerActionPill(
-                                        label = "More like this",
-                                        thumbUrl = uiState.recommendedItems.first().artworkUrl,
-                                        onClick = { openSurface(onShowMoreRecommended) },
-                                    ),
-                                )
-                            }
-                        }
+                    } else if (uiState.collectionItems.isNotEmpty() || uiState.recommendedItems.isNotEmpty()) {
+                        listOf(
+                            PlayerActionPill(
+                                label = "More",
+                                thumbUrl =
+                                    uiState.collectionItems.firstOrNull()?.artworkUrl
+                                        ?: uiState.recommendedItems.first().artworkUrl,
+                                onClick = { openSurface(onShowMore) },
+                            ),
+                        )
                     }
 
                 PlayerBottomControls(
@@ -345,8 +333,6 @@ internal fun PlayerOverlay(
 
         PlayerMoreSheet(
             visible = uiState.activeSurface == PlayerSurface.MORE,
-            section = uiState.moreSection,
-            collectionName = uiState.collectionName,
             collectionItems = uiState.collectionItems,
             recommendedItems = uiState.recommendedItems,
             moreIsLoading = uiState.moreIsLoading,

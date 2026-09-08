@@ -223,8 +223,7 @@ fun PlayerRoute(
                 onSelectAddonSubtitle = session::selectAddonSubtitle,
                 onSelectEpisode = session::showStreamsForEpisode,
                 onSeasonSelected = session::onSeasonSelected,
-                onShowMoreCollection = session::showMoreCollection,
-                onShowMoreRecommended = session::showMoreRecommended,
+                onShowMore = session::showMore,
                 onOpenTitle = onOpenTitle,
                 onCycleResizeMode = {
                     val next = uiState.resizeMode.next()

@@ -78,11 +78,6 @@ enum class PlayerSurface {
     SUBTITLES,
 }
 
-enum class MoreSection {
-    COLLECTION,
-    RECOMMENDED,
-}
-
 @Immutable
 data class PlayerUiState(
     val title: String,
@@ -105,8 +100,6 @@ data class PlayerUiState(
     val seasonEpisodes: List<MediaVideo> = emptyList(),
     val episodesIsLoading: Boolean = false,
     val episodesStatusMessage: String = "",
-    val moreSection: MoreSection = MoreSection.RECOMMENDED,
-    val collectionName: String? = null,
     val collectionItems: List<CatalogItem> = emptyList(),
     val recommendedItems: List<CatalogItem> = emptyList(),
     val moreIsLoading: Boolean = false,
@@ -386,20 +379,12 @@ class PlayerSessionViewModel(
         }
     }
 
-    fun showMoreCollection() {
-        showMore(MoreSection.COLLECTION)
-    }
-
-    fun showMoreRecommended() {
-        showMore(MoreSection.RECOMMENDED)
-    }
-
-    private fun showMore(section: MoreSection) {
+    fun showMore() {
         val details = _uiState.value.details ?: return
         if (!details.itemType.equals("movie", ignoreCase = true)) return
         selectorCoordinator.dismiss()
         _uiState.update { state ->
-            state.copy(activeSurface = PlayerSurface.MORE, moreSection = section)
+            state.copy(activeSurface = PlayerSurface.MORE)
         }
     }
 
@@ -887,7 +872,6 @@ class PlayerSessionViewModel(
             _uiState.update {
                 it.copy(
                     moreIsLoading = false,
-                    collectionName = extras.collectionName?.trim()?.takeIf { name -> name.isNotBlank() },
                     collectionItems = collection,
                     recommendedItems = recommended,
                 )
