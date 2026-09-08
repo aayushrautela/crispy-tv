@@ -1,5 +1,6 @@
 package com.crispy.tv.sync
 
+import android.util.Log
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
@@ -19,12 +20,17 @@ internal class HouseholdAddonsCloudSync(
             try {
                 supabase.ensureValidSession()
             } catch (t: Throwable) {
+                Log.w(LOG_TAG, "pull aborted: session refresh failed: ${t.message}")
                 return Result.failure(t)
             }
-        if (session == null) return Result.success(Unit)
+        if (session == null) {
+            Log.i(LOG_TAG, "pull skipped: no active session")
+            return Result.success(Unit)
+        }
 
         return try {
             val dtos = backend.listAddons(session.accessToken)
+            Log.i(LOG_TAG, "pull: ${dtos.size} server addon row(s)")
             val localRows = dtos.mapIndexedNotNull { index, dto ->
                 toLocalRow(dto)?.let { row ->
                     CloudAddonRow(
@@ -34,8 +40,11 @@ internal class HouseholdAddonsCloudSync(
                 }
             }
             addonRegistry.reconcileCloudAddons(localRows)
-            merge(pluginSyncBridge?.reconcilePull(dtos))
+            val result = merge(pluginSyncBridge?.reconcilePull(dtos))
+            logOutcome("pull", result)
+            result
         } catch (t: Throwable) {
+            Log.w(LOG_TAG, "pull failed: ${t.message}")
             Result.failure(t)
         }
     }
@@ -45,14 +54,22 @@ internal class HouseholdAddonsCloudSync(
             try {
                 supabase.ensureValidSession()
             } catch (t: Throwable) {
+                Log.w(LOG_TAG, "push aborted: session refresh failed: ${t.message}")
                 return Result.failure(t)
             }
-        if (session == null) return Result.success(Unit)
+        if (session == null) {
+            Log.i(LOG_TAG, "push skipped: no active session")
+            return Result.success(Unit)
+        }
 
         val profileId = activeProfileStore.getActiveProfileId(session.userId)?.trim().orEmpty()
+        if (profileId.isBlank()) {
+            Log.w(LOG_TAG, "push: no active profile id; server will reject installs")
+        }
 
         return try {
             val serverAddons = backend.listAddons(session.accessToken)
+            Log.i(LOG_TAG, "push: ${serverAddons.size} server addon row(s), profile=${profileId.ifBlank { "<missing>" }}")
             val localRows = addonRegistry.exportCloudAddons()
 
             // Only reconcile addons this client knows about. Rows of other or
@@ -74,10 +91,19 @@ internal class HouseholdAddonsCloudSync(
                 }
             }
 
-            merge(pluginSyncBridge?.reconcilePush(session.accessToken, profileId, serverAddons))
+            val result = merge(pluginSyncBridge?.reconcilePush(session.accessToken, profileId, serverAddons))
+            logOutcome("push", result)
+            result
         } catch (t: Throwable) {
+            Log.w(LOG_TAG, "push failed: ${t.message}")
             Result.failure(t)
         }
+    }
+
+    private fun logOutcome(operation: String, result: Result<Unit>) {
+        result
+            .onSuccess { Log.i(LOG_TAG, "$operation completed") }
+            .onFailure { Log.w(LOG_TAG, "$operation failed: ${it.message.orEmpty()}") }
     }
 
     private fun merge(pluginResult: Result<Unit>?): Result<Unit> = when {
@@ -100,5 +126,6 @@ internal class HouseholdAddonsCloudSync(
 
     private companion object {
         const val ADDON_TYPE_STREMIO = "stremio"
+        private const val LOG_TAG = "CrispySync"
     }
 }

@@ -26,12 +26,15 @@ internal class FossPluginAddonsSyncBridge(
             .filter { it.type == ADDON_TYPE_JSPLUGIN }
             .groupBy({ it.manifestUrl.trim() }) { it.payload[KEY_PROVIDER_ID].orEmpty() }
 
+        Log.i(LOG_TAG, "sync pull start: ${serverAddons.size} server addon row(s), ${serverRowsByRepo.size} jsplugin repo(s)")
         serverRowsByRepo.keys.forEach { repoUrl ->
             val installed = repoClient.repos().any { it.url.equals(repoUrl, ignoreCase = true) }
             if (!installed && !repoClient.isRemoved(repoUrl)) {
                 repoClient.installSynced(repoUrl)
                     .onFailure { errors.add("install $repoUrl: ${it.message.orEmpty()}") }
                     .onSuccess { Log.i(LOG_TAG, "sync pull: installed repo $repoUrl") }
+            } else if (!installed) {
+                Log.i(LOG_TAG, "sync pull: skip tombstoned repo $repoUrl")
             }
         }
 
@@ -92,6 +95,11 @@ internal class FossPluginAddonsSyncBridge(
             }
         }
 
+        Log.i(
+            LOG_TAG,
+            "sync push start: ${localEnabled.size} local enabled scraper(s), ${serverPlugins.size} server jsplugin row(s), " +
+                "profile=${profileId.ifBlank { "<missing>" }}",
+        )
         localEnabled.forEach { local ->
             val exists = serverPlugins.any { dto ->
                 dto.manifestUrl.equals(local.repoUrl, ignoreCase = true) &&
@@ -110,7 +118,9 @@ internal class FossPluginAddonsSyncBridge(
                             KEY_VERSION to local.version,
                         ),
                     )
-                }.onFailure { errors.add("install ${local.providerId}: ${it.message.orEmpty()}") }
+                }
+                    .onSuccess { Log.i(LOG_TAG, "sync push: installed row ${local.providerId} (${local.repoUrl})") }
+                    .onFailure { errors.add("install ${local.providerId}: ${it.message.orEmpty()}") }
             }
         }
 
@@ -136,6 +146,10 @@ internal class FossPluginAddonsSyncBridge(
                     }
             }
         }
+        Log.i(
+            LOG_TAG,
+            "sync push done: ${if (errors.isEmpty()) "ok" else "errors: " + errors.joinToString("; ")}",
+        )
         return aggregate(errors)
     }
 
