@@ -2,8 +2,16 @@ package com.crispy.tv.playerui
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import com.crispy.tv.domain.player.TapSeekChain
+import com.crispy.tv.domain.player.TapSeekEvent
+import com.crispy.tv.domain.player.TapZone
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -13,7 +21,6 @@ internal const val VERTICAL_GESTURE_SENSITIVITY = 0.65f
 internal const val VERTICAL_GESTURE_SLOP_MULTIPLIER = 3f
 internal const val VERTICAL_GESTURE_MIN_HEIGHT_FRACTION = 0.06f
 internal const val VERTICAL_GESTURE_DOMINANCE_RATIO = 1.2f
-internal const val DOUBLE_TAP_SEEK_STEP_MS = 10_000L
 
 internal fun Modifier.playerVerticalDragGestures(
     gestureController: PlayerGestureController?,
@@ -98,16 +105,55 @@ internal fun Modifier.playerVerticalDragGestures(
     },
 )
 
+internal fun Modifier.playerTapGestures(
+    chain: TapSeekChain,
+    scope: CoroutineScope,
+    isSurfaceOpen: () -> Boolean,
+    positionMs: () -> Long,
+    durationMs: () -> Long,
+    onSurfaceTap: () -> Unit,
+    onEvents: (List<TapSeekEvent>) -> Unit,
+): Modifier = this.then(
+    Modifier.pointerInput(chain, scope) {
+        var commitJob: Job? = null
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+            if (isSurfaceOpen()) {
+                chain.reset()
+                commitJob?.cancel()
+                onSurfaceTap()
+                return@awaitEachGesture
+            }
+            val width = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
+            val zone = when {
+                up.position.x < width * LEFT_GESTURE_BOUNDARY -> TapZone.LEFT
+                up.position.x > width * RIGHT_GESTURE_BOUNDARY -> TapZone.RIGHT
+                else -> TapZone.CENTER
+            }
+            val nowMs = up.uptimeMillis
+            val events = chain.onTap(zone, positionMs(), durationMs(), nowMs)
+            onEvents(events)
+            if (events.any { it is TapSeekEvent.ChainStarted || it is TapSeekEvent.ChainExtended }) {
+                commitJob?.cancel()
+                commitJob = scope.launch {
+                    delay(chain.repeatWindowMs)
+                    onEvents(chain.commit(durationMs()))
+                }
+            }
+        }
+    },
+)
+
 internal fun formatGestureBrightness(level: Float): String =
     "${(level.coerceIn(0f, 1f) * 100f).roundToInt()}%"
 
 internal fun formatGestureVolume(level: PlayerGestureController.AudioLevel): String =
     if (level.isMuted) "Muted" else "${(level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()}%"
 
-internal fun playbackSeekDeltaLabel(targetMs: Long, currentMs: Long): String {
-    val delta = targetMs - currentMs
-    val seconds = abs(delta) / 1000L
-    return if (delta >= 0) "+${seconds}s" else "-${seconds}s"
+internal fun playbackSeekDeltaLabel(deltaMs: Long): String {
+    val seconds = abs(deltaMs) / 1000L
+    return if (deltaMs >= 0) "+${seconds}s" else "-${seconds}s"
 }
 
 private enum class GestureRegion {

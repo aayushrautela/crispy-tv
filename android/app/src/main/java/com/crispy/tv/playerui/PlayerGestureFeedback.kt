@@ -1,13 +1,19 @@
 package com.crispy.tv.playerui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
@@ -22,13 +28,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.domain.player.TapZone
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -110,6 +120,65 @@ internal data class GestureFeedbackMessage(
     val text: String,
     val icon: ImageVector,
 )
+
+internal data class SeekRippleState(
+    val side: TapZone,
+    val totalDeltaMs: Long,
+    val tapCount: Int,
+) {
+    val isForward: Boolean get() = totalDeltaMs >= 0
+}
+
+private val SEEK_RIPPLE_BASE_WIDTH = 72.dp
+private val SEEK_RIPPLE_STEP_WIDTH = 18.dp
+private val SEEK_RIPPLE_MAX_WIDTH = 160.dp
+
+@Composable
+internal fun SeekRippleOverlay(
+    state: SeekRippleState?,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = state != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier,
+    ) {
+        val ripple = state ?: return@AnimatedVisibility
+        val targetWidth = (SEEK_RIPPLE_BASE_WIDTH + (ripple.tapCount - 1) * SEEK_RIPPLE_STEP_WIDTH)
+            .coerceAtMost(SEEK_RIPPLE_MAX_WIDTH)
+        val width by animateDpAsState(targetWidth, label = "seekRippleWidth")
+        val gradient = if (ripple.isForward) {
+            Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.22f)))
+        } else {
+            Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.Transparent))
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier =
+                    Modifier
+                        .align(if (ripple.side == TapZone.LEFT) Alignment.CenterStart else Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(width)
+                        .background(brush = gradient),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = if (ripple.isForward) GestureIcons.Forward10 else GestureIcons.Backward10,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(36.dp),
+                )
+                Text(
+                    text = playbackSeekDeltaLabel(ripple.totalDeltaMs),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
 
 internal object GestureIcons {
     val Brightness = Icons.Filled.Brightness6

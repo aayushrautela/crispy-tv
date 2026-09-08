@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,16 +24,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
@@ -43,6 +41,8 @@ import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.domain.player.TapSeekChain
+import com.crispy.tv.domain.player.TapSeekEvent
 import com.crispy.tv.streams.StreamSelectorSheet
 import kotlinx.coroutines.delay
 
@@ -67,13 +67,12 @@ internal fun PlayerOverlay(
     onSelectAudioTrack: (String?) -> Unit,
     onSelectSubtitleTrack: (String?) -> Unit,
     onRefreshAddonSubtitles: () -> Unit,
-    onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
     onSelectEpisode: (String) -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onShowMore: () -> Unit,
     onOpenTitle: (CatalogItem) -> Unit,
     onCycleResizeMode: () -> Unit,
-    onDoubleTapSeek: (Long) -> Unit,
+    onCommitSeek: (targetMs: Long, totalDeltaMs: Long) -> Unit,
 ) {
     val overlayPadding = rememberOverlayPadding(minPadding = 12.dp)
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
@@ -89,11 +88,17 @@ internal fun PlayerOverlay(
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
     var controlsResetToken by remember { mutableStateOf(0) }
     var showLoadingCurtain by remember { mutableStateOf(uiState.isBuffering) }
+    var seekRipple by remember { mutableStateOf<SeekRippleState?>(null) }
+
+    val doubleTapTimeoutMs = LocalView.current.viewConfiguration.doubleTapTimeoutMillis
+    val seekChain = remember(doubleTapTimeoutMs) { TapSeekChain(doubleTapWindowMs = doubleTapTimeoutMs) }
+    val tapGestureScope = rememberCoroutineScope()
 
     val latestOnBack by rememberUpdatedState(onBack)
     val latestOnTogglePlayPause by rememberUpdatedState(onTogglePlayPause)
     val latestOnSeekTo by rememberUpdatedState(onSeekTo)
-    val latestOnDoubleTapSeek by rememberUpdatedState(onDoubleTapSeek)
+    val latestOnCommitSeek by rememberUpdatedState(onCommitSeek)
+    val latestDurationMs by rememberUpdatedState(effectiveDurationMs)
 
     fun resetControlsTimer() {
         controlsResetToken += 1
@@ -106,8 +111,7 @@ internal fun PlayerOverlay(
     }
 
     val isSurfaceOpen = uiState.activeSurface != PlayerSurface.NONE || selectorState.visible
-
-    var layoutWidthPx by remember { mutableIntStateOf(0) }
+    val latestIsSurfaceOpen by rememberUpdatedState(isSurfaceOpen)
 
     BackHandler(enabled = isSurfaceOpen) {
         onCloseSurface()
@@ -144,50 +148,47 @@ internal fun PlayerOverlay(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .onGloballyPositioned { coordinates ->
-                        val width = coordinates.size.width
-                        if (width > 0 && width != layoutWidthPx) {
-                            layoutWidthPx = width
-                        }
-                    }
-                    .pointerInput(isSurfaceOpen, controlsVisible, layoutWidthPx) {
-                        detectTapGestures(
-                            onTap = {
-                                if (isSurfaceOpen) {
-                                    onCloseSurface()
-                                    return@detectTapGestures
-                                }
-
-                                controlsVisible = !controlsVisible
-                                if (controlsVisible) {
-                                    resetControlsTimer()
-                                }
-                            },
-                            onDoubleTap = { offset ->
-                                if (isSurfaceOpen) return@detectTapGestures
-                                if (layoutWidthPx <= 0) return@detectTapGestures
-                                val positionMs = positionMsState.value.coerceAtLeast(0L)
-                                val maxMs = effectiveDurationMs.takeIf { it > 0L }
-                                val targetMs = when {
-                                    offset.x < layoutWidthPx * LEFT_GESTURE_BOUNDARY ->
-                                        (positionMs - DOUBLE_TAP_SEEK_STEP_MS).coerceAtLeast(0L)
-                                    offset.x > layoutWidthPx * RIGHT_GESTURE_BOUNDARY -> {
-                                        val unclamped = positionMs + DOUBLE_TAP_SEEK_STEP_MS
-                                        maxMs?.let { unclamped.coerceAtMost(it) } ?: unclamped
+                    .playerTapGestures(
+                        chain = seekChain,
+                        scope = tapGestureScope,
+                        isSurfaceOpen = { latestIsSurfaceOpen },
+                        positionMs = { positionMsState.value.coerceAtLeast(0L) },
+                        durationMs = { latestDurationMs },
+                        onSurfaceTap = onCloseSurface,
+                        onEvents = { events ->
+                            for (event in events) {
+                                when (event) {
+                                    TapSeekEvent.ToggleControls -> {
+                                        controlsVisible = !controlsVisible
+                                        if (controlsVisible) resetControlsTimer()
                                     }
-                                    else -> return@detectTapGestures
+                                    TapSeekEvent.RevertControls -> controlsVisible = !controlsVisible
+                                    is TapSeekEvent.ChainStarted -> {
+                                        controlsVisible = false
+                                        seekRipple = SeekRippleState(event.side, event.pendingDeltaMs, event.count)
+                                    }
+                                    is TapSeekEvent.ChainExtended -> {
+                                        seekRipple = SeekRippleState(event.side, event.pendingDeltaMs, event.count)
+                                    }
+                                    is TapSeekEvent.ChainCommitted -> {
+                                        seekRipple = null
+                                        latestOnCommitSeek(event.targetMs, event.totalDeltaMs)
+                                    }
                                 }
-                                latestOnDoubleTapSeek(targetMs)
-                                controlsVisible = false
-                            },
-                        )
-                    },
+                            }
+                        },
+                    ),
         )
 
         PlayerLoadingCurtain(
             visible = showLoadingCurtain,
             palette = palette,
             modifier = Modifier.align(Alignment.Center),
+        )
+
+        SeekRippleOverlay(
+            state = seekRipple,
+            modifier = Modifier.fillMaxSize(),
         )
 
         AnimatedVisibility(
@@ -380,7 +381,6 @@ internal fun PlayerOverlay(
             addonSubtitles = uiState.addonSubtitles,
             addonSubtitlesLoading = uiState.addonSubtitlesLoading,
             addonSubtitlesError = uiState.addonSubtitlesError,
-            selectedAddonSubtitleId = uiState.selectedAddonSubtitleId,
             palette = palette,
             onSelectSubtitleTrack = {
                 resetControlsTimer()
@@ -389,10 +389,6 @@ internal fun PlayerOverlay(
             onRefreshAddonSubtitles = {
                 resetControlsTimer()
                 onRefreshAddonSubtitles()
-            },
-            onSelectAddonSubtitle = { subtitle ->
-                resetControlsTimer()
-                onSelectAddonSubtitle(subtitle)
             },
             onDismiss = onCloseSurface,
         )

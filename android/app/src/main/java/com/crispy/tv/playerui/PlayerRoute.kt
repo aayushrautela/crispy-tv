@@ -220,7 +220,6 @@ fun PlayerRoute(
                 onSelectAudioTrack = session::selectAudioTrack,
                 onSelectSubtitleTrack = session::selectSubtitleTrack,
                 onRefreshAddonSubtitles = session::refreshAddonSubtitles,
-                onSelectAddonSubtitle = session::selectAddonSubtitle,
                 onSelectEpisode = session::showStreamsForEpisode,
                 onSeasonSelected = session::onSeasonSelected,
                 onShowMore = session::showMore,
@@ -237,16 +236,8 @@ fun PlayerRoute(
                         holdMs = 900,
                     )
                 },
-                onDoubleTapSeek = { targetMs ->
+                onCommitSeek = { targetMs, _ ->
                     session.seekTo(targetMs)
-                    gestureFeedback.show(
-                        scope,
-                        GestureFeedbackMessage(
-                            text = playbackSeekDeltaLabel(targetMs, positionMsState.value),
-                            icon = if (targetMs >= positionMsState.value) GestureIcons.Forward10 else GestureIcons.Backward10,
-                        ),
-                        holdMs = 900,
-                    )
                 },
             )
 
