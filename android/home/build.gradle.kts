@@ -1,10 +1,9 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
-    namespace = "com.crispy.tv.ui.assets"
+    namespace = "com.crispy.tv.home"
     compileSdk = 37
 
     defaultConfig {
@@ -16,17 +15,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-
-    buildFeatures {
-        compose = true
-    }
 }
 
 dependencies {
+    implementation(project(":android:core-domain"))
+    implementation(project(":android:backend"))
+    implementation(project(":android:addons"))
+    implementation(project(":android:player"))
+
     implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.runtime:runtime")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.animation:animation")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }

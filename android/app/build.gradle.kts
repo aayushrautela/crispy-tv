@@ -142,6 +142,7 @@ android {
 
 dependencies {
     implementation(project(":android:core-domain"))
+    implementation(project(":android:home"))
     implementation(project(":android:player"))
     implementation(project(":android:native-engine"))
     implementation(project(":android:network"))

@@ -1,11 +1,11 @@
 package com.crispy.tv.home
 
-internal data class CatalogSectionLayoutMeta(
+data class CatalogSectionLayoutMeta(
     val key: String,
     val layout: String,
 )
 
-internal fun buildHomeLayoutState(
+fun buildHomeLayoutState(
     wideRails: Map<String, HomeWideRailSectionUi>,
     catalogSectionLayoutMeta: List<CatalogSectionLayoutMeta>,
 ): HomeLayoutState {

@@ -3,7 +3,7 @@ package com.crispy.tv.home
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
 
-internal class HomeRefreshCoordinator(
+class HomeRefreshCoordinator(
     private val homeCatalogService: HomeCatalogService,
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,

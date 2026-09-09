@@ -8,7 +8,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-internal class RecommendationCatalogDiskCacheStore(appContext: Context) {
+class RecommendationCatalogDiskCacheStore(appContext: Context) {
     private val cacheDirectory = appContext.filesDir.resolve(CACHE_DIRECTORY_NAME).also { directory ->
         if (!directory.exists()) {
             directory.mkdirs()

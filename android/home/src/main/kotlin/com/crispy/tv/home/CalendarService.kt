@@ -78,7 +78,7 @@ data class ThisWeekResult(
     val isError: Boolean = false,
 )
 
-class CalendarService internal constructor(
+class CalendarService constructor(
     private val backendClient: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
 ) {

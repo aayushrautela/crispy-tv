@@ -11,18 +11,6 @@ internal const val IMAGE_SETTINGS_PREFS_NAME = "image_settings"
 internal const val IMAGE_SETTINGS_KEY_QUALITY = "image_quality"
 private const val DEFAULT_IMAGE_QUALITY = "medium"
 
-enum class ImageQuality(val displayName: String, val key: String) {
-    LOW("Low", "low"),
-    MEDIUM("Medium", "medium"),
-    HIGH("High", "high");
-
-    companion object {
-        fun fromKey(key: String?): ImageQuality {
-            return entries.firstOrNull { it.key == key } ?: MEDIUM
-        }
-    }
-}
-
 data class ImageSettings(
     val quality: ImageQuality = ImageQuality.fromKey(DEFAULT_IMAGE_QUALITY),
 )

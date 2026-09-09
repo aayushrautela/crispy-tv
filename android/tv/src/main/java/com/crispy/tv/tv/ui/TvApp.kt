@@ -1,12 +1,14 @@
 package com.crispy.tv.tv.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -17,16 +19,16 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import android.app.Application
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import com.crispy.tv.ui.brand.CrispyIntroSplash
+import kotlinx.coroutines.delay
 import com.crispy.tv.tv.player.TvPlayerViewModel
 import com.crispy.tv.tv.sources.TvSourcesViewModel
 import com.crispy.tv.tv.ui.screens.player.TvPlayerScreen
 import com.crispy.tv.tv.ui.sources.TvSourcesScreen
-import com.crispy.tv.tv.home.HomeViewModel
+import com.crispy.tv.tv.home.TvHomeViewModel
 import com.crispy.tv.tv.session.TvSessionState
 import com.crispy.tv.tv.session.TvSessionViewModel
 import com.crispy.tv.tv.ui.components.SidebarNavigation
@@ -40,33 +42,37 @@ import com.crispy.tv.tv.ui.screens.SettingsScreen
 import com.crispy.tv.tv.ui.screens.auth.ProfilePickerScreen
 import com.crispy.tv.tv.ui.screens.auth.SignInScreen
 
+private const val IntroTimeoutMs = 3_000L
+
 @Composable
 fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
     val session by sessionViewModel.state.collectAsStateWithLifecycle()
+    var introDone by rememberSaveable { mutableStateOf(false) }
 
-    when (val s = session) {
-        TvSessionState.Loading -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Loading…",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    LaunchedEffect(Unit) {
+        delay(IntroTimeoutMs)
+        introDone = true
+    }
+
+    // Hold the splash until the intro has played through even if session
+    // resolution finishes first; afterwards the finished frame holds.
+    when {
+        session == TvSessionState.Loading || !introDone -> {
+            CrispyIntroSplash(
+                playIntro = !introDone,
+                onFinished = { introDone = true },
+            )
         }
         is TvSessionState.SignedOut -> {
             val signInInFlight by sessionViewModel.signInInFlight.collectAsStateWithLifecycle()
             val signInError by sessionViewModel.signInError.collectAsStateWithLifecycle()
             val deviceLogin by sessionViewModel.deviceLoginState.collectAsStateWithLifecycle()
+            val configError = (session as? TvSessionState.SignedOut)?.configError
             LaunchedEffect(Unit) {
                 sessionViewModel.startDeviceLogin()
             }
             SignInScreen(
-                configError = s.configError,
+                configError = configError,
                 inFlight = signInInFlight,
                 error = signInError,
                 onSignIn = sessionViewModel::signIn,
@@ -78,7 +84,7 @@ fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
         }
         is TvSessionState.NeedsProfile -> {
             ProfilePickerScreen(
-                profiles = s.profiles,
+                profiles = (session as? TvSessionState.NeedsProfile)?.profiles.orEmpty(),
                 onSelect = sessionViewModel::selectProfile,
             )
         }
@@ -95,7 +101,13 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val selected = TvDestination.fromRoute(backStackEntry?.destination?.route)
-    val homeViewModel: HomeViewModel = viewModel()
+    val appContext = LocalContext.current.applicationContext
+    val homeViewModel: TvHomeViewModel = viewModel(
+        factory = TvHomeViewModel.factory(appContext),
+    )
+    LaunchedEffect(homeViewModel) {
+        homeViewModel.ensureLoaded()
+    }
 
     Row(
         modifier = Modifier
@@ -124,8 +136,7 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     viewModel = homeViewModel,
                     onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
                 )
-            }
-            composable(
+            }            composable(
                 "sources/{itemId}/{mediaType}/{lookupId}",
                 arguments = listOf(
                     navArgument("itemId") { type = NavType.StringType },

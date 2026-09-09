@@ -7,6 +7,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.crispy.tv.backend.PlaybackEventInput
+import com.crispy.tv.home.HomeRefreshBus
+import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.tv.di.TvServices
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,6 +83,7 @@ class TvPlayerViewModel(
     override fun onCleared() {
         runCatching { reportProgress(snapshot = true, completed = true) }
         player.release()
+        HomeRefreshBus.emit(HomeRefreshEvent.PlaybackEnded)
         super.onCleared()
     }
 

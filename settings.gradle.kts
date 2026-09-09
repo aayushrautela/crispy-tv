@@ -19,6 +19,7 @@ rootProject.name = "crispy-rewrite"
 
 include(":android:app")
 include(":android:tv")
+include(":android:home")
 include(":android:core-domain")
 include(":android:contract-tests")
 include(":android:player")

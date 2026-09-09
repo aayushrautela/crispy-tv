@@ -13,13 +13,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composableimport androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -30,6 +29,8 @@ import com.crispy.tv.ui.assets.R
 
 private const val IntroDurationMs = 1200
 private const val RevealVisibilityThreshold = 0.01f
+
+private val IntroBackground: Color = Color(0xFF141414)
 
 private val EnterEasing: Easing = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
@@ -119,7 +120,7 @@ fun CrispyIntroSplash(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(IntroBackground),
         contentAlignment = Alignment.Center,
     ) {
         Row(

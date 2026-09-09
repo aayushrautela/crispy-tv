@@ -11,6 +11,8 @@ import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource
+import com.crispy.tv.home.HomeRefreshBus
+import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.tv.di.TvServices
@@ -428,6 +430,8 @@ class DetailViewModel(
             _state.value = _state.value.copy(isInWatchlist = target)
             runCatching {
                 TvServices.watchHistoryService(appContext).setTitleInWatchlist(itemId, target)
+            }.onSuccess { result ->
+                if (result.accepted) HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
             }
         }
     }

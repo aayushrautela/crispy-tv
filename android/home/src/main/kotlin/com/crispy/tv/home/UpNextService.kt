@@ -6,7 +6,7 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import java.time.Instant
 
-class UpNextService internal constructor(
+class UpNextService constructor(
     private val backendClient: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
 ) {

@@ -65,7 +65,7 @@ data class HomePrimaryFeedLoadResult(
     val sectionsStatusMessage: String = "",
 )
 
-class HomeCatalogService internal constructor(
+class HomeCatalogService constructor(
     private val backendClient: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
     private val diskCacheStore: RecommendationCatalogDiskCacheStore,
