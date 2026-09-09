@@ -24,6 +24,7 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import com.crispy.tv.MainActivity
 import com.crispy.tv.R
+import com.crispy.tv.ui.assets.R as AssetsR
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -266,7 +267,7 @@ internal class PlayerMediaSessionManager private constructor(
 
         val notification =
             NotificationCompat.Builder(appContext, NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+                .setSmallIcon(AssetsR.mipmap.ic_launcher_monochrome)
                 .setContentTitle(currentTitle)
                 .setContentText(currentSubtitle)
                 .setContentIntent(buildContentPendingIntent())

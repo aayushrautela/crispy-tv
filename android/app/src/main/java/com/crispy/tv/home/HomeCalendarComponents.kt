@@ -231,7 +231,7 @@ private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {
         season != null && episode != null -> "S$season E$episode"
         item.episodeRange != null -> item.episodeRange
         episode != null -> "Episode $episode"
-        item.releaseDate != null -> item.releaseDate.take(10)
+        item.releaseDate != null -> item.releaseDate.orEmpty().take(10)
         else -> "Upcoming episode"
     }
 }
