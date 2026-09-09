@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -132,6 +133,7 @@ internal data class SeekRippleState(
 @Composable
 internal fun SeekRippleOverlay(
     state: SeekRippleState?,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -142,7 +144,7 @@ internal fun SeekRippleOverlay(
     ) {
         val ripple = state ?: return@AnimatedVisibility
         val density = LocalDensity.current
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             val zoneInset = maxWidth * 0.10f
             val chevronStepPx = with(density) { 32.dp.toPx() }
             val slide = remember { Animatable(0f) }

@@ -188,6 +188,7 @@ internal fun PlayerOverlay(
 
         SeekRippleOverlay(
             state = seekRipple,
+            contentPadding = tightBottomPadding,
             modifier = Modifier.fillMaxSize(),
         )
 
