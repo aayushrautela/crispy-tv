@@ -21,7 +21,6 @@ import com.crispy.tv.home.HeroState
 import com.crispy.tv.home.RailLoadState
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.UpNextService
-import com.crispy.tv.home.WatchHistoryService
 import com.crispy.tv.home.buildHomeLayoutState
 import com.crispy.tv.home.continueWatchingContentKey
 import com.crispy.tv.home.sectionKey

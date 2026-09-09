@@ -332,7 +332,7 @@ private fun HomeWideRailBlock(
                         item.continueWatchingItem != null
                     TvWideRailCard(
                         item = item,
-                        onClick = { item.detailsItemId?.let(onOpenDetails) },
+                        onClick = { item.detailsItemId?.let { onOpenDetails(item) } },
                         onLongClick = if (canRemove) {
                             { onToggleActions(item.key) }
                         } else {
