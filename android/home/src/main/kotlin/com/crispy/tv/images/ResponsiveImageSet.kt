@@ -30,6 +30,14 @@ data class ResponsiveImageSet(
     }
 }
 
+fun CrispyBackendClient.ResponsiveImageSet.toUiResponsiveImageSet(): ResponsiveImageSet {
+    return ResponsiveImageSet(
+        low = small,
+        medium = medium,
+        high = large,
+    )
+}
+
 internal fun CrispyBackendClient.ResponsiveImageSet.toDomainMap(): Map<String, String?> {
     return mapOf(
         "small" to small,
