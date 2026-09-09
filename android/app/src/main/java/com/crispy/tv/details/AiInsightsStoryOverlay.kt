@@ -5,6 +5,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -29,16 +33,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -70,6 +77,11 @@ private val SlideDisplayOrder =
         AiInsightSlideKey.THE_CATCH,
         AiInsightSlideKey.TRIVIA,
     )
+
+private const val ShapeRotationPeriodMs = 14_000
+
+/** Extra scale so the counter-rotated image keeps covering the shape corners. */
+private const val CounterRotationOverscan = 1.45f
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -172,7 +184,9 @@ internal fun AiInsightsStoryOverlay(
                 ) { pageIndex ->
                     val slide = slides[pageIndex.coerceIn(0, slides.lastIndex)]
                     val imageUrl =
-                        if (slide.key == AiInsightSlideKey.STANDOUT_ELEMENT) {
+                        if (slide.key == AiInsightSlideKey.STANDOUT_ELEMENT ||
+                            slide.key == AiInsightSlideKey.TRIVIA
+                        ) {
                             resolveSlideImageUrl(
                                 slide = slide,
                                 cyclingBackdropUrl =
@@ -232,10 +246,9 @@ private fun AiInsightsStorySlide(
                 palette = palette,
             )
         AiInsightSlideKey.TRIVIA ->
-            AiInsightsMoodSlide(
-                labelText = slide.label.ifBlank { "Did you know?" },
-                bodyText = slide.body ?: slide.context,
-                moodIcon = Icons.Outlined.Lightbulb,
+            AiInsightsTriviaSlide(
+                slide = slide,
+                imageUrl = imageUrl,
                 palette = palette,
             )
         AiInsightSlideKey.UNKNOWN ->
@@ -268,7 +281,6 @@ private fun AiInsightsStandoutSlide(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AiInsightsKicker(text = slide.label, palette = palette)
             slide.focus?.let { focus ->
                 Text(
                     text = focus,
@@ -279,11 +291,132 @@ private fun AiInsightsStandoutSlide(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            slide.context?.let { context ->
+                Text(
+                    text = context,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = palette.onPageBackground.copy(alpha = 0.80f),
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
 
-/** Good/catch/trivia pages: large muted icon, consistent kicker + headline text below. */
+/** Fun fact page: backdrop cropped into a slowly rotating 4-leaf clover, headline text below. */
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun AiInsightsTriviaSlide(
+    slide: AiInsightSlide,
+    imageUrl: String?,
+    palette: DetailsPaletteColors,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = true),
+            contentAlignment = Alignment.Center,
+        ) {
+            AiInsightsRotatingBackdrop(
+                imageUrl = imageUrl,
+                shape = MaterialShapes.Clover4Leaf.toShape(),
+                palette = palette,
+                modifier = Modifier.size(252.dp),
+            )
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AiInsightsKicker(text = slide.label.ifBlank { "Did you know?" }, palette = palette)
+            val bodyText = slide.body ?: slide.context
+            if (!bodyText.isNullOrBlank()) {
+                Text(
+                    text = bodyText,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = palette.onPageBackground,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Backdrop image clipped to [shape] while ONLY the clipping silhouette rotates slowly:
+ * the container rotates with an infinite transition and the image counter-rotates
+ * (with overscan) so its content stays perfectly still underneath the moving crop.
+ */
+@Composable
+private fun AiInsightsRotatingBackdrop(
+    imageUrl: String?,
+    shape: Shape,
+    palette: DetailsPaletteColors,
+    modifier: Modifier = Modifier,
+) {
+    val rotationDegrees = rememberSlowRotationDegrees()
+    Box(
+        modifier =
+            modifier
+                .graphicsLayer { rotationZ = rotationDegrees }
+                .clip(shape)
+                .background(palette.pillBackground.copy(alpha = 0.88f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        val url = imageUrl.normalizedUrl()
+        if (url != null) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            rotationZ = -rotationDegrees
+                            scaleX = CounterRotationOverscan
+                            scaleY = CounterRotationOverscan
+                        },
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = palette.onPillBackground.copy(alpha = 0.70f),
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .graphicsLayer { rotationZ = -rotationDegrees },
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberSlowRotationDegrees(): Float {
+    val transition = rememberInfiniteTransition(label = "ai_insights_shape_rotation")
+    val rotation =
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = ShapeRotationPeriodMs, easing = LinearEasing),
+                ),
+            label = "ai_insights_shape_rotation_degrees",
+        )
+    return rotation.value
+}
+
+/** Good/catch pages: large muted icon, consistent kicker + headline text below. */
 @Composable
 private fun AiInsightsMoodSlide(
     labelText: String,
