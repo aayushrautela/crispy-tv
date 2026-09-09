@@ -50,11 +50,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.AlertDialog
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme as M3MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.darkColorScheme
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import androidx.tv.material3.TextButton
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -217,7 +219,7 @@ fun HomeScreen(
                                                 actionsItemKey = if (actionsItemKey == key) null else key
                                             },
                                             onOpenDetails = { item ->
-                                                item.detailsItemId?.takeIf { it.isNotBlank() }?.let(onOpenItem)
+                                                item.detailsItemId?.let(onOpenItem)
                                             },
                                             onRemove = { item ->
                                                 item.continueWatchingItem?.let(viewModel::removeContinueWatchingItem)
@@ -330,7 +332,7 @@ private fun HomeWideRailBlock(
                         item.continueWatchingItem != null
                     TvWideRailCard(
                         item = item,
-                        onClick = { item.detailsItemId?.takeIf { it.isNotBlank() }?.let(onOpenDetails) },
+                        onClick = { item.detailsItemId?.let(onOpenDetails) },
                         onLongClick = if (canRemove) {
                             { onToggleActions(item.key) }
                         } else {
@@ -369,30 +371,31 @@ private fun TvWideRailItemActionsDialog(
     onOpenDetails: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    AlertDialog(
-        show = true,
-        onDismissRequest = onDismiss,
-        title = { Text(text = item.title) },
-        text = {
-            Text(
-                text = listOfNotNull(
-                    item.subtitle.takeIf { it.isNotBlank() },
-                    item.badgeLabel,
-                ).joinToString(" · ").ifBlank { item.title },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        confirmButton = {
-            Button(onClick = onOpenDetails) { Text(text = "Open details") }
-        },
-        dismissButton = {
-            if (showRemove) {
-                TextButton(onClick = onRemove) { Text(text = "Remove") }
-            } else {
-                TextButton(onClick = onDismiss) { Text(text = "Cancel") }
-            }
-        },
-    )
+    M3MaterialTheme(colorScheme = darkColorScheme()) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(text = item.title) },
+            text = {
+                Text(
+                    text = listOfNotNull(
+                        item.subtitle.takeIf { it.isNotBlank() },
+                        item.badgeLabel,
+                    ).joinToString(" · ").ifBlank { item.title },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                Button(onClick = onOpenDetails) { Text(text = "Open details") }
+            },
+            dismissButton = {
+                if (showRemove) {
+                    TextButton(onClick = onRemove) { Text(text = "Remove") }
+                } else {
+                    TextButton(onClick = onDismiss) { Text(text = "Cancel") }
+                }
+            },
+        )
+    }
 }
 
 @Composable

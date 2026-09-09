@@ -24,7 +24,9 @@ import com.crispy.tv.home.UpNextService
 import com.crispy.tv.home.WatchHistoryService
 import com.crispy.tv.home.buildHomeLayoutState
 import com.crispy.tv.home.continueWatchingContentKey
+import com.crispy.tv.home.sectionKey
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.tv.di.TvServices
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import kotlinx.coroutines.CancellationException
@@ -153,7 +155,7 @@ class TvHomeViewModel internal constructor(
                 if (item.id.isNotBlank()) {
                     watchHistoryService.removeFromPlayback(playbackId = item.id.trim())
                 } else {
-                    com.crispy.tv.player.WatchHistoryResult(accepted = true, statusMessage = "")
+                    com.crispy.tv.player.WatchHistoryResult(statusMessage = "", accepted = true)
                 }
             if (!removalResult.accepted) {
                 _errorEvents.tryEmit(removalResult.statusMessage.ifBlank { "Unable to remove this item." })

@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
@@ -121,20 +120,19 @@ fun TvRailHeader(
                 )
             }
             if (!skeleton && onViewAllClick != null) {
-                Surface(
-                    onClick = onViewAllClick,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                Box(
                     modifier = Modifier
                         .width(36.dp)
-                        .height(36.dp),
+                        .height(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(onClick = onViewAllClick),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "See all",
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "See all",
+                    )
                 }
             }
         }
@@ -204,19 +202,19 @@ fun TvWideRailCard(
         )
 
         if (!item.badgeLabel.isNullOrBlank()) {
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = Color.Black.copy(alpha = 0.65f),
-                contentColor = Color.White,
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(12.dp),
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.Black.copy(alpha = 0.65f)),
             ) {
                 Text(
                     text = item.badgeLabel.orEmpty(),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
                 )
             }
         }

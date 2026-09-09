@@ -63,7 +63,7 @@ fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
                 onFinished = { introDone = true },
             )
         }
-        is TvSessionState.SignedOut -> {
+        session is TvSessionState.SignedOut -> {
             val signInInFlight by sessionViewModel.signInInFlight.collectAsStateWithLifecycle()
             val signInError by sessionViewModel.signInError.collectAsStateWithLifecycle()
             val deviceLogin by sessionViewModel.deviceLoginState.collectAsStateWithLifecycle()
@@ -72,7 +72,7 @@ fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
                 sessionViewModel.startDeviceLogin()
             }
             SignInScreen(
-                configError = configError,
+                configError = configError ?: false,
                 inFlight = signInInFlight,
                 error = signInError,
                 onSignIn = sessionViewModel::signIn,
@@ -82,13 +82,13 @@ fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
                 onCancelDeviceLogin = sessionViewModel::cancelDeviceLogin,
             )
         }
-        is TvSessionState.NeedsProfile -> {
+        session is TvSessionState.NeedsProfile -> {
             ProfilePickerScreen(
                 profiles = (session as? TvSessionState.NeedsProfile)?.profiles.orEmpty(),
                 onSelect = sessionViewModel::selectProfile,
             )
         }
-        is TvSessionState.SignedIn -> {
+        session is TvSessionState.SignedIn -> {
             SignedInApp(
                 sessionViewModel = sessionViewModel,
             )
@@ -136,7 +136,8 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     viewModel = homeViewModel,
                     onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
                 )
-            }            composable(
+            }
+            composable(
                 "sources/{itemId}/{mediaType}/{lookupId}",
                 arguments = listOf(
                     navArgument("itemId") { type = NavType.StringType },

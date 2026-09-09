@@ -28,13 +28,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -261,7 +266,7 @@ private fun AiInsightsStorySlide(
     }
 }
 
-/** Page 1: calm hero — simple rounded-rect backdrop card on top, standout text below. */
+/** Page 1: calm hero — rounded-rect backdrop card on top, kicker + headline below like other pages. */
 @Composable
 private fun AiInsightsStandoutSlide(
     slide: AiInsightSlide,
@@ -279,24 +284,19 @@ private fun AiInsightsStandoutSlide(
         Spacer(modifier = Modifier.weight(1f, fill = true))
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             slide.focus?.let { focus ->
+                AiInsightsKicker(text = focus, palette = palette)
+            }
+            val bodyText = slide.context ?: slide.body
+            if (!bodyText.isNullOrBlank()) {
                 Text(
-                    text = focus,
+                    text = bodyText,
                     style = MaterialTheme.typography.headlineSmall,
                     color = palette.onPageBackground,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            slide.context?.let { context ->
-                Text(
-                    text = context,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = palette.onPageBackground.copy(alpha = 0.80f),
-                    maxLines = 5,
+                    maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -368,7 +368,7 @@ private fun AiInsightsRotatingBackdrop(
             modifier
                 .graphicsLayer { rotationZ = rotationDegrees }
                 .clip(shape)
-                .background(palette.pillBackground.copy(alpha = 0.88f)),
+                .background(palette.pillBackgroundSolid),
         contentAlignment = Alignment.Center,
     ) {
         val url = imageUrl.normalizedUrl()
@@ -473,11 +473,11 @@ private fun AiInsightsHeroArtwork(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp)
+                .padding(top = 24.dp)
                 .heightIn(max = 232.dp)
                 .aspectRatio(16f / 10f)
                 .clip(RoundedCornerShape(34.dp))
-                .background(palette.pillBackground.copy(alpha = 0.72f)),
+                .background(palette.pillBackgroundSolid),
         contentAlignment = Alignment.Center,
     ) {
         if (!imageUrl.isNullOrBlank()) {
@@ -591,31 +591,8 @@ private fun AiInsightsStoryBackground(
                     .fillMaxSize()
                     .background(
                         Brush.radialGradient(
-                            colors = listOf(palette.accent.copy(alpha = 0.24f), Color.Transparent),
-                            radius = 920f,
-                        ),
-                    ),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(palette.accent.copy(alpha = 0.18f), Color.Transparent),
-                            radius = 680f,
-                        ),
-                    ),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.58f to palette.pageBackground.copy(alpha = 0.70f),
-                            1f to palette.pageBackground,
+                            colors = listOf(palette.accent.copy(alpha = 0.16f), Color.Transparent),
+                            radius = 720f,
                         ),
                     ),
         )
@@ -683,12 +660,14 @@ private fun AiInsightsFooterActions(
         ) {
             AiInsightsPillButton(
                 text = if (isInWatchlist) "In watchlist" else "Add to watchlist",
+                icon = if (isInWatchlist) Icons.Filled.Check else Icons.Filled.PlaylistAdd,
                 palette = palette,
                 onClick = onToggleWatchlist,
                 modifier = Modifier.weight(1f),
             )
             AiInsightsPillButton(
                 text = "Share",
+                icon = Icons.Outlined.Share,
                 palette = palette,
                 onClick = onShare,
                 modifier = Modifier.weight(1f),
@@ -705,21 +684,27 @@ private fun AiInsightsFooterActions(
 @Composable
 private fun AiInsightsPillButton(
     text: String,
+    icon: ImageVector,
     palette: DetailsPaletteColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(
+    Button(
         onClick = onClick,
         modifier = modifier.height(44.dp),
         shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, palette.onPageBackground.copy(alpha = 0.34f)),
         colors =
-            ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.Transparent,
-                contentColor = palette.onPageBackground,
+            ButtonDefaults.buttonColors(
+                containerColor = palette.accent,
+                contentColor = palette.onAccent,
             ),
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = text,
             maxLines = 1,
