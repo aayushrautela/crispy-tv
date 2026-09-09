@@ -6,6 +6,7 @@ import android.os.Handler
 import android.util.Log
 import android.view.SurfaceView
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
@@ -407,11 +408,22 @@ class NativePlaybackController(
         )
     }
 
+    // Media3's MergingMediaSource namespaces side-loaded subtitle format ids as
+    // "<childIndex>:<formatId>" (child index in the merged source), so the ext:<hash>
+    // marker set in PlaybackMediaItems survives only as the id's suffix. Canonicalize
+    // at this single boundary so every consumer compares/reports the plain ext:<hash>
+    // id regardless of how many merge layers prefixed it.
+    private fun externalFormatId(format: Format): String? {
+        val rawId = format.id ?: return null
+        if (!rawId.contains(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)) return null
+        return EXTERNAL_SUBTITLE_TRACK_ID_PREFIX + rawId.substringAfter(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)
+    }
+
     private fun findExoTrackByStableId(trackType: Int, stableId: String): Pair<Tracks.Group, Int>? {
         for (group in exoPlayer.currentTracks.groups) {
             if (group.type != trackType) continue
             for (i in 0 until group.length) {
-                if (group.getTrackFormat(i).id == stableId) return group to i
+                if (externalFormatId(group.getTrackFormat(i)) == stableId) return group to i
             }
         }
         return null
@@ -731,11 +743,9 @@ class NativePlaybackController(
             for (formatIndex in 0 until group.length) {
                 if (!group.isTrackSupported(formatIndex)) continue
                 val format = group.getTrackFormat(formatIndex)
-                val stableId = format.id?.takeIf { it.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX) }
+                val stableId = externalFormatId(format)
                 tracks.add(
                     NativeTrack(
-                        // Only our own ext: ids are stable across rebuilds; anything else
-                        // (embedded, in-band manifest ids) keeps positional identity.
                         id = stableId ?: "$groupIndex:$formatIndex",
                         index = groupIndex,
                         language = format.language?.takeIf { it.isNotBlank() },
@@ -754,7 +764,7 @@ class NativePlaybackController(
             if (group.type != trackType) continue
             for (formatIndex in 0 until group.length) {
                 if (group.isTrackSelected(formatIndex)) {
-                    return "$groupIndex:$formatIndex"
+                    return externalFormatId(group.getTrackFormat(formatIndex)) ?: "$groupIndex:$formatIndex"
                 }
             }
         }
