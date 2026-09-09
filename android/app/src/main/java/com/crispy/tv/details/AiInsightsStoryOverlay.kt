@@ -5,10 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -40,11 +36,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,20 +50,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
-import com.crispy.tv.ai.AiInsightStandoutTag
 import com.crispy.tv.ai.AiInsightsResult
 
 /** Story presentation order: standout hook first, then good/bad, fun fact last. */
@@ -80,11 +70,6 @@ private val SlideDisplayOrder =
         AiInsightSlideKey.THE_CATCH,
         AiInsightSlideKey.TRIVIA,
     )
-
-private const val ShapeRotationPeriodMs = 14_000
-
-/** Extra scale so the counter-rotated image keeps covering the shape corners. */
-private const val CounterRotationOverscan = 1.45f
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -122,8 +107,6 @@ internal fun AiInsightsStoryOverlay(
     }
 
     val safeIndex = index.coerceIn(0, slides.lastIndex)
-    val currentSlide = slides[safeIndex]
-    val currentAccent = slideAccentColor(currentSlide, palette)
 
     fun prev() {
         index = (safeIndex - 1).coerceAtLeast(0)
@@ -143,10 +126,7 @@ internal fun AiInsightsStoryOverlay(
                 .fillMaxSize()
                 .background(palette.pageBackground),
     ) {
-        AiInsightsStoryBackground(
-            palette = palette,
-            accentColor = currentAccent,
-        )
+        AiInsightsStoryBackground(palette = palette)
 
         Column(
             modifier =
@@ -162,7 +142,6 @@ internal fun AiInsightsStoryOverlay(
                 index = safeIndex,
                 onDismiss = onDismiss,
                 palette = palette,
-                accentColor = currentAccent,
             )
 
             Box(
@@ -192,17 +171,26 @@ internal fun AiInsightsStoryOverlay(
                     modifier = Modifier.fillMaxSize(),
                 ) { pageIndex ->
                     val slide = slides[pageIndex.coerceIn(0, slides.lastIndex)]
-                        AiInsightsStorySlide(
-                            slide = slide,
-                            cyclingBackdropUrl =
-                                if (cyclingBackdrops.isEmpty()) {
-                                    null
-                                } else {
-                                    cyclingBackdrops[pageIndex % cyclingBackdrops.size]
-                                },
-                            artworkUrl = artworkUrl,
-                            palette = palette,
-                        )
+                    val imageUrl =
+                        if (slide.key == AiInsightSlideKey.STANDOUT_ELEMENT) {
+                            resolveSlideImageUrl(
+                                slide = slide,
+                                cyclingBackdropUrl =
+                                    if (cyclingBackdrops.isEmpty()) {
+                                        null
+                                    } else {
+                                        cyclingBackdrops[pageIndex % cyclingBackdrops.size]
+                                    },
+                                artworkUrl = artworkUrl,
+                            )
+                        } else {
+                            null
+                        }
+                    AiInsightsStorySlide(
+                        slide = slide,
+                        imageUrl = imageUrl,
+                        palette = palette,
+                    )
                 }
             }
 
@@ -217,61 +205,45 @@ internal fun AiInsightsStoryOverlay(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
-    cyclingBackdropUrl: String?,
-    artworkUrl: String?,
+    imageUrl: String?,
     palette: DetailsPaletteColors,
 ) {
-    val imageUrl = resolveSlideImageUrl(
-        slide = slide,
-        cyclingBackdropUrl = cyclingBackdropUrl,
-        artworkUrl = artworkUrl,
-    )
-    val accentColor = slideAccentColor(slide, palette)
-
     when (slide.key) {
         AiInsightSlideKey.STANDOUT_ELEMENT ->
             AiInsightsStandoutSlide(
                 slide = slide,
                 imageUrl = imageUrl,
                 palette = palette,
-                accentColor = accentColor,
             )
         AiInsightSlideKey.THE_GOOD_STUFF ->
             AiInsightsMoodSlide(
-                slide = slide,
-                imageUrl = imageUrl,
-                shape = MaterialShapes.Sunny.toShape(),
+                labelText = slide.label,
+                bodyText = slide.body ?: slide.context,
                 moodIcon = Icons.Outlined.ThumbUp,
                 palette = palette,
-                accentColor = accentColor,
             )
         AiInsightSlideKey.THE_CATCH ->
             AiInsightsMoodSlide(
-                slide = slide,
-                imageUrl = imageUrl,
-                shape = MaterialShapes.VerySunny.toShape(),
+                labelText = slide.label,
+                bodyText = slide.body ?: slide.context,
                 moodIcon = Icons.Outlined.SentimentVeryDissatisfied,
                 palette = palette,
-                accentColor = accentColor,
             )
         AiInsightSlideKey.TRIVIA ->
-            AiInsightsTriviaSlide(
-                slide = slide,
-                imageUrl = imageUrl,
+            AiInsightsMoodSlide(
+                labelText = slide.label.ifBlank { "Did you know?" },
+                bodyText = slide.body ?: slide.context,
+                moodIcon = Icons.Outlined.Lightbulb,
                 palette = palette,
-                accentColor = accentColor,
             )
         AiInsightSlideKey.UNKNOWN ->
             AiInsightsMoodSlide(
-                slide = slide,
-                imageUrl = imageUrl,
-                shape = MaterialShapes.Sunny.toShape(),
+                labelText = slide.label,
+                bodyText = slide.body ?: slide.context,
                 moodIcon = Icons.Outlined.AutoAwesome,
                 palette = palette,
-                accentColor = accentColor,
             )
     }
 }
@@ -282,7 +254,6 @@ private fun AiInsightsStandoutSlide(
     slide: AiInsightSlide,
     imageUrl: String?,
     palette: DetailsPaletteColors,
-    accentColor: Color,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -291,7 +262,6 @@ private fun AiInsightsStandoutSlide(
         AiInsightsHeroArtwork(
             imageUrl = imageUrl,
             palette = palette,
-            accentColor = accentColor,
         )
         Spacer(modifier = Modifier.weight(1f, fill = true))
         Column(
@@ -309,35 +279,17 @@ private fun AiInsightsStandoutSlide(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            slide.context?.let { context ->
-                Text(
-                    text = context,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = palette.onPageBackground.copy(alpha = 0.80f),
-                    maxLines = 5,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            slide.tag?.let { tag ->
-                AiInsightsTagChip(
-                    tag = tag,
-                    palette = palette,
-                    accentColor = accentColor,
-                )
-            }
         }
     }
 }
 
-/** Positive/negative pages: backdrop cropped into a slowly rotating material shape plus a muted mood icon. */
+/** Good/catch/trivia pages: large muted icon, consistent kicker + headline text below. */
 @Composable
 private fun AiInsightsMoodSlide(
-    slide: AiInsightSlide,
-    imageUrl: String?,
-    shape: Shape,
+    labelText: String,
+    bodyText: String?,
     moodIcon: ImageVector,
     palette: DetailsPaletteColors,
-    accentColor: Color,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -359,21 +311,12 @@ private fun AiInsightsMoodSlide(
                         .size(304.dp)
                         .offset(y = (-38).dp),
             )
-            AiInsightsRotatingBackdrop(
-                imageUrl = imageUrl,
-                shape = shape,
-                palette = palette,
-                accentColor = accentColor,
-                scrimAlpha = 0f,
-                modifier = Modifier.size(252.dp),
-            )
         }
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AiInsightsKicker(text = slide.label, palette = palette)
-            val bodyText = slide.body ?: slide.context
+            AiInsightsKicker(text = labelText, palette = palette)
             if (!bodyText.isNullOrBlank()) {
                 Text(
                     text = bodyText,
@@ -388,167 +331,16 @@ private fun AiInsightsMoodSlide(
     }
 }
 
-/** Fun fact page: soft rotating arch over a dimmed backdrop, text centered in a pill. */
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AiInsightsTriviaSlide(
-    slide: AiInsightSlide,
-    imageUrl: String?,
-    palette: DetailsPaletteColors,
-    accentColor: Color,
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = true),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Lightbulb,
-                contentDescription = null,
-                tint = palette.onPageBackground.copy(alpha = 0.12f),
-                modifier =
-                    Modifier
-                        .size(300.dp)
-                        .offset(y = (-34).dp),
-            )
-            AiInsightsRotatingBackdrop(
-                imageUrl = imageUrl,
-                shape = MaterialShapes.Arch.toShape(),
-                palette = palette,
-                accentColor = accentColor,
-                scrimAlpha = 0.42f,
-                modifier = Modifier.size(width = 240.dp, height = 280.dp),
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            AiInsightsKicker(text = slide.label.ifBlank { "Did you know?" }, palette = palette)
-            val bodyText = slide.body ?: slide.context
-            if (!bodyText.isNullOrBlank()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(30.dp))
-                            .background(palette.pillBackground.copy(alpha = 0.90f))
-                            .padding(horizontal = 22.dp, vertical = 18.dp),
-                ) {
-                    Text(
-                        text = bodyText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = palette.onPillBackground,
-                        textAlign = TextAlign.Center,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Backdrop image clipped to [shape] while ONLY the clipping silhouette rotates slowly:
- * the container rotates with an infinite transition and the image counter-rotates
- * (with overscan) so its content stays perfectly still underneath the moving crop.
- */
-@Composable
-private fun AiInsightsRotatingBackdrop(
-    imageUrl: String?,
-    shape: Shape,
-    palette: DetailsPaletteColors,
-    accentColor: Color,
-    scrimAlpha: Float,
-    modifier: Modifier = Modifier,
-) {
-    val rotationDegrees = rememberSlowRotationDegrees()
-    Box(
-        modifier =
-            modifier
-                .graphicsLayer { rotationZ = rotationDegrees }
-                .clip(shape)
-                .background(
-                    Brush.linearGradient(
-                        colors =
-                            listOf(
-                                accentColor.copy(alpha = 0.30f),
-                                palette.pillBackground.copy(alpha = 0.88f),
-                            ),
-                    ),
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        val url = imageUrl.normalizedUrl()
-        if (url != null) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            rotationZ = -rotationDegrees
-                            scaleX = CounterRotationOverscan
-                            scaleY = CounterRotationOverscan
-                        },
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
-                contentDescription = null,
-                tint = palette.onPillBackground.copy(alpha = 0.70f),
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .graphicsLayer { rotationZ = -rotationDegrees },
-            )
-        }
-        if (scrimAlpha > 0f) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(palette.pageBackground.copy(alpha = scrimAlpha)),
-            )
-        }
-    }
-}
-
-@Composable
-private fun rememberSlowRotationDegrees(): Float {
-    val transition = rememberInfiniteTransition(label = "ai_insights_shape_rotation")
-    val rotation =
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(durationMillis = ShapeRotationPeriodMs, easing = LinearEasing),
-                ),
-            label = "ai_insights_shape_rotation_degrees",
-        )
-    return rotation.value
-}
-
 @Composable
 private fun AiInsightsHeroArtwork(
     imageUrl: String?,
     palette: DetailsPaletteColors,
-    accentColor: Color,
 ) {
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .padding(top = 12.dp)
                 .heightIn(max = 232.dp)
                 .aspectRatio(16f / 10f)
                 .clip(RoundedCornerShape(34.dp))
@@ -576,8 +368,7 @@ private fun AiInsightsHeroArtwork(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to accentColor.copy(alpha = 0.06f),
-                            0.64f to Color.Transparent,
+                            0f to Color.Transparent,
                             1f to palette.pageBackground.copy(alpha = 0.38f),
                         ),
                     ),
@@ -603,28 +394,6 @@ private fun AiInsightsKicker(
 }
 
 @Composable
-private fun AiInsightsTagChip(
-    tag: AiInsightStandoutTag,
-    palette: DetailsPaletteColors,
-    accentColor: Color,
-) {
-    Box(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(accentColor.copy(alpha = 0.18f))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-    ) {
-        Text(
-            text = tag.displayLabel(),
-            style = MaterialTheme.typography.labelLarge,
-            color = palette.onPageBackground.copy(alpha = 0.88f),
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
 private fun AiInsightsEmptyStory(
     palette: DetailsPaletteColors,
     isInWatchlist: Boolean,
@@ -638,10 +407,7 @@ private fun AiInsightsEmptyStory(
                 .fillMaxSize()
                 .background(palette.pageBackground),
     ) {
-        AiInsightsStoryBackground(
-            palette = palette,
-            accentColor = palette.accent,
-        )
+        AiInsightsStoryBackground(palette = palette)
         Column(
             modifier =
                 Modifier
@@ -656,7 +422,6 @@ private fun AiInsightsEmptyStory(
                 index = 0,
                 onDismiss = onDismiss,
                 palette = palette,
-                accentColor = palette.accent,
             )
             Box(
                 modifier =
@@ -685,7 +450,6 @@ private fun AiInsightsEmptyStory(
 @Composable
 private fun AiInsightsStoryBackground(
     palette: DetailsPaletteColors,
-    accentColor: Color,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -705,7 +469,7 @@ private fun AiInsightsStoryBackground(
                     .fillMaxSize()
                     .background(
                         Brush.radialGradient(
-                            colors = listOf(accentColor.copy(alpha = 0.18f), Color.Transparent),
+                            colors = listOf(palette.accent.copy(alpha = 0.18f), Color.Transparent),
                             radius = 680f,
                         ),
                     ),
@@ -731,7 +495,6 @@ private fun AiInsightsProgressHeader(
     index: Int,
     onDismiss: () -> Unit,
     palette: DetailsPaletteColors,
-    accentColor: Color,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -745,7 +508,7 @@ private fun AiInsightsProgressHeader(
             repeat(slideCount.coerceAtLeast(1)) { i ->
                 val fillColor =
                     if (i <= index) {
-                        accentColor.copy(alpha = 0.96f)
+                        palette.accent.copy(alpha = 0.96f)
                     } else {
                         palette.onPageBackground.copy(alpha = 0.20f)
                     }
@@ -781,11 +544,6 @@ private fun AiInsightsFooterActions(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "Generative AI is experimental",
-            style = MaterialTheme.typography.bodySmall,
-            color = palette.onPageBackground.copy(alpha = 0.62f),
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -803,6 +561,11 @@ private fun AiInsightsFooterActions(
                 modifier = Modifier.weight(1f),
             )
         }
+        Text(
+            text = "Generative AI is experimental",
+            style = MaterialTheme.typography.bodySmall,
+            color = palette.onPageBackground.copy(alpha = 0.62f),
+        )
     }
 }
 
@@ -845,26 +608,5 @@ private fun resolveSlideImageUrl(
         ?: cyclingBackdropUrl.normalizedUrl()
         ?: artworkUrl.normalizedUrl()
 }
-
-private fun slideAccentColor(slide: AiInsightSlide, fallback: DetailsPaletteColors): Color {
-    val raw = slide.accent.trim()
-    if (raw.isEmpty()) return fallback.accent
-    val hex = raw.removePrefix("#")
-    val value = hex.toLongOrNull(16) ?: return fallback.accent
-    return when (hex.length) {
-        6 -> Color(0xFF000000L or value)
-        8 -> Color(value)
-        else -> fallback.accent
-    }
-}
-
-private fun AiInsightStandoutTag.displayLabel(): String =
-    when (this) {
-        AiInsightStandoutTag.PERFORMANCE -> "Performance"
-        AiInsightStandoutTag.VISUALS -> "Visuals"
-        AiInsightStandoutTag.STORY -> "Story"
-        AiInsightStandoutTag.DIRECTION -> "Direction"
-        AiInsightStandoutTag.WORLD_BUILDING -> "World-building"
-    }
 
 private fun String?.normalizedUrl(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
