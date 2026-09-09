@@ -357,7 +357,7 @@ internal fun HeroSection(
                 )
             } else {
                 Text(
-                    text = details.title ?: "",
+                    text = details.title,
                     style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
                     maxLines = 2,
