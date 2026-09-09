@@ -226,12 +226,14 @@ private fun calendarBadgeLabel(item: CalendarEpisodeItem): String? {
 private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {
     val season = item.season
     val episode = item.episode
+    val episodeRange = item.episodeRange
+    val releaseDate = item.releaseDate
     return when {
-        item.episodeRange != null && season != null -> "S$season ${item.episodeRange}"
+        episodeRange != null && season != null -> "S$season $episodeRange"
         season != null && episode != null -> "S$season E$episode"
-        item.episodeRange != null -> item.episodeRange
+        episodeRange != null -> episodeRange
         episode != null -> "Episode $episode"
-        item.releaseDate != null -> item.releaseDate.orEmpty().take(10)
+        releaseDate != null -> releaseDate.take(10)
         else -> "Upcoming episode"
     }
 }
