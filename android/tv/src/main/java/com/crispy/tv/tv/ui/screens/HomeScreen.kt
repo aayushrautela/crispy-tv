@@ -145,7 +145,7 @@ fun HomeScreen(
 
         val rowsListState = rememberLazyListState()
         val density = LocalDensity.current
-        val rowsTopInsetPx = remember(density) { with(density) { RowsFocusTopInsetDp.roundToPx() } }
+        val rowsTopInsetPx = remember(density) { with(density) { RowsFocusTopInsetDp.roundToPx() }.toFloat() }
         val rowsScrollSpec = remember(rowsTopInsetPx) {
             tvRowsBringIntoViewSpec(
                 topInsetPx = rowsTopInsetPx,
@@ -334,7 +334,7 @@ private fun TvHomeRailRow(
 ) {
     val density = LocalDensity.current
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val startInsetPx = remember(density) { with(density) { TvHomeDimensions.EdgePadding.roundToPx() } }
+    val startInsetPx = remember(density) { with(density) { TvHomeDimensions.EdgePadding.roundToPx() }.toFloat() }
     val railScrollSpec = remember(startInsetPx, isRtl) {
         tvRailBringIntoViewSpec(startInsetPx = startInsetPx, isRtl = isRtl)
     }
