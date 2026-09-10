@@ -1,37 +1,39 @@
 package com.crispy.tv.tv.ui
 
+import androidx.activity.compose.BackHandler
+import android.app.Application
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.NavType
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.platform.LocalContext
-import android.app.Application
 import androidx.tv.material3.MaterialTheme
 import com.crispy.tv.ui.brand.CrispyIntroSplash
 import kotlinx.coroutines.delay
 import com.crispy.tv.tv.player.TvPlayerViewModel
 import com.crispy.tv.tv.sources.TvSourcesViewModel
-import com.crispy.tv.tv.ui.screens.player.TvPlayerScreen
-import com.crispy.tv.tv.ui.sources.TvSourcesScreen
-import com.crispy.tv.tv.home.TvHomeViewModel
-import com.crispy.tv.tv.session.TvSessionState
-import com.crispy.tv.tv.session.TvSessionViewModel
+import com.crispy.tv.tv.ui.components.LocalTvContentFocusRequester
 import com.crispy.tv.tv.ui.components.SidebarNavigation
+import com.crispy.tv.tv.ui.components.rememberTvSidebarState
 import com.crispy.tv.tv.ui.navigation.TvDestination
 import com.crispy.tv.tv.ui.screens.HomeScreen
 import com.crispy.tv.tv.ui.screens.detail.DetailScreen
@@ -100,7 +102,13 @@ fun TvApp(sessionViewModel: TvSessionViewModel = viewModel()) {
 private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val selected = TvDestination.fromRoute(backStackEntry?.destination?.route)
+    val currentRoute = backStackEntry?.destination?.route
+    val selected = TvDestination.fromRoute(currentRoute)
+    val rootRoutes = remember { TvDestination.entries.map { it.route }.toSet() }
+    val showSidebar = currentRoute in rootRoutes
+    val sidebarState = rememberTvSidebarState()
+    val contentFocusRequester = remember { FocusRequester() }
+
     val appContext = LocalContext.current.applicationContext
     val homeViewModel: TvHomeViewModel = viewModel(
         factory = TvHomeViewModel.factory(appContext),
@@ -109,28 +117,22 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
         homeViewModel.ensureLoaded()
     }
 
-    Row(
+    // Back on a root route opens the sidebar; a second Back exits the app.
+    BackHandler(enabled = showSidebar && !sidebarState.isExpanded) {
+        sidebarState.requestOpen()
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(color = MaterialTheme.colorScheme.background),
     ) {
-        SidebarNavigation(
-            selected = selected,
-            onSelect = { destination ->
-                if (destination != selected) {
-                    navController.navigate(destination.route) {
-                        popUpTo(TvDestination.default.route) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            },
-        )
-        NavHost(
-            navController = navController,
-            startDestination = TvDestination.default.route,
-            modifier = Modifier.fillMaxSize(),
-        ) {
+        CompositionLocalProvider(LocalTvContentFocusRequester provides contentFocusRequester) {
+            NavHost(
+                navController = navController,
+                startDestination = TvDestination.default.route,
+                modifier = Modifier.fillMaxSize(),
+            ) {
             composable(TvDestination.Home.route) {
                 HomeScreen(
                     viewModel = homeViewModel,
@@ -213,9 +215,27 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     },
                 )
             }
-            composable(TvDestination.Search.route) { SearchScreen() }
-            composable(TvDestination.Library.route) { LibraryScreen() }
-            composable(TvDestination.Settings.route) { SettingsScreen() }
+                composable(TvDestination.Search.route) { SearchScreen() }
+                composable(TvDestination.Library.route) { LibraryScreen() }
+                composable(TvDestination.Settings.route) { SettingsScreen() }
+            }
+        }
+
+        if (showSidebar) {
+            SidebarNavigation(
+                state = sidebarState,
+                selected = selected,
+                onSelect = { destination ->
+                    if (destination != selected) {
+                        navController.navigate(destination.route) {
+                            popUpTo(TvDestination.default.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                modifier = Modifier.align(Alignment.TopStart),
+            )
         }
     }
 }

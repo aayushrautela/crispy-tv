@@ -15,8 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,37 +49,12 @@ fun TvHeroSection(
             Box(modifier = Modifier.fillMaxSize().background(bgColor))
         }
 
-        // left fade into background color (keeps text column readable)
+        // Proportional readability scrim (left fade + bottom fade) so the title
+        // and bottom rail transition into the page background at any hero size.
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colorStops = arrayOf(
-                            0.0f to bgColor,
-                            0.28f to bgColor.copy(alpha = 0.82f),
-                            0.55f to bgColor.copy(alpha = 0.38f),
-                            1.0f to Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
-
-        // bottom strip into background color (seamless transition into rails)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(180.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.0f to Color.Transparent,
-                            0.55f to bgColor.copy(alpha = 0.55f),
-                            1.0f to bgColor,
-                        ),
-                    ),
-                ),
+                .matchParentSize()
+                .tvHeroScrim(bgColor),
         )
 
         Column(

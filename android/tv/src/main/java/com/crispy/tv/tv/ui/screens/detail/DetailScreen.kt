@@ -34,7 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +52,7 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ui.assets.R
 import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
 import com.crispy.tv.tv.ui.components.RailSection
+import com.crispy.tv.tv.ui.components.tvHeroScrim
 import com.crispy.tv.tv.ui.components.skeletonElement
 import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
 import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
@@ -288,19 +289,13 @@ private fun DetailContent(
                         .height(360.dp),
                 )
             }
+            // Proportional readability scrim (left fade + bottom fade), shared
+            // with the home hero so both surfaces read identically.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(360.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
-                                MaterialTheme.colorScheme.background,
-                            ),
-                        ),
-                    ),
+                    .tvHeroScrim(MaterialTheme.colorScheme.background),
             )
             Column(
                 modifier = Modifier
