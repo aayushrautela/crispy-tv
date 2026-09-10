@@ -45,6 +45,7 @@ import androidx.tv.material3.Text
 import com.crispy.tv.tv.session.DeviceLoginState
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
+import com.crispy.tv.ui.brand.CrispyMark
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
@@ -179,11 +180,7 @@ private fun QrSignInPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = "Crispy",
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        CrispyMark(modifier = Modifier.height(72.dp))
         Spacer(Modifier.height(8.dp))
 
         when (deviceLogin) {

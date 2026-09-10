@@ -6,8 +6,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.BringIntoViewSpec
-import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,17 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -56,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
@@ -85,18 +79,17 @@ private const val HERO_SETTLE_DELAY_MS = 140L
 private const val WIDE_RAIL_SKELETON_COUNT = 3
 private const val CATALOG_SKELETON_COUNT = 5
 
-private data class HeroRef(val railKey: String, val index: Int)
-
 /**
  * TV home mirrors the phone home section pipeline (hero feed, Continue Watching,
- * Up Next, This Week, catalog rows, collection shelves) rendered in the pinned
- * Google TV style: a full-bleed hero backdrop cross-fades with focus while rails
- * scroll in the lower pane.
+ * Up Next, This Week, catalog rows, collection shelves) in the Nuvio style: the
+ * top half is a live detail panel (backdrop, title, synopsis, progress, actions)
+ * for the currently focused title, with rails scrolling in the lower pane.
  */
 @Composable
 fun HomeScreen(
     viewModel: TvHomeViewModel,
     onOpenItem: (String) -> Unit,
+    onPlayItem: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -113,17 +106,9 @@ fun HomeScreen(
         onDispose { viewModel.onHomeHidden() }
     }
 
-    var activeRef by remember { mutableStateOf<HeroRef?>(null) }
-    var committedRef by remember { mutableStateOf<HeroRef?>(null) }
+    var activePreview by remember { mutableStateOf<CrispyCardItem?>(null) }
+    var committedPreview by remember { mutableStateOf<CrispyCardItem?>(null) }
     var actionsItemKey by remember { mutableStateOf<String?>(null) }
-
-    fun resolveRailCard(ref: HeroRef?): CrispyCardItem? {
-        val candidate = ref ?: return null
-        val rail = state.wideRailSections[candidate.railKey] ?: return null
-        val ready = rail.state as? RailLoadState.Ready ?: return null
-        val item = ready.items.getOrNull(candidate.index) ?: return null
-        return item.toHeroCard()
-    }
 
     val heroItems = state.heroState.items
     val heroFeedItem = remember(heroItems, state.heroState.selectedId) {
@@ -131,20 +116,12 @@ fun HomeScreen(
         heroItems.firstOrNull { it.id == selected } ?: heroItems.firstOrNull()
     }
 
-    val heroCard: CrispyCardItem? = heroFeedItem?.toHeroCard()
-        ?: resolveRailCard(committedRef)
+    val previewCard: CrispyCardItem? = committedPreview ?: heroFeedItem?.toHeroCard()
 
-    LaunchedEffect(state.wideRailSections) {
-        if (heroFeedItem == null && state.wideRailSections.isNotEmpty() && resolveRailCard(committedRef) == null) {
-            val firstRail = state.wideRailSections.values.firstOrNull { (it.state as? RailLoadState.Ready)?.items?.isNotEmpty() == true }
-            committedRef = firstRail?.let { HeroRef(it.key, 0) }
-        }
-    }
-
-    LaunchedEffect(activeRef) {
-        if (activeRef != null) {
+    LaunchedEffect(activePreview) {
+        if (activePreview != null) {
             delay(HERO_SETTLE_DELAY_MS)
-            committedRef = activeRef
+            committedPreview = activePreview
         }
     }
 
@@ -156,33 +133,46 @@ fun HomeScreen(
         val heroHeight = screenHeight - rowsViewportHeight + 28.dp
 
         Crossfade(
-            targetState = heroCard,
+            targetState = previewCard,
             animationSpec = tween(durationMillis = 320),
-            label = "home_hero_backdrop",
+            label = "home_hero_panel",
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .fillMaxWidth()
                 .height(heroHeight),
-        ) { crossfadedItem ->
+        ) { card ->
             Box(modifier = Modifier.fillMaxSize()) {
-                TvHeroSection(item = crossfadedItem, modifier = Modifier.fillMaxSize())
-            }
-        }
-
-        val listState = rememberLazyListState()
-        val density = LocalDensity.current
-        val rowHeaderTopInsetPx = with(density) { 0.dp.toPx() }
-        val latestCanScrollBackward by rememberUpdatedState(listState.canScrollBackward)
-        val rowHeaderSnapSpec = remember(rowHeaderTopInsetPx) {
-            object : BringIntoViewSpec {
-                override fun calculateScrollDistance(
-                    offset: Float,
-                    size: Float,
-                    containerSize: Float,
-                ): Float {
-                    val distance = offset - rowHeaderTopInsetPx
-                    if (distance < 0f && !latestCanScrollBackward) return 0f
-                    return distance
+                TvHeroSection(item = card, modifier = Modifier.fillMaxSize())
+                if (card != null) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 48.dp, bottom = 44.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedButton(onClick = { onOpenItem(card.id) }) { Text(text = "Details") }
+                        Button(onClick = { onPlayItem(card.id) }) { Text(text = "Play") }
+                    }
+                    card.progressFraction?.let { progress ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 48.dp, bottom = 28.dp)
+                                .width(220.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -196,17 +186,15 @@ fun HomeScreen(
                 )
             }
             else -> {
-                CompositionLocalProvider(LocalBringIntoViewSpec provides rowHeaderSnapSpec) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .height(rowsViewportHeight)
-                            .clipToBounds(),
-                        contentPadding = PaddingValues(bottom = rowsViewportHeight),
-                        verticalArrangement = Arrangement.spacedBy(TvHomeDimensions.SectionSpacingDp.dp),
-                    ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(rowsViewportHeight)
+                        .clipToBounds(),
+                    contentPadding = PaddingValues(bottom = rowsViewportHeight),
+                    verticalArrangement = Arrangement.spacedBy(TvHomeDimensions.SectionSpacingDp.dp),
+                ) {
                         state.layoutState.blocks.forEach { block ->
                             when (block) {
                                 is HomeWideRailLayoutUi -> {
@@ -224,8 +212,8 @@ fun HomeScreen(
                                             onRemove = { item ->
                                                 item.continueWatchingItem?.let(viewModel::removeContinueWatchingItem)
                                             },
-                                            onItemFocused = { index ->
-                                                if (heroFeedItem == null) activeRef = HeroRef(section.key, index)
+                                            onItemPreview = { item ->
+                                                activePreview = item.toHeroCard()
                                             },
                                         )
                                     }
@@ -237,6 +225,7 @@ fun HomeScreen(
                                         HomeCatalogSectionBlock(
                                             sectionUi = sectionUi,
                                             onItemClick = { item -> onOpenItem(item.itemId) },
+                                            onItemPreview = { item -> activePreview = item.toHeroCard() },
                                         )
                                     }
                                 }
@@ -269,7 +258,6 @@ fun HomeScreen(
                             }
                         }
                     }
-                }
             }
         }
     }
@@ -282,6 +270,17 @@ private fun HomeWideRailItemUi.toHeroCard(): CrispyCardItem =
         imageUrl = imageUrl,
         description = subtitle.takeIf { it.isNotBlank() },
         badge = badgeLabel,
+        progressFraction = progressFraction,
+    )
+
+private fun CatalogItem.toHeroCard(): CrispyCardItem =
+    CrispyCardItem(
+        id = itemId,
+        title = title,
+        imageUrl = artworkUrl,
+        rating = rating,
+        year = year,
+        genre = genre,
     )
 
 private fun HomeHeroItem.toHeroCard(): CrispyCardItem =
@@ -302,7 +301,7 @@ private fun HomeWideRailBlock(
     onToggleActions: (String) -> Unit,
     onOpenDetails: (HomeWideRailItemUi) -> Unit,
     onRemove: (HomeWideRailItemUi) -> Unit,
-    onItemFocused: (Int) -> Unit,
+    onItemPreview: (HomeWideRailItemUi) -> Unit,
 ) {
     val isLoading = section.state is RailLoadState.Loading
     val readyItems = (section.state as? RailLoadState.Ready)?.items.orEmpty()
@@ -323,11 +322,11 @@ private fun HomeWideRailBlock(
                     TvWideRailSkeletonCard()
                 }
             } else {
-                itemsIndexed(
+                items(
                     readyItems,
-                    key = { _, item -> item.key },
-                    contentType = { _, _ -> "wideRailCard" },
-                ) { index, item ->
+                    key = { item -> item.key },
+                    contentType = { "wideRailCard" },
+                ) { item ->
                     val canRemove = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING &&
                         item.continueWatchingItem != null
                     TvWideRailCard(
@@ -338,7 +337,7 @@ private fun HomeWideRailBlock(
                         } else {
                             null
                         },
-                        onFocused = { onItemFocused(index) },
+                        onFocused = { onItemPreview(item) },
                     )
                 }
             }
@@ -402,6 +401,7 @@ private fun TvWideRailItemActionsDialog(
 private fun HomeCatalogSectionBlock(
     sectionUi: HomeCatalogSectionUi,
     onItemClick: (CatalogItem) -> Unit,
+    onItemPreview: (CatalogItem) -> Unit,
 ) {
     val sectionSkeleton = sectionUi.isLoading && sectionUi.items.isEmpty()
 
@@ -462,6 +462,7 @@ private fun HomeCatalogSectionBlock(
                     TvCatalogPosterCard(
                         item = item,
                         onClick = { onItemClick(item) },
+                        onFocused = { onItemPreview(item) },
                     )
                 }
             }

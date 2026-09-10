@@ -1,9 +1,12 @@
 package com.crispy.tv.tv.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,8 +34,11 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.tv.ui.navigation.TvDestination
+import kotlinx.coroutines.delay
 
 private val SidebarWidth = 200.dp
+private val SidebarCollapsedWidth = 76.dp
+private val SidebarCollapseDelayMs = 2_500L
 
 @Composable
 fun SidebarNavigation(
@@ -39,12 +46,29 @@ fun SidebarNavigation(
     onSelect: (TvDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var focused by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(true) }
+    LaunchedEffect(focused) {
+        if (focused) {
+            expanded = true
+        } else {
+            delay(SidebarCollapseDelayMs)
+            expanded = false
+        }
+    }
+    val width by animateDpAsState(
+        targetValue = if (expanded) SidebarWidth else SidebarCollapsedWidth,
+        animationSpec = tween(durationMillis = 220),
+        label = "sidebarWidth",
+    )
+
     Column(
         modifier = modifier
-            .width(SidebarWidth)
+            .width(width)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
-            .padding(vertical = 24.dp),
+            .padding(vertical = 24.dp)
+            .onFocusChanged { focused = it.hasFocus },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(8.dp))
@@ -53,6 +77,7 @@ fun SidebarNavigation(
                 icon = destination.icon,
                 label = destination.label,
                 selected = destination == selected,
+                expanded = expanded,
                 onClick = { onSelect(destination) },
                 modifier = Modifier.padding(vertical = 6.dp),
             )
@@ -65,6 +90,7 @@ private fun SidebarItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
+    expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -76,9 +102,10 @@ private fun SidebarItem(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = if (expanded) 20.dp else 0.dp)
             .scale(scale)
             .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(14.dp))
@@ -111,15 +138,17 @@ private fun SidebarItem(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            color = if (selected || focused) {
-                MaterialTheme.colorScheme.onBackground
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+        if (expanded) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (selected || focused) {
+                    MaterialTheme.colorScheme.onBackground
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
     }
 }

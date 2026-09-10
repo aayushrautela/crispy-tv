@@ -291,9 +291,9 @@ private fun AiInsightsStandoutSlide(
             if (!bodyText.isNullOrBlank()) {
                 Text(
                     text = bodyText,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     color = palette.onPageBackground,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -337,9 +337,9 @@ private fun AiInsightsTriviaSlide(
             if (!bodyText.isNullOrBlank()) {
                 Text(
                     text = bodyText,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     color = palette.onPageBackground,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -451,9 +451,9 @@ private fun AiInsightsMoodSlide(
             if (!bodyText.isNullOrBlank()) {
                 Text(
                     text = bodyText,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     color = palette.onPageBackground,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -589,8 +589,8 @@ private fun AiInsightsStoryBackground(
                     .fillMaxSize()
                     .background(
                         Brush.radialGradient(
-                            colors = listOf(palette.accent.copy(alpha = 0.16f), Color.Transparent),
-                            radius = 720f,
+                            colors = listOf(palette.accent.copy(alpha = 0.10f), Color.Transparent),
+                            radius = 640f,
                         ),
                     ),
         )

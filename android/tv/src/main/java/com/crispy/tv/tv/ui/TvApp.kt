@@ -135,6 +135,7 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
+                    onPlayItem = { itemId -> navController.navigate("play/$itemId") },
                 )
             }
             composable(
