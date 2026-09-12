@@ -80,12 +80,12 @@ fun createWatchSyncState(profileId: String): WatchSyncState =
 private fun effectsForKind(kind: WatchSyncKind): List<WatchSyncEffect> =
     when (kind) {
         WatchSyncKind.ContinueWatching -> listOf(WatchSyncEffect.RefetchContinueWatching)
-        WatchSyncKind.HISTORY ->
+        WatchSyncKind.History ->
             listOf(WatchSyncEffect.RefetchContinueWatching, WatchSyncEffect.RefetchHistory)
-        WatchSyncKind.WATCHLIST -> listOf(WatchSyncEffect.RefetchWatchlist)
-        WatchSyncKind.RATINGS -> listOf(WatchSyncEffect.RefetchRatings)
-        WatchSyncKind.HOME -> listOf(WatchSyncEffect.RefetchHome)
-        WatchSyncKind.UNKNOWN -> emptyList()
+        WatchSyncKind.Watchlist -> listOf(WatchSyncEffect.RefetchWatchlist)
+        WatchSyncKind.Ratings -> listOf(WatchSyncEffect.RefetchRatings)
+        WatchSyncKind.Home -> listOf(WatchSyncEffect.RefetchHome)
+        WatchSyncKind.Unknown -> emptyList()
     }
 
 fun reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent): WatchSyncResult {
