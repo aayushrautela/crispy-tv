@@ -21,16 +21,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -55,6 +57,28 @@ private fun panelFor(key: String): PanelColor {
     val index = abs(key.hashCode()) % COLLECTION_PANELS.size
     return COLLECTION_PANELS[index]
 }
+
+private fun Modifier.verticalTitleRightHalf(): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(
+            Constraints(
+                minWidth = 0,
+                maxWidth = constraints.maxHeight,
+                minHeight = 0,
+                maxHeight = constraints.maxWidth,
+            ),
+        )
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            placeable.placeWithLayer(
+                IntOffset(
+                    x = constraints.maxWidth * 3 / 4 - placeable.width / 2,
+                    y = constraints.maxHeight / 2 - placeable.height / 2,
+                ),
+            ) {
+                rotationZ = -90f
+            }
+        }
+    }
 
 @Composable
 internal fun HomeCollectionSectionRow(
@@ -163,10 +187,10 @@ private fun HomeCollectionCard(
             fontWeight = FontWeight.Bold,
             color = panel.text,
             textAlign = TextAlign.Center,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxWidth(0.5f)
-                .graphicsLayer { rotationZ = -90f },
+            softWrap = false,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.verticalTitleRightHalf(),
         )
     }
 }
