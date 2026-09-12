@@ -123,16 +123,18 @@ class LibraryViewModel internal constructor(
     private var syncSource: WatchSyncSource? = null
 
     init {
-        val context = backendContextResolver.resolve() ?: return@init
-        syncSource =
-            WatchSyncSource(
-                httpClient = AppHttp.okHttp(appContext),
-                baseUrl = backend.baseUrl,
-                accessToken = context.accessToken,
-                profileId = context.profileId,
-                onEffect = { effect -> onSyncEffect(effect) },
-            )
-        syncSource?.onSurfaceVisible()
+        viewModelScope.launch {
+            val context = backendContextResolver.resolve() ?: return@launch
+            syncSource =
+                WatchSyncSource(
+                    httpClient = AppHttp.okHttp(appContext),
+                    baseUrl = backend.baseUrl,
+                    accessToken = context.accessToken,
+                    profileId = context.profileId,
+                    onEffect = { effect -> onSyncEffect(effect) },
+                )
+            syncSource?.onSurfaceVisible()
+        }
     }
 
     private fun onSyncEffect(effect: WatchSyncEffect) {
