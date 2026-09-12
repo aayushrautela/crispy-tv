@@ -12,19 +12,56 @@ data class WatchSyncState(
     val isSurfaceVisible: Boolean,
 )
 
+/**
+ * The surface an invalidation targets, sent by the server on the `watch_changed`
+ * SSE event so the client can route each invalidation to the right refetch.
+ * [Unknown] is a forward-compat sentinel for kinds a new server may emit that
+ * this client does not yet understand — the reducer ignores them.
+ */
+sealed interface WatchSyncKind {
+    data object ContinueWatching : WatchSyncKind
+    data object History : WatchSyncKind
+    data object Watchlist : WatchSyncKind
+    data object Ratings : WatchSyncKind
+    data object Home : WatchSyncKind
+    data object Unknown : WatchSyncKind
+
+    companion object {
+        /** A legacy server omits `kind`; treat it as [ContinueWatching]. */
+        fun fromRaw(raw: String?): WatchSyncKind =
+            when (raw?.trim()?.lowercase()) {
+                "continue_watching" -> ContinueWatching
+                "history" -> History
+                "watchlist" -> Watchlist
+                "ratings" -> Ratings
+                "home" -> Home
+                null, "" -> ContinueWatching
+                else -> Unknown
+            }
+    }
+}
+
 sealed interface WatchSyncEvent {
     data object SurfaceBecameVisible : WatchSyncEvent
     data object SurfaceHidden : WatchSyncEvent
     data object ConnectionOpened : WatchSyncEvent
     data object ConnectionClosed : WatchSyncEvent
     data object MaxDurationElapsed : WatchSyncEvent
-    data class InvalidationReceived(val profileId: String, val atMs: Long) : WatchSyncEvent
+    data class InvalidationReceived(
+        val profileId: String,
+        val kind: WatchSyncKind,
+        val atMs: Long,
+    ) : WatchSyncEvent
 }
 
 sealed interface WatchSyncEffect {
     data object OpenConnection : WatchSyncEffect
     data object CloseConnection : WatchSyncEffect
     data object RefetchContinueWatching : WatchSyncEffect
+    data object RefetchHistory : WatchSyncEffect
+    data object RefetchWatchlist : WatchSyncEffect
+    data object RefetchRatings : WatchSyncEffect
+    data object RefetchHome : WatchSyncEffect
 }
 
 data class WatchSyncResult(
@@ -38,6 +75,18 @@ fun createWatchSyncState(profileId: String): WatchSyncState =
         connection = WatchSyncConnection.DISCONNECTED,
         isSurfaceVisible = false,
     )
+
+/** Maps a server [WatchSyncKind] to the client refetch effects it triggers. */
+private fun effectsForKind(kind: WatchSyncKind): List<WatchSyncEffect> =
+    when (kind) {
+        WatchSyncKind.ContinueWatching -> listOf(WatchSyncEffect.RefetchContinueWatching)
+        WatchSyncKind.HISTORY ->
+            listOf(WatchSyncEffect.RefetchContinueWatching, WatchSyncEffect.RefetchHistory)
+        WatchSyncKind.WATCHLIST -> listOf(WatchSyncEffect.RefetchWatchlist)
+        WatchSyncKind.RATINGS -> listOf(WatchSyncEffect.RefetchRatings)
+        WatchSyncKind.HOME -> listOf(WatchSyncEffect.RefetchHome)
+        WatchSyncKind.UNKNOWN -> emptyList()
+    }
 
 fun reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent): WatchSyncResult {
     return when (event) {
@@ -68,7 +117,10 @@ fun reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent): WatchSyncResu
             if (state.isSurfaceVisible) {
                 WatchSyncResult(
                     state.copy(connection = WatchSyncConnection.CONNECTED),
-                    listOf(WatchSyncEffect.RefetchContinueWatching),
+                    listOf(
+                        WatchSyncEffect.RefetchContinueWatching,
+                        WatchSyncEffect.RefetchHome,
+                    ),
                 )
             } else {
                 WatchSyncResult(
@@ -84,7 +136,7 @@ fun reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent): WatchSyncResu
 
         is WatchSyncEvent.InvalidationReceived -> {
             if (state.connection == WatchSyncConnection.CONNECTED && event.profileId == state.profileId) {
-                WatchSyncResult(state, listOf(WatchSyncEffect.RefetchContinueWatching))
+                WatchSyncResult(state, effectsForKind(event.kind))
             } else {
                 WatchSyncResult(state, emptyList())
             }
@@ -111,4 +163,8 @@ fun WatchSyncEffect.toContractValue(): String =
         WatchSyncEffect.OpenConnection -> "open_connection"
         WatchSyncEffect.CloseConnection -> "close_connection"
         WatchSyncEffect.RefetchContinueWatching -> "refetch_continue_watching"
+        WatchSyncEffect.RefetchHistory -> "refetch_history"
+        WatchSyncEffect.RefetchWatchlist -> "refetch_watchlist"
+        WatchSyncEffect.RefetchRatings -> "refetch_ratings"
+        WatchSyncEffect.RefetchHome -> "refetch_home"
     }

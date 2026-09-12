@@ -36,6 +36,9 @@ class WatchSyncContractTest {
                         "invalidation" ->
                             WatchSyncEvent.InvalidationReceived(
                                 profileId = obj.requireString("profile_id", path),
+                                kind = com.crispy.tv.domain.watch.WatchSyncKind.fromRaw(
+                                    obj.optionalString("kind", path),
+                                ),
                                 atMs = obj.optionalLong("at_ms", path) ?: 0L,
                             )
                         "max_duration_elapsed" -> WatchSyncEvent.MaxDurationElapsed

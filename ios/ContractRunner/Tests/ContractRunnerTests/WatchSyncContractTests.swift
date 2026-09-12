@@ -37,6 +37,7 @@ final class WatchSyncContractTests: XCTestCase {
                 case "invalidation":
                     event = .invalidationReceived(
                         profileId: try requireString(object, "profile_id", fixture: url),
+                        kind: watchSyncOptionalKind(object, "kind"),
                         atMs: watchSyncOptionalInt64(object, "at_ms") ?? 0
                     )
                 case "max_duration_elapsed":
@@ -57,6 +58,13 @@ final class WatchSyncContractTests: XCTestCase {
             XCTAssertEqual(expectedEffects, actualEffects, "\(caseId): effects mismatch")
         }
     }
+}
+
+private func watchSyncOptionalKind(_ object: [String: Any], _ key: String) -> WatchSyncKind {
+    guard let value = object[key], !(value is NSNull), let raw = value as? String, !raw.isEmpty else {
+        return .continueWatching
+    }
+    return WatchSyncKind.fromRaw(raw)
 }
 
 private func watchSyncOptionalInt64(_ object: [String: Any], _ key: String) -> Int64? {
