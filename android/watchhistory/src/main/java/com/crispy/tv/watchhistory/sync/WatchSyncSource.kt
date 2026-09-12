@@ -2,6 +2,7 @@ package com.crispy.tv.watchhistory.sync
 
 import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.domain.watch.WatchSyncEvent
+import com.crispy.tv.domain.watch.WatchSyncKind
 import com.crispy.tv.domain.watch.WatchSyncState
 import com.crispy.tv.domain.watch.createWatchSyncState
 import com.crispy.tv.domain.watch.reduceWatchSync
