@@ -33,7 +33,8 @@
                   "max_duration_elapsed"
                 ]
               },
-              "profile_id": { "type": "string" }
+              "profile_id": { "type": "string" },
+              "kind": { "type": "string" }
             }
           }
         }
@@ -48,7 +49,15 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["open_connection", "close_connection", "refetch_continue_watching"]
+            "enum": [
+              "open_connection",
+              "close_connection",
+              "refetch_continue_watching",
+              "refetch_history",
+              "refetch_watchlist",
+              "refetch_ratings",
+              "refetch_home"
+            ]
           }
         }
       }

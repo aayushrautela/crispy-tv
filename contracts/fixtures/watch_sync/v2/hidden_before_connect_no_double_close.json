@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "watch_sync",
   "case_id": "hidden_before_connect_no_double_close",
   "now_ms": 1739923200000,

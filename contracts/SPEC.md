@@ -85,12 +85,23 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - **Runtime is canonical from TMDB metadata, not the playing file.** `UserData.RuntimeTicks` and `UserData.PlayedPercentage` are derived server-side by joining the item to its TMDB `runtime` (`movie`) or `episode_run_time` (`show`, average) — torrent/addy file lengths are unreliable, so client-reported `durationSeconds` is only a last-resort fallback. The client reports **position only** (`positionSeconds` + `lastPlayedAt`); it must not be the source of duration.
   - Continue-watching entries are shown whenever a resume position exists (`PlaybackPositionTicks > 0` / `LastPlayedDate` present), even if `PlayedPercentage` is momentarily null (metadata runtime missing). A null percent is surfaced as "Continue" without a progress bar, never dropped.
 - `watch_sync`
-  - Real-time cross-device sync for continue-watching: a server-pushed invalidation channel plus deterministic client connection/refetch policy.
+  - Real-time cross-device sync: a server-pushed invalidation channel plus deterministic client connection/refetch policy. One channel carries all surfaces; the `kind` field routes each invalidation to the right refetch.
+  - Surfaces: `continue_watching`, `history`, `watchlist`, `ratings`, `home`.
   - Server transport: `GET /v1/profiles/:profileId/watch/stream` (SSE), guarded by the same auth + profile-unlock guard as other watch routes.
   - Channel: Redis pub/sub `cw:{accountId}`; server filters messages by `profileId` before writing to the client.
   - Message envelope: `id`, `event: watch_changed`, `data: { profileId, kind, at_ms }`, `retry`.
-  - Server coalescing: progress ticks are debounced per profile (`cw-dirty:{accountId}:{profileId}`, ~5s window); `playback_completed` and dismiss bypass the debounce (force publish). Reconnect + refetch covers any gap.
-  - Client policy (deterministic reducer, mirrored in `android/core-domain` and Swift ContractRunner): open the stream when the continue-watching surface is visible/foreground; close it when hidden/backgrounded; on any `watch_changed` while connected (or on (re)connect) → refetch the continue-watching page; force reconnect on `max_duration_elapsed`. DB is the source of truth; the stream is an invalidation trigger only.
+  - Server coercion timing: publish an invalidation **when a refetch would see the new truth**. `continue_watching`, `history`, `watchlist`, `ratings` are committed synchronously in the DB at the write, so they publish at write time. `home` is expensive to render (hydration), so it publishes **only once the rebuilt snapshot is persisted to cache** — never at cache-delete time (`invalidateHomeCache`), which would prompt a refetch against an empty cache.
+  - Server coalescing: progress ticks are debounced per profile (`cw-dirty:{accountId}:{profileId}`, ~5s window); discrete mutations bypass the debounce (force publish). Reconnect + refetch covers any gap.
+  - Kind → effects mapping (pure reducer, mirrored in `android/core-domain` and Swift ContractRunner):
+    - `continue_watching` → `refetch_continue_watching`
+    - `history` → `refetch_continue_watching` + `refetch_history` (a history removal deletes the underlying watch_state row and also drops the item from continue-watching)
+    - `watchlist` → `refetch_watchlist`
+    - `ratings` → `refetch_ratings`
+    - `home` → `refetch_home`
+    - missing `kind` (legacy server) → `refetch_continue_watching`
+    - unknown `kind` (future server) → no effect
+  - Client policy: open the stream when a consuming surface is visible/foreground; close it when hidden/backgrounded. On `connection_opened` (reconnect) emit `refetch_continue_watching` + `refetch_home`, then on any `watch_changed` while connected (or on reconnect) emit the per-`kind` effects. Reconnect + refetch covers any gap (`max_duration_elapsed` forces reconnect). The server DB/cache is the source of truth; the stream is an invalidation trigger only.
+  - `contract_version` 2: adds the five-kind `kind` routing, `refetch_history`/`refetch_watchlist`/`refetch_ratings`/`refetch_home` effects, and the `refetch_home` side effect on `connection_opened`.
   - Watched items derive state from `UserData.LastPlayedDate`.
   - Search results, recommendations, and other card-like title metadata items are raw `BaseItemDto`.
   - Title metadata routes use `/v1/metadata/items/:itemId`.

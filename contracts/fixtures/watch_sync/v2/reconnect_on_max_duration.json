@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "watch_sync",
   "case_id": "reconnect_on_max_duration",
   "now_ms": 1739923200000,
@@ -13,6 +13,6 @@
     ]
   },
   "expected": {
-    "effects": ["open_connection", "refetch_continue_watching", "close_connection", "open_connection", "refetch_continue_watching"]
+    "effects": ["open_connection", "refetch_continue_watching", "refetch_home", "close_connection", "open_connection", "refetch_continue_watching", "refetch_home"]
   }
 }
