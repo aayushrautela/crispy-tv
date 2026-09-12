@@ -36,7 +36,7 @@ class WatchSyncSource(
     private val baseUrl: String,
     private val accessToken: String,
     private val profileId: String,
-    private val onRefetch: () -> Unit,
+    private val onEffect: (WatchSyncEffect) -> Unit,
     private val maxDurationMs: Long = 30L * 60L * 1000L,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -64,7 +64,12 @@ class WatchSyncSource(
             when (effect) {
                 WatchSyncEffect.OpenConnection -> openStream()
                 WatchSyncEffect.CloseConnection -> closeStream()
-                WatchSyncEffect.RefetchContinueWatching -> onRefetch()
+                WatchSyncEffect.RefetchContinueWatching,
+                WatchSyncEffect.RefetchHistory,
+                WatchSyncEffect.RefetchWatchlist,
+                WatchSyncEffect.RefetchRatings,
+                WatchSyncEffect.RefetchHome,
+                -> onEffect(effect)
             }
         }
     }
@@ -147,9 +152,12 @@ class WatchSyncSource(
         data: String,
     ) {
         if (eventName != "watch_changed") return
-        val changedProfile =
-            runCatching { JSONObject(data).optString("profileId", "") }.getOrNull() ?: return
-        handle(WatchSyncEvent.InvalidationReceived(changedProfile, 0L))
+        val json = runCatching { JSONObject(data) }.getOrNull() ?: return
+        val changedProfile = json.optString("profileId", "").trim()
+        if (changedProfile.isBlank()) return
+        val kind = WatchSyncKind.fromRaw(json.optString("kind", "").takeIf { it.isNotBlank() })
+        val atMs = json.optLong("at_ms", 0L)
+        handle(WatchSyncEvent.InvalidationReceived(changedProfile, kind, atMs))
     }
 
     private fun closeStream() {

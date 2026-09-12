@@ -35,6 +35,10 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.domain.watch.WatchSyncEffect
+import com.crispy.tv.network.AppHttp
+import com.crispy.tv.watchhistory.sync.WatchSyncSource
+import kotlinx.coroutines.flow.combine
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.app.appGraph
@@ -103,6 +107,7 @@ data class LibraryUiState(
 )
 
 class LibraryViewModel internal constructor(
+    private val appContext: Context,
     private val backend: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
     private val userMediaRepository: UserMediaRepository,
@@ -111,12 +116,46 @@ class LibraryViewModel internal constructor(
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
 
+    // Bumped per section to re-trigger the Pager when a server signal invalidates
+    // that section. Combined into the flow key below.
+    private val sectionRefreshTokens = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    private var syncSource: WatchSyncSource? = null
+
+    init {
+        val context = backendContextResolver.resolve() ?: return@init
+        syncSource =
+            WatchSyncSource(
+                httpClient = AppHttp.okHttp(appContext),
+                baseUrl = backend.baseUrl,
+                accessToken = context.accessToken,
+                profileId = context.profileId,
+                onEffect = { effect -> onSyncEffect(effect) },
+            )
+        syncSource?.onSurfaceVisible()
+    }
+
+    private fun onSyncEffect(effect: WatchSyncEffect) {
+        val sectionId =
+            when (effect) {
+                WatchSyncEffect.RefetchHistory -> LIBRARY_SECTION_HISTORY
+                WatchSyncEffect.RefetchWatchlist -> LIBRARY_SECTION_WATCHLIST
+                WatchSyncEffect.RefetchRatings -> LIBRARY_SECTION_RATINGS
+                else -> return
+            }
+        sectionRefreshTokens.update { tokens ->
+            tokens + (sectionId to ((tokens[sectionId] ?: 0) + 1))
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val items: Flow<PagingData<CatalogItem>> =
-        _uiState
-            .map { it.selectedSectionId }
+        combine(
+            _uiState.map { it.selectedSectionId }.distinctUntilChanged(),
+            sectionRefreshTokens,
+        ) { sectionId, tokens -> sectionId to (tokens[sectionId] ?: 0) }
             .distinctUntilChanged()
-            .flatMapLatest { sectionId ->
+            .flatMapLatest { (sectionId, _) ->
                 Pager(
                     config =
                         PagingConfig(
@@ -134,6 +173,13 @@ class LibraryViewModel internal constructor(
                     },
                 ).flow
             }.cachedIn(viewModelScope)
+
+    override fun onCleared() {
+        syncSource?.onSurfaceHidden()
+        syncSource?.close()
+        syncSource = null
+        super.onCleared()
+    }
 
     fun selectSection(sectionId: String) {
         val normalized = sectionId.trim()
@@ -175,6 +221,7 @@ class LibraryViewModel internal constructor(
                     if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
+                            appContext = appContext,
                             backend = BackendServicesProvider.backendClient(appContext),
                             backendContextResolver = BackendContextResolverProvider.get(appContext),
                             userMediaRepository = DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext)),

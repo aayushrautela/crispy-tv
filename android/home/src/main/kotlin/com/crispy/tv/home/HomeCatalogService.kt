@@ -34,7 +34,10 @@ import org.json.JSONObject
 import java.util.Locale
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
-private const val HOME_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
+// Home snapshots are reused as a stale-while-revalidate fallback: keep the last
+// server snapshot indefinitely (until a fresh fetch overwrites it) so an idle app
+// never paints an empty home. The server is the refresh trigger, not a client
+// timer, so the cache is intentionally not time-bounded here.
 private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
 private const val DISCOVER_ADDON_NAME = "Crispy"
 
@@ -84,7 +87,9 @@ class HomeCatalogService constructor(
         sectionLimit: Int = Int.MAX_VALUE,
     ): HomePrimaryFeedLoadResult? {
         val backendContext = getBackendContext()
-        val snapshot = readCachedSnapshot(profileId = backendContext?.profileId, maxAgeMs = HOME_CACHE_MAX_AGE_MS)
+        // Stale-while-revalidate: reuse the last snapshot regardless of age so a
+        // restored/idle app always repaints, then revalidate via loadPrimaryHomeFeed.
+        val snapshot = readCachedSnapshot(profileId = backendContext?.profileId, maxAgeMs = null)
             ?: return null
         return snapshot.toPrimaryHomeFeedLoadResult(sectionLimit = sectionLimit)
     }
@@ -167,7 +172,9 @@ class HomeCatalogService constructor(
             snapshot
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            readCachedSnapshot(profileId = backendContext.profileId, maxAgeMs = HOME_CACHE_MAX_AGE_MS)
+            // On a failed live fetch, fall back to the last cached snapshot at any age
+            // rather than discarding it (the previous 15-minute cap erased home on idle).
+            readCachedSnapshot(profileId = backendContext.profileId, maxAgeMs = null)
                 ?: emptySnapshot(error.message ?: "Failed to load recommendations.")
         }
     }

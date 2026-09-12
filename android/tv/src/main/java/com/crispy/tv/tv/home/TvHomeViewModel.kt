@@ -167,13 +167,21 @@ class TvHomeViewModel internal constructor(
             val context = backendResolver.resolve() ?: return@launch
             watchSyncSource?.close()
             watchSyncSource =
-                WatchSyncSource(
-                    httpClient = com.crispy.tv.network.AppHttp.okHttp(appContext),
-                    baseUrl = backendClient.baseUrl,
-                    accessToken = context.accessToken,
-                    profileId = context.profileId,
-                    onRefetch = { refreshWatchActivityAndThisWeek() },
-                )
+            WatchSyncSource(
+                httpClient = com.crispy.tv.network.AppHttp.okHttp(appContext),
+                baseUrl = backendClient.baseUrl,
+                accessToken = context.accessToken,
+                profileId = context.profileId,
+                onEffect = { effect ->
+                    when (effect) {
+                        com.crispy.tv.domain.watch.WatchSyncEffect.RefetchContinueWatching,
+                        com.crispy.tv.domain.watch.WatchSyncEffect.RefetchHistory,
+                        -> refreshWatchActivityAndThisWeek()
+                        com.crispy.tv.domain.watch.WatchSyncEffect.RefetchHome -> refreshPrimary()
+                        else -> Unit
+                    }
+                },
+            )
             watchSyncSource?.onSurfaceVisible()
         }
     }
@@ -186,6 +194,10 @@ class TvHomeViewModel internal constructor(
         watchSyncSource?.close()
         watchSyncSource = null
         super.onCleared()
+    }
+
+    private fun refreshPrimary() {
+        viewModelScope.launch { loadPrimary() }
     }
 
     private fun refreshWatchActivityAndThisWeek() {

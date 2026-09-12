@@ -12,6 +12,7 @@ import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import com.crispy.tv.network.AppHttp
 import kotlinx.coroutines.CancellationException
@@ -138,7 +139,15 @@ class HomeViewModel internal constructor(
                     baseUrl = backendClient.baseUrl,
                     accessToken = context.accessToken,
                     profileId = context.profileId,
-                    onRefetch = { refreshWatchActivityAndThisWeek() },
+                    onEffect = { effect ->
+                        when (effect) {
+                            WatchSyncEffect.RefetchContinueWatching,
+                            WatchSyncEffect.RefetchHistory,
+                            -> refreshWatchActivityAndThisWeek()
+                            WatchSyncEffect.RefetchHome -> refreshPrimary()
+                            else -> Unit
+                        }
+                    },
                 )
             watchSyncSource?.onSurfaceVisible()
         }
@@ -152,6 +161,10 @@ class HomeViewModel internal constructor(
         watchSyncSource?.close()
         watchSyncSource = null
         super.onCleared()
+    }
+
+    private fun refreshPrimary() {
+        viewModelScope.launch { loadPrimary() }
     }
 
     private fun refreshWatchActivityAndThisWeek() {
