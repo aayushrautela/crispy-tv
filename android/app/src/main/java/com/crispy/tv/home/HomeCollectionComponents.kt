@@ -29,7 +29,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -54,16 +53,18 @@ private val COLLECTION_PANELS = listOf(
 )
 
 private fun panelFor(key: String): PanelColor {
-    val index = abs(key.hashCode()) % COLLECTION_PANELS.size
+    val mixed = (key.hashCode().toLong() * 2654435761L).toInt()
+    val index = abs(mixed) % COLLECTION_PANELS.size
     return COLLECTION_PANELS[index]
 }
 
-private fun Modifier.verticalTitleRightHalf(): Modifier =
+private fun Modifier.verticalTitleRightHalf(margin: Dp): Modifier =
     layout { measurable, constraints ->
+        val marginPx = margin.roundToPx()
         val placeable = measurable.measure(
             Constraints(
                 minWidth = 0,
-                maxWidth = constraints.maxHeight,
+                maxWidth = (constraints.maxHeight - marginPx * 2).coerceAtLeast(0),
                 minHeight = 0,
                 maxHeight = constraints.maxWidth,
             ),
@@ -187,10 +188,7 @@ private fun HomeCollectionCard(
             fontWeight = FontWeight.Bold,
             color = panel.text,
             textAlign = TextAlign.Center,
-            softWrap = false,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.verticalTitleRightHalf(),
+            modifier = Modifier.verticalTitleRightHalf(12.dp),
         )
     }
 }
