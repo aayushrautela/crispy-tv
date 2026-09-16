@@ -10,6 +10,7 @@ import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.WatchMutationInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
 import com.crispy.tv.backend.CrispyBackendClient.WatchStatesEnvelope
+import com.crispy.tv.backend.CrispyBackendClient.WatchGenerationsResponse
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -191,6 +192,26 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
 ): ClientMediaCardQueryResult {
     return listClientMediaCardQueryResultApi(
         accessToken, profileId, path = "ratings", limit = limit, cursor = cursor,
+    )
+}
+
+internal suspend fun CrispyBackendClient.getWatchGenerationsApi(
+    accessToken: String,
+    profileId: String,
+): WatchGenerationsResponse? {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/generations".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response) ?: return null
+    return WatchGenerationsResponse(
+        continueWatchingMs = json.optLongOrNull("continue_watching"),
+        historyMs = json.optLongOrNull("history"),
+        watchlistMs = json.optLongOrNull("watchlist"),
+        ratingsMs = json.optLongOrNull("ratings"),
+        homeMs = json.optLongOrNull("home"),
     )
 }
 

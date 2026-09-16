@@ -16,6 +16,8 @@ class LibraryPagingSource(
     private val backend: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
     private val sectionId: String,
+    private val libraryCache: LibraryDiskCacheStore,
+    private val appliedGenerationMsProvider: () -> Long?,
 ) : PagingSource<String, CatalogItem>() {
     override fun getRefreshKey(state: PagingState<String, CatalogItem>): String? = null
 
@@ -29,6 +31,20 @@ class LibraryPagingSource(
                 }
                     ?: return LoadResult.Error(IllegalStateException("Sign in and select a profile to load your library."))
 
+            if (params.key == null) {
+                val cached =
+                    withContext(Dispatchers.IO) {
+                        libraryCache.read(backendContext.profileId, sectionId)
+                    }
+                if (cached != null) {
+                    return@runCatching LoadResult.Page(
+                        data = cached.items,
+                        prevKey = null,
+                        nextKey = cached.nextCursor?.takeIf { cached.hasMore && it.isNotBlank() },
+                    )
+                }
+            }
+
             val page =
                 withContext(Dispatchers.IO) {
                     loadLibrarySectionPage(
@@ -40,6 +56,17 @@ class LibraryPagingSource(
                         cursor = params.key,
                     )
                 }
+
+            if (params.key == null) {
+                withContext(Dispatchers.IO) {
+                    libraryCache.write(
+                        profileId = backendContext.profileId,
+                        sectionId = sectionId,
+                        page = page,
+                        appliedGenerationMs = appliedGenerationMsProvider(),
+                    )
+                }
+            }
 
             LoadResult.Page(
                 data = page.items,

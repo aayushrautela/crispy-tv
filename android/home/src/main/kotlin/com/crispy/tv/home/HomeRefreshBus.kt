@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 sealed interface HomeRefreshEvent {
     data object PlaybackEnded : HomeRefreshEvent
     data object WatchlistChanged : HomeRefreshEvent
+    data object HistoryChanged : HomeRefreshEvent
+    data object RatingsChanged : HomeRefreshEvent
 }
 
 object HomeRefreshBus {

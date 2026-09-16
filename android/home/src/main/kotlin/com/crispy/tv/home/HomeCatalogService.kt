@@ -31,6 +31,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
 import java.util.Locale
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
@@ -168,7 +169,7 @@ class HomeCatalogService constructor(
                 profileId = backendContext.profileId,
             )
             val snapshot = response?.toSnapshot() ?: emptySnapshot("No recommendations available right now.")
-            writeCachedSnapshot(backendContext.profileId, snapshot)
+            writeCachedSnapshot(backendContext.profileId, snapshot, expiresAtIso = response?.expiresAt)
             snapshot
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
@@ -183,27 +184,54 @@ class HomeCatalogService constructor(
         return backendContextResolver.resolve()
     }
 
-    private suspend fun writeCachedSnapshot(profileId: String, snapshot: HomeCatalogSnapshot) {
+    private suspend fun writeCachedSnapshot(profileId: String, snapshot: HomeCatalogSnapshot, expiresAtIso: String?) {
+        val payloadJson = JSONObject(snapshot.toCachePayload()).apply {
+            val normalizedExpiresAt = expiresAtIso?.trim()
+            if (!normalizedExpiresAt.isNullOrBlank()) {
+                put("expires_at", normalizedExpiresAt)
+            }
+        }.toString()
         diskCacheStore.write(
             cacheKey = cacheKey(profileId),
-            payload = snapshot.toCachePayload(),
+            payload = payloadJson,
         )
         diskCacheStore.write(
             cacheKey = GLOBAL_CACHE_KEY,
-            payload = snapshot.toCachePayload(),
+            payload = payloadJson,
         )
     }
 
     private suspend fun readCachedSnapshot(profileId: String?, maxAgeMs: Long?): HomeCatalogSnapshot? {
-        val cacheKeys = buildList {
-            profileId?.trim()?.takeIf { it.isNotBlank() }?.let { add(cacheKey(it)) }
-            add(GLOBAL_CACHE_KEY)
-        }
-        for (cacheKey in cacheKeys) {
+        for (cacheKey in homeCacheKeys(profileId)) {
             val payload = diskCacheStore.read(cacheKey, maxAgeMs = maxAgeMs)?.payload ?: continue
             return runCatching { payload.toSnapshot() }.getOrNull() ?: continue
         }
         return null
+    }
+
+    suspend fun cachedHomeExpiresAtMs(): Long? {
+        val backendContext = getBackendContext()
+        return readCachedHomeExpiresAtMs(profileId = backendContext?.profileId)
+    }
+
+    private suspend fun readCachedHomeExpiresAtMs(profileId: String?): Long? {
+        for (cacheKey in homeCacheKeys(profileId)) {
+            val payload = diskCacheStore.read(cacheKey, maxAgeMs = null)?.payload ?: continue
+            val expiresAt = runCatching { JSONObject(payload) }.getOrNull()
+                ?.optString("expires_at")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: continue
+            val parsed = runCatching { Instant.parse(expiresAt).toEpochMilli() }.getOrNull()
+                ?: continue
+            return parsed
+        }
+        return null
+    }
+
+    private fun homeCacheKeys(profileId: String?): List<String> {
+        return buildList {
+            profileId?.trim()?.takeIf { it.isNotBlank() }?.let { add(cacheKey(it)) }
+            add(GLOBAL_CACHE_KEY)
+        }
     }
 
     private fun cacheKey(profileId: String): String {

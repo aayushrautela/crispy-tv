@@ -289,6 +289,14 @@ class CrispyBackendClient(
         val items: List<WatchStateResponse>,
     )
 
+    data class WatchGenerationsResponse(
+        val continueWatchingMs: Long?,
+        val historyMs: Long?,
+        val watchlistMs: Long?,
+        val ratingsMs: Long?,
+        val homeMs: Long?,
+    )
+
     // --- Paged watch collections (ClientMediaCardQueryResult) ---
 
     data class ClientMediaCardQueryResult(
@@ -727,6 +735,13 @@ class CrispyBackendClient(
         cursor: String? = null,
     ): ClientMediaCardQueryResult {
         return listRatingsApi(accessToken, profileId, limit, cursor)
+    }
+
+    suspend fun getWatchGenerations(
+        accessToken: String,
+        profileId: String,
+    ): WatchGenerationsResponse? {
+        return getWatchGenerationsApi(accessToken, profileId)
     }
 
     suspend fun getWatchState(accessToken: String, profileId: String, itemId: String): WatchStateEnvelope {

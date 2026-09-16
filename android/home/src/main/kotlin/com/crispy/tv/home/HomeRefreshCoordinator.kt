@@ -13,10 +13,13 @@ class HomeRefreshCoordinator(
 ) {
     private val continueWatchingLimit = 30
 
+    suspend fun cachedHomeExpiresAtMs(): Long? {
+        return homeCatalogService.cachedHomeExpiresAtMs()
+    }
+
     suspend fun loadCachedPrimarySnapshot(): HomePrimarySnapshot? {
         val primaryFeedResult = homeCatalogService.loadCachedPrimaryHomeFeed()
             ?: return null
-
         val heroItems = primaryFeedResult.heroResult.items
         val allSections = primaryFeedResult.sections
         val headerPills = allSections

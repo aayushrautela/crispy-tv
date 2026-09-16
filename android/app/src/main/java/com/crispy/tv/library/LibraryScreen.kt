@@ -31,11 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.watch.WatchSyncEffect
+import com.crispy.tv.home.HomeRefreshBus
+import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import kotlinx.coroutines.flow.combine
@@ -57,7 +60,9 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -112,6 +117,7 @@ class LibraryViewModel internal constructor(
     private val backendContextResolver: BackendContextResolver,
     private val userMediaRepository: UserMediaRepository,
     private val outbox: UserMutationOutbox,
+    private val libraryCache: LibraryDiskCacheStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
@@ -121,6 +127,10 @@ class LibraryViewModel internal constructor(
     private val sectionRefreshTokens = MutableStateFlow<Map<String, Int>>(emptyMap())
 
     private var syncSource: WatchSyncSource? = null
+
+    // The most recent server generations snapshot, used to stamp fresh cache
+    // writes so the next open can tell whether the cached page is stale.
+    private var latestGenerations: CrispyBackendClient.WatchGenerationsResponse? = null
 
     init {
         viewModelScope.launch {
@@ -135,6 +145,61 @@ class LibraryViewModel internal constructor(
                 )
             syncSource?.onSurfaceVisible()
         }
+
+        viewModelScope.launch {
+            val context = backendContextResolver.resolve() ?: return@launch
+            checkServerGenerations(context)
+        }
+
+        viewModelScope.launch {
+            HomeRefreshBus.events.collect { event ->
+                val sectionId =
+                    when (event) {
+                        HomeRefreshEvent.WatchlistChanged -> LIBRARY_SECTION_WATCHLIST
+                        HomeRefreshEvent.HistoryChanged -> LIBRARY_SECTION_HISTORY
+                        HomeRefreshEvent.RatingsChanged -> LIBRARY_SECTION_RATINGS
+                        else -> return@collect
+                    }
+                viewModelScope.launch { invalidateSection(sectionId) }
+            }
+        }
+    }
+
+    private suspend fun checkServerGenerations(context: BackendContext) {
+        val generations =
+            runCatching {
+                backend.getWatchGenerations(
+                    accessToken = context.accessToken,
+                    profileId = context.profileId,
+                )
+            }.getOrNull() ?: return
+        latestGenerations = generations
+        LIBRARY_SECTIONS.forEach { section ->
+            val sectionId = section.id
+            val serverGen = generations.generationMsFor(sectionId)
+            if (serverGen != null) {
+                val applied =
+                    withContext(Dispatchers.IO) {
+                        libraryCache.read(context.profileId, sectionId)?.appliedGenerationMs
+                    }
+                if (applied == null || serverGen > applied) {
+                    libraryCache.invalidate(context.profileId, sectionId)
+                    bumpSectionToken(sectionId)
+                }
+            }
+        }
+    }
+
+    private suspend fun invalidateSection(sectionId: String) {
+        val context = backendContextResolver.resolve() ?: return
+        libraryCache.invalidate(context.profileId, sectionId)
+        bumpSectionToken(sectionId)
+    }
+
+    private fun bumpSectionToken(sectionId: String) {
+        sectionRefreshTokens.update { tokens ->
+            tokens + (sectionId to ((tokens[sectionId] ?: 0) + 1))
+        }
     }
 
     private fun onSyncEffect(effect: WatchSyncEffect) {
@@ -145,9 +210,7 @@ class LibraryViewModel internal constructor(
                 WatchSyncEffect.RefetchRatings -> LIBRARY_SECTION_RATINGS
                 else -> return
             }
-        sectionRefreshTokens.update { tokens ->
-            tokens + (sectionId to ((tokens[sectionId] ?: 0) + 1))
-        }
+        viewModelScope.launch { invalidateSection(sectionId) }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -171,6 +234,8 @@ class LibraryViewModel internal constructor(
                             backend = backend,
                             backendContextResolver = backendContextResolver,
                             sectionId = sectionId,
+                            libraryCache = libraryCache,
+                            appliedGenerationMsProvider = { latestGenerations?.generationMsFor(sectionId) },
                         )
                     },
                 ).flow
@@ -228,12 +293,22 @@ class LibraryViewModel internal constructor(
                             backendContextResolver = BackendContextResolverProvider.get(appContext),
                             userMediaRepository = DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext)),
                             outbox = appContext.appGraph().userMutationOutbox,
+                            libraryCache = LibraryDiskCacheStore(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
             }
         }
+    }
+}
+
+internal fun CrispyBackendClient.WatchGenerationsResponse.generationMsFor(sectionId: String): Long? {
+    return when (sectionId) {
+        LIBRARY_SECTION_HISTORY -> historyMs
+        LIBRARY_SECTION_WATCHLIST -> watchlistMs
+        LIBRARY_SECTION_RATINGS -> ratingsMs
+        else -> null
     }
 }
 

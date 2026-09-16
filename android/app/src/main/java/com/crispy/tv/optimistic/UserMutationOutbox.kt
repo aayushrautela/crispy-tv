@@ -139,7 +139,7 @@ class UserMutationOutbox(
             result?.success == true -> {
                 all.removeAt(index)
                 commit(all, persist = true)
-                HomeRefreshBus.emit(com.crispy.tv.home.HomeRefreshEvent.WatchlistChanged)
+                publishMutationSuccessEvents(mutation)
             }
             result?.conflict == true -> {
                 all[index] = mutation.copyStatus(
@@ -160,6 +160,23 @@ class UserMutationOutbox(
                         ).copyNextAttempt(nextAttempt)
                         .copyAttempt(mutation.attempt + 1)
                 commit(all, persist = true)
+            }
+        }
+    }
+
+    private fun publishMutationSuccessEvents(mutation: UserMutation) {
+        when (mutation) {
+            is WatchlistMutation -> {
+                HomeRefreshBus.emit(com.crispy.tv.home.HomeRefreshEvent.WatchlistChanged)
+            }
+            is TitleWatchedMutation,
+            is EpisodeWatchedMutation,
+            is SeasonWatchedMutation,
+            -> {
+                HomeRefreshBus.emit(com.crispy.tv.home.HomeRefreshEvent.HistoryChanged)
+            }
+            is RatingMutation -> {
+                HomeRefreshBus.emit(com.crispy.tv.home.HomeRefreshEvent.RatingsChanged)
             }
         }
     }

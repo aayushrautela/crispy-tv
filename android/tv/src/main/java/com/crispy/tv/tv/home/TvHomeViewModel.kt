@@ -114,7 +114,10 @@ class TvHomeViewModel internal constructor(
         viewModelScope.launch {
             HomeRefreshBus.events.collect { event ->
                 when (event) {
-                    HomeRefreshEvent.PlaybackEnded, HomeRefreshEvent.WatchlistChanged ->
+                    HomeRefreshEvent.PlaybackEnded,
+                    HomeRefreshEvent.WatchlistChanged,
+                    HomeRefreshEvent.HistoryChanged,
+                    ->
                         refreshWatchActivityAndThisWeek()
                 }
             }
@@ -130,7 +133,7 @@ class TvHomeViewModel internal constructor(
                 ?.let(::applyPrimarySnapshot)
 
             coroutineScope {
-                async { loadPrimary() }
+                async { refreshPrimaryHomeIfStale() }
                 async { loadContinueWatching() }
                 async { loadUpNext() }
                 async { loadThisWeek() }
@@ -183,6 +186,7 @@ class TvHomeViewModel internal constructor(
                 },
             )
             watchSyncSource?.onSurfaceVisible()
+            refreshPrimaryHomeIfStale()
         }
     }
 
@@ -198,6 +202,14 @@ class TvHomeViewModel internal constructor(
 
     private fun refreshPrimary() {
         viewModelScope.launch { loadPrimary() }
+    }
+
+    private suspend fun refreshPrimaryHomeIfStale() {
+        val expiresAtMs = runCatching { refreshCoordinator.cachedHomeExpiresAtMs() }.getOrNull()
+        val nowMs = System.currentTimeMillis()
+        if (expiresAtMs == null || nowMs >= expiresAtMs) {
+            loadPrimary()
+        }
     }
 
     private fun refreshWatchActivityAndThisWeek() {
