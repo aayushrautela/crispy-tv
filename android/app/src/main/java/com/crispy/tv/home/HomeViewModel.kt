@@ -108,6 +108,7 @@ class HomeViewModel internal constructor(
                     -> {
                         refreshWatchActivityAndThisWeek()
                     }
+                    HomeRefreshEvent.RatingsChanged -> Unit
                 }
             }
         }

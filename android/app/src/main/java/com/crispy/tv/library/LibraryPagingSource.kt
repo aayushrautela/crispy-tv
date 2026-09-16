@@ -195,7 +195,7 @@ private fun String.toCatalogType(): String {
     }
 }
 
-internal data class LibrarySectionPageUi(
+data class LibrarySectionPageUi(
     val items: List<CatalogItem> = emptyList(),
     val nextCursor: String? = null,
     val hasMore: Boolean = false,

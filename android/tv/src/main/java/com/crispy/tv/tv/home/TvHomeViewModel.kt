@@ -119,6 +119,7 @@ class TvHomeViewModel internal constructor(
                     HomeRefreshEvent.HistoryChanged,
                     ->
                         refreshWatchActivityAndThisWeek()
+                    HomeRefreshEvent.RatingsChanged -> Unit
                 }
             }
         }

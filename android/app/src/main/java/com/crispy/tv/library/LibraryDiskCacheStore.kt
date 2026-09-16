@@ -164,7 +164,7 @@ class LibraryDiskCacheStore(appContext: Context) {
             .put("high", high)
     }
 
-    private fun parseResponsiveImage(key: String): ResponsiveImageSet? {
+    private fun JSONObject.parseResponsiveImage(key: String): ResponsiveImageSet? {
         val json = optJSONObject(key) ?: return null
         val low = json.optNullableString("low")
         val medium = json.optNullableString("medium")
