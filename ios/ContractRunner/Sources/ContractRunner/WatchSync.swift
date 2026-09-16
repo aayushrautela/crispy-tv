@@ -123,7 +123,7 @@ public func reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent) -> Wat
         if state.isSurfaceVisible {
             return WatchSyncResult(
                 state: WatchSyncState(profileId: state.profileId, connection: .connected, isSurfaceVisible: state.isSurfaceVisible),
-                effects: [.refetchContinueWatching, .refetchHome]
+                effects: [.refetchContinueWatching]
             )
         }
         return WatchSyncResult(

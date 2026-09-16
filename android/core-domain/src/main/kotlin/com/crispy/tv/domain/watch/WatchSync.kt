@@ -117,10 +117,7 @@ fun reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent): WatchSyncResu
             if (state.isSurfaceVisible) {
                 WatchSyncResult(
                     state.copy(connection = WatchSyncConnection.CONNECTED),
-                    listOf(
-                        WatchSyncEffect.RefetchContinueWatching,
-                        WatchSyncEffect.RefetchHome,
-                    ),
+                    listOf(WatchSyncEffect.RefetchContinueWatching),
                 )
             } else {
                 WatchSyncResult(
