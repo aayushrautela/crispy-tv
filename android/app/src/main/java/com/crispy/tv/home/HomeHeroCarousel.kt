@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -194,7 +195,8 @@ internal fun HomeHeroCarousel(
                 )
                 val subtitle = listOfNotNull(
                     item.year,
-                    item.genres.firstOrNull()
+                    item.genres.firstOrNull(),
+                    item.rating?.let { "★ $it" }
                 ).joinToString(" • ")
 
                 if (subtitle.isNotEmpty()) {
@@ -203,6 +205,16 @@ internal fun HomeHeroCarousel(
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+                item.tagline?.takeIf { it.isNotBlank() }?.let { tagline ->
+                    Text(
+                        text = tagline,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontStyle = FontStyle.Italic,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Text(

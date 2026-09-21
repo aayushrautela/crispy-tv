@@ -318,6 +318,7 @@ private fun HomeHeroItem.toHeroCard(): CrispyCardItem =
         year = year,
         genre = genres.firstOrNull(),
         description = description,
+        tagline = tagline,
     )
 
 /**

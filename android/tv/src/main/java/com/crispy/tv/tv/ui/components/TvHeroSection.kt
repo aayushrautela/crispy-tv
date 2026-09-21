@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +90,19 @@ fun TvHeroSection(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+
+            item?.tagline?.takeIf { it.isNotBlank() }?.let { tagline ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = tagline,
+                    fontSize = 15.sp,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
             item?.description?.takeIf { it.isNotBlank() }?.let { description ->

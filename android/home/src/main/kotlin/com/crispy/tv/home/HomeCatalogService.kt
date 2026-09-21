@@ -47,6 +47,7 @@ data class HomeHeroItem(
     val id: String,
     val title: String,
     val description: String,
+    val tagline: String? = null,
     val rating: String?,
     val year: String? = null,
     val genres: List<String> = emptyList(),
@@ -295,6 +296,7 @@ class HomeCatalogService constructor(
             year = year?.toString(),
             genre = genres.firstOrNull(),
             description = overview,
+            tagline = tagline,
         )
     }
 
@@ -391,6 +393,7 @@ class HomeCatalogService constructor(
                                                             .put("year", item.year)
                                                             .put("genre", item.genre)
                                                             .put("description", item.description)
+                                                            .put("tagline", item.tagline)
                                             )
                                         }
                                     },
@@ -470,6 +473,7 @@ class HomeCatalogService constructor(
             year = json.optString("year").trim().ifBlank { null },
             genre = json.optString("genre").trim().ifBlank { null },
             description = json.optString("description").trim().ifBlank { null },
+            tagline = json.optString("tagline").trim().ifBlank { null },
         )
     }
 
@@ -495,6 +499,7 @@ class HomeCatalogService constructor(
                                 id = hero.itemId,
                                 title = hero.title,
                                 description = hero.description,
+                                tagline = hero.tagline,
                                 rating = hero.rating,
                                 year = hero.year,
                                 genres = hero.genres,

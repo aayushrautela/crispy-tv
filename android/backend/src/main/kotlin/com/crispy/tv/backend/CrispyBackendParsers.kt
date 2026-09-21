@@ -365,6 +365,7 @@ internal fun CrispyBackendClient.parseClientMediaCard(json: JSONObject): ClientM
         mediaType = mediaType,
         title = title,
         overview = json.optNullableString("overview"),
+        tagline = json.optNullableString("tagline"),
         year = json.optIntOrNull("year"),
         releaseDate = json.optNullableString("releaseDate"),
         rating = json.optDoubleOrNull("rating"),

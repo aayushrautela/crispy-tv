@@ -106,7 +106,9 @@ class HomeCatalogsContractTest {
             type = json.requireString("type", path),
             rating = json.optionalString("rating", path),
             year = json.optionalString("year", path),
+            genre = json.optionalString("genre", path),
             description = json.optionalString("description", path),
+            tagline = json.optionalString("tagline", path),
         )
     }
 
@@ -130,6 +132,7 @@ class HomeCatalogsContractTest {
             itemId = json.requireString("item_id", path),
             title = json.requireString("title", path),
             description = json.requireString("description", path),
+            tagline = json.optionalString("tagline", path),
             rating = json.optionalString("rating", path),
             year = json.optionalString("year", path),
             genres = json.requireJsonArray("genres", path).toStringList(path),

@@ -15,6 +15,7 @@ data class HomeCatalogItem(
     val year: String? = null,
     val genre: String? = null,
     val description: String? = null,
+    val tagline: String? = null,
 )
 
 enum class HomeCatalogSource(val key: String) {
@@ -86,6 +87,7 @@ data class HomeCatalogHeroItem(
     val itemId: String,
     val title: String,
     val description: String,
+    val tagline: String? = null,
     val rating: String?,
     val year: String? = null,
     val genres: List<String> = emptyList(),
@@ -323,9 +325,10 @@ private fun buildHeroResult(
                     itemId = item.itemId,
                     title = item.title,
                     description = item.description ?: fallbackDescription,
+                    tagline = item.tagline,
                     rating = item.rating,
                     year = item.year,
-                    genres = emptyList(),
+                    genres = listOfNotNull(item.genre),
                     artworkUrl = artwork,
                     artwork = item.artwork,
                     addonId = item.addonId,
