@@ -20,28 +20,26 @@ fun buildHomeLayoutState(
         blocks += HomeWideRailLayoutUi(key = section.key, kind = section.kind)
     }
 
-    var index = 0
-    while (index < catalogSectionLayoutMeta.size) {
-        val sectionMeta = catalogSectionLayoutMeta[index]
+    val collectionKeys = catalogSectionLayoutMeta
+        .filter { it.layout.equals("collection", ignoreCase = true) }
+        .map { it.key }
+
+    var collectionShelfPlaced = collectionKeys.isEmpty()
+
+    for (sectionMeta in catalogSectionLayoutMeta) {
         if (sectionMeta.layout.equals("collection", ignoreCase = true)) {
-            val groupedKeys = mutableListOf<String>()
-            while (
-                index < catalogSectionLayoutMeta.size &&
-                    catalogSectionLayoutMeta[index].layout.equals("collection", ignoreCase = true)
-            ) {
-                groupedKeys += catalogSectionLayoutMeta[index].key
-                index += 1
+            if (!collectionShelfPlaced) {
+                blocks += HomeCollectionShelfSectionUi(
+                    key = collectionKeys.joinToString(separator = ":", prefix = "collections:"),
+                    sectionKeys = collectionKeys,
+                )
+                collectionShelfPlaced = true
             }
-            blocks += HomeCollectionShelfSectionUi(
-                key = groupedKeys.joinToString(separator = ":", prefix = "collections:"),
-                sectionKeys = groupedKeys,
-            )
         } else {
             blocks += HomeCatalogRowSectionUi(
                 key = sectionMeta.key,
                 sectionKey = sectionMeta.key,
             )
-            index += 1
         }
     }
 
