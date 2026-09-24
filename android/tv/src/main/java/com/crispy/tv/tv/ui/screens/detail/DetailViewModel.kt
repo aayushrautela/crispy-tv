@@ -56,6 +56,12 @@ data class ExtraVideoUi(
     val thumbnailUrl: String?,
 )
 
+data class DetailListSection(
+    val key: String,
+    val title: String,
+    val items: List<CrispyCardItem>,
+)
+
 data class DetailUiState(
     val loading: Boolean = true,
     val error: String? = null,
@@ -76,7 +82,7 @@ data class DetailUiState(
     val episodes: List<DetailEpisodeUi> = emptyList(),
     val episodesLoading: Boolean = false,
     val cast: List<CastMemberUi> = emptyList(),
-    val similar: List<CrispyCardItem> = emptyList(),
+    val lists: List<DetailListSection> = emptyList(),
     val lookupMediaTypeName: String? = null,
     val lookupId: String? = null,
     val ctaLabel: String = "Watch now",
@@ -87,8 +93,6 @@ data class DetailUiState(
     val aiStoryVisible: Boolean = false,
     val aiUnavailable: Boolean = false,
     val extraVideos: List<ExtraVideoUi> = emptyList(),
-    val collectionName: String? = null,
-    val collectionItems: List<CrispyCardItem> = emptyList(),
     val titleRatings: CrispyBackendClient.MetadataTitleRatings? = null,
     val itemRating: Double? = null,
     val trailers: List<TvTrailerEntry> = emptyList(),
@@ -331,9 +335,13 @@ class DetailViewModel(
                     .distinctBy { it.id }
                     .map { company -> CompanyUi(id = company.id, name = company.name, logoUrl = company.logoUrl) },
                 detailRows = buildDetailRows(item, detailsModel, detail.production, isSeries, seasonCount),
-                collectionName = null,
-                collectionItems = extras?.collection.orEmpty().map { it.toCardItem() },
-                similar = extras?.similar.orEmpty().map { it.toCardItem() },
+                lists = extras?.lists.orEmpty().map { list ->
+                    DetailListSection(
+                        key = list.key,
+                        title = list.title,
+                        items = list.items.map { it.toCardItem() },
+                    )
+                },
                 trailers = buildTrailerSources(detail.videos),
             )
         }

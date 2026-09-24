@@ -326,13 +326,17 @@ public func getMetadataItemDetail(accessToken: String, itemId: String) async thr
 
 public func getMetadataItemExtras(accessToken: String, itemId: String) async throws -> MetadataTitleExtras {
         let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))/extras", accessToken: accessToken)
-        let collection = (json.jsonObject("Collection")?["Items"] as? [[String: Any]])?.compactMap { try? ClientMediaCard.parse($0) }
         return MetadataTitleExtras(
             seasons: json.jsonArray("Seasons").compactMap { try? ClientMediaCard.parse($0) },
-            similar: json.jsonArray("Similar").compactMap { try? ClientMediaCard.parse($0) },
             reviews: json.jsonArray("Reviews").compactMap(parseMetadataReview),
-            collection: collection,
-            collectionName: json.jsonString("CollectionName")
+            lists: json.jsonArray("Lists").compactMap { list in
+                guard let key = list["key"] as? String, let title = list["title"] as? String else { return nil }
+                return MetadataExtrasList(
+                    key: key,
+                    title: title,
+                    items: (list["items"] as? [[String: Any]])?.compactMap { try? ClientMediaCard.parse($0) } ?? []
+                )
+            }
         )
     }
 

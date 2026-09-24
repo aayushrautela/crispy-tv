@@ -2,7 +2,7 @@ import CrispyKit
 import SwiftUI
 
 /// Title details page, port of the Android `DetailsScreen` (hero, meta,
-/// watch CTA, overview, cast, seasons/episodes, similar).
+/// watch CTA, overview, cast, seasons/episodes, extras lists).
 struct DetailsScreen: View {
     let itemId: String
     let itemType: String
@@ -87,26 +87,28 @@ struct DetailsScreen: View {
                             .padding(.horizontal, 16)
                     }
 
-                    if !viewModel.similar.isEmpty {
-                        RailSectionView(title: "More like this") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(spacing: Theme.railSpacing) {
-                                    ForEach(viewModel.similar) { item in
-                                        NavigationLink(value: item.detailsRoute) {
-                                            LandscapeCardView(
-                                                title: item.title,
-                                                artworkUrl: item.artworkUrl,
-                                                logoUrl: item.logoUrl,
-                                                ratingText: item.ratingText,
-                                                yearText: item.yearText,
-                                                maturityRating: item.maturityRating,
-                                                genre: item.genre
-                                            )
+                    ForEach(viewModel.lists) { list in
+                        if !list.items.isEmpty {
+                            RailSectionView(title: list.title) {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    LazyHStack(spacing: Theme.railSpacing) {
+                                        ForEach(list.items) { item in
+                                            NavigationLink(value: item.detailsRoute) {
+                                                LandscapeCardView(
+                                                    title: item.title,
+                                                    artworkUrl: item.artworkUrl,
+                                                    logoUrl: item.logoUrl,
+                                                    ratingText: item.ratingText,
+                                                    yearText: item.yearText,
+                                                    maturityRating: item.maturityRating,
+                                                    genre: item.genre
+                                                )
+                                            }
+                                            .buttonStyle(.plain)
                                         }
-                                        .buttonStyle(.plain)
                                     }
+                                    .padding(.horizontal, 16)
                                 }
-                                .padding(.horizontal, 16)
                             }
                         }
                     }

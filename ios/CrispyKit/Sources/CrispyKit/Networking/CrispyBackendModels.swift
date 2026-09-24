@@ -299,12 +299,16 @@ public let backdrops: [String]
 public let nextEpisode: ClientMediaCard?
 }
 
+public struct MetadataExtrasList: Equatable {
+public let key: String
+public let title: String
+public let items: [ClientMediaCard]
+}
+
 public struct MetadataTitleExtras: Equatable {
 public let seasons: [ClientMediaCard]
-public let similar: [ClientMediaCard]
 public let reviews: [MetadataReview]
-public let collection: [ClientMediaCard]?
-public let collectionName: String?
+public let lists: [MetadataExtrasList]
 }
 
 public struct PersonKnownForItem: Equatable, Identifiable {

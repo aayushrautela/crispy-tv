@@ -102,7 +102,6 @@ data class PlayerUiState(
     val seasonEpisodes: List<MediaVideo> = emptyList(),
     val episodesIsLoading: Boolean = false,
     val episodesStatusMessage: String = "",
-    val collectionItems: List<CatalogItem> = emptyList(),
     val recommendedItems: List<CatalogItem> = emptyList(),
     val moreIsLoading: Boolean = false,
     val currentPlaybackUrl: String? = null,
@@ -860,20 +859,15 @@ class PlayerSessionViewModel(
                     add(id)
                     detailsIdKeys()?.let(::addAll)
                 }
-            val collection =
-                extras.collection.orEmpty()
+            val recommended =
+                extras.lists
+                    .flatMap { it.items }
                     .mapNotNull { it.toCatalogItem() }
                     .filter { it.itemId !in currentKeys }
-            val collectionKeys = collection.map { "${it.type}:${it.id}" }.toHashSet()
-            val recommended =
-                extras.similar
-                    .mapNotNull { it.toCatalogItem() }
-                    .filter { it.itemId !in currentKeys && "${it.type}:${it.id}" !in collectionKeys }
                     .distinctBy { "${it.type}:${it.id}" }
             _uiState.update {
                 it.copy(
                     moreIsLoading = false,
-                    collectionItems = collection,
                     recommendedItems = recommended,
                 )
             }

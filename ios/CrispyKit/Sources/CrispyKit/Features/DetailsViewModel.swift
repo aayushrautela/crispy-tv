@@ -3,7 +3,7 @@ import Observation
 import ContractRunner
 
 /// Port of the Android `DetailsViewModel` data assembly (backend slice):
-/// title detail + extras (seasons/similar) + season episodes.
+/// title detail + extras (seasons/lists) + season episodes.
 @MainActor
 @Observable
 public final class DetailsViewModel {
@@ -12,7 +12,7 @@ public let itemType: String
 
     public private(set) var detail: MetadataTitleDetail?
     public private(set) var seasons: [ClientMediaCard] = []
-    public private(set) var similar: [MediaCard] = []
+    public private(set) var lists: [ExtrasListSection] = []
     public private(set) var episodes: [ClientMediaCard] = []
     public private(set) var reviews: [MetadataReview] = []
     public private(set) var selectedSeasonNumber: Int?
@@ -54,7 +54,13 @@ public func load(environment: AppEnvironment) async {
 
             let extras = try? await extrasResult
             seasons = extras?.seasons ?? []
-            similar = (extras?.similar ?? []).map { MediaCard.from($0) }
+            lists = (extras?.lists ?? []).map { list in
+                ExtrasListSection(
+                    key: list.key,
+                    title: list.title,
+                    items: list.items.map { MediaCard.from($0) }
+                )
+            }
             reviews = extras?.reviews ?? []
             extrasLoaded = true
 
@@ -110,4 +116,11 @@ public func selectSeason(_ seasonNumber: Int, environment: AppEnvironment) async
             season: seasonNumber
         )) ?? []
     }
+}
+
+public struct ExtrasListSection: Equatable, Identifiable {
+    public let key: String
+    public let title: String
+    public let items: [MediaCard]
+    public var id: String { key }
 }

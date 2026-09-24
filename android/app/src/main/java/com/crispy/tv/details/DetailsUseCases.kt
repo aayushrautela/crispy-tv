@@ -208,7 +208,7 @@ internal class DetailsUseCases(
                 }.onSuccess { extras ->
                     Log.d(
                         TAG,
-                        "Loaded title extras for itemId=$itemId seasons=${extras.seasons.size} reviews=${extras.reviews.size} similar=${extras.similar.size} hasCollection=${extras.collection != null}",
+                        "Loaded title extras for itemId=$itemId seasons=${extras.seasons.size} reviews=${extras.reviews.size} lists=${extras.lists.map { "${it.key}:${it.items.size}" }}",
                     )
                 }.onFailure { error ->
                     Log.w(TAG, "Failed to load title extras for itemId=$itemId", error)

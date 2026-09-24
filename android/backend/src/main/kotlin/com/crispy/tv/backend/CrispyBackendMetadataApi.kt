@@ -13,6 +13,7 @@ import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal suspend fun CrispyBackendClient.searchTitlesApi(
@@ -180,12 +181,27 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
         MetadataTitleExtrasResponse(
             seasons = parseClientMediaCards(json.optJSONArray("Seasons")),
             reviews = parseMetadataReviewViews(json.optJSONArray("Reviews")),
-            similar = parseClientMediaCards(json.optJSONArray("Similar")),
-            collection = json.optJSONObject("Collection")?.optJSONArray("Items")?.let {
-                parseClientMediaCards(it).takeIf { cards -> cards.isNotEmpty() }
-            },
-            collectionName = json.optNullableString("CollectionName"),
+            lists = parseMetadataExtrasLists(json.optJSONArray("Lists")),
         )
+    }
+}
+
+internal fun CrispyBackendClient.parseMetadataExtrasLists(array: JSONArray?): List<CrispyBackendClient.MetadataExtrasList> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val list = safeArray.optJSONObject(index) ?: continue
+            val key = list.optString("key").trim()
+            val title = list.optString("title").trim()
+            if (key.isBlank() || title.isBlank()) continue
+            add(
+                CrispyBackendClient.MetadataExtrasList(
+                    key = key,
+                    title = title,
+                    items = parseClientMediaCards(list.optJSONArray("items")),
+                )
+            )
+        }
     }
 }
 

@@ -320,12 +320,16 @@ class CrispyBackendClient(
         val production: MetadataProductionInfoView,
     )
 
+    data class MetadataExtrasList(
+        val key: String,
+        val title: String,
+        val items: List<ClientMediaCard>,
+    )
+
     data class MetadataTitleExtrasResponse(
         val seasons: List<ClientMediaCard>,
         val reviews: List<MetadataReviewView>,
-        val similar: List<ClientMediaCard>,
-        val collection: List<ClientMediaCard>?,
-        val collectionName: String? = null,
+        val lists: List<MetadataExtrasList>,
     )
 
     data class MetadataSeriesEpisodesResponse(
