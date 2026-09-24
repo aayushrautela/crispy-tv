@@ -746,7 +746,7 @@ class CrispyBackendClient(
     suspend fun getWatchGenerations(
         accessToken: String,
         profileId: String,
-    ): WatchGenerationsResponse? {
+    ): WatchGenerationsResponse {
         return getWatchGenerationsApi(accessToken, profileId)
     }
 

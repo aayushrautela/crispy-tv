@@ -198,14 +198,14 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
 internal suspend fun CrispyBackendClient.getWatchGenerationsApi(
     accessToken: String,
     profileId: String,
-): WatchGenerationsResponse? {
+): WatchGenerationsResponse {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/generations".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = requireSuccess(response) ?: return null
+    val json = requireSuccess(response)
     return WatchGenerationsResponse(
         continueWatchingMs = json.optLongOrNull("continue_watching"),
         historyMs = json.optLongOrNull("history"),
