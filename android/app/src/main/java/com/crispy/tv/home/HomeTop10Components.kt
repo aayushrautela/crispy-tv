@@ -23,13 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +37,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.crispy.tv.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.crispyImageRequest
@@ -46,7 +46,7 @@ import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 private const val TOP10_LIMIT = 10
 private val Top10PosterWidth: Dp = 150.dp
 private val Top10Overlap: Dp = 14.dp
-private val Top10LineWidth: Dp = 2.dp
+private val Top10FontFamily = FontFamily(Font(R.font.bungee_outline))
 
 @Composable
 internal fun HomeTop10SectionRow(
@@ -161,22 +161,12 @@ private fun Top10HollowMark(
 private fun hollowTextStyle(
     fontSize: TextUnit,
     letterSpacing: TextUnit,
-): TextStyle {
-    val density = LocalDensity.current
-    val fontSizePx = with(density) { fontSize.toPx() }
-    val strokeWidthPx = with(density) { Top10LineWidth.toPx() }
-    return TextStyle(
-        fontSize = fontSize,
-        fontWeight = FontWeight.Black,
-        letterSpacing = letterSpacing,
-        color = MaterialTheme.colorScheme.primary,
-        drawStyle = Stroke(
-            width = strokeWidthPx,
-            join = StrokeJoin.Round,
-            pathEffect = PathEffect.cornerPathEffect(radius = fontSizePx * 0.08f),
-        ),
-    )
-}
+): TextStyle = TextStyle(
+    fontFamily = Top10FontFamily,
+    fontSize = fontSize,
+    letterSpacing = letterSpacing,
+    color = MaterialTheme.colorScheme.primary,
+)
 
 @Composable
 private fun HomeTop10Poster(
