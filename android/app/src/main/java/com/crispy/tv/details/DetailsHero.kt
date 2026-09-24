@@ -542,7 +542,7 @@ private fun HeroTrailerLayer(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                (LayoutInflater.from(ctx).inflate(R.layout.hero_trailer_player_view, null, false) as PlayerView).apply {
+                (LayoutInflater.from(ctx).inflate(com.crispy.tv.R.layout.hero_trailer_player_view, null, false) as PlayerView).apply {
                     layoutParams =
                         ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
