@@ -160,7 +160,7 @@ fun AiSearchButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_auto_awesome),
+            painter = painterResource(R.drawable.ic_wand_stars),
             contentDescription = "AI search",
             modifier = Modifier.rotate(rotation),
             tint = if (isHighlighted) {

@@ -373,7 +373,7 @@ internal fun HeaderInfoSection(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 CrispyIcon(
-                                    painter = painterResource(R.drawable.ic_auto_awesome),
+                                    painter = painterResource(R.drawable.ic_wand_stars),
                                     contentDescription = null,
                                 )
                             }
@@ -532,7 +532,7 @@ internal fun HeaderInfoSection(
                         contentAlignment = Alignment.Center,
                     ) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_auto_awesome),
+                            painter = painterResource(R.drawable.ic_wand_stars),
                             contentDescription = null,
                         )
                     }
