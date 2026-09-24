@@ -1,0 +1,36 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "page19_cap_clamps_has_more",
+  "input": {
+    "combo": {
+      "type": "all",
+      "genre": null,
+      "sort": "popularity"
+    },
+    "page": 19,
+    "responses": {
+      "movie": {
+        "items": [
+          { "item_id": "m-190", "type": "movie" }
+        ],
+        "has_more": true
+      },
+      "series": {
+        "items": [
+          { "item_id": "s-190", "type": "series" }
+        ],
+        "has_more": true
+      }
+    }
+  },
+  "expected": {
+    "requests": [
+      { "type": "movie", "genre": null, "sort": "popularity", "page": 19 },
+      { "type": "series", "genre": null, "sort": "popularity", "page": 19 }
+    ],
+    "items": ["m-190", "s-190"],
+    "has_more": false,
+    "next_page": null
+  }
+}

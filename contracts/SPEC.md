@@ -52,18 +52,28 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - Ratings dedupe by source case-insensitively while preserving first-seen order.
   - Append synthetic `Internet Movie Database` and `Metacritic` ratings from top-level OMDb fields only when those sources are otherwise absent.
 - `home_catalogs`
-  - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
+  - Plan home-screen hero shelves, header sections, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
   - `contract_version` 6 replaces `media_key` with opaque `item_id` on client-facing title items.
   - `contract_version` 7 removes the hero shelf limit; hero items include every valid item from the selected list (no `hero_limit` cap).
   - `contract_version` 9 surfaces the raw list `kind` (the wire `listKey`) as a named `kind` field on every section, instead of only living implicitly inside `catalog_id`.
+  - `contract_version` 10 removes the `discover` input/output and `listDiscoverCatalogs`; Discover now plans requests via the `browse_titles` suite instead of deriving catalog refs from the home snapshot.
   - Section metadata is preserved end-to-end: `kind`, `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection uses the first `presentation = hero` list; if no list has `presentation = hero`, the hero result is empty (no fallback to non-hero lists).
   - Hero items require `artwork_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
   - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | collection_shelf | rail` UI decisions and unknown values normalize to `rail`.
   - Wire-level `sectionType` ∈ {`categoryTabs`, `heroCarousel`, `contentRail`, `collectionRail`} is mapped to `presentation` deterministically: `categoryTabs` → `pill`, `heroCarousel` → `hero`, `collectionRail` → `collection_shelf`, else → `rail`.
   - All `presentation = collection_shelf` sections render as a single "Collections" shelf regardless of their position in the feed; cards keep feed order (recommended rails first, generic defaults after).
-  - Discover filtering accepts only `movie` and `show`, includes only `presentation = rail` sections, and page results use canonical attempted-url keys with source + kind + variant.
+  - Page results use canonical attempted-url keys with source + kind + variant.
+- `browse_titles`
+  - Deterministic Discover browse planning that mirrors the web Discover page: type fan-out, per-page merge order, and the page cap. Pure; no network/time.
+  - A combo is `{type, genre, sort}`. `type` ∈ {`all`, `movie`, `series`}; `all` fans out to `movie` then `series` (in that order), any other type yields a single request for that type.
+  - `genre` is trimmed; blank/`null` becomes `null` (omitted from the wire query). `sort` ∈ {`popularity`, `rating`, `release`} and is passed through.
+  - Pages are 0-based. `MAX_PAGES = 20`, so valid page indices are `0..19`; for `page >= MAX_PAGES` no requests are planned and the merged result is empty (`items = []`, `has_more = false`, `next_page = null`).
+  - Merged items are the per-type response items concatenated in fan-out order (movie items before series items) — never interleaved.
+  - Merged `has_more = any(response.has_more) && page < 19`.
+  - `next_page = has_more ? page + 1 : null`.
+  - A type with no supplied response contributes no items and no `has_more`.
 - `catalog_url_building`
   - Build deterministic addon catalog request URL variants from addon `base_url`, preserved manifest query params, media type, catalog id, pagination, and filters.
   - For first-page requests with no filters, try simple path first, then path-style extras, then legacy query style.

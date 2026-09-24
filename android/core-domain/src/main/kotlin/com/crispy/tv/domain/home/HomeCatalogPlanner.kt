@@ -118,12 +118,6 @@ data class HomeCatalogSection(
         get() = heading.ifBlank { title.ifBlank { name.ifBlank { catalogId } } }
 }
 
-data class HomeCatalogDiscoverRef(
-    val section: HomeCatalogSection,
-    val addonName: String,
-    val genres: List<String> = emptyList(),
-)
-
 data class HomeCatalogFeedPlan(
     val heroResult: HomeCatalogHeroResult = HomeCatalogHeroResult(),
     val sections: List<HomeCatalogSection> = emptyList(),
@@ -169,42 +163,6 @@ fun planPersonalHomeFeed(
         snapshot = snapshot,
         sectionLimit = sectionLimit,
     )
-}
-
-fun listDiscoverCatalogs(
-    snapshot: HomeCatalogSnapshot,
-    mediaType: String? = null,
-    limit: Int = Int.MAX_VALUE,
-): Pair<List<HomeCatalogDiscoverRef>, String> {
-    val normalizedType = mediaType?.trim()?.lowercase(Locale.US)?.takeIf { it.isNotBlank() }
-    if (normalizedType != null && normalizedType != "movie" && normalizedType != "show") {
-        return emptyList<HomeCatalogDiscoverRef>() to "Unsupported media type: $mediaType"
-    }
-
-    if (snapshot.lists.isEmpty()) {
-        return emptyList<HomeCatalogDiscoverRef>() to snapshot.statusMessage
-    }
-
-    val filteredLists =
-        snapshot.lists.filter { list ->
-            list.presentation == HomeCatalogPresentation.RAIL &&
-                (normalizedType == null || list.supportsMediaType(normalizedType))
-        }
-
-    if (filteredLists.isEmpty()) {
-        val suffix = if (normalizedType == null) "" else " for $normalizedType"
-        return emptyList<HomeCatalogDiscoverRef>() to "No discover catalogs found$suffix."
-    }
-
-    val targetCount = limit.coerceAtLeast(1)
-    val limitedLists = if (targetCount >= filteredLists.size) filteredLists else filteredLists.take(targetCount)
-    return limitedLists.map { list ->
-        HomeCatalogDiscoverRef(
-            section = list.toSection(),
-            addonName = "Supabase",
-            genres = emptyList(),
-        )
-    } to ""
 }
 
 fun buildCatalogPage(
@@ -371,19 +329,6 @@ private fun HomeCatalogList.toSection(): HomeCatalogSection {
         title = title,
         subtitle = subtitle,
     )
-}
-
-private fun HomeCatalogList.supportsMediaType(mediaType: String): Boolean {
-    val normalizedMediaType = mediaType.toHomeCatalogMediaType()
-    return mediaTypes.any { it.toHomeCatalogMediaType().equals(normalizedMediaType, ignoreCase = true) } ||
-        items.any { it.type.toHomeCatalogMediaType().equals(normalizedMediaType, ignoreCase = true) }
-}
-
-private fun String.toHomeCatalogMediaType(): String {
-    return when (trim().lowercase(Locale.US)) {
-        "series", "tv" -> "show"
-        else -> trim().lowercase(Locale.US)
-    }
 }
 
 private const val DEFAULT_VARIANT_KEY = "default"

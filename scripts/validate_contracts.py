@@ -15,6 +15,7 @@ SUITE_TO_SCHEMA = {
     "next_episode": "next_episode.schema.json",
     "omdb": "omdb.schema.json",
     "home_catalogs": "home_catalogs.schema.json",
+    "browse_titles": "browse_titles.schema.json",
     "catalog_url_building": "catalog_url_building.schema.json",
     "profile_sorting": "profile_sorting.schema.json",
     "profile_name_validation": "profile_name_validation.schema.json",

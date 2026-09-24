@@ -1,0 +1,30 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "movie_single_genre_p3",
+  "input": {
+    "combo": {
+      "type": "movie",
+      "genre": "drama",
+      "sort": "release"
+    },
+    "page": 3,
+    "responses": {
+      "movie": {
+        "items": [
+          { "item_id": "m-31", "type": "movie" },
+          { "item_id": "m-32", "type": "movie" }
+        ],
+        "has_more": true
+      }
+    }
+  },
+  "expected": {
+    "requests": [
+      { "type": "movie", "genre": "drama", "sort": "release", "page": 3 }
+    ],
+    "items": ["m-31", "m-32"],
+    "has_more": true,
+    "next_page": 4
+  }
+}

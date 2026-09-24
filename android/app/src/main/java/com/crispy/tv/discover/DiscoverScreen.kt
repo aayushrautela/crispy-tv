@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -69,11 +67,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.catalog.CatalogPagingSource
-import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.home.HomeCatalogService
+import com.crispy.tv.search.SearchGenreSuggestion
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
@@ -86,39 +81,40 @@ import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-enum class DiscoverTypeFilter(val label: String, val mediaType: String?) {
-    All(label = "All", mediaType = null),
-    Movies(label = "Movies", mediaType = "movie"),
-    Series(label = "Series", mediaType = "show")
+enum class DiscoverTypeFilter(val label: String, val value: String) {
+    All(label = "All", value = "all"),
+    Movies(label = "Movies", value = "movie"),
+    Series(label = "Shows", value = "series")
+}
+
+enum class DiscoverSortFilter(val label: String, val value: String) {
+    Trending(label = "Trending", value = "popularity"),
+    Rating(label = "Rating", value = "rating"),
+    ReleaseDate(label = "Release date", value = "release")
 }
 
 @Immutable
 data class DiscoverUiState(
-    val typeFilter: DiscoverTypeFilter = DiscoverTypeFilter.Movies,
-    val isRefreshing: Boolean = false,
-    val statusMessage: String = "",
-    val catalogs: List<DiscoverCatalogRef> = emptyList(),
-    val selectedCatalogKey: String? = null,
+    val typeFilter: DiscoverTypeFilter = DiscoverTypeFilter.All,
+    val genreKey: String? = null,
+    val genreLabel: String? = null,
+    val sortFilter: DiscoverSortFilter = DiscoverSortFilter.Trending,
 ) {
-    val selectedCatalog: DiscoverCatalogRef?
-        get() = catalogs.firstOrNull { it.key == selectedCatalogKey }
+    val comboKey: String
+        get() = "${typeFilter.value}|${genreKey.orEmpty()}|${sortFilter.value}"
 }
 
 class DiscoverViewModel(
-    private val homeCatalogService: HomeCatalogService
+    private val repository: BackendBrowseRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DiscoverUiState())
@@ -127,83 +123,44 @@ class DiscoverViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val items: Flow<PagingData<CatalogItem>> =
         _uiState
-            .map { it.selectedCatalog }
+            .map { it.comboKey }
             .distinctUntilChanged()
-            .flatMapLatest { selectedCatalog ->
-                if (selectedCatalog == null) {
-                    flowOf(PagingData.empty())
-                } else {
-                    Pager(
-                        config =
-                            PagingConfig(
-                                pageSize = PAGE_SIZE,
-                                initialLoadSize = PAGE_SIZE,
-                                prefetchDistance = 10,
-                                enablePlaceholders = false,
-                            ),
-                        pagingSourceFactory = {
-                            CatalogPagingSource(
-                                homeCatalogService = homeCatalogService,
-                                section = selectedCatalog.section,
-                            )
-                        },
-                    ).flow
-                }
+            .flatMapLatest { _ ->
+                val state = _uiState.value
+                Pager(
+                    config =
+                        PagingConfig(
+                            pageSize = PAGE_SIZE,
+                            initialLoadSize = PAGE_SIZE,
+                            prefetchDistance = 10,
+                            enablePlaceholders = false,
+                        ),
+                    pagingSourceFactory = {
+                        BrowsePagingSource(
+                            repository = repository,
+                            type = state.typeFilter.value,
+                            genre = state.genreKey,
+                            sort = state.sortFilter.value,
+                        )
+                    },
+                ).flow
             }.cachedIn(viewModelScope)
-
-    init {
-        refresh()
-    }
 
     fun setTypeFilter(filter: DiscoverTypeFilter) {
         _uiState.update { it.copy(typeFilter = filter) }
-        refresh(preserveCatalogs = false)
     }
 
-    fun selectCatalog(catalog: DiscoverCatalogRef) {
-        _uiState.update { it.copy(selectedCatalogKey = catalog.key) }
-    }
-
-    fun refresh() {
-        refresh(preserveCatalogs = true)
-    }
-
-    private fun refresh(preserveCatalogs: Boolean) {
-        val snapshot = uiState.value
-        val filterSnapshot = snapshot.typeFilter
-        val priorSelected = snapshot.selectedCatalogKey
-
+    fun setGenre(genre: SearchGenreSuggestion?) {
         _uiState.update {
             it.copy(
-                isRefreshing = true,
-                statusMessage = if (preserveCatalogs && it.catalogs.isNotEmpty()) it.statusMessage else "",
-                catalogs = if (preserveCatalogs) it.catalogs else emptyList(),
-                selectedCatalogKey = if (preserveCatalogs) it.selectedCatalogKey else null,
+                genreKey = genre?.key,
+                genreLabel = genre?.label,
             )
         }
+    }
 
-        viewModelScope.launch {
-            val catalogsResult =
-                withContext(Dispatchers.IO) {
-                    homeCatalogService.listDiscoverCatalogs(
-                        mediaType = filterSnapshot.mediaType,
-                    )
-                }
-            val catalogs = catalogsResult.first
-            val statusMessage = catalogsResult.second
-            val selectedKey =
-                priorSelected?.takeIf { key -> catalogs.any { it.key == key } }
-                    ?: catalogs.firstOrNull()?.key
-
-            _uiState.update {
-                it.copy(
-                    isRefreshing = false,
-                    catalogs = catalogs,
-                    selectedCatalogKey = selectedKey,
-                    statusMessage = statusMessage,
-                )
-            }
-        }
+    fun setSortFilter(filter: DiscoverSortFilter) {
+        _uiState.update { it.copy(sortFilter = filter) }
     }
 
     companion object {
@@ -214,7 +171,7 @@ class DiscoverViewModel(
                     if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
-                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext)
+                            repository = BackendBrowseRepository.create(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -273,12 +230,10 @@ fun DiscoverRoute(
             DiscoverScreen(
                 uiState = uiState,
                 pagingItems = pagingItems,
-                onRefresh = {
-                    viewModel.refresh()
-                    pagingItems.refresh()
-                },
+                onRefresh = { pagingItems.refresh() },
                 onTypeFilterClick = viewModel::setTypeFilter,
-                onCatalogClick = viewModel::selectCatalog,
+                onGenreClick = viewModel::setGenre,
+                onSortClick = viewModel::setSortFilter,
                 onItemClick = onItemClick,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,
@@ -289,7 +244,8 @@ fun DiscoverRoute(
 
 private enum class DiscoverSheet {
     Type,
-    Catalog
+    Genre,
+    Sort
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -299,20 +255,20 @@ private fun DiscoverScreen(
     pagingItems: LazyPagingItems<CatalogItem>,
     onRefresh: () -> Unit,
     onTypeFilterClick: (DiscoverTypeFilter) -> Unit,
-    onCatalogClick: (DiscoverCatalogRef) -> Unit,
+    onGenreClick: (SearchGenreSuggestion?) -> Unit,
+    onSortClick: (DiscoverSortFilter) -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
-    val selectedCatalog = uiState.selectedCatalog
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
     val gridState = rememberLazyGridState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
     val refreshState = pagingItems.loadState.refresh
     val appendState = pagingItems.loadState.append
-    val isRefreshing = uiState.isRefreshing || (refreshState is LoadState.Loading && pagingItems.itemCount > 0)
+    val isRefreshing = refreshState is LoadState.Loading && pagingItems.itemCount > 0
     val pagingStatusMessage =
         when {
             refreshState is LoadState.Error && pagingItems.itemCount > 0 -> {
@@ -325,6 +281,7 @@ private fun DiscoverScreen(
 
             else -> ""
         }
+    val genreLabel = uiState.genreLabel ?: "All genres"
 
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) {
@@ -389,10 +346,38 @@ private fun DiscoverScreen(
                         item {
                             FilterChip(
                                 selected = false,
-                                onClick = { activeSheet = DiscoverSheet.Catalog },
+                                onClick = { activeSheet = DiscoverSheet.Genre },
                                 label = {
                                     Text(
-                                        text = selectedCatalog?.section?.title ?: "Select catalog",
+                                        text = genreLabel,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_keyboard_arrow_down),
+                                        contentDescription = null
+                                    )
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                border = null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                    labelColor = MaterialTheme.colorScheme.onSurface,
+                                    selectedContainerColor = Color.White,
+                                    selectedLabelColor = Color(0xFF141414),
+                                ),
+                            )
+                        }
+
+                        item {
+                            FilterChip(
+                                selected = false,
+                                onClick = { activeSheet = DiscoverSheet.Sort },
+                                label = {
+                                    Text(
+                                        text = uiState.sortFilter.label,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -416,37 +401,18 @@ private fun DiscoverScreen(
 
                     }
                 }
-                if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
+                if (pagingStatusMessage.isNotBlank()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (selectedCatalog != null) {
-                                Text(
-                                    text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            if (uiState.statusMessage.isNotBlank()) {
-                                Text(
-                                    text = uiState.statusMessage,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            if (pagingStatusMessage.isNotBlank() && pagingStatusMessage != uiState.statusMessage) {
-                                Text(
-                                    text = pagingStatusMessage,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        Text(
+                            text = pagingStatusMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = Dimensions.SmallSpacing)
+                        )
                     }
                 }
 
-                if ((uiState.isRefreshing && uiState.catalogs.isEmpty()) || (refreshState is LoadState.Loading && pagingItems.itemCount == 0 && selectedCatalog != null)) {
+                if (refreshState is LoadState.Loading && pagingItems.itemCount == 0) {
                     items(DISCOVER_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "discover-skeleton-$index" }, contentType = { "posterSkeleton" }) {
                         DiscoverPosterSkeleton(modifier = Modifier.fillMaxWidth())
                     }
@@ -460,9 +426,8 @@ private fun DiscoverScreen(
                                 Text(
                                     text =
                                         when {
-                                            selectedCatalog == null -> "Select a catalog to start discovering"
                                             refreshState is LoadState.Error -> refreshState.error.message ?: "Failed to load results."
-                                            else -> "No content found"
+                                            else -> "No results found. Try changing the filters."
                                         },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -574,71 +539,115 @@ private fun DiscoverScreen(
                         }
                     }
 
-                    DiscoverSheet.Catalog -> {
+                    DiscoverSheet.Genre -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(bottom = safeBottomPadding())
                     ) {
                             item {
                                 Text(
-                                    text = "Catalog",
+                                    text = "Genre",
                                     style = MaterialTheme.typography.titleMedium,
                                     modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
                                 )
                             }
-                            if (uiState.catalogs.isEmpty()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = Dimensions.PageBottomPadding),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "No catalogs available",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            item {
+                                ListItem(
+                                    leadingContent = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_layers),
+                                            contentDescription = null
                                         )
-                                    }
-                                }
-                            } else {
-                                items(
-                                    items = uiState.catalogs,
-                                    key = { it.key }
-                                ) { catalog ->
-                                    ListItem(
-                                         supportingContent = {
-                                             Text(
-                                                 text = catalog.addonName,
-                                                 maxLines = 1,
-                                                 overflow = TextOverflow.Ellipsis
-                                             )
-                                         },
-                                        trailingContent =
-                                            if (uiState.selectedCatalogKey == catalog.key) {
-                                                {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.ic_check),
-                                                        contentDescription = null
-                                                    )
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                onCatalogClick(catalog)
-                                                activeSheet = null
+                                    },
+                                    trailingContent =
+                                        if (uiState.genreKey == null) {
+                                            {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.ic_check),
+                                                    contentDescription = null
+                                                )
                                             }
-                                            .padding(horizontal = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = catalog.section.title,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                        } else {
+                                            null
+                                        },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onGenreClick(null)
+                                            activeSheet = null
+                                        }
+                                        .padding(horizontal = 4.dp)
+                                ) {
+                                    Text("All genres")
+                                }
+                            }
+                            items(SearchGenreSuggestion.entries) { genre ->
+                                ListItem(
+                                    leadingContent = {
+                                        Icon(
+                                            painter = painterResource(genre.imageResId),
+                                            contentDescription = null
                                         )
-                                    }
+                                    },
+                                    trailingContent =
+                                        if (uiState.genreKey == genre.key) {
+                                            {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.ic_check),
+                                                    contentDescription = null
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onGenreClick(genre)
+                                            activeSheet = null
+                                        }
+                                        .padding(horizontal = 4.dp)
+                                ) {
+                                    Text(genre.label)
+                                }
+                            }
+                        }
+                    }
+
+                    DiscoverSheet.Sort -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(bottom = safeBottomPadding())
+                    ) {
+                            item {
+                                Text(
+                                    text = "Sort by",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
+                                )
+                            }
+                            items(DiscoverSortFilter.entries) { filter ->
+                                ListItem(
+                                    trailingContent =
+                                        if (uiState.sortFilter == filter) {
+                                            {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.ic_check),
+                                                    contentDescription = null
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+.clickable {
+                                            onSortClick(filter)
+                                            activeSheet = null
+                                        }
+                                        .padding(horizontal = 4.dp)
+                                ) {
+                                    Text(filter.label)
                                 }
                             }
                         }

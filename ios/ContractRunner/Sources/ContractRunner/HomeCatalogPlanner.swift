@@ -209,18 +209,6 @@ public struct HomeCatalogSection: Equatable {
     }
 }
 
-public struct HomeCatalogDiscoverRef: Equatable {
-    public let section: HomeCatalogSection
-    public let addonName: String
-    public let genres: [String]
-
-    public init(section: HomeCatalogSection, addonName: String, genres: [String] = []) {
-        self.section = section
-        self.addonName = addonName
-        self.genres = genres
-    }
-}
-
 public struct HomeCatalogFeedPlan: Equatable {
     public let heroResult: HomeCatalogHeroResult
     public let sections: [HomeCatalogSection]
@@ -285,43 +273,6 @@ public func planPersonalHomeFeed(
     sectionLimit: Int = .max
 ) -> HomeCatalogFeedPlan {
     planHomeFeed(snapshot: snapshot, sectionLimit: sectionLimit)
-}
-
-public func listDiscoverCatalogs(
-    snapshot: HomeCatalogSnapshot,
-    mediaType: String? = nil,
-    limit: Int = .max
-) -> ([HomeCatalogDiscoverRef], String) {
-    let normalizedType = mediaType?
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .lowercased()
-        .nilIfBlank()
-
-    if let normalizedType, normalizedType != "movie", normalizedType != "show" {
-        return ([], "Unsupported media type: \(mediaType ?? "")")
-    }
-
-    guard !snapshot.lists.isEmpty else {
-        return ([], snapshot.statusMessage)
-    }
-
-    let filteredLists = snapshot.lists.filter { list in
-        list.presentation == .rail && (normalizedType == nil || list.supportsMediaType(normalizedType!))
-    }
-
-    guard !filteredLists.isEmpty else {
-        let suffix = normalizedType.map { " for \($0)" } ?? ""
-        return ([], "No discover catalogs found\(suffix).")
-    }
-
-    let targetCount = max(limit, 1)
-    let limitedLists = targetCount >= filteredLists.count ? filteredLists : Array(filteredLists.prefix(targetCount))
-    return (
-        limitedLists.map { list in
-            HomeCatalogDiscoverRef(section: list.toSection(), addonName: "Supabase", genres: [])
-        },
-        ""
-    )
 }
 
 public func buildCatalogPage(
@@ -468,24 +419,9 @@ private extension HomeCatalogList {
             subtitle: subtitle
         )
     }
-
-    func supportsMediaType(_ mediaType: String) -> Bool {
-        let normalizedMediaType = mediaType.toHomeCatalogMediaType()
-        return mediaTypes.contains(where: { $0.toHomeCatalogMediaType().caseInsensitiveCompare(normalizedMediaType) == .orderedSame }) ||
-            items.contains(where: { $0.type.toHomeCatalogMediaType().caseInsensitiveCompare(normalizedMediaType) == .orderedSame })
-    }
 }
 
 private extension String {
-    func toHomeCatalogMediaType() -> String {
-        switch trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "series", "tv":
-            return "show"
-        default:
-            return trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        }
-    }
-
     func nilIfBlank() -> String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

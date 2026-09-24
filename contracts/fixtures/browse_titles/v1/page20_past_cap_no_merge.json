@@ -1,0 +1,31 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "page20_past_cap_no_merge",
+  "input": {
+    "combo": {
+      "type": "all",
+      "genre": null,
+      "sort": "popularity"
+    },
+    "page": 20,
+    "responses": {
+      "movie": {
+        "items": [
+          { "item_id": "m-200", "type": "movie" }
+        ],
+        "has_more": true
+      },
+      "series": {
+        "items": [],
+        "has_more": true
+      }
+    }
+  },
+  "expected": {
+    "requests": [],
+    "items": [],
+    "has_more": false,
+    "next_page": null
+  }
+}

@@ -9,6 +9,7 @@ import com.crispy.tv.backend.CrispyBackendClient.ClientImages
 import com.crispy.tv.backend.CrispyBackendClient.CalendarItem
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
+import com.crispy.tv.backend.CrispyBackendClient.BrowseTitlesResponse
 import com.crispy.tv.backend.CrispyBackendClient.ClientParentImages
 import com.crispy.tv.backend.CrispyBackendClient.ClientParentRef
 import com.crispy.tv.backend.CrispyBackendClient.ClientProgress
@@ -236,6 +237,17 @@ internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): S
         movies = parseClientMediaCards(json.optJSONArray("movies")),
         series = parseClientMediaCards(json.optJSONArray("series")),
         people = parsePersonSearchResultItems(json.optJSONArray("people")),
+    )
+}
+
+internal fun CrispyBackendClient.parseBrowseTitlesResponse(json: JSONObject): BrowseTitlesResponse {
+    val itemsArray = json.optJSONArray("items")
+    val total = json.optIntOrNull("total")
+    val hasMore = json.optBoolean("hasMore", false)
+    return BrowseTitlesResponse(
+        items = parseClientMediaCards(itemsArray),
+        total = total,
+        hasMore = hasMore,
     )
 }
 

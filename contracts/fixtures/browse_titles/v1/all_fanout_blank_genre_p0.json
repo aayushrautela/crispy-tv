@@ -1,0 +1,38 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "all_fanout_blank_genre_p0",
+  "input": {
+    "combo": {
+      "type": "all",
+      "genre": "",
+      "sort": "popularity"
+    },
+    "page": 0,
+    "responses": {
+      "movie": {
+        "items": [
+          { "item_id": "m-1", "type": "movie" },
+          { "item_id": "m-2", "type": "movie" }
+        ],
+        "has_more": true
+      },
+      "series": {
+        "items": [
+          { "item_id": "s-1", "type": "series" },
+          { "item_id": "s-2", "type": "series" }
+        ],
+        "has_more": false
+      }
+    }
+  },
+  "expected": {
+    "requests": [
+      { "type": "movie", "genre": null, "sort": "popularity", "page": 0 },
+      { "type": "series", "genre": null, "sort": "popularity", "page": 0 }
+    ],
+    "items": ["m-1", "m-2", "s-1", "s-2"],
+    "has_more": true,
+    "next_page": 1
+  }
+}

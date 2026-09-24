@@ -268,6 +268,14 @@ public struct SearchSuggestionsResponse: Equatable {
 public let suggestions: [SearchSuggestionItem]
 }
 
+// MARK: - Browse
+
+public struct BrowseTitlesResponse: Equatable {
+    public let items: [ClientMediaCard]
+    public let total: Int?
+    public let hasMore: Bool
+}
+
 // MARK: - Watch actions
 
 public struct WatchActionResponse: Equatable {

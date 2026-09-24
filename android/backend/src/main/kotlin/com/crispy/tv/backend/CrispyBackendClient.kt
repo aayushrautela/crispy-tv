@@ -259,6 +259,14 @@ class CrispyBackendClient(
         val items: List<UpNextItem>,
     )
 
+    // --- Browse ---
+
+    data class BrowseTitlesResponse(
+        val items: List<ClientMediaCard>,
+        val total: Int?,
+        val hasMore: Boolean,
+    )
+
     // --- Watch State ---
 
     data class WatchedStateView(
@@ -685,6 +693,24 @@ class CrispyBackendClient(
         profileId: String,
     ): ProfileHomeResponse? {
         return getHomeApi(accessToken, profileId)
+    }
+
+    suspend fun browseTitles(
+        accessToken: String,
+        type: String,
+        genre: String? = null,
+        sort: String = "popularity",
+        page: Int = 0,
+        limit: Int = 60,
+    ): BrowseTitlesResponse {
+        return browseTitlesApi(
+            accessToken = accessToken,
+            type = type,
+            genre = genre,
+            sort = sort,
+            page = page,
+            limit = limit,
+        )
     }
 
     suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {

@@ -1,5 +1,5 @@
 {
-  "contract_version": 9,
+  "contract_version": 10,
   "suite": "home_catalogs",
   "case_id": "no_hero_list_yields_empty_hero_result",
   "input": {
@@ -70,10 +70,6 @@
       ]
     },
     "section_limit": 0,
-    "discover": {
-      "media_type": null,
-      "limit": 0
-    },
     "page": {
       "catalog_id": "personal:featured:default",
       "page": 0,
@@ -101,39 +97,19 @@
       ],
       "sections_status_message": ""
     },
-    "discover": {
-      "catalogs": [
+    "page": {
+      "items": [
         {
-          "section": {
-            "kind": "featured",
-            "catalog_id": "personal:featured:default",
-            "source": "personal",
-            "presentation": "rail",
-            "variant_key": "default",
-            "name": "featured",
-            "heading": "Staff picks",
-            "title": "Featured",
-            "subtitle": ""
-          },
-          "addon_name": "Supabase",
-          "genres": []
+          "item_id": "show:tmdb:95396",
+          "title": "Severance",
+          "artwork_url": "https://img/severance.jpg",
+          "addon_id": "supabase",
+          "type": "series",
+          "rating": null,
+          "year": "2022",
+          "description": null
         }
       ],
-      "status_message": ""
-    },
-      "page": {
-        "items": [
-          {
-            "item_id": "show:tmdb:95396",
-            "title": "Severance",
-            "artwork_url": "https://img/severance.jpg",
-            "addon_id": "supabase",
-            "type": "series",
-            "rating": null,
-            "year": "2022",
-            "description": null
-          }
-        ],
       "status_message": "",
       "attempted_urls": [
         "supabase:personal:p1:featured:default:page=1"

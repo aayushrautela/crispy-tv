@@ -56,13 +56,3 @@ data class CatalogPageResult(
     val statusMessage: String = "",
     val attemptedUrls: List<String> = emptyList()
 )
-
-@Immutable
-data class DiscoverCatalogRef(
-    val section: CatalogSectionRef,
-    val addonName: String,
-    val genres: List<String> = emptyList()
-) {
-    val key: String
-        get() = section.key
-}

@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "series_single_trim_genre_p0",
+  "input": {
+    "combo": {
+      "type": "series",
+      "genre": "  horror ",
+      "sort": "popularity"
+    },
+    "page": 0,
+    "responses": {
+      "series": {
+        "items": [
+          { "item_id": "s-20", "type": "series" }
+        ],
+        "has_more": true
+      }
+    }
+  },
+  "expected": {
+    "requests": [
+      { "type": "series", "genre": "horror", "sort": "popularity", "page": 0 }
+    ],
+    "items": ["s-20"],
+    "has_more": true,
+    "next_page": 1
+  }
+}

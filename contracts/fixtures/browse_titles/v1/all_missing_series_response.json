@@ -1,0 +1,31 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "all_missing_series_response",
+  "input": {
+    "combo": {
+      "type": "all",
+      "genre": "comedy",
+      "sort": "release"
+    },
+    "page": 5,
+    "responses": {
+      "movie": {
+        "items": [
+          { "item_id": "m-51", "type": "movie" },
+          { "item_id": "m-52", "type": "movie" }
+        ],
+        "has_more": true
+      }
+    }
+  },
+  "expected": {
+    "requests": [
+      { "type": "movie", "genre": "comedy", "sort": "release", "page": 5 },
+      { "type": "series", "genre": "comedy", "sort": "release", "page": 5 }
+    ],
+    "items": ["m-51", "m-52"],
+    "has_more": true,
+    "next_page": 6
+  }
+}

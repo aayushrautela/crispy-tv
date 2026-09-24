@@ -1,0 +1,37 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "all_fanout_genre_has_more_false_p0",
+  "input": {
+    "combo": {
+      "type": "all",
+      "genre": "action",
+      "sort": "rating"
+    },
+    "page": 0,
+    "responses": {
+      "movie": {
+        "items": [
+          { "item_id": "m-10", "type": "movie" }
+        ],
+        "has_more": false
+      },
+      "series": {
+        "items": [
+          { "item_id": "s-10", "type": "series" },
+          { "item_id": "s-11", "type": "series" }
+        ],
+        "has_more": false
+      }
+    }
+  },
+  "expected": {
+    "requests": [
+      { "type": "movie", "genre": "action", "sort": "rating", "page": 0 },
+      { "type": "series", "genre": "action", "sort": "rating", "page": 0 }
+    ],
+    "items": ["m-10", "s-10", "s-11"],
+    "has_more": false,
+    "next_page": null
+  }
+}

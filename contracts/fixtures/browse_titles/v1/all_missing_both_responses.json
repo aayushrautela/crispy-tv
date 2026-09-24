@@ -1,0 +1,23 @@
+{
+  "contract_version": 1,
+  "suite": "browse_titles",
+  "case_id": "all_missing_both_responses",
+  "input": {
+    "combo": {
+      "type": "all",
+      "genre": "  ",
+      "sort": "rating"
+    },
+    "page": 7,
+    "responses": {}
+  },
+  "expected": {
+    "requests": [
+      { "type": "movie", "genre": null, "sort": "rating", "page": 7 },
+      { "type": "series", "genre": null, "sort": "rating", "page": 7 }
+    ],
+    "items": [],
+    "has_more": false,
+    "next_page": null
+  }
+}

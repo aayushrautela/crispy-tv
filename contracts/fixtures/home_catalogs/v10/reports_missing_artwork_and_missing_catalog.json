@@ -1,7 +1,7 @@
 {
-  "contract_version": 9,
+  "contract_version": 10,
   "suite": "home_catalogs",
-  "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
+  "case_id": "reports_missing_artwork_and_missing_catalog",
   "input": {
     "snapshot": {
       "profile_id": "p2",
@@ -60,10 +60,6 @@
       ]
     },
     "section_limit": 5,
-    "discover": {
-      "media_type": "anime",
-      "limit": 2
-    },
     "page": {
       "catalog_id": "personal:unknown:default",
       "page": 1,
@@ -90,10 +86,6 @@
         }
       ],
       "sections_status_message": ""
-    },
-    "discover": {
-      "catalogs": [],
-      "status_message": "Unsupported media type: anime"
     },
     "page": {
       "items": [],

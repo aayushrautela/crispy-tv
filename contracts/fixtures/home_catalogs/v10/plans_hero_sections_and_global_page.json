@@ -1,7 +1,7 @@
 {
-  "contract_version": 9,
+  "contract_version": 10,
   "suite": "home_catalogs",
-  "case_id": "plans_hero_sections_discover_and_global_page",
+  "case_id": "plans_hero_sections_and_global_page",
   "input": {
     "snapshot": {
       "profile_id": "profile-123",
@@ -115,10 +115,6 @@
       ]
     },
     "section_limit": 2,
-    "discover": {
-      "media_type": "show",
-      "limit": 3
-    },
     "page": {
       "catalog_id": "personal:trending-series:default",
       "page": 2,
@@ -179,26 +175,6 @@
         }
       ],
       "sections_status_message": ""
-    },
-    "discover": {
-      "catalogs": [
-        {
-          "section": {
-            "kind": "trending-series",
-            "catalog_id": "personal:trending-series:default",
-            "source": "personal",
-            "presentation": "rail",
-            "variant_key": "default",
-            "name": "trending-series",
-            "heading": "",
-            "title": "Trending Series",
-            "subtitle": "Binge now"
-          },
-          "addon_name": "Supabase",
-          "genres": []
-        }
-      ],
-      "status_message": ""
     },
     "page": {
       "items": [

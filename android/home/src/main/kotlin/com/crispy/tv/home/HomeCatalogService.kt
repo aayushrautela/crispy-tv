@@ -8,14 +8,12 @@ import com.crispy.tv.backend.toStringMap
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.catalog.DiscoverCatalogRef
 import com.crispy.tv.domain.home.HomeCatalogItem
 import com.crispy.tv.domain.home.HomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogSnapshot
 import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.domain.home.buildCatalogPage
-import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
 import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.images.ResponsiveImageSet
@@ -40,7 +38,6 @@ private const val PREVIEW_ITEM_LIMIT = 12
 // never paints an empty home. The server is the refresh trigger, not a client
 // timer, so the cache is intentionally not time-bounded here.
 private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
-private const val DISCOVER_ADDON_NAME = "Crispy"
 
 @Immutable
 data class HomeHeroItem(
@@ -94,33 +91,6 @@ class HomeCatalogService constructor(
         val snapshot = readCachedSnapshot(profileId = backendContext?.profileId, maxAgeMs = null)
             ?: return null
         return snapshot.toPrimaryHomeFeedLoadResult(sectionLimit = sectionLimit)
-    }
-
-    suspend fun listDiscoverCatalogs(
-        mediaType: String? = null,
-        limit: Int = Int.MAX_VALUE,
-    ): Pair<List<DiscoverCatalogRef>, String> {
-        val snapshot = loadSnapshot()
-        val (catalogs, statusMessage) = listDiscoverCatalogs(snapshot, mediaType = mediaType, limit = limit)
-        return catalogs.map { catalog ->
-            DiscoverCatalogRef(
-                section =
-                    CatalogSectionRef(
-                        catalogId = catalog.section.catalogId,
-                        source = catalog.section.source,
-                        presentation = catalog.section.presentation,
-                        layout = catalog.section.layout.orEmpty(),
-                        variantKey = catalog.section.variantKey,
-                        kind = catalog.section.kind,
-                        name = catalog.section.name,
-                        heading = catalog.section.heading,
-                        title = catalog.section.title,
-                        subtitle = catalog.section.subtitle,
-                    ),
-                addonName = DISCOVER_ADDON_NAME,
-                genres = catalog.genres,
-            )
-        } to statusMessage
     }
 
     suspend fun fetchCatalogPage(

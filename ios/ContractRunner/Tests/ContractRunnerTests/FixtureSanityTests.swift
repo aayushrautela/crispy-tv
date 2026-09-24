@@ -12,6 +12,7 @@ final class FixtureSanityTests: XCTestCase {
             "next_episode",
             "omdb",
             "home_catalogs",
+            "browse_titles",
             "catalog_url_building",
             "sync_planner",
             "storage_v1",

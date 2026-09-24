@@ -15,17 +15,11 @@ final class HomeCatalogsContractTests: XCTestCase {
             let input = try requireObject(root, "input", fixture: fixtureURL)
             let expected = try requireObject(root, "expected", fixture: fixtureURL)
             let snapshot = try parseSnapshot(try requireObject(input, "snapshot", fixture: fixtureURL), fixture: fixtureURL)
-            let discoverInput = try requireObject(input, "discover", fixture: fixtureURL)
             let pageInput = try requireObject(input, "page", fixture: fixtureURL)
 
             let actualPersonalFeed = planPersonalHomeFeed(
                 snapshot: snapshot,
                 sectionLimit: try requireInt(input, "section_limit", fixture: fixtureURL)
-            )
-            let actualDiscover = listDiscoverCatalogs(
-                snapshot: snapshot,
-                mediaType: optionalString(discoverInput, "media_type"),
-                limit: try requireInt(discoverInput, "limit", fixture: fixtureURL)
             )
             let actualPage = buildCatalogPage(
                 snapshot: snapshot,
@@ -35,9 +29,6 @@ final class HomeCatalogsContractTests: XCTestCase {
             )
 
             XCTAssertEqual(try parsePersonalFeed(try requireObject(expected, "personal_feed", fixture: fixtureURL), fixture: fixtureURL), actualPersonalFeed, "\(caseId): personal_feed")
-            let expectedDiscover = try parseDiscover(try requireObject(expected, "discover", fixture: fixtureURL), fixture: fixtureURL)
-            XCTAssertEqual(expectedDiscover.catalogs, actualDiscover.0, "\(caseId): discover catalogs")
-            XCTAssertEqual(expectedDiscover.statusMessage, actualDiscover.1, "\(caseId): discover status")
             XCTAssertEqual(try parsePage(try requireObject(expected, "page", fixture: fixtureURL), fixture: fixtureURL), actualPage, "\(caseId): page")
         }
     }
@@ -144,25 +135,6 @@ final class HomeCatalogsContractTests: XCTestCase {
             heading: optionalString(object, "heading") ?? "",
             title: optionalString(object, "title") ?? "",
             subtitle: optionalString(object, "subtitle") ?? ""
-        )
-    }
-
-    private func parseDiscover(_ object: [String: Any], fixture: URL) throws -> (catalogs: [HomeCatalogDiscoverRef], statusMessage: String) {
-        return (
-            catalogs: try requireArray(object, "catalogs", fixture: fixture).map { try parseDiscoverRef($0, fixture: fixture) },
-            statusMessage: try requireString(object, "status_message", fixture: fixture)
-        )
-    }
-
-    private func parseDiscoverRef(_ value: Any, fixture: URL) throws -> HomeCatalogDiscoverRef {
-        guard let object = value as? [String: Any] else {
-            throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): discover ref must be an object")
-        }
-
-        return HomeCatalogDiscoverRef(
-            section: try parseSection(try requireObject(object, "section", fixture: fixture), fixture: fixture),
-            addonName: try requireString(object, "addon_name", fixture: fixture),
-            genres: try stringArrayValue(try requireArray(object, "genres", fixture: fixture), fixture: fixture, field: "genres")
         )
     }
 

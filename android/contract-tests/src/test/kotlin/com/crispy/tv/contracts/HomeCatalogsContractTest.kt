@@ -1,6 +1,5 @@
 package com.crispy.tv.contracts
 
-import com.crispy.tv.domain.home.HomeCatalogDiscoverRef
 import com.crispy.tv.domain.home.HomeCatalogHeroItem
 import com.crispy.tv.domain.home.HomeCatalogHeroResult
 import com.crispy.tv.domain.home.HomeCatalogItem
@@ -12,7 +11,6 @@ import com.crispy.tv.domain.home.HomeCatalogSection
 import com.crispy.tv.domain.home.HomeCatalogSnapshot
 import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.domain.home.buildCatalogPage
-import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
 import java.nio.file.Path
 import kotlin.test.Test
@@ -35,17 +33,11 @@ class HomeCatalogsContractTest {
             val input = fixture.requireJsonObject("input", path)
             val expected = fixture.requireJsonObject("expected", path)
             val snapshot = parseSnapshot(input.requireJsonObject("snapshot", path), path)
-            val discoverInput = input.requireJsonObject("discover", path)
             val pageInput = input.requireJsonObject("page", path)
 
             val actualPersonalFeed = planPersonalHomeFeed(
                 snapshot = snapshot,
                 sectionLimit = input.requireInt("section_limit", path),
-            )
-            val actualDiscover = listDiscoverCatalogs(
-                snapshot = snapshot,
-                mediaType = discoverInput.optionalString("media_type", path),
-                limit = discoverInput.requireInt("limit", path),
             )
             val actualPage = buildCatalogPage(
                 snapshot = snapshot,
@@ -58,11 +50,6 @@ class HomeCatalogsContractTest {
                 parsePersonalFeed(expected.requireJsonObject("personal_feed", path), path),
                 actualPersonalFeed,
                 "$caseId: personal_feed",
-            )
-            assertEquals(
-                parseDiscover(expected.requireJsonObject("discover", path), path),
-                actualDiscover,
-                "$caseId: discover",
             )
             assertEquals(
                 parsePage(expected.requireJsonObject("page", path), path),
@@ -155,19 +142,6 @@ class HomeCatalogsContractTest {
             heading = json.optionalString("heading", path).orEmpty(),
             title = json.optionalString("title", path).orEmpty(),
             subtitle = json.optionalString("subtitle", path).orEmpty(),
-        )
-    }
-
-    private fun parseDiscover(json: JsonObject, path: Path): Pair<List<HomeCatalogDiscoverRef>, String> {
-        return json.requireJsonArray("catalogs", path).map { parseDiscoverRef(it.jsonObject, path) } to
-            json.requireString("status_message", path)
-    }
-
-    private fun parseDiscoverRef(json: JsonObject, path: Path): HomeCatalogDiscoverRef {
-        return HomeCatalogDiscoverRef(
-            section = parseSection(json.requireJsonObject("section", path), path),
-            addonName = json.requireString("addon_name", path),
-            genres = json.requireJsonArray("genres", path).toStringList(path),
         )
     }
 

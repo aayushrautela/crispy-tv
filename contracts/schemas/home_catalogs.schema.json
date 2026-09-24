@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 9
+      "minimum": 10
     },
     "suite": {
       "const": "home_catalogs"
@@ -26,7 +26,6 @@
       "required": [
         "snapshot",
         "section_limit",
-        "discover",
         "page"
       ],
       "additionalProperties": false,
@@ -36,25 +35,6 @@
         },
         "section_limit": {
           "type": "integer"
-        },
-        "discover": {
-          "type": "object",
-          "required": [
-            "media_type",
-            "limit"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "media_type": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "limit": {
-              "type": "integer"
-            }
-          }
         },
         "page": {
           "type": "object",
@@ -82,7 +62,6 @@
       "type": "object",
       "required": [
         "personal_feed",
-        "discover",
         "page"
       ],
       "additionalProperties": false,
@@ -122,25 +101,6 @@
               }
             },
             "sections_status_message": {
-              "type": "string"
-            }
-          }
-        },
-        "discover": {
-          "type": "object",
-          "required": [
-            "catalogs",
-            "status_message"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "catalogs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/discover_ref"
-              }
-            },
-            "status_message": {
               "type": "string"
             }
           }
@@ -423,29 +383,6 @@
         },
         "subtitle": {
           "type": "string"
-        }
-      }
-    },
-    "discover_ref": {
-      "type": "object",
-      "required": [
-        "section",
-        "addon_name",
-        "genres"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "section": {
-          "$ref": "#/$defs/section"
-        },
-        "addon_name": {
-          "type": "string"
-        },
-        "genres": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       }
     }

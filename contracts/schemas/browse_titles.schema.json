@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "browse_titles"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "combo",
+        "page",
+        "responses"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "combo": {
+          "type": "object",
+          "required": [
+            "type",
+            "genre",
+            "sort"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "genre": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sort": {
+              "type": "string"
+            }
+          }
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "movie": {
+              "$ref": "#/$defs/type_response"
+            },
+            "series": {
+              "$ref": "#/$defs/type_response"
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "requests",
+        "items",
+        "has_more",
+        "next_page"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/request"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "next_page": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "type_response": {
+      "type": "object",
+      "required": [
+        "items",
+        "has_more"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/response_item"
+          }
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      }
+    },
+    "response_item": {
+      "type": "object",
+      "required": [
+        "item_id",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "type",
+        "genre",
+        "sort",
+        "page"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "genre": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sort": {
+          "type": "string"
+        },
+        "page": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

@@ -154,6 +154,37 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         )
     }
 
+    // MARK: - Browse
+
+    public func browseTitles(
+        accessToken: String,
+        type: String,
+        genre: String? = nil,
+        sort: String = "popularity",
+        page: Int = 0,
+        limit: Int = 60
+    ) async throws -> BrowseTitlesResponse {
+        var items = [
+            URLQueryItem(name: "type", value: type.trimmingCharacters(in: .whitespacesAndNewlines)),
+            URLQueryItem(name: "sort", value: sort.trimmingCharacters(in: .whitespacesAndNewlines)),
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+        if let genre = genre?.nilIfBlank {
+            items.append(URLQueryItem(name: "genre", value: genre))
+        }
+        let json = try await getJson(
+            path: "/v1/browse/titles",
+            queryItems: items,
+            accessToken: accessToken
+        )
+        return BrowseTitlesResponse(
+            items: json.jsonArray("items").compactMap { try? ClientMediaCard.parse($0) },
+            total: json.jsonInt("total"),
+            hasMore: json.jsonBool("hasMore", defaultValue: false)
+        )
+    }
+
     // MARK: - Accounts / settings
 
     public func updateProfile(
