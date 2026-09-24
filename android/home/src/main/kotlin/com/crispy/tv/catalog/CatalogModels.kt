@@ -13,6 +13,7 @@ data class CatalogSectionRef(
     val presentation: HomeCatalogPresentation,
     val layout: String = "",
     val variantKey: String = "default",
+    val kind: String = "",
     val name: String = "",
     val heading: String = "",
     val title: String = "",

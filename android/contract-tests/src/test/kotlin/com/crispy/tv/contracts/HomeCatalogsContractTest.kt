@@ -144,6 +144,7 @@ class HomeCatalogsContractTest {
 
     private fun parseSection(json: JsonObject, path: Path): HomeCatalogSection {
         return HomeCatalogSection(
+            kind = json.requireString("kind", path),
             catalogId = json.requireString("catalog_id", path),
             source = HomeCatalogSource.fromRaw(json.requireString("source", path))
                 ?: error("${path.fileName}: invalid section source"),

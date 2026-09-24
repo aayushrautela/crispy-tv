@@ -1,5 +1,5 @@
 {
-  "contract_version": 8,
+  "contract_version": 9,
   "suite": "home_catalogs",
   "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
   "input": {
@@ -78,6 +78,7 @@
       },
       "sections": [
         {
+          "kind": "drama",
           "catalog_id": "personal:drama:default",
           "source": "personal",
           "presentation": "rail",

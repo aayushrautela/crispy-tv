@@ -56,7 +56,8 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
   - `contract_version` 6 replaces `media_key` with opaque `item_id` on client-facing title items.
   - `contract_version` 7 removes the hero shelf limit; hero items include every valid item from the selected list (no `hero_limit` cap).
-  - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
+  - `contract_version` 9 surfaces the raw list `kind` (the wire `listKey`) as a named `kind` field on every section, instead of only living implicitly inside `catalog_id`.
+  - Section metadata is preserved end-to-end: `kind`, `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection uses the first `presentation = hero` list; if no list has `presentation = hero`, the hero result is empty (no fallback to non-hero lists).
   - Hero items require `artwork_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
   - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | collection_shelf | rail` UI decisions and unknown values normalize to `rail`.

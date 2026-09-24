@@ -169,6 +169,7 @@ public struct HomeCatalogHeroResult: Equatable {
 }
 
 public struct HomeCatalogSection: Equatable {
+    public let kind: String
     public let catalogId: String
     public let source: HomeCatalogSource
     public let presentation: HomeCatalogPresentation
@@ -180,6 +181,7 @@ public struct HomeCatalogSection: Equatable {
     public let subtitle: String
 
     public init(
+        kind: String = "",
         catalogId: String,
         source: HomeCatalogSource,
         presentation: HomeCatalogPresentation,
@@ -190,6 +192,7 @@ public struct HomeCatalogSection: Equatable {
         title: String = "",
         subtitle: String = ""
     ) {
+        self.kind = kind
         self.catalogId = catalogId
         self.source = source
         self.presentation = presentation
@@ -399,10 +402,6 @@ public func parseHomeCatalogId(_ catalogId: String) -> HomeCatalogIdentifier? {
     return HomeCatalogIdentifier(source: source, kind: kind, variantKey: variantKey)
 }
 
-public func resolveHomeCatalogSource(catalogId: String) -> HomeCatalogSource {
-    parseHomeCatalogId(catalogId)?.source ?? .personal
-}
-
 private func buildHeroResult(snapshot: HomeCatalogSnapshot) -> HomeCatalogHeroResult {
     guard let heroList = snapshot.lists.first(where: { $0.presentation == .hero }) else {
         return HomeCatalogHeroResult(
@@ -457,6 +456,7 @@ private func buildHomeCatalogSections(lists: [HomeCatalogList], limit: Int) -> [
 private extension HomeCatalogList {
     func toSection() -> HomeCatalogSection {
         HomeCatalogSection(
+            kind: kind,
             catalogId: catalogId,
             source: source,
             presentation: presentation,

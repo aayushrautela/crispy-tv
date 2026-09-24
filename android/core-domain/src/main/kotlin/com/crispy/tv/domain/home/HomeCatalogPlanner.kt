@@ -103,6 +103,7 @@ data class HomeCatalogHeroResult(
 )
 
 data class HomeCatalogSection(
+    val kind: String = "",
     val catalogId: String,
     val source: HomeCatalogSource,
     val presentation: HomeCatalogPresentation,
@@ -294,10 +295,6 @@ fun parseHomeCatalogId(catalogId: String): HomeCatalogIdentifier? {
     )
 }
 
-fun resolveHomeCatalogSource(catalogId: String): HomeCatalogSource {
-    return parseHomeCatalogId(catalogId)?.source ?: HomeCatalogSource.PERSONAL
-}
-
 private fun buildHeroResult(
     snapshot: HomeCatalogSnapshot,
 ): HomeCatalogHeroResult {
@@ -363,6 +360,7 @@ private fun buildHomeCatalogSections(
 
 private fun HomeCatalogList.toSection(): HomeCatalogSection {
     return HomeCatalogSection(
+        kind = kind,
         catalogId = catalogId,
         source = source,
         presentation = presentation,

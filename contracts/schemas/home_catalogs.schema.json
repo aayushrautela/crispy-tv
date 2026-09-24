@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 7
+      "minimum": 9
     },
     "suite": {
       "const": "home_catalogs"
@@ -374,6 +374,7 @@
     "section": {
       "type": "object",
       "required": [
+        "kind",
         "catalog_id",
         "source",
         "presentation",
@@ -385,6 +386,9 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "kind": {
+          "type": "string"
+        },
         "catalog_id": {
           "type": "string"
         },

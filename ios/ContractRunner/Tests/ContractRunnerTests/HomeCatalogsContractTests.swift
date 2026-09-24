@@ -134,6 +134,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogSection(
+            kind: try requireString(object, "kind", fixture: fixture),
             catalogId: try requireString(object, "catalog_id", fixture: fixture),
             source: source,
             presentation: HomeCatalogPresentation.fromRaw(optionalString(object, "presentation")),

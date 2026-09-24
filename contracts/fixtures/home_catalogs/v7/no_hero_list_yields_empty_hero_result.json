@@ -1,5 +1,5 @@
 {
-  "contract_version": 8,
+  "contract_version": 9,
   "suite": "home_catalogs",
   "case_id": "no_hero_list_yields_empty_hero_result",
   "input": {
@@ -88,6 +88,7 @@
       },
       "sections": [
         {
+          "kind": "featured",
           "catalog_id": "personal:featured:default",
           "source": "personal",
           "presentation": "rail",
@@ -104,6 +105,7 @@
       "catalogs": [
         {
           "section": {
+            "kind": "featured",
             "catalog_id": "personal:featured:default",
             "source": "personal",
             "presentation": "rail",

@@ -122,10 +122,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             )
     ) { entry ->
         val args = entry.arguments
+        val catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty()
+        val catalogIdentifier =
+            com.crispy.tv.domain.home.parseHomeCatalogId(catalogId)
         val section =
             CatalogSectionRef(
-                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty(),
-                source = com.crispy.tv.domain.home.resolveHomeCatalogSource(args?.getString(AppRoutes.CatalogIdArg).orEmpty()),
+                catalogId = catalogId,
+                source = catalogIdentifier?.source ?: com.crispy.tv.domain.home.HomeCatalogSource.PERSONAL,
+                kind = catalogIdentifier?.kind.orEmpty(),
                 presentation = com.crispy.tv.domain.home.HomeCatalogPresentation.RAIL,
                 title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
             )
