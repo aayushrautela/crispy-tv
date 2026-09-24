@@ -180,15 +180,23 @@ internal fun HomeRoute(
                     is HomeCatalogRowSectionUi -> {
                         val sectionUi = catalogSections[block.sectionKey]
                         if (sectionUi != null) {
-                            val onSeeAll = remember(sectionUi.section) {
-                                { onCatalogSeeAllClick(sectionUi.section) }
+                            if (isTop10ListKey(sectionUi.section.kind)) {
+                                HomeTop10SectionRow(
+                                    sectionUi = sectionUi,
+                                    horizontalPadding = horizontalPadding,
+                                    onItemClick = onCatalogItemClick,
+                                )
+                            } else {
+                                val onSeeAll = remember(sectionUi.section) {
+                                    { onCatalogSeeAllClick(sectionUi.section) }
+                                }
+                                HomeCatalogSectionRow(
+                                    sectionUi = sectionUi,
+                                    horizontalPadding = horizontalPadding,
+                                    onSeeAllClick = onSeeAll,
+                                    onItemClick = onCatalogItemClick,
+                                )
                             }
-                            HomeCatalogSectionRow(
-                                sectionUi = sectionUi,
-                                horizontalPadding = horizontalPadding,
-                                onSeeAllClick = onSeeAll,
-                                onItemClick = onCatalogItemClick,
-                            )
                         }
                     }
 

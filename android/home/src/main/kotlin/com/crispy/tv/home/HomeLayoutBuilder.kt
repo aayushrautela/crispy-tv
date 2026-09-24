@@ -3,6 +3,7 @@ package com.crispy.tv.home
 data class CatalogSectionLayoutMeta(
     val key: String,
     val layout: String,
+    val isTopTen: Boolean = false,
 )
 
 fun buildHomeLayoutState(
@@ -21,13 +22,13 @@ fun buildHomeLayoutState(
     }
 
     val collectionKeys = catalogSectionLayoutMeta
-        .filter { it.layout.equals("collection", ignoreCase = true) }
+        .filter { !it.isTopTen && it.layout.equals("collection", ignoreCase = true) }
         .map { it.key }
 
     var collectionShelfPlaced = collectionKeys.isEmpty()
 
     for (sectionMeta in catalogSectionLayoutMeta) {
-        if (sectionMeta.layout.equals("collection", ignoreCase = true)) {
+        if (!sectionMeta.isTopTen && sectionMeta.layout.equals("collection", ignoreCase = true)) {
             if (!collectionShelfPlaced) {
                 blocks += HomeCollectionShelfSectionUi(
                     key = collectionKeys.joinToString(separator = ":", prefix = "collections:"),

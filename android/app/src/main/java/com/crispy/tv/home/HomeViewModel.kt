@@ -262,7 +262,11 @@ coroutineScope {
 
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
         catalogSectionLayoutMeta = snapshot.catalogSections.map { sectionUi ->
-            CatalogSectionLayoutMeta(key = sectionUi.section.key, layout = sectionUi.section.layout)
+            CatalogSectionLayoutMeta(
+                key = sectionUi.section.key,
+                layout = sectionUi.section.layout,
+                isTopTen = isTop10ListKey(sectionUi.section.kind),
+            )
         }
         _state.update { current ->
             current.copy(
