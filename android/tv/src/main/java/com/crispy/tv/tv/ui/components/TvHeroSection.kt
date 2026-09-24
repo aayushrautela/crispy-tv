@@ -65,10 +65,10 @@ fun TvHeroSection(
             if (item != null) {
                 Text(
                     text = item.title,
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -101,17 +101,6 @@ fun TvHeroSection(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            item?.description?.takeIf { it.isNotBlank() }?.let { description ->
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = description,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f),
-                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
