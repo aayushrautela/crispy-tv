@@ -123,7 +123,7 @@ internal fun HomeTop10Card(
     val rankStyle = hollowDisplayTextStyle(fontSize = 104.sp, letterSpacing = (-0.05f).sp)
     val textMeasurer = rememberTextMeasurer()
     val digitWidthPx = remember(rank, rankStyle) {
-        textMeasurer.measure(AnnotatedString(rank.toString()), style = rankStyle).width
+        textMeasurer.measure(AnnotatedString(rank.toString()), style = rankStyle).size.width
     }
     val density = LocalDensity.current
     val digitWidth = remember(digitWidthPx) { with(density) { digitWidthPx.toDp() } }
