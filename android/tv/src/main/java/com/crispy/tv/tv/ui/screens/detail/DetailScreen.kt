@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,22 +51,14 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.assets.R
 import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
+import com.crispy.tv.tv.ui.components.CrispyIcon
 import com.crispy.tv.tv.ui.components.RailSection
 import com.crispy.tv.tv.ui.components.tvHeroScrim
 import com.crispy.tv.tv.ui.components.skeletonElement
 import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
 import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
 import kotlin.math.roundToInt
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
@@ -337,13 +330,13 @@ private fun DetailContent(
                     )
                     HeaderActionButton(
                         label = if (state.isInWatchlist) "In watchlist" else "Watchlist",
-                        icon = Icons.Filled.Add,
+                        icon = R.drawable.ic_add_filled,
                         active = state.isInWatchlist,
                         onClick = onToggleWatchlist,
                     )
                     HeaderActionButton(
                         label = if (state.isWatched) "Watched" else "Mark watched",
-                        icon = Icons.Filled.Check,
+                        icon = R.drawable.ic_check_filled,
                         active = state.isWatched,
                         onClick = onToggleWatched,
                     )
@@ -353,7 +346,7 @@ private fun DetailContent(
                         } else {
                             "Rate"
                         },
-                        icon = Icons.Filled.Star,
+                        icon = R.drawable.ic_star_filled,
                         active = state.isRated,
                         onClick = {
                             pendingRating = (state.userRating ?: 0).toFloat()
@@ -362,7 +355,7 @@ private fun DetailContent(
                     )
                     HeaderActionButton(
                         label = "Share",
-                        icon = Icons.Filled.Share,
+                        icon = R.drawable.ic_share_filled,
                         active = false,
                         onClick = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
@@ -377,13 +370,14 @@ private fun DetailContent(
                     if (state.trailers.isNotEmpty()) {
                         HeaderActionButton(
                             label = if (trailerPlaying) "Pause" else "Trailer",
-                            icon = if (trailerPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            icon = if (trailerPlaying) R.drawable.ic_pause_filled else R.drawable.ic_play_arrow_filled,
                             active = trailerPlaying,
                             onClick = { trailerPlaying = !trailerPlaying },
                         )
                         HeaderActionButton(
                             label = if (trailerMuted) "Muted" else "Sound on",
-                            icon = if (trailerMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            icon = if (trailerMuted) R.drawable.ic_volume_off_filled else R.drawable.ic_volume_up_filled,
+                            autoMirror = true,
                             active = !trailerMuted,
                             onClick = { trailerMuted = !trailerMuted },
                         )
@@ -447,7 +441,7 @@ private fun DetailContent(
         )
 
         // Body order mirrors the phone app: Ratings, Cast & Crew, Reviews, Production,
-        // Episodes, Making of, Collection, More like this, details rows.
+        // Episodes, Making of, extras lists, details rows.
         if (state.cast.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
             CastRail(cast = state.cast)
@@ -493,20 +487,11 @@ private fun DetailContent(
             ExtrasRail(videos = state.extraVideos, title = state.title)
         }
 
-        if (state.collectionItems.isNotEmpty()) {
+        state.lists.filter { it.items.isNotEmpty() }.forEach { list ->
             Spacer(Modifier.height(16.dp))
             RailSection(
-                title = state.collectionName ?: "Collection",
-                items = state.collectionItems,
-                onItemClick = { onOpenItem(it.id) },
-            )
-        }
-
-        if (state.similar.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            RailSection(
-                title = "More like this",
-                items = state.similar,
+                title = list.title,
+                items = list.items,
                 onItemClick = { onOpenItem(it.id) },
             )
         }
@@ -769,7 +754,7 @@ private fun EpisodeRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (watchState?.isWatched == true) {
                     Icon(
-                        imageVector = Icons.Filled.CheckCircle,
+                        painter = painterResource(R.drawable.ic_check_circle_filled),
                         contentDescription = "Watched",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),
@@ -828,7 +813,7 @@ private fun EpisodeRow(
                 .clickable(onClick = onToggleWatched),
         ) {
             Icon(
-                imageVector = Icons.Filled.Check,
+                painter = painterResource(R.drawable.ic_check_filled),
                 contentDescription = "Toggle watched",
                 tint = if (watchState?.isWatched == true) {
                     MaterialTheme.colorScheme.onPrimary
@@ -844,9 +829,10 @@ private fun EpisodeRow(
 @Composable
 private fun HeaderActionButton(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    @DrawableRes icon: Int,
     active: Boolean,
     onClick: () -> Unit,
+    autoMirror: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
@@ -863,16 +849,33 @@ private fun HeaderActionButton(
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (active) {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(16.dp),
-        )
+        val iconPainter = painterResource(icon)
+        if (autoMirror) {
+            CrispyIcon(
+                painter = iconPainter,
+                contentDescription = null,
+                tint =
+                    if (active) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                modifier = Modifier.size(16.dp),
+                autoMirror = true,
+            )
+        } else {
+            Icon(
+                painter = iconPainter,
+                contentDescription = null,
+                tint =
+                    if (active) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                modifier = Modifier.size(16.dp),
+            )
+        }
         Spacer(Modifier.width(7.dp))
         Text(
             text = label,
@@ -989,7 +992,7 @@ private fun ReviewOverlay(review: ReviewUi, onDismiss: () -> Unit) {
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Filled.Star,
+                                painter = painterResource(R.drawable.ic_star_filled),
                                 contentDescription = null,
                                 tint = Color(0xFFFFD54F),
                                 modifier = Modifier.size(14.dp),

@@ -30,14 +30,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -60,9 +53,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,6 +64,8 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 
 /** Story presentation order: standout hook first, then good/bad, fun fact last. */
 private val SlideDisplayOrder =
@@ -238,14 +233,14 @@ private fun AiInsightsStorySlide(
             AiInsightsMoodSlide(
                 labelText = slide.label,
                 bodyText = slide.body ?: slide.context,
-                moodIcon = Icons.Outlined.ThumbUp,
+                moodIcon = R.drawable.ic_thumb_up,
                 palette = palette,
             )
         AiInsightSlideKey.THE_CATCH ->
             AiInsightsMoodSlide(
                 labelText = slide.label,
                 bodyText = slide.body ?: slide.context,
-                moodIcon = Icons.Outlined.SentimentVeryDissatisfied,
+                moodIcon = R.drawable.ic_sentiment_very_dissatisfied,
                 palette = palette,
             )
         AiInsightSlideKey.TRIVIA ->
@@ -258,7 +253,7 @@ private fun AiInsightsStorySlide(
             AiInsightsMoodSlide(
                 labelText = slide.label,
                 bodyText = slide.body ?: slide.context,
-                moodIcon = Icons.Outlined.AutoAwesome,
+                moodIcon = R.drawable.ic_auto_awesome,
                 palette = palette,
             )
     }
@@ -385,8 +380,8 @@ private fun AiInsightsRotatingBackdrop(
                 contentScale = ContentScale.Crop,
             )
         } else {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
+            CrispyIcon(
+                painter = painterResource(R.drawable.ic_auto_awesome),
                 contentDescription = null,
                 tint = palette.onPillBackground.copy(alpha = 0.70f),
                 modifier =
@@ -419,7 +414,7 @@ private fun rememberSlowRotationDegrees(): Float {
 private fun AiInsightsMoodSlide(
     labelText: String,
     bodyText: String?,
-    moodIcon: ImageVector,
+    @DrawableRes moodIcon: Int,
     palette: DetailsPaletteColors,
 ) {
     Column(
@@ -434,7 +429,7 @@ private fun AiInsightsMoodSlide(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = moodIcon,
+                painter = painterResource(moodIcon),
                 contentDescription = null,
                 tint = palette.onPageBackground.copy(alpha = 0.12f),
                 modifier =
@@ -486,8 +481,8 @@ private fun AiInsightsHeroArtwork(
                 contentScale = ContentScale.Crop,
             )
         } else {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
+            CrispyIcon(
+                painter = painterResource(R.drawable.ic_auto_awesome),
                 contentDescription = null,
                 tint = palette.onPillBackground.copy(alpha = 0.72f),
                 modifier = Modifier.size(52.dp),
@@ -632,7 +627,7 @@ private fun AiInsightsProgressHeader(
         }
         IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
             Icon(
-                imageVector = Icons.Filled.Close,
+                painter = painterResource(R.drawable.ic_close_filled),
                 contentDescription = "Close",
                 tint = palette.onPageBackground,
             )
@@ -658,14 +653,14 @@ private fun AiInsightsFooterActions(
         ) {
             AiInsightsPillButton(
                 text = if (isInWatchlist) "In watchlist" else "Add to watchlist",
-                icon = if (isInWatchlist) Icons.Filled.Check else Icons.Filled.PlaylistAdd,
+                icon = if (isInWatchlist) R.drawable.ic_check_filled else R.drawable.ic_playlist_add_filled,
                 palette = palette,
                 onClick = onToggleWatchlist,
                 modifier = Modifier.weight(1f),
             )
             AiInsightsPillButton(
                 text = "Share",
-                icon = Icons.Outlined.Share,
+                icon = R.drawable.ic_share,
                 palette = palette,
                 onClick = onShare,
                 modifier = Modifier.weight(1f),
@@ -682,7 +677,7 @@ private fun AiInsightsFooterActions(
 @Composable
 private fun AiInsightsPillButton(
     text: String,
-    icon: ImageVector,
+    @DrawableRes icon: Int,
     palette: DetailsPaletteColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -697,8 +692,8 @@ private fun AiInsightsPillButton(
                 contentColor = palette.onAccent,
             ),
     ) {
-        Icon(
-            imageVector = icon,
+        CrispyIcon(
+            painter = painterResource(icon),
             contentDescription = null,
             modifier = Modifier.size(18.dp),
         )

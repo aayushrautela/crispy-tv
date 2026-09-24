@@ -1,36 +1,30 @@
 package com.crispy.tv.ui.navigation
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.VideoLibrary
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.annotation.DrawableRes
+import com.crispy.tv.ui.assets.R
 
 enum class TopLevelDestination(
     val route: String,
     val label: String,
-    val inactiveIcon: ImageVector,
-    val activeIcon: ImageVector,
+    @DrawableRes val inactiveIcon: Int,
+    @DrawableRes val activeIcon: Int,
 ) {
     Home(
         route = AppRoutes.HomeRoute,
         label = "Home",
-        inactiveIcon = Icons.Outlined.Home,
-        activeIcon = Icons.Filled.Home,
+        inactiveIcon = R.drawable.ic_home,
+        activeIcon = R.drawable.ic_home_filled,
     ),
     Discover(
         route = AppRoutes.DiscoverRoute,
         label = "Discover",
-        inactiveIcon = Icons.Outlined.Explore,
-        activeIcon = Icons.Filled.Explore,
+        inactiveIcon = R.drawable.ic_explore,
+        activeIcon = R.drawable.ic_explore_filled,
     ),
     Library(
         route = AppRoutes.LibraryRoute,
         label = "Library",
-        inactiveIcon = Icons.Outlined.VideoLibrary,
-        activeIcon = Icons.Filled.VideoLibrary,
+        inactiveIcon = R.drawable.ic_video_library,
+        activeIcon = R.drawable.ic_video_library_filled,
     ),
 }

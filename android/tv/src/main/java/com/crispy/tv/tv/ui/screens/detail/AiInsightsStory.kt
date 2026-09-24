@@ -22,9 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +45,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +59,7 @@ import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightStandoutTag
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.ui.assets.R
 
 private val AiInsightsBorderColors =
     listOf(
@@ -169,7 +168,7 @@ internal fun AiInsightsButton(
             .padding(horizontal = 20.dp),
     ) {
         Icon(
-            imageVector = Icons.Outlined.AutoAwesome,
+            painter = painterResource(R.drawable.ic_auto_awesome),
             contentDescription = null,
             tint = if (isLoading) {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
@@ -280,7 +279,7 @@ private fun StorySlides(
                 }
             }
             Icon(
-                imageVector = Icons.Filled.Close,
+                painter = painterResource(R.drawable.ic_close_filled),
                 contentDescription = "Close",
                 tint = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier

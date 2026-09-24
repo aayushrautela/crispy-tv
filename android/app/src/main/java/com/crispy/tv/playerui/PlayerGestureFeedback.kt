@@ -16,13 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Brightness6
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Crop
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,10 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.domain.player.TapZone
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -99,10 +95,11 @@ internal fun GestureFeedbackOverlay(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Icon(
-                                imageVector = message.icon,
+                            CrispyIcon(
+                                painter = painterResource(message.icon),
                                 contentDescription = null,
                                 tint = Color.White,
+                                autoMirror = message.autoMirror,
                             )
                             Text(
                                 text = message.text,
@@ -119,7 +116,8 @@ internal fun GestureFeedbackOverlay(
 
 internal data class GestureFeedbackMessage(
     val text: String,
-    val icon: ImageVector,
+    @DrawableRes val icon: Int,
+    val autoMirror: Boolean = false,
 )
 
 internal data class SeekRippleState(
@@ -169,12 +167,14 @@ internal fun SeekRippleOverlay(
                 ) {
                     repeat(2) {
                         Icon(
-                            imageVector =
-                                if (ripple.isForward) {
-                                    Icons.Filled.ChevronRight
-                                } else {
-                                    Icons.Filled.ChevronLeft
-                                },
+                            painter =
+                                painterResource(
+                                    if (ripple.isForward) {
+                                        R.drawable.ic_chevron_right_filled
+                                    } else {
+                                        R.drawable.ic_chevron_left_filled
+                                    }
+                                ),
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(32.dp),
@@ -192,9 +192,9 @@ internal fun SeekRippleOverlay(
 }
 
 internal object GestureIcons {
-    val Brightness = Icons.Filled.Brightness6
-    val VolumeUp = Icons.AutoMirrored.Filled.VolumeUp
-    val VolumeMuted = Icons.AutoMirrored.Filled.VolumeOff
-    val Resize = Icons.Filled.Crop
+    @DrawableRes val Brightness: Int = R.drawable.ic_brightness_6_filled
+    @DrawableRes val VolumeUp: Int = R.drawable.ic_volume_up_filled
+    @DrawableRes val VolumeMuted: Int = R.drawable.ic_volume_off_filled
+    @DrawableRes val Resize: Int = R.drawable.ic_crop_filled
 }
 

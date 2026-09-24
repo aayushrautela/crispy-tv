@@ -29,15 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowDropDown
-import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -64,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -74,6 +66,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
@@ -178,10 +173,11 @@ private fun AuthScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             IconButton(onClick = { signUpStep = 1 }) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.ArrowBack,
+                                CrispyIcon(
+                                    painter = painterResource(R.drawable.ic_arrow_back),
                                     contentDescription = "Back",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    autoMirror = true,
                                 )
                             }
                             Text(
@@ -222,7 +218,7 @@ private fun AuthScreen(
                             shape = RoundedCornerShape(8.dp),
                         ) {
                             if (uiState.isBusy) {
-                                LoadingIndicator(modifier = Modifier.padding(end = 8.dp))
+                                LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispySpinner)
                             } else {
                                 Text("Get Started")
                             }
@@ -271,7 +267,7 @@ private fun AuthScreen(
                             ),
                             leadingIcon = {
                                 Icon(
-                                    Icons.Outlined.Email,
+                                    painter = painterResource(R.drawable.ic_mail),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -291,7 +287,7 @@ private fun AuthScreen(
                             ),
                             leadingIcon = {
                                 Icon(
-                                    Icons.Outlined.Lock,
+                                    painter = painterResource(R.drawable.ic_lock),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -299,7 +295,7 @@ private fun AuthScreen(
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
-                                        if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        painter = painterResource(if (passwordVisible) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
                                         contentDescription = if (passwordVisible) "Hide password" else "Show password",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -336,7 +332,7 @@ private fun AuthScreen(
                                 shape = RoundedCornerShape(8.dp),
                             ) {
                                 if (uiState.isBusy) {
-                                    LoadingIndicator(modifier = Modifier.padding(end = 8.dp))
+                                    LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispySpinner)
                                 } else {
                                     Text("Sign In")
                                 }
@@ -512,13 +508,13 @@ private fun ProfileSelectorScreen(
 
             if (isSetup) {
                 if (uiState.isBusy) {
-                    LoadingIndicator(color = Color.White)
+                    LoadingIndicator(color = CrispySpinner)
                 } else {
                     ProfileSetupScreen(onFinishSetup = onFinishSetup)
                 }
             } else {
                 if (uiState.isBusy && uiState.profiles.isEmpty()) {
-                    LoadingIndicator(color = Color.White)
+                    LoadingIndicator(color = CrispySpinner)
                 } else {
                     ProfileGrid(
                         profiles = uiState.profiles,
@@ -639,7 +635,7 @@ private fun ProfileSetupScreen(onFinishSetup: (name: String, language: String, a
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     IconButton(onClick = { languageMenuOpen = true }) {
-                        Icon(Icons.Outlined.ArrowDropDown, contentDescription = "Select language")
+                        Icon(painter = painterResource(R.drawable.ic_arrow_drop_down), contentDescription = "Select language")
                     }
                 },
             )
@@ -721,7 +717,7 @@ private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
                 )
             } else {
                 Icon(
-                    Icons.Outlined.AccountCircle,
+                    painter = painterResource(R.drawable.ic_account_circle),
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(64.dp),
@@ -756,7 +752,7 @@ private fun ProfileAddCard(onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Outlined.Add,
+                painter = painterResource(R.drawable.ic_add),
                 contentDescription = "Add profile",
                 tint = Color.White,
                 modifier = Modifier.size(48.dp),
@@ -818,12 +814,16 @@ private fun ProfileManagementScreen(
                 title = "Profiles",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
+                            contentDescription = "Back",
+                            autoMirror = true,
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = onOpenCreateDialog) {
-                        Icon(Icons.Outlined.Add, contentDescription = "Add profile")
+                        Icon(painter = painterResource(R.drawable.ic_add), contentDescription = "Add profile")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -857,7 +857,7 @@ private fun ProfileManagementScreen(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        LoadingIndicator()
+                        LoadingIndicator(color = CrispySpinner)
                     }
                 }
             }
@@ -958,7 +958,7 @@ private fun ProfileRow(name: String, isKids: Boolean, avatarUrl: String?) {
                 )
             } else {
                 Icon(
-                    Icons.Outlined.AccountCircle,
+                    painter = painterResource(R.drawable.ic_account_circle),
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(32.dp),
@@ -1076,7 +1076,11 @@ private fun AccountSettingsScreen(
                 title = "Account settings",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
+                            contentDescription = "Back",
+                            autoMirror = true,
+                        )
                     }
                 },
                 scrollBehavior = scrollBehavior,

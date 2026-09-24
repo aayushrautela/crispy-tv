@@ -22,19 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.CheckCircleOutline
-import androidx.compose.material.icons.outlined.Replay
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -68,6 +55,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextLayoutResult
@@ -78,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.util.normalizeRatingText
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Date
@@ -438,8 +429,8 @@ internal fun HeaderInfoSection(
                                 modifier = Modifier.width(34.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AutoAwesome,
+                                CrispyIcon(
+                                    painter = painterResource(R.drawable.ic_auto_awesome),
                                     contentDescription = null,
                                 )
                             }
@@ -468,8 +459,8 @@ internal fun HeaderInfoSection(
                     ) {
                         val iconVector =
                             when (watchCta.icon) {
-                                WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
-                                WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
+                                WatchCtaIcon.REPLAY -> R.drawable.ic_replay
+                                WatchCtaIcon.PLAY -> R.drawable.ic_play_arrow_filled
                             }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -479,8 +470,8 @@ internal fun HeaderInfoSection(
                                 modifier = Modifier.width(34.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = iconVector,
+                                CrispyIcon(
+                                    painter = painterResource(iconVector),
                                     contentDescription = null,
                                 )
                             }
@@ -520,7 +511,7 @@ internal fun HeaderInfoSection(
                         selected = isInWatchlist,
                         sync = optimisticSync.watchlist,
                         palette = palette,
-                        icon = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        icon = if (isInWatchlist) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
                         onClick = onToggleWatchlist
                     )
 
@@ -529,7 +520,7 @@ internal fun HeaderInfoSection(
                         selected = isWatched,
                         sync = optimisticSync.watched,
                         palette = palette,
-                        icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                        icon = if (isWatched) R.drawable.ic_check_circle_filled else R.drawable.ic_check_circle,
                         onClick = onToggleWatched
                     )
 
@@ -540,7 +531,7 @@ internal fun HeaderInfoSection(
                         sync = optimisticSync.rating,
                         palette = palette,
                         selectedAccent = gold,
-                        icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        icon = if (isRated) R.drawable.ic_star_filled else R.drawable.ic_star,
                         onClick = {
                             pendingRating = (userRating ?: 0).toFloat()
                             showRatingDialog = true
@@ -552,7 +543,7 @@ internal fun HeaderInfoSection(
                         selected = false,
                         sync = OptimisticSyncBadge(),
                         palette = palette,
-                        icon = Icons.Outlined.Share,
+                        icon = R.drawable.ic_share,
                         onClick = {
                             val title = details.title
                             val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -593,8 +584,8 @@ internal fun HeaderInfoSection(
                         modifier = Modifier.width(34.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AutoAwesome,
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_auto_awesome),
                             contentDescription = null,
                         )
                     }
@@ -637,8 +628,8 @@ internal fun HeaderInfoSection(
             ) {
                 val iconVector =
                     when (watchCta.icon) {
-                        WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
-                        WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
+                        WatchCtaIcon.REPLAY -> R.drawable.ic_replay
+                        WatchCtaIcon.PLAY -> R.drawable.ic_play_arrow_filled
                     }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -648,8 +639,8 @@ internal fun HeaderInfoSection(
                         modifier = Modifier.width(34.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = iconVector,
+                        CrispyIcon(
+                            painter = painterResource(iconVector),
                             contentDescription = null,
                         )
                     }
@@ -732,7 +723,7 @@ private fun DetailsQuickActionsRow(
             selected = isInWatchlist,
             sync = optimisticSync.watchlist,
             palette = palette,
-            icon = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            icon = if (isInWatchlist) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
             onClick = onToggleWatchlist
         )
 
@@ -741,7 +732,7 @@ private fun DetailsQuickActionsRow(
             selected = isWatched,
             sync = optimisticSync.watched,
             palette = palette,
-            icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+            icon = if (isWatched) R.drawable.ic_check_circle_filled else R.drawable.ic_check_circle,
             onClick = onToggleWatched
         )
 
@@ -752,7 +743,7 @@ private fun DetailsQuickActionsRow(
             sync = optimisticSync.rating,
             palette = palette,
             selectedAccent = gold,
-            icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
+            icon = if (isRated) R.drawable.ic_star_filled else R.drawable.ic_star,
             onClick = onRate
         )
 
@@ -761,7 +752,7 @@ private fun DetailsQuickActionsRow(
             selected = false,
             sync = OptimisticSyncBadge(),
             palette = palette,
-            icon = Icons.Outlined.Share,
+            icon = R.drawable.ic_share,
             onClick = onShare
         )
     }
@@ -774,7 +765,7 @@ private fun DetailsQuickAction(
     sync: OptimisticSyncBadge,
     palette: DetailsPaletteColors,
     selectedAccent: Color? = null,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    @DrawableRes icon: Int,
     onClick: () -> Unit
 ) {
     val accent = selectedAccent ?: palette.accent
@@ -802,11 +793,11 @@ private fun DetailsQuickAction(
             contentColor = palette.onPillBackground
         ) {
             androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
+                CrispyIcon(
+                    painter = painterResource(icon),
                     contentDescription = label,
                     tint = iconTint,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
@@ -840,8 +831,8 @@ private fun HeaderMetaRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
+                CrispyIcon(
+                    painter = painterResource(R.drawable.ic_star_filled),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = Color(0xFFFFD54F)
@@ -933,7 +924,7 @@ internal fun ExpandableDescription(
                         )
                     ) {
                         Icon(
-                            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            painter = if (expanded) painterResource(R.drawable.ic_keyboard_arrow_up_filled) else painterResource(R.drawable.ic_keyboard_arrow_down_filled),
                             contentDescription = toggleDescriptionLabel,
                             modifier = Modifier.size(18.dp),
                             tint = textColor.copy(alpha = 0.82f),

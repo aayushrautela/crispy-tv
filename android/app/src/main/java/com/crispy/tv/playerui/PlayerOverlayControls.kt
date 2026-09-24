@@ -20,13 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
@@ -55,6 +48,8 @@ import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
@@ -80,9 +75,10 @@ internal fun PlayerTopBar(
     ) {
         Surface(shape = CircleShape, color = palette.pillBackground, contentColor = palette.onPillBackground) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                CrispyIcon(
+                    painter = painterResource(R.drawable.ic_arrow_back_filled),
                     contentDescription = "Back",
+                    autoMirror = true,
                 )
             }
         }
@@ -128,7 +124,7 @@ internal fun PlayerTopBar(
             enabled = isMetadataLoaded,
         ) {
             Icon(
-                imageVector = Icons.Outlined.Info,
+                painter = painterResource(R.drawable.ic_info),
                 contentDescription = "Info",
                 tint = if (isMetadataLoaded) palette.onPillBackground else palette.onPillBackground.copy(alpha = 0.4f),
             )
@@ -262,7 +258,7 @@ internal fun PlayerBottomControls(
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.GraphicEq,
+                                painter = painterResource(R.drawable.ic_graphic_eq_filled),
                                 contentDescription = "Audio tracks",
                                 tint = palette.onPillBackground,
                                 modifier = Modifier.size(20.dp),
@@ -274,7 +270,7 @@ internal fun PlayerBottomControls(
                         modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Subtitles,
+                            painter = painterResource(R.drawable.ic_subtitles_filled),
                             contentDescription = "Subtitles",
                             tint = palette.onPillBackground,
                             modifier = Modifier.size(20.dp),
@@ -285,7 +281,7 @@ internal fun PlayerBottomControls(
                         modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.Layers,
+                            painter = painterResource(R.drawable.ic_layers),
                             contentDescription = "Streams",
                             tint = palette.onPillBackground,
                             modifier = Modifier.size(20.dp),
@@ -303,8 +299,8 @@ internal fun PlayerBottomControls(
                                 modifier = Modifier.size(20.dp),
                             )
                         } else {
-                            Icon(
-                                imageVector = Icons.Filled.Crop,
+                            CrispyIcon(
+                                painter = painterResource(R.drawable.ic_crop_filled),
                                 contentDescription = "Resize: ${resizeMode.label}",
                                 tint = palette.onPillBackground,
                                 modifier = Modifier.size(20.dp),

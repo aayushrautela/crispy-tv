@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,11 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.annotation.DrawableRes
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
@@ -41,7 +41,8 @@ import com.crispy.tv.ui.components.rememberCrispyImageModel
 data class ItemActionSheetItem(
     val label: String,
     val supporting: String? = null,
-    val icon: ImageVector? = null,
+    @DrawableRes val icon: Int? = null,
+    val autoMirror: Boolean = false,
     val filled: Boolean = false,
     val destructive: Boolean = false,
     val dividerBefore: Boolean = false,
@@ -113,6 +114,7 @@ fun ItemActionSheet(
                 label = action.label,
                 supporting = action.supporting.orEmpty(),
                 icon = action.icon,
+                autoMirror = action.autoMirror,
                 filled = action.filled,
                 destructive = action.destructive,
                 onClick = action.onClick,
@@ -124,10 +126,11 @@ fun ItemActionSheet(
 fun WatchActionRow(
     label: String,
     supporting: String,
-    icon: ImageVector?,
+    @DrawableRes icon: Int?,
     filled: Boolean,
     destructive: Boolean = false,
     onClick: () -> Unit,
+    autoMirror: Boolean = false,
 ) {
     val accent = when {
         destructive -> MaterialTheme.colorScheme.error
@@ -172,11 +175,12 @@ fun WatchActionRow(
             contentAlignment = Alignment.Center,
         ) {
             if (icon != null) {
-                Icon(
-                    imageVector = icon,
+                CrispyIcon(
+                    painter = painterResource(icon),
                     contentDescription = null,
                     tint = if (filled) MaterialTheme.colorScheme.onPrimary else accent,
                     modifier = Modifier.size(22.dp),
+                    autoMirror = autoMirror,
                 )
             }
         }

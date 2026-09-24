@@ -11,10 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -52,7 +49,10 @@ import com.crispy.tv.plugins.repo.PluginRepoClient
 import com.crispy.tv.plugins.repo.PluginRepoInfo
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -219,9 +219,10 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                 title = "Plugins",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
                             contentDescription = "Back",
+                            autoMirror = true,
                         )
                     }
                 },
@@ -283,7 +284,7 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                         enabled = !uiState.isInstalling,
                     ) {
                         if (uiState.isInstalling) {
-                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp, color = CrispySpinner)
                             Spacer(modifier = Modifier.height(0.dp))
                         } else {
                             Text("Install repository")
@@ -315,10 +316,10 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                                 )
                             }
                             IconButton(onClick = { viewModel.refreshRepo(repo.url) }) {
-                                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh repository")
+                                Icon(painter = painterResource(R.drawable.ic_refresh), contentDescription = "Refresh repository")
                             }
                             IconButton(onClick = { viewModel.removeRepo(repo.url) }) {
-                                Icon(imageVector = Icons.Outlined.Delete, contentDescription = "Remove repository")
+                                Icon(painter = painterResource(R.drawable.ic_delete), contentDescription = "Remove repository")
                             }
                         }
                         repo.scrapers.forEach { scraper ->

@@ -13,10 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -33,7 +30,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.catalog.CatalogItem
@@ -182,7 +181,6 @@ internal fun PlayerOverlay(
 
         PlayerLoadingCurtain(
             visible = showLoadingCurtain,
-            palette = palette,
             modifier = Modifier.align(Alignment.Center),
         )
 
@@ -229,7 +227,7 @@ internal fun PlayerOverlay(
                                 .size(84.dp),
                     ) {
                         Icon(
-                            imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            painter = painterResource(if (uiState.isPlaying) R.drawable.ic_pause_filled else R.drawable.ic_play_arrow_filled),
                             contentDescription = if (uiState.isPlaying) "Pause" else "Play",
                             modifier = Modifier.size(44.dp),
                         )
@@ -260,13 +258,11 @@ internal fun PlayerOverlay(
                                 onClick = { openSurface(onShowEpisodes) },
                             ),
                         )
-                    } else if (uiState.collectionItems.isNotEmpty() || uiState.recommendedItems.isNotEmpty()) {
+                    } else if (uiState.recommendedItems.isNotEmpty()) {
                         listOf(
                             PlayerActionPill(
                                 label = "More",
-                                thumbUrl =
-                                    uiState.collectionItems.firstOrNull()?.artworkUrl
-                                        ?: uiState.recommendedItems.first().artworkUrl,
+                                thumbUrl = uiState.recommendedItems.first().artworkUrl,
                                 onClick = { openSurface(onShowMore) },
                             ),
                         )
@@ -337,7 +333,6 @@ internal fun PlayerOverlay(
 
         PlayerMoreSheet(
             visible = uiState.activeSurface == PlayerSurface.MORE,
-            collectionItems = uiState.collectionItems,
             recommendedItems = uiState.recommendedItems,
             moreIsLoading = uiState.moreIsLoading,
             palette = palette,

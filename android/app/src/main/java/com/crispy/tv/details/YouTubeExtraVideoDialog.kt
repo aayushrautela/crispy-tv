@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.res.painterResource
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -107,7 +107,7 @@ internal fun YouTubeExtraVideoDialog(
                     )
                     IconButton(onClick = onDismiss) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            painter = painterResource(R.drawable.ic_close_filled),
                             contentDescription = "Close",
                         )
                     }
@@ -200,10 +200,11 @@ internal fun YouTubeExtraVideoDialog(
                             context.startActivity(intent)
                         },
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_open_in_new_filled),
                             contentDescription = null,
                             modifier = Modifier.padding(end = 4.dp),
+                            autoMirror = true,
                         )
                         Text("Open in YouTube")
                     }

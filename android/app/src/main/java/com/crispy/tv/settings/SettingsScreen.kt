@@ -16,23 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.ClosedCaption
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.VideoSettings
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -43,9 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
@@ -56,7 +46,7 @@ import com.crispy.tv.ui.utils.appBarScrollBehavior
 data class SettingsItem(
     val label: String,
     val description: String? = null,
-    val icon: ImageVector,
+    @DrawableRes val icon: Int,
     val iconTint: androidx.compose.ui.graphics.Color,
     val onClick: () -> Unit = {}
 )
@@ -88,7 +78,7 @@ fun SettingsScreen(
                         SettingsItem(
                             label = "Account and subscription",
                             description = "Manage your account, subscription, profiles, and billing",
-                            icon = Icons.Outlined.Person,
+                            icon = R.drawable.ic_person,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToAccountsProfiles
                         )
@@ -101,21 +91,21 @@ fun SettingsScreen(
                         SettingsItem(
                             label = "Playback",
                             description = "Player defaults and intro controls",
-                            icon = Icons.Outlined.VideoSettings,
+                            icon = R.drawable.ic_video_settings,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToPlaybackSettings
                         ),
                         SettingsItem(
                             label = "Image Quality",
                             description = "Choose artwork detail and cache size",
-                            icon = Icons.Outlined.Image,
+                            icon = R.drawable.ic_image,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToImageSettings
                         ),
                         SettingsItem(
                             label = "Subtitles",
                             description = "Caption styling and defaults",
-                            icon = Icons.Outlined.ClosedCaption,
+                            icon = R.drawable.ic_closed_caption,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
@@ -129,7 +119,7 @@ fun SettingsScreen(
                                 SettingsItem(
                                     label = "Plugins",
                                     description = "JavaScript plugin repositories",
-                                    icon = Icons.Outlined.Build,
+                                    icon = R.drawable.ic_build,
                                     iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     onClick = onNavigateToPluginsSettings,
                                 ),
@@ -139,7 +129,7 @@ fun SettingsScreen(
                             SettingsItem(
                                 label = "Addons",
                                 description = "Install and remove addon manifests",
-                                icon = Icons.Outlined.Extension,
+                                icon = R.drawable.ic_extension,
                                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 onClick = onNavigateToAddonsSettings,
                             ),
@@ -148,7 +138,7 @@ fun SettingsScreen(
                             SettingsItem(
                                 label = "Language & Region",
                                 description = "Preferred content language",
-                                icon = Icons.Outlined.Language,
+                                icon = R.drawable.ic_language,
                                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
                         )
@@ -161,7 +151,7 @@ fun SettingsScreen(
                         SettingsItem(
                             label = "About",
                             description = "Version, licenses, and credits",
-                            icon = Icons.Outlined.Info,
+                            icon = R.drawable.ic_info,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
@@ -180,9 +170,10 @@ fun SettingsScreen(
                 title = "Settings",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
                             contentDescription = "Back",
+                            autoMirror = true,
                         )
                     }
                 },
@@ -282,8 +273,8 @@ private fun SettingsItemRow(
                     .background(item.iconTint.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = item.icon,
+                CrispyIcon(
+                    painter = painterResource(item.icon),
                     contentDescription = null,
                     tint = item.iconTint,
                     modifier = Modifier.size(22.dp)
@@ -291,10 +282,11 @@ private fun SettingsItemRow(
             }
         },
         trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            CrispyIcon(
+                painter = painterResource(R.drawable.ic_keyboard_arrow_right),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                autoMirror = true,
             )
         },
         modifier = Modifier

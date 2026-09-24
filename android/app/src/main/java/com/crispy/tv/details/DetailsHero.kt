@@ -31,9 +31,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -59,13 +56,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
-import com.crispy.tv.R
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.addons.model.MediaDetails
@@ -273,7 +271,7 @@ internal fun HeroSection(
         }
 
         if (hasTrailer) {
-            val icon = if (isActuallyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+            val icon = if (isActuallyPlaying) R.drawable.ic_pause_filled else R.drawable.ic_play_arrow_filled
             val label = if (isActuallyPlaying) "Pause" else "Trailer"
             Surface(
                 modifier = Modifier
@@ -290,7 +288,7 @@ internal fun HeroSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = icon,
+                        painter = painterResource(icon),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )

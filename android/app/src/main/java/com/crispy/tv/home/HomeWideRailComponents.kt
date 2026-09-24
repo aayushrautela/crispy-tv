@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -44,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import coil3.compose.AsyncImage
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.ItemActionSheet
 import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
@@ -139,7 +137,8 @@ internal fun HomeWideRailSection(
                 add(
                     ItemActionSheetItem(
                         label = "Open details",
-                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        icon = R.drawable.ic_open_in_new_filled,
+                        autoMirror = true,
                         onClick = {
                             actionsItemKey = null
                             when (actionItem.kind) {
@@ -153,7 +152,7 @@ internal fun HomeWideRailSection(
                     add(
                         ItemActionSheetItem(
                             label = "Remove",
-                            icon = Icons.Outlined.Delete,
+                            icon = R.drawable.ic_delete,
                             destructive = true,
                             dividerBefore = true,
                             onClick = {

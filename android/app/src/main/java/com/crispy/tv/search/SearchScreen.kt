@@ -37,10 +37,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.History
-
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
@@ -64,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyShelfSection
 import com.crispy.tv.ui.components.LandscapeCard
@@ -71,6 +68,7 @@ import com.crispy.tv.ui.components.PersonCircleCard
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Locale
@@ -280,7 +278,7 @@ private fun RecentSearchChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Outlined.History,
+            painter = painterResource(R.drawable.ic_history),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -297,7 +295,7 @@ private fun RecentSearchChip(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Outlined.Clear,
+                painter = painterResource(R.drawable.ic_close),
                 contentDescription = "Remove recent search",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -354,7 +352,7 @@ private fun SearchResultsContent(
 
             else -> {
                 if (isLoading) {
-                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
+                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CrispySpinner) }
                 }
                 if (buckets.movies.isNotEmpty()) {
                     item(key = "movies") {
@@ -504,7 +502,7 @@ private fun SearchSuggestionsContent(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                LoadingIndicator()
+                LoadingIndicator(color = CrispySpinner)
             }
         } else if (suggestions.isEmpty()) {
             Text(

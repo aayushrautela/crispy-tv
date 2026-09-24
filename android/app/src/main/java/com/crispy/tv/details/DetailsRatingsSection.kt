@@ -16,9 +16,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,8 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.annotation.DrawableRes
 import androidx.annotation.RawRes
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -37,6 +35,7 @@ import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.addons.util.normalizeRatingText
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
 
 @Composable
@@ -121,8 +120,8 @@ private fun RatingPill(rating: DetailsRatingPill, modifier: Modifier = Modifier)
                                 maxLines = 1,
                             )
                         } else {
-                            Icon(
-                                imageVector = rating.badgeIcon ?: Icons.Filled.Star,
+                            CrispyIcon(
+                                painter = painterResource(rating.badgeIcon ?: R.drawable.ic_star_filled),
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -165,7 +164,7 @@ private data class DetailsRatingPill(
     val badgeText: String?,
     val badgeColor: Color,
     val badgeContentColor: Color,
-    val badgeIcon: ImageVector? = null,
+    @DrawableRes val badgeIcon: Int? = null,
     @param:RawRes val badgeLogoRes: Int? = null,
 )
 

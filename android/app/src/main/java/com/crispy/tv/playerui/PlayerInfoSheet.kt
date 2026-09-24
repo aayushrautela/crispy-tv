@@ -26,9 +26,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +47,7 @@ import com.crispy.tv.details.formatRuntimeForHeader
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.util.normalizeRatingText
+import com.crispy.tv.ui.assets.R
 
 @Composable
 internal fun PlayerInfoSheet(
@@ -106,7 +105,7 @@ internal fun PlayerInfoSheet(
                             modifier = Modifier.align(Alignment.TopEnd),
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Close,
+                                painter = painterResource(R.drawable.ic_close_filled),
                                 contentDescription = "Close",
                                 tint = palette.onPageBackground,
                             )
@@ -220,7 +219,7 @@ private fun MetaRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Star,
+                    painter = painterResource(R.drawable.ic_star_filled),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = Color(0xFFFFD54F),

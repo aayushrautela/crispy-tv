@@ -14,11 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ExitToApp
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Settings
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -36,10 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.avatar.AvatarUrlResolver
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -103,7 +102,11 @@ fun ProfileMenuRoute(
                 title = "Profile",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
+                            contentDescription = "Back",
+                            autoMirror = true,
+                        )
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -127,7 +130,7 @@ fun ProfileMenuRoute(
                 onClick = onOpenSettings,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Outlined.Settings, contentDescription = null)
+                Icon(painter = painterResource(R.drawable.ic_settings), contentDescription = null)
                 Spacer(modifier = Modifier.size(8.dp))
                 Text("Open settings")
             }
@@ -139,7 +142,7 @@ fun ProfileMenuRoute(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 ProfileMenuRow(
-                    icon = Icons.Outlined.Person,
+                    icon = R.drawable.ic_person,
                     label = "Manage profiles",
                     onClick = onManageProfiles,
                 )
@@ -149,9 +152,10 @@ fun ProfileMenuRoute(
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 ProfileMenuRow(
-                    icon = Icons.AutoMirrored.Outlined.ExitToApp,
+                    icon = R.drawable.ic_exit_to_app,
                     label = "Sign out",
                     onClick = onSignOut,
+                    autoMirror = true,
                 )
             }
         }
@@ -197,7 +201,7 @@ private fun ProfileMenuHeader(profile: ActiveProfileInfo?) {
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Outlined.Person,
+                    painter = painterResource(R.drawable.ic_person),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(36.dp),
@@ -223,13 +227,19 @@ private fun ProfileMenuHeader(profile: ActiveProfileInfo?) {
 
 @Composable
 private fun ProfileMenuRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    @DrawableRes icon: Int,
     label: String,
     onClick: () -> Unit,
+    autoMirror: Boolean = false,
 ) {
     ListItem(
         leadingContent = {
-            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            CrispyIcon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                autoMirror = autoMirror,
+            )
         },
         modifier = Modifier.clickable(onClick = onClick),
     ) {

@@ -32,9 +32,6 @@ import androidx.paging.cachedIn
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -63,8 +60,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.assets.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,6 +82,7 @@ import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -371,7 +371,7 @@ private fun DiscoverScreen(
                                 label = { Text(uiState.typeFilter.label) },
                                 trailingIcon = {
                                     Icon(
-                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        painter = painterResource(R.drawable.ic_keyboard_arrow_down),
                                         contentDescription = null
                                     )
                                 },
@@ -399,7 +399,7 @@ private fun DiscoverScreen(
                                 },
                                 trailingIcon = {
                                     Icon(
-                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        painter = painterResource(R.drawable.ic_keyboard_arrow_down),
                                         contentDescription = null
                                     )
                                 },
@@ -511,7 +511,7 @@ private fun DiscoverScreen(
                                 .padding(vertical = Dimensions.ListItemPadding),
                             contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(20.dp))
+                            LoadingIndicator(modifier = Modifier.size(20.dp), color = CrispySpinner)
                         }
                     }
                 } else if (appendState is LoadState.Error) {
@@ -553,7 +553,7 @@ private fun DiscoverScreen(
                                         if (uiState.typeFilter == filter) {
                                             {
                                                 Icon(
-                                                    imageVector = Icons.Outlined.Check,
+                                                    painter = painterResource(R.drawable.ic_check),
                                                     contentDescription = null
                                                 )
                                             }
@@ -618,7 +618,7 @@ private fun DiscoverScreen(
                                             if (uiState.selectedCatalogKey == catalog.key) {
                                                 {
                                                     Icon(
-                                                        imageVector = Icons.Outlined.Check,
+                                                        painter = painterResource(R.drawable.ic_check),
                                                         contentDescription = null
                                                     )
                                                 }

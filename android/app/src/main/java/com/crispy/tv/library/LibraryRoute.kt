@@ -5,11 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -30,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.crispy.tv.ui.assets.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
@@ -42,6 +39,7 @@ import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
+import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import androidx.compose.ui.unit.dp
@@ -99,7 +97,7 @@ fun LibraryRoute(
                 title = { CrispySectionAppBarTitle(label = "Library") },
                 actions = {
                     IconButton(onClick = onOpenCalendar) {
-                        Icon(Icons.Outlined.Event, contentDescription = "Calendar")
+                        Icon(painter = painterResource(R.drawable.ic_event), contentDescription = "Calendar")
                     }
                     ProfileIconButton(onClick = onOpenAccountsProfiles)
                 },
@@ -142,7 +140,7 @@ fun LibraryRoute(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LoadingIndicator()
+                    LoadingIndicator(color = CrispySpinner)
                 }
             }
         } else if (pagingItems.itemCount == 0) {
@@ -175,7 +173,8 @@ fun LibraryRoute(
                 add(
                     ItemActionSheetItem(
                         label = "Open details",
-                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        icon = R.drawable.ic_open_in_new_filled,
+                        autoMirror = true,
                         onClick = {
                             selectedLibraryItem = null
                             onItemClick(item, null)
@@ -185,7 +184,7 @@ fun LibraryRoute(
                 add(
                     ItemActionSheetItem(
                         label = if (watched) "Mark as unwatched" else "Mark as watched",
-                        icon = if (watched) Icons.Filled.Check else Icons.Outlined.Check,
+                        icon = if (watched) R.drawable.ic_check_filled else R.drawable.ic_check,
                         filled = watched,
                         dividerBefore = true,
                         onClick = {

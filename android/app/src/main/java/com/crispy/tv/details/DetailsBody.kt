@@ -24,8 +24,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,12 +32,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
+import com.crispy.tv.ui.assets.R
 
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
@@ -238,7 +238,7 @@ internal fun LazyListScope.detailsBodyContent(
                                 leadingIcon = if (uiState.seasonWatchStates[season] == true) {
                                     {
                                         Icon(
-                                            imageVector = Icons.Filled.Check,
+                                            painter = painterResource(R.drawable.ic_check_filled),
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp),
                                             tint = palette.accent,
@@ -332,60 +332,35 @@ internal fun LazyListScope.detailsBodyContent(
         )
     }
 
-    val collectionName = uiState.titleExtras?.collectionName
-    val collection = uiState.titleExtras?.collection.orEmpty()
-    val collectionParts = collection.mapNotNull { it.toCatalogItem() }
-    if (collectionParts.isNotEmpty()) {
-        item(key = "collection-header") {
-            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                Spacer(modifier = Modifier.height(18.dp))
-                Text(
-                    text = collectionName ?: "Franchise Collection",
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-        }
-        item(key = "collection-row") {
-            LazyRow(
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(items = collectionParts, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                    val key = "details-collection-${item.itemId}"
-                    HomeCatalogPosterCard(
-                        item = item,
-                        sharedElementKey = key,
-                        onClick = { onItemClick(item, key) },
+    val lists = uiState.titleExtras?.lists.orEmpty()
+    lists.forEach { list ->
+        val listItems = list.items.mapNotNull { it.toCatalogItem() }
+        if (listItems.isNotEmpty()) {
+            item(key = "list-header-${list.key}") {
+                Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Text(
+                        text = list.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
-        }
-    }
-
-    val similar = (uiState.titleExtras?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
-    if (similar.isNotEmpty()) {
-        item(key = "similar-header") {
-            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                Spacer(modifier = Modifier.height(18.dp))
-                Text(text = "More like this", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-        }
-        item(key = "similar-row") {
-            LazyRow(
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(items = similar, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                    val key = "details-similar-${item.itemId}"
-                    HomeCatalogPosterCard(
-                        item = item,
-                        sharedElementKey = key,
-                        onClick = { onItemClick(item, key) },
-                    )
+            item(key = "list-items-${list.key}") {
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(items = listItems, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
+                        val key = "details-list-${list.key}-${item.itemId}"
+                        HomeCatalogPosterCard(
+                            item = item,
+                            sharedElementKey = key,
+                            onClick = { onItemClick(item, key) },
+                        )
+                    }
                 }
             }
         }

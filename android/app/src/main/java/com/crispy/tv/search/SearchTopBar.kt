@@ -16,10 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +39,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
+import com.crispy.tv.ui.assets.R
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,7 +100,7 @@ fun SearchBar(
         },
         leadingIcon = {
             Icon(
-                imageVector = Icons.Outlined.Search,
+                painter = painterResource(R.drawable.ic_search),
                 contentDescription = null,
                 modifier = Modifier.padding(start = 6.dp),
             )
@@ -117,7 +115,7 @@ fun SearchBar(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Clear,
+                        painter = painterResource(R.drawable.ic_close),
                         contentDescription = "Clear search",
                     )
                 }
@@ -162,7 +160,7 @@ fun AiSearchButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Outlined.AutoAwesome,
+            painter = painterResource(R.drawable.ic_auto_awesome),
             contentDescription = "AI search",
             modifier = Modifier.rotate(rotation),
             tint = if (isHighlighted) {

@@ -17,11 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -65,6 +61,8 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -477,9 +475,10 @@ private fun AddonsSettingsScreen(
                 title = "Addons",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back"
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
+                            contentDescription = "Back",
+                            autoMirror = true,
                         )
                     }
                 },
@@ -522,7 +521,7 @@ private fun AddonsSettingsScreen(
                     modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Add,
+                        painter = painterResource(R.drawable.ic_add),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
@@ -757,7 +756,7 @@ private fun AddonListRow(
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Outlined.Extension,
+                        painter = painterResource(R.drawable.ic_extension),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -785,7 +784,7 @@ private fun AddonListRow(
         trailingContent = {
             IconButton(onClick = onRemove) {
                 Icon(
-                    imageVector = Icons.Outlined.Delete,
+                    painter = painterResource(R.drawable.ic_delete),
                     contentDescription = "Remove addon",
                     tint = MaterialTheme.colorScheme.error
                 )

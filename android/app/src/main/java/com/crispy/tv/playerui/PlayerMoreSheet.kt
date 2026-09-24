@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.HomeCatalogPosterCard
@@ -38,7 +38,6 @@ import com.crispy.tv.home.HomeCatalogPosterCard
 @Composable
 internal fun PlayerMoreSheet(
     visible: Boolean,
-    collectionItems: List<CatalogItem>,
     recommendedItems: List<CatalogItem>,
     moreIsLoading: Boolean,
     palette: DetailsPaletteColors,
@@ -67,7 +66,7 @@ internal fun PlayerMoreSheet(
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Close,
+                        painter = painterResource(R.drawable.ic_close_filled),
                         contentDescription = "Close",
                         tint = Color.White,
                     )
@@ -94,8 +93,7 @@ internal fun PlayerMoreSheet(
                     color = Color.White,
                 )
 
-                val collectionIds = collectionItems.mapTo(HashSet()) { "${it.type}:${it.id}" }
-                val items = collectionItems + recommendedItems.filter { "${it.type}:${it.id}" !in collectionIds }
+                val items = recommendedItems
                 when {
                     moreIsLoading && items.isEmpty() -> {
                         Text(

@@ -12,29 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.AccountBalance
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.EmojiEvents
-import androidx.compose.material.icons.outlined.Favorite
-import androidx.compose.material.icons.outlined.FlashOn
-import androidx.compose.material.icons.outlined.Gavel
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.LiveTv
-import androidx.compose.material.icons.outlined.Map
-import androidx.compose.material.icons.outlined.Masks
-import androidx.compose.material.icons.outlined.MoodBad
-import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.Rocket
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.SentimentVerySatisfied
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.Theaters
-import androidx.compose.material.icons.outlined.Videocam
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -50,12 +28,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
@@ -222,23 +201,16 @@ internal fun HomeHeroCarousel(
 
                 val heroMeta = buildList {
                     item.genres.firstOrNull()?.let { genre -> add(genreIcon(genre) to genre) }
-                    item.year?.let { add(Icons.Outlined.CalendarMonth to it) }
-                    item.rating?.let { add(Icons.Filled.Star to it) }
+                    item.year?.let { add(R.drawable.ic_calendar_month to it) }
+                    item.rating?.let { add(R.drawable.ic_star_filled to it) }
                 }
 
                 if (heroMeta.isNotEmpty()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        heroMeta.forEachIndexed { index, (icon, label) ->
-                            if (index > 0) {
-                                Text(
-                                    text = "•",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = Color.White.copy(alpha = 0.5f)
-                                )
-                            }
+                        heroMeta.forEach { (icon, label) ->
                             HeroMetaItem(icon = icon, label = label)
                         }
                     }
@@ -259,42 +231,42 @@ internal fun HomeHeroCarousel(
     }
 }
 
-private fun genreIcon(genre: String): ImageVector {
+private fun genreIcon(genre: String): Int {
     return when (genre.trim().lowercase()) {
-        "action" -> Icons.Outlined.Bolt
-        "adventure" -> Icons.Outlined.Map
-        "animated", "animation" -> Icons.Outlined.Theaters
-        "comedy" -> Icons.Outlined.SentimentVerySatisfied
-        "crime" -> Icons.Outlined.Gavel
-        "documentary" -> Icons.Outlined.Videocam
-        "drama" -> Icons.Outlined.Masks
-        "family" -> Icons.Outlined.Group
-        "fantasy" -> Icons.Outlined.AutoAwesome
-        "horror" -> Icons.Outlined.MoodBad
-        "history" -> Icons.Outlined.AccountBalance
-        "music" -> Icons.Outlined.MusicNote
-        "mystery" -> Icons.Outlined.Search
-        "reality" -> Icons.Outlined.LiveTv
-        "romance" -> Icons.Outlined.Favorite
+        "action" -> R.drawable.ic_bolt
+        "adventure" -> R.drawable.ic_map
+        "animated", "animation" -> R.drawable.ic_theaters
+        "comedy" -> R.drawable.ic_sentiment_very_satisfied
+        "crime" -> R.drawable.ic_gavel
+        "documentary" -> R.drawable.ic_videocam
+        "drama" -> R.drawable.ic_masks
+        "family" -> R.drawable.ic_group
+        "fantasy" -> R.drawable.ic_auto_awesome
+        "horror" -> R.drawable.ic_skull
+        "history" -> R.drawable.ic_account_balance
+        "music" -> R.drawable.ic_music_note
+        "mystery" -> R.drawable.ic_search
+        "reality" -> R.drawable.ic_live_tv
+        "romance" -> R.drawable.ic_favorite
         "scifi", "sci-fi", "science fiction", "sci-fi & fantasy", "sci fi & fantasy",
-        "sci-fi and fantasy" -> Icons.Outlined.Rocket
-        "sport" -> Icons.Outlined.EmojiEvents
-        "thriller" -> Icons.Outlined.FlashOn
-        "tv movie" -> Icons.Outlined.LiveTv
-        "war" -> Icons.Outlined.Shield
-        "western" -> Icons.Outlined.Movie
-        else -> Icons.Outlined.Movie
+        "sci-fi and fantasy" -> R.drawable.ic_rocket
+        "sport" -> R.drawable.ic_emoji_events
+        "thriller" -> R.drawable.ic_flash_on
+        "tv movie" -> R.drawable.ic_live_tv
+        "war" -> R.drawable.ic_shield
+        "western" -> R.drawable.ic_movie
+        else -> R.drawable.ic_movie
     }
 }
 
 @Composable
-private fun HeroMetaItem(icon: ImageVector, label: String) {
+private fun HeroMetaItem(@DrawableRes icon: Int, label: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
-            imageVector = icon,
+            painter = painterResource(icon),
             contentDescription = null,
             modifier = Modifier.size(14.dp),
             tint = Color.White.copy(alpha = 0.8f)

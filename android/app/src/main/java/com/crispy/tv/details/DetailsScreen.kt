@@ -27,15 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,11 +59,14 @@ import androidx.compose.ui.text.font.FontWeight
 import com.crispy.tv.ui.components.ItemActionSheet
 import com.crispy.tv.ui.components.ItemActionSheetItem
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
@@ -348,20 +342,22 @@ internal fun DetailsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        CrispyIcon(
+                            painter = painterResource(R.drawable.ic_arrow_back_filled),
                             contentDescription = "Back",
-                            tint = contentColor
+                            tint = contentColor,
+                            autoMirror = true,
                         )
                     }
                 },
                 actions = {
                     if (showTrailer && !trailerKey.isNullOrBlank()) {
                         IconButton(onClick = { onTrailerMutedChanged(!userMutedTrailer) }) {
-                            Icon(
-                                imageVector = if (userMutedTrailer) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            CrispyIcon(
+                                painter = painterResource(if (userMutedTrailer) R.drawable.ic_volume_off_filled else R.drawable.ic_volume_up_filled),
                                 contentDescription = if (userMutedTrailer) "Unmute trailer" else "Mute trailer",
                                 tint = contentColor,
+                                autoMirror = true,
                             )
                         }
                     }
@@ -432,7 +428,7 @@ internal fun DetailsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Filled.Star,
+                                            painter = painterResource(R.drawable.ic_star_filled),
                                             contentDescription = null,
                                             tint = Color(0xFFFFD54F),
                                         )
@@ -472,7 +468,7 @@ internal fun DetailsScreen(
                         ItemActionSheetItem(
                             label = if (watchState.isWatched) "Unmark as watched" else "Mark as watched",
                             supporting = "This episode only",
-                            icon = if (watchState.isWatched) Icons.Filled.Check else Icons.Outlined.Check,
+                            icon = if (watchState.isWatched) R.drawable.ic_check_filled else R.drawable.ic_check,
                             filled = watchState.isWatched,
                             onClick = {
                                 onToggleEpisodeWatched(selectedEpisode)
@@ -489,7 +485,7 @@ internal fun DetailsScreen(
                                         "Mark season $episodeSeason as watched"
                                     },
                                 supporting = "All episodes in this season",
-                                icon = if (seasonWatched) Icons.Filled.DoneAll else Icons.Outlined.DoneAll,
+                                icon = if (seasonWatched) R.drawable.ic_done_all_filled else R.drawable.ic_done_all,
                                 filled = seasonWatched,
                                 dividerBefore = true,
                                 onClick = {

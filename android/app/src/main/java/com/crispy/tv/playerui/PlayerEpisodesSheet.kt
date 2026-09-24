@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -32,7 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.details.EpisodeCard
@@ -78,7 +78,7 @@ internal fun PlayerEpisodesSheet(
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Close,
+                        painter = painterResource(R.drawable.ic_close_filled),
                         contentDescription = "Close",
                         tint = Color.White,
                     )

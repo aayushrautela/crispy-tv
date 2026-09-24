@@ -17,11 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Subtitles
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -45,12 +41,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
 import com.crispy.tv.streams.SHEET_HEIGHT_FRACTION
 import com.crispy.tv.streams.SHEET_MAX_WIDTH
+import com.crispy.tv.ui.assets.R
 import java.util.Locale
 
 private val ISO639_2_TO_1 =
@@ -208,7 +206,7 @@ internal fun PlayerAudioSheet(
                             subtitle = title?.let { languageLabelForCode(track.language) },
                             isSelected = track.id == selectedAudioTrackId,
                             palette = palette,
-                            leadingIcon = if (track.language == null) Icons.Filled.MusicNote else Icons.Filled.GraphicEq,
+                            leadingIcon = if (track.language == null) R.drawable.ic_music_note_filled else R.drawable.ic_graphic_eq_filled,
                             onClick = { onSelectAudioTrack(track.id) },
                         )
                     }
@@ -315,7 +313,7 @@ internal fun PlayerSubtitleSheet(
                         subtitle = null,
                         isSelected = offSelected,
                         palette = palette,
-                        leadingIcon = Icons.Filled.Subtitles,
+                        leadingIcon = R.drawable.ic_subtitles_filled,
                         onClick = { onSelectSubtitleTrack(null) },
                     )
                 }
@@ -330,7 +328,7 @@ internal fun PlayerSubtitleSheet(
                         subtitle = option.subtitle,
                         isSelected = option.isSelected,
                         palette = palette,
-                        leadingIcon = Icons.Filled.Subtitles,
+                        leadingIcon = R.drawable.ic_subtitles_filled,
                         onClick = { onSelectSubtitleTrack(option.trackId) },
                     )
                 }
@@ -445,7 +443,7 @@ private fun TrackRow(
     subtitle: String?,
     isSelected: Boolean,
     palette: DetailsPaletteColors,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
+     leadingIcon: Int,
     onClick: () -> Unit,
 ) {
     val containerColor = if (isSelected) palette.accent else Color.Transparent
@@ -463,7 +461,7 @@ private fun TrackRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = leadingIcon,
+            painter = painterResource(leadingIcon),
             contentDescription = null,
             tint = contentColor,
             modifier = Modifier.size(20.dp),
@@ -491,7 +489,7 @@ private fun TrackRow(
         }
         if (isSelected) {
             Icon(
-                imageVector = Icons.Filled.Check,
+                painter = painterResource(R.drawable.ic_check_filled),
                 contentDescription = null,
                 tint = palette.onAccent,
                 modifier = Modifier.size(20.dp),

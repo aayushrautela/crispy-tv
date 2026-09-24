@@ -1,21 +1,17 @@
 package com.crispy.tv.tv.ui.navigation
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.annotation.DrawableRes
+import com.crispy.tv.ui.assets.R
 
 enum class TvDestination(
     val route: String,
     val label: String,
-    val icon: ImageVector,
+    @DrawableRes val icon: Int,
 ) {
-    Home("home", "Home", Icons.Filled.Home),
-    Search("search", "Search", Icons.Filled.Search),
-    Library("library", "Library", Icons.Filled.List),
-    Settings("settings", "Settings", Icons.Filled.Settings);
+    Home("home", "Home", R.drawable.ic_home_filled),
+    Search("search", "Search", R.drawable.ic_search_filled),
+    Library("library", "Library", R.drawable.ic_list_filled),
+    Settings("settings", "Settings", R.drawable.ic_settings_filled);
 
     companion object {
         val default = Home

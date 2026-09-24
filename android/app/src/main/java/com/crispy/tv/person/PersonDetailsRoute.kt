@@ -28,9 +28,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -60,7 +58,9 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.home.HomeCatalogPosterCard
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.ui.components.initials
@@ -188,9 +188,10 @@ private fun PersonDetailsScreen(
             },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back"
+                    CrispyIcon(
+                        painter = painterResource(R.drawable.ic_arrow_back),
+                        contentDescription = "Back",
+                        autoMirror = true,
                     )
                 }
             },

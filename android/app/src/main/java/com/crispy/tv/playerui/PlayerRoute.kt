@@ -107,6 +107,7 @@ fun PlayerRoute(
                     GestureFeedbackMessage(
                         text = if (level.isMuted) "Muted" else formatGestureVolume(level),
                         icon = if (level.isMuted) GestureIcons.VolumeMuted else GestureIcons.VolumeUp,
+                        autoMirror = true,
                     ),
                     holdMs = 800,
                 )

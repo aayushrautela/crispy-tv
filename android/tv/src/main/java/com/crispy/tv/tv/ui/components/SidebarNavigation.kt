@@ -40,12 +40,14 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.annotation.DrawableRes
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.tv.ui.navigation.TvDestination
+import com.crispy.tv.ui.assets.R
 import kotlinx.coroutines.delay
 
 private val SidebarExpandedWidth = 200.dp
@@ -276,7 +278,7 @@ private fun SidebarPanel(
 
 @Composable
 private fun SidebarItem(
-    icon: ImageVector,
+    @DrawableRes icon: Int,
     label: String,
     selected: Boolean,
     showLabel: Boolean,
@@ -326,7 +328,7 @@ private fun SidebarItem(
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Icon(
-            imageVector = icon,
+            painter = painterResource(icon),
             contentDescription = label,
             tint = if (selected || focused) {
                 MaterialTheme.colorScheme.primary
