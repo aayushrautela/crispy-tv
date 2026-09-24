@@ -11,10 +11,8 @@ import com.crispy.tv.domain.sync.UpsertProfileDataCall
 import com.crispy.tv.domain.sync.planSyncRpcCalls
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import java.nio.file.Path
@@ -121,15 +119,6 @@ class SyncPlannerContractTest {
 private fun JsonElement.jsonObjectOrError(path: Path, index: Int): JsonObject {
     return this as? JsonObject
         ?: error("${path.toDisplayPath()}: expected object at index $index")
-}
-
-private fun JsonObject.optionalBoolean(key: String, path: Path): Boolean? {
-    val value = this[key] ?: return null
-    if (value is JsonNull) return null
-    val primitive = value as? JsonPrimitive
-        ?: error("${path.toDisplayPath()}: '$key' must be boolean or null")
-    return primitive.booleanOrNull
-        ?: error("${path.toDisplayPath()}: '$key' must be boolean or null")
 }
 
 private fun JsonObject.toStringMap(path: Path, label: String): Map<String, String> {
