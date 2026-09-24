@@ -21,20 +21,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.PaintingStyle
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -128,32 +122,20 @@ internal fun HomeTop10Card(
     onClick: () -> Unit,
 ) {
     val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
     val rankText = rank.toString()
     val rankStyle = hollowTextStyle(fontSize = 104.sp, letterSpacing = (-0.05f).sp)
-    val rankLayout = rememberHollowLayout(rankText, rankStyle)
-    val glyphWidthPx = rankLayout.size.width
-    val glyphHeightPx = rankLayout.size.height
-    val glyphWidth = Dp(glyphWidthPx / density.density)
-    val posterOffset = (glyphWidth - Top10Overlap).coerceAtLeast(0.dp)
-    val lineWidthPx = Top10LineWidth.value * density.density
-    val outlineColor = MaterialTheme.colorScheme.primary
+    val digitWidthPx = remember(rankText, rankStyle) {
+        textMeasurer.measure(AnnotatedString(rankText), style = rankStyle).size.width
+    }
+    val digitWidth = Dp(digitWidthPx / density.density)
+    val posterOffset = (digitWidth - Top10Overlap).coerceAtLeast(0.dp)
 
     Box(modifier = Modifier.width(Top10PosterWidth + posterOffset)) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .drawWithCache {
-                    val path = rankLayout.multiParagraph.getPathForRange(0, rankText.length)
-                    onDrawBehind {
-                        drawHollowPath(
-                            path = path,
-                            color = outlineColor,
-                            strokeWidthPx = lineWidthPx,
-                            dx = lineWidthPx,
-                            dy = size.height - glyphHeightPx - lineWidthPx,
-                        )
-                    }
-                },
+        Text(
+            text = rankText,
+            style = rankStyle,
+            modifier = Modifier.align(Alignment.BottomStart),
         )
         HomeTop10Poster(
             item = item,
@@ -171,71 +153,29 @@ private fun Top10HollowMark(
     fontSize: TextUnit,
     letterSpacing: TextUnit,
 ) {
-    val density = LocalDensity.current
     val style = hollowTextStyle(fontSize = fontSize, letterSpacing = letterSpacing)
-    val layout = rememberHollowLayout(text, style)
-    val lineWidthPx = Top10LineWidth.value * density.density
-    val outlineColor = MaterialTheme.colorScheme.primary
-    val width = Dp((layout.size.width + lineWidthPx * 2) / density.density)
-    val height = Dp((layout.size.height + lineWidthPx * 2) / density.density)
-
-    Box(
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .drawWithCache {
-                val path = layout.multiParagraph.getPathForRange(0, text.length)
-                onDrawBehind {
-                    drawHollowPath(
-                        path = path,
-                        color = outlineColor,
-                        strokeWidthPx = lineWidthPx,
-                        dx = lineWidthPx,
-                        dy = lineWidthPx,
-                    )
-                }
-            },
-    )
+    Text(text = text, style = style)
 }
 
-private fun DrawScope.drawHollowPath(
-    path: Path,
-    color: Color,
-    strokeWidthPx: Float,
-    dx: Float,
-    dy: Float,
-) {
-    drawIntoCanvas { canvas ->
-        val paint = Paint().apply {
-            this.color = color
-            style = PaintingStyle.Stroke
-            strokeWidth = strokeWidthPx
-            strokeCap = StrokeCap.Round
-            strokeJoin = StrokeJoin.Round
-            isAntiAlias = true
-        }
-        canvas.save()
-        canvas.translate(dx, dy)
-        canvas.drawPath(path, paint)
-        canvas.restore()
-    }
-}
-
+@Composable
 private fun hollowTextStyle(
     fontSize: TextUnit,
     letterSpacing: TextUnit,
-): TextStyle = TextStyle(
-    fontSize = fontSize,
-    fontWeight = FontWeight.Black,
-    letterSpacing = letterSpacing,
-)
-
-@Composable
-private fun rememberHollowLayout(text: String, style: TextStyle): TextLayoutResult {
-    val textMeasurer = rememberTextMeasurer()
-    return remember(text, style) {
-        textMeasurer.measure(AnnotatedString(text), style = style)
-    }
+): TextStyle {
+    val density = LocalDensity.current
+    val fontSizePx = with(density) { fontSize.toPx() }
+    val strokeWidthPx = with(density) { Top10LineWidth.toPx() }
+    return TextStyle(
+        fontSize = fontSize,
+        fontWeight = FontWeight.Black,
+        letterSpacing = letterSpacing,
+        color = MaterialTheme.colorScheme.primary,
+        drawStyle = Stroke(
+            width = strokeWidthPx,
+            join = StrokeJoin.Round,
+            pathEffect = PathEffect.cornerPathEffect(radius = fontSizePx * 0.08f),
+        ),
+    )
 }
 
 @Composable
