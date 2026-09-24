@@ -113,7 +113,7 @@ internal fun HeroSection(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
-    val heroHeight = (configuration.screenHeightDp.dp * 0.55f).coerceIn(300.dp, 520.dp)
+    val heroHeight = (configuration.screenHeightDp.dp * 0.40f).coerceIn(300.dp, 520.dp)
 
     val hasTrailer = trailer.isNotEmpty()
     var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
