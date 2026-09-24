@@ -467,12 +467,22 @@ internal fun HeaderInfoSection(
                         onClick = onToggleWatched
                     )
 
-                    DetailsVoteActions(
-                        liked = liked,
+                    DetailsQuickAction(
+                        label = "Like",
+                        selected = liked == true,
                         sync = optimisticSync.rating,
                         palette = palette,
-                        onLike = { onSetLiked(if (liked == true) null else true) },
-                        onDislike = { onSetLiked(if (liked == false) null else false) },
+                        icon = if (liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+                        onClick = { onSetLiked(if (liked == true) null else true) }
+                    )
+
+                    DetailsQuickAction(
+                        label = "Dislike",
+                        selected = liked == false,
+                        sync = optimisticSync.rating,
+                        palette = palette,
+                        icon = if (liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+                        onClick = { onSetLiked(if (liked == false) null else false) }
                     )
 
                     DetailsQuickAction(
@@ -668,12 +678,22 @@ private fun DetailsQuickActionsRow(
             onClick = onToggleWatched
         )
 
-        DetailsVoteActions(
-            liked = liked,
+        DetailsQuickAction(
+            label = "Like",
+            selected = liked == true,
             sync = optimisticSync.rating,
             palette = palette,
-            onLike = { onSetLiked(if (liked == true) null else true) },
-            onDislike = { onSetLiked(if (liked == false) null else false) },
+            icon = if (liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+            onClick = { onSetLiked(if (liked == true) null else true) }
+        )
+
+        DetailsQuickAction(
+            label = "Dislike",
+            selected = liked == false,
+            sync = optimisticSync.rating,
+            palette = palette,
+            icon = if (liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+            onClick = { onSetLiked(if (liked == false) null else false) }
         )
 
         DetailsQuickAction(
@@ -683,37 +703,6 @@ private fun DetailsQuickActionsRow(
             palette = palette,
             icon = R.drawable.ic_share,
             onClick = onShare
-        )
-    }
-}
-
-@Composable
-private fun DetailsVoteActions(
-    liked: Boolean?,
-    sync: OptimisticSyncBadge,
-    palette: DetailsPaletteColors,
-    onLike: () -> Unit,
-    onDislike: () -> Unit,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DetailsQuickAction(
-            label = "Like",
-            selected = liked == true,
-            sync = sync,
-            palette = palette,
-            icon = if (liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
-            onClick = onLike,
-        )
-        DetailsQuickAction(
-            label = "Dislike",
-            selected = liked == false,
-            sync = sync,
-            palette = palette,
-            icon = if (liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
-            onClick = onDislike,
         )
     }
 }
