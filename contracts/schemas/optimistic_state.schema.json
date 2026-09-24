@@ -133,8 +133,7 @@
       "required": [
         "is_in_watchlist",
         "is_watched",
-        "is_rated",
-        "user_rating",
+        "liked",
         "episode_watched",
         "season_watched"
       ],
@@ -145,12 +144,9 @@
         "is_watched": {
           "type": "boolean"
         },
-        "is_rated": {
-          "type": "boolean"
-        },
-        "user_rating": {
+        "liked": {
           "type": [
-            "integer",
+            "boolean",
             "null"
           ]
         },
@@ -286,7 +282,7 @@
       "properties": {
         "value": {
           "type": [
-            "integer",
+            "boolean",
             "null"
           ]
         },

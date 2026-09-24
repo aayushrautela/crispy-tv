@@ -124,6 +124,8 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - Local intent is modeled as a `UserMutation` (one of `watchlist`, `title_watched`, `episode_watched`, `season_watched`, `rating`) carrying a client nonce `id` for idempotency, an `entity_id` for coalescing, `attempt`, `status`, and `next_attempt_ms`.
   - `derive` operation: `deriveUserState(snapshot, mutations)` returns the display state. Within a `(kind, entity_id)` group the most recently created mutation wins. `pending`/`inflight` show the local `desired` value with `sync = syncing`; `failed`/`conflict` fall back to server truth with `sync = error`; no active mutation yields server truth with `sync = idle`.
   - Rapid double-toggles collapse: two `watchlist` mutations for the same `entity_id` resolve to the latest `desired`.
+  - The `rating` mutation is a binary like/dislike vote: `desired` is `true` (like), `false` (dislike), or `null` (clear the vote). Server truth is a single nullable `liked` field (no numeric star rating); a tri-state toggle shows the optimistic value while `syncing` and rolls back to server truth on `failed`/`conflict`.
+  - `contract_version` 3 replaced the numeric snapshot fields `is_rated`/`user_rating` with a single nullable `liked` and changed `rating.desired` from integer to boolean-or-null.
   - `plan_outbox` operation: `planOutbox(mutations, now_ms)` returns `OutboxAction`s for `pending` mutations whose `next_attempt_ms <= now_ms`, ordered by `(created_at_ms, id)`. `failed`/`conflict`/`inflight` are never scheduled by this step (the processor re-queues failed writes with a new backoff).
   - Backoff is `base * 2^(attempt-1)` capped at `max_delay_ms` (`nextBackoffDelayMs`).
 
@@ -156,3 +158,15 @@ only as passive metadata in `ProviderIds`/`externalIds`.
 Home catalog fixtures now use `item_id` instead of `media_key`.
 The `search_ranking_and_dedup` contract was removed — it was a pre-server TMDB normalization
 contract and no longer has a runtime caller after TMDB provider removal.
+
+### Migration: optimistic_state v3 (2026-09)
+
+The `optimistic_state` suite migrated from `contract_version` 2 to 3 to match the
+server's binary like/dislike vote API (`PUT /v1/profiles/:profileId/watch/rating/:itemId`
+with `{ liked: boolean|null }`). The numeric star rating was removed: the
+`UserStateSnapshot` fields `is_rated`/`user_rating` were replaced by a single
+nullable `liked`, and the `rating` mutation's `desired` changed from integer
+(0–10, `null` = remove) to boolean (`true` = like, `false` = dislike, `null` =
+clear). v2 fixtures live under `contracts/fixtures/optimistic_state/v1/` with
+`contract_version` 3; the Kotlin `UserMutations.kt` and the Swift
+`UserMutations.swift` both derive the rating field as `Boolean?`/`Bool?`.

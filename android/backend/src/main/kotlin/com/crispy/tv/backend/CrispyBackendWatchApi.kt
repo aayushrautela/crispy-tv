@@ -315,17 +315,17 @@ internal suspend fun CrispyBackendClient.deleteWatchlistApi(
     return parseWatchActionResponse(requireSuccess(response))
 }
 
-internal suspend fun CrispyBackendClient.putRatingApi(
+internal suspend fun CrispyBackendClient.setLikedApi(
     accessToken: String,
     profileId: String,
     itemId: String,
-    rating: Int,
+    liked: Boolean,
     occurredAt: String? = null,
     payload: Map<String, Any?> = emptyMap(),
 ): WatchActionResponse {
     checkConfigured()
     val requestBody = JSONObject().apply {
-        put("rating", rating)
+        put("liked", liked)
         if (!occurredAt.isNullOrBlank()) put("occurredAt", occurredAt.trim())
         if (payload.isNotEmpty()) put("payload", payload.toJsonObject())
     }.toString()

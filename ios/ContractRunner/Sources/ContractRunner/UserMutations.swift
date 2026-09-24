@@ -92,9 +92,10 @@ public struct RatingMutation: UserMutation {
     public let attempt: Int
     public let status: MutationStatus
     public let nextAttemptAtMs: Int64
-    public let desired: Int?
+    /// `true` = like, `false` = dislike, `nil` = clear the vote.
+    public let desired: Bool?
     public var kind: MutationKind { .rating }
-    public init(id: String, titleItemId: String, entityId: String, createdAtMs: Int64, attempt: Int, status: MutationStatus, nextAttemptAtMs: Int64, desired: Int?) {
+    public init(id: String, titleItemId: String, entityId: String, createdAtMs: Int64, attempt: Int, status: MutationStatus, nextAttemptAtMs: Int64, desired: Bool?) {
         self.id = id
         self.titleItemId = titleItemId
         self.entityId = entityId
@@ -165,15 +166,13 @@ public struct SeasonWatchedMutation: UserMutation {
 public struct UserStateSnapshot {
     public let isInWatchlist: Bool
     public let isWatched: Bool
-    public let isRated: Bool
-    public let userRating: Int?
+    public let liked: Bool?
     public let episodeWatched: [String: Bool]
     public let seasonWatched: [Int: Bool]
-    public init(isInWatchlist: Bool = false, isWatched: Bool = false, isRated: Bool = false, userRating: Int? = nil, episodeWatched: [String: Bool] = [:], seasonWatched: [Int: Bool] = [:]) {
+    public init(isInWatchlist: Bool = false, isWatched: Bool = false, liked: Bool? = nil, episodeWatched: [String: Bool] = [:], seasonWatched: [Int: Bool] = [:]) {
         self.isInWatchlist = isInWatchlist
         self.isWatched = isWatched
-        self.isRated = isRated
-        self.userRating = userRating
+        self.liked = liked
         self.episodeWatched = episodeWatched
         self.seasonWatched = seasonWatched
     }
@@ -197,7 +196,7 @@ public struct MutationSyncView: Equatable {
 public struct DerivedUserState {
     public let watchlist: (Bool, MutationSyncView)
     public let titleWatched: (Bool, MutationSyncView)
-    public let rating: (Int?, MutationSyncView)
+    public let rating: (Bool?, MutationSyncView)
     public let episodeWatched: [String: (Bool, MutationSyncView)]
     public let seasonWatched: [Int: (Bool, MutationSyncView)]
 }
@@ -279,7 +278,7 @@ public func deriveUserState(snapshot: UserStateSnapshot, mutations: [any UserMut
 
     let watchlist = reduce(server: snapshot.isInWatchlist, mutation: active(.watchlist)) { ($0 as! WatchlistMutation).desired }
     let titleWatched = reduce(server: snapshot.isWatched, mutation: active(.titleWatched)) { ($0 as! TitleWatchedMutation).desired }
-    let rating = reduce(server: snapshot.userRating, mutation: active(.rating)) { ($0 as! RatingMutation).desired }
+    let rating = reduce(server: snapshot.liked, mutation: active(.rating)) { ($0 as! RatingMutation).desired }
 
     var episodeWatched = snapshot.episodeWatched
     var episodeSync: [String: MutationSyncView] = [:]

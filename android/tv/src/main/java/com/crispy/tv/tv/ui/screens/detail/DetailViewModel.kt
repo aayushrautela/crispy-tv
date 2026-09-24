@@ -102,8 +102,7 @@ data class DetailUiState(
     val episodeWatchStates: Map<String, EpisodeWatchStateUi> = emptyMap(),
     val isInWatchlist: Boolean = false,
     val isWatched: Boolean = false,
-    val isRated: Boolean = false,
-    val userRating: Int? = null,
+    val liked: Boolean? = null,
 )
 
 data class EpisodeWatchStateUi(
@@ -304,8 +303,7 @@ class DetailViewModel(
                 episodes = episodes,
                 isInWatchlist = watchState?.isInWatchlist ?: false,
                 isWatched = watchState?.isWatched ?: false,
-                isRated = watchState?.isRated ?: false,
-                userRating = watchState?.userRating,
+                liked = watchState?.liked,
                 episodeWatchStates = episodeStates,
                 cast = detail.cast.map {
                     CastMemberUi(
@@ -464,12 +462,12 @@ class DetailViewModel(
         }
     }
 
-    fun setRating(rating: Int?) {
+    fun setLiked(liked: Boolean?) {
         val appContext = getApplication<Application>()
         viewModelScope.launch {
-            _state.value = _state.value.copy(isRated = rating != null, userRating = rating)
+            _state.value = _state.value.copy(liked = liked)
             runCatching {
-                TvServices.watchHistoryService(appContext).setTitleRating(itemId, rating)
+                TvServices.watchHistoryService(appContext).setTitleLiked(itemId, liked)
             }
         }
     }

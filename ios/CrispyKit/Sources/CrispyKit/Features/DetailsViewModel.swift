@@ -20,6 +20,7 @@ public let itemType: String
     public private(set) var isLoadingEpisodes = false
     public private(set) var errorMessage = ""
     public private(set) var watchState: WatchState?
+    public private(set) var liked: Bool?
     public private(set) var ctaLabel = "Play"
     public private(set) var ctaIconSystemName = "play.fill"
 
@@ -70,6 +71,7 @@ public func load(environment: AppEnvironment) async {
                     profileId: context2.profileId,
                     itemId: itemId
                 )
+                liked = watchState?.liked
                 resolveCta()
             }
 
@@ -115,6 +117,34 @@ public func selectSeason(_ seasonNumber: Int, environment: AppEnvironment) async
             seriesItemId: itemId,
             season: seasonNumber
         )) ?? []
+    }
+
+    /// Binary like/dislike vote. Optimistic flip with revert on failure (no outbox).
+    public func setLiked(_ value: Bool?, environment: AppEnvironment) async {
+        let previous = liked
+        liked = value
+        guard let context = await environment.backendContext() else {
+            liked = previous
+            return
+        }
+        do {
+            if let value {
+                _ = try await environment.backend.setLiked(
+                    accessToken: context.accessToken,
+                    profileId: context.profileId,
+                    itemId: itemId,
+                    liked: value
+                )
+            } else {
+                _ = try await environment.backend.deleteRating(
+                    accessToken: context.accessToken,
+                    profileId: context.profileId,
+                    itemId: itemId
+                )
+            }
+        } catch {
+            liked = watchState?.liked
+        }
     }
 }
 

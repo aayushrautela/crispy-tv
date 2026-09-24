@@ -82,6 +82,15 @@ internal fun JsonObject.optionalInt(key: String, path: Path): Int? {
         ?: error("${path.toDisplayPath()}: '$key' must be integer or null")
 }
 
+internal fun JsonObject.optionalBoolean(key: String, path: Path): Boolean? {
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    val primitive = value as? JsonPrimitive
+        ?: error("${path.toDisplayPath()}: '$key' must be boolean or null")
+    return primitive.booleanOrNull
+        ?: error("${path.toDisplayPath()}: '$key' must be boolean or null")
+}
+
 internal fun JsonObject.optionalString(key: String, path: Path): String? {
     val value = this[key] ?: return null
     if (value is JsonNull) return null

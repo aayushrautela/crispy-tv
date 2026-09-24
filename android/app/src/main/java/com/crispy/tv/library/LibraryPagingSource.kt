@@ -121,7 +121,7 @@ private suspend fun loadLibrarySectionPage(
 
 private fun ClientMediaCard.toCatalogItem(
     watchedAt: String?,
-    ratingValue: Int?,
+    liked: Boolean?,
     lastActivityAt: String?,
 ): CatalogItem {
     val isEpisode = mediaType.equals("episode", ignoreCase = true)
@@ -144,9 +144,8 @@ private fun ClientMediaCard.toCatalogItem(
         year = year?.toString(),
         genre = genres.firstOrNull(),
         maturityRating = maturityRating,
-        watchedAt = watchedAt,
-        ratingValue = ratingValue,
-        lastActivityAt = lastActivityAt,
+watchedAt = watchedAt,
+        liked = liked,
         episodeCount = if (isEpisode) 1 else null,
     )
 }
@@ -155,10 +154,10 @@ private fun ClientMediaCard.libraryCatalogItemFromProgress(): CatalogItem {
     val progress = progress
     val lastActivityAt = progress?.lastPlayedAt
     val watchedAt = lastActivityAt?.takeIf { progress.played == true }
-    val ratingValue = progress?.userRating?.toInt()?.takeIf { it in 1..10 }
+    val liked = progress?.liked
     return toCatalogItem(
         watchedAt = watchedAt,
-        ratingValue = ratingValue,
+        liked = liked,
         lastActivityAt = lastActivityAt,
     )
 }

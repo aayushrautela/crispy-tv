@@ -22,16 +22,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +69,6 @@ import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Date
-import kotlin.math.roundToInt
 
 private val AiInsightsBorderColors =
     listOf(
@@ -159,8 +155,7 @@ internal fun HeaderInfoSection(
     details: MediaDetails?,
     isInWatchlist: Boolean,
     isWatched: Boolean,
-    isRated: Boolean,
-    userRating: Int?,
+    liked: Boolean?,
     optimisticSync: OptimisticSync,
     palette: DetailsPaletteColors,
     watchCta: WatchCta,
@@ -169,7 +164,7 @@ internal fun HeaderInfoSection(
     onWatchNow: () -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
-    onSetRating: (Int?) -> Unit,
+    onSetLiked: (Boolean?) -> Unit,
     softFade: Modifier = Modifier,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -290,58 +285,6 @@ internal fun HeaderInfoSection(
 
 
     val genre = details.genres.take(2).joinToString(" · ") { it.trim() }
-
-    var showRatingDialog by rememberSaveable { mutableStateOf(false) }
-    var pendingRating by rememberSaveable { mutableStateOf(0f) }
-
-    if (showRatingDialog) {
-        AlertDialog(
-            onDismissRequest = { showRatingDialog = false },
-            title = { Text("Rate") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = if (pendingRating.roundToInt() == 0) "No rating" else "${pendingRating.roundToInt()}/10",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Slider(
-                        value = pendingRating,
-                        onValueChange = { pendingRating = it },
-                        valueRange = 0f..10f,
-                        steps = 9
-                    )
-
-                    TextButton(
-                        onClick = {
-                            onSetRating(null)
-                            showRatingDialog = false
-                        },
-                        enabled = pendingRating.roundToInt() != 0
-                    ) {
-                        Text("Clear")
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val ratingInt = pendingRating.roundToInt().coerceIn(0, 10)
-                        onSetRating(if (ratingInt == 0) null else ratingInt)
-                        showRatingDialog = false
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showRatingDialog = false }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 
     Column(
         modifier = softFade
@@ -524,18 +467,12 @@ internal fun HeaderInfoSection(
                         onClick = onToggleWatched
                     )
 
-                    val gold = Color(0xFFFFD700)
-                    DetailsQuickAction(
-                        label = if (isRated) (userRating?.let { "Rated $it" } ?: "Rated") else "Rate",
-                        selected = isRated,
+                    DetailsVoteActions(
+                        liked = liked,
                         sync = optimisticSync.rating,
                         palette = palette,
-                        selectedAccent = gold,
-                        icon = if (isRated) R.drawable.ic_star_filled else R.drawable.ic_star,
-                        onClick = {
-                            pendingRating = (userRating ?: 0).toFloat()
-                            showRatingDialog = true
-                        }
+                        onLike = { onSetLiked(if (liked == true) null else true) },
+                        onDislike = { onSetLiked(if (liked == false) null else false) },
                     )
 
                     DetailsQuickAction(
@@ -673,15 +610,11 @@ internal fun HeaderInfoSection(
                 palette = palette,
                 isInWatchlist = isInWatchlist,
                 isWatched = isWatched,
-                isRated = isRated,
-                userRating = userRating,
+                liked = liked,
                 optimisticSync = optimisticSync,
                 onToggleWatchlist = onToggleWatchlist,
                 onToggleWatched = onToggleWatched,
-                onRate = {
-                    pendingRating = (userRating ?: 0).toFloat()
-                    showRatingDialog = true
-                },
+                onSetLiked = onSetLiked,
                 onShare = {
                     val title = details.title
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -702,13 +635,12 @@ private fun DetailsQuickActionsRow(
     palette: DetailsPaletteColors,
     isInWatchlist: Boolean,
     isWatched: Boolean,
-    isRated: Boolean,
-    userRating: Int?,
+    liked: Boolean?,
     optimisticSync: OptimisticSync,
     modifier: Modifier = Modifier,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
-    onRate: () -> Unit,
+    onSetLiked: (Boolean?) -> Unit,
     onShare: () -> Unit,
 ) {
     Row(
@@ -736,15 +668,12 @@ private fun DetailsQuickActionsRow(
             onClick = onToggleWatched
         )
 
-        val gold = Color(0xFFFFD700)
-        DetailsQuickAction(
-            label = if (isRated) (userRating?.let { "Rated $it" } ?: "Rated") else "Rate",
-            selected = isRated,
+        DetailsVoteActions(
+            liked = liked,
             sync = optimisticSync.rating,
             palette = palette,
-            selectedAccent = gold,
-            icon = if (isRated) R.drawable.ic_star_filled else R.drawable.ic_star,
-            onClick = onRate
+            onLike = { onSetLiked(if (liked == true) null else true) },
+            onDislike = { onSetLiked(if (liked == false) null else false) },
         )
 
         DetailsQuickAction(
@@ -754,6 +683,37 @@ private fun DetailsQuickActionsRow(
             palette = palette,
             icon = R.drawable.ic_share,
             onClick = onShare
+        )
+    }
+}
+
+@Composable
+private fun DetailsVoteActions(
+    liked: Boolean?,
+    sync: OptimisticSyncBadge,
+    palette: DetailsPaletteColors,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DetailsQuickAction(
+            label = "Like",
+            selected = liked == true,
+            sync = sync,
+            palette = palette,
+            icon = if (liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+            onClick = onLike,
+        )
+        DetailsQuickAction(
+            label = "Dislike",
+            selected = liked == false,
+            sync = sync,
+            palette = palette,
+            icon = if (liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+            onClick = onDislike,
         )
     }
 }

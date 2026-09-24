@@ -82,10 +82,8 @@ internal const val LIBRARY_SECTION_HISTORY = "history"
 internal const val LIBRARY_SECTION_WATCHLIST = "watchlist"
 internal const val LIBRARY_SECTION_RATINGS = "ratings"
 
-private const val RATING_BAND_TOP = "top_rated"
 private const val RATING_BAND_LIKED = "liked"
-private const val RATING_BAND_MIXED = "mixed"
-private const val RATING_BAND_LOW = "low_rated"
+private const val RATING_BAND_DISLIKED = "disliked"
 
 private const val WATCHLIST_GROUP_THIS_MONTH = "this_month"
 private const val WATCHLIST_GROUP_LAST_MONTH = "last_month"
@@ -415,18 +413,14 @@ private data class RatingBandUi(
 private fun buildRatingBandSections(items: List<CatalogItem>): List<RatingBandUi> {
     val bands =
         listOf(
-            RATING_BAND_TOP to "Top Rated",
             RATING_BAND_LIKED to "Liked",
-            RATING_BAND_MIXED to "Mixed Feelings",
-            RATING_BAND_LOW to "Low Rated",
+            RATING_BAND_DISLIKED to "Disliked",
         )
     return bands.map { (key, label) ->
         val bandItems =
             when (key) {
-                RATING_BAND_TOP -> items.filter { it.ratingValue != null && it.ratingValue in 8..10 }
-                RATING_BAND_LIKED -> items.filter { it.ratingValue != null && it.ratingValue in 6..7 }
-                RATING_BAND_MIXED -> items.filter { it.ratingValue != null && it.ratingValue in 4..5 }
-                RATING_BAND_LOW -> items.filter { it.ratingValue != null && it.ratingValue in 1..3 }
+                RATING_BAND_LIKED -> items.filter { it.liked == true }
+                RATING_BAND_DISLIKED -> items.filter { it.liked == false }
                 else -> emptyList()
             }
         RatingBandUi(key, label, bandItems)

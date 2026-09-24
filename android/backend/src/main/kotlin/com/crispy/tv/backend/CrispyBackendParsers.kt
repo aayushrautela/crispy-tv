@@ -408,7 +408,7 @@ internal fun CrispyBackendClient.parseClientProgress(json: JSONObject?): ClientP
         percent = safe.optDoubleOrNull("percent"),
         lastPlayedAt = safe.optNullableString("lastPlayedAt"),
         watchlisted = safe.optBoolean("watchlisted", false),
-        userRating = safe.optDoubleOrNull("userRating"),
+        liked = safe.optBooleanOrNull("liked"),
     )
 }
 
@@ -475,6 +475,7 @@ private fun clientMediaCardToWatchStateResponse(card: ClientMediaCard): WatchSta
         played = played,
         watched = if (played && lastPlayedAt != null) WatchedStateView(watchedAt = lastPlayedAt) else null,
         playCount = progress?.playCount ?: 0,
+        liked = progress?.liked,
         resumePositionSeconds = positionSeconds,
         durationSeconds = durationSeconds,
         progressPercent = progressPercent,

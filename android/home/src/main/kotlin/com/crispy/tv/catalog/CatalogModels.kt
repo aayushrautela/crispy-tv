@@ -42,7 +42,7 @@ data class CatalogItem(
     val genre: String? = null,
     val description: String? = null,
     val maturityRating: String? = null,
-    val ratingValue: Int? = null,
+    val liked: Boolean? = null,
     val addedAt: String? = null,
     val watchedAt: String? = null,
     val ratedAt: String? = null,

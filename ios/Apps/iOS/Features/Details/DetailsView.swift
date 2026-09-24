@@ -248,19 +248,47 @@ struct DetailsScreen: View {
 
     @ViewBuilder
     private func watchCta(_ viewModel: DetailsViewModel) -> some View {
-        Button {
-            showPlaybackNotice = true
+        HStack(spacing: 10) {
+            Button {
+                showPlaybackNotice = true
+            } label: {
+                Label("Play", systemImage: "play.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.glassProminent)
+            .alert("Playback", isPresented: $showPlaybackNotice) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("The player arrives with the next milestone.")
+            }
+
+            voteButton(viewModel, isLike: true)
+            voteButton(viewModel, isLike: false)
+        }
+    }
+
+    private func voteButton(_ viewModel: DetailsViewModel, isLike: Bool) -> some View {
+        let active = isLike ? (viewModel.liked == true) : (viewModel.liked == false)
+        let systemImage = isLike
+            ? (active ? "hand.thumbsup.fill" : "hand.thumbsup")
+            : (active ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+        let voteValue: Bool? = isLike ? true : false
+        return Button {
+            Task {
+                await viewModel.setLiked(
+                    viewModel.liked == voteValue ? nil : voteValue,
+                    environment: environment
+                )
+            }
         } label: {
-            Label("Play", systemImage: "play.fill")
-                .frame(maxWidth: .infinity)
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
                 .padding(.vertical, 8)
+                .padding(.horizontal, 12)
         }
-        .buttonStyle(.glassProminent)
-        .alert("Playback", isPresented: $showPlaybackNotice) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("The player arrives with the next milestone.")
-        }
+        .buttonStyle(.glass)
+        .accessibilityLabel(isLike ? "Like" : "Dislike")
     }
 
     @ViewBuilder

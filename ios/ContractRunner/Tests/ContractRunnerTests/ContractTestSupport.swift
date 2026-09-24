@@ -52,6 +52,16 @@ func optionalInt(_ object: [String: Any], _ key: String) -> Int? {
     return intValue(value)
 }
 
+func optionalBool(_ object: [String: Any], _ key: String) -> Bool? {
+    guard let value = object[key] else {
+        return nil
+    }
+    if value is NSNull {
+        return nil
+    }
+    return value as? Bool
+}
+
 func requireObject(_ object: [String: Any], _ key: String, fixture: URL) throws -> [String: Any] {
     guard let value = object[key] as? [String: Any] else {
         throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): missing object \(key)")

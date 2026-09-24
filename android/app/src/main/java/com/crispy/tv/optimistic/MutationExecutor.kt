@@ -55,7 +55,7 @@ internal class UserMediaMutationExecutor(
                     repository.setTitleInWatchlist(mutation.entityId, mutation.desired)
 
                 is RatingMutation ->
-                    repository.setTitleRating(mutation.entityId, mutation.desired)
+                    repository.setTitleLiked(mutation.entityId, mutation.desired)
 
                 is TitleWatchedMutation -> {
                     val request =

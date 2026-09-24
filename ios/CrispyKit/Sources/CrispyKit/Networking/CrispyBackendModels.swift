@@ -74,7 +74,7 @@ public let durationSeconds: Int?
 public let percent: Double?
 public let lastPlayedAt: String?
 public let watchlisted: Bool
-public let userRating: Double?
+public let liked: Bool?
 
 public static func parse(_ json: [String: Any]?) -> ClientProgress? {
         guard let json, !json.isEmpty else { return nil }
@@ -86,7 +86,7 @@ public static func parse(_ json: [String: Any]?) -> ClientProgress? {
             percent: json.jsonDouble("percent"),
             lastPlayedAt: json.jsonString("lastPlayedAt"),
             watchlisted: json.jsonBool("watchlisted", defaultValue: false),
-            userRating: json.jsonDouble("userRating")
+            liked: json.jsonBoolOptional("liked")
         )
     }
 }
@@ -475,10 +475,11 @@ public struct MetadataCompany: Equatable, Identifiable {
 }
 
 public struct WatchState: Equatable {
-    public let itemId: String
-    public let played: Bool
-    public let playCount: Int
-    public let resumePositionSeconds: Double?
-    public let durationSeconds: Double?
-    public let progressPercent: Double?
+public let itemId: String
+public let played: Bool
+public let playCount: Int
+public let resumePositionSeconds: Double?
+public let durationSeconds: Double?
+public let progressPercent: Double?
+public let liked: Bool?
 }

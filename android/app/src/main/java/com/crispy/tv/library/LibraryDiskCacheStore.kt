@@ -98,6 +98,11 @@ class LibraryDiskCacheStore(appContext: Context) {
         return optString(key).trim().takeIf { it.isNotEmpty() }
     }
 
+    private fun JSONObject.optBooleanOrNull(key: String): Boolean? {
+        if (!has(key) || isNull(key)) return null
+        return optBoolean(key)
+    }
+
     private fun parseItems(array: JSONArray?): List<CatalogItem> {
         val safe = array ?: return emptyList()
         return buildList {
@@ -125,7 +130,7 @@ class LibraryDiskCacheStore(appContext: Context) {
             year = optNullableString("year"),
             genre = optNullableString("genre"),
             maturityRating = optNullableString("maturity_rating"),
-            ratingValue = optInt("rating_value", 0).takeIf { it > 0 },
+            liked = optBooleanOrNull("liked"),
             addedAt = optNullableString("added_at"),
             watchedAt = optNullableString("watched_at"),
             ratedAt = optNullableString("rated_at"),
@@ -149,7 +154,7 @@ class LibraryDiskCacheStore(appContext: Context) {
             .put("year", year)
             .put("genre", genre)
             .put("maturity_rating", maturityRating)
-            .put("rating_value", ratingValue)
+            .put("liked", liked ?: JSONObject.NULL)
             .put("added_at", addedAt)
             .put("watched_at", watchedAt)
             .put("rated_at", ratedAt)

@@ -57,11 +57,7 @@ import com.crispy.tv.tv.ui.components.tvHeroScrim
 import com.crispy.tv.tv.ui.components.skeletonElement
 import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
 import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
-import kotlin.math.roundToInt
 import androidx.annotation.DrawableRes
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Slider
-import androidx.compose.material3.TextButton
 
 internal val ScreenPadding = 48.dp
 
@@ -77,7 +73,7 @@ fun DetailScreen(
     onToggleEpisodeWatched: (DetailEpisodeUi) -> Unit = {},
     onAiInsightsClick: () -> Unit = {},
     onDismissAiInsights: () -> Unit = {},
-    onSetRating: (Int?) -> Unit = {},
+    onSetLiked: (Boolean?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val seed by rememberDetailsSeedColor(
@@ -101,7 +97,7 @@ fun DetailScreen(
                 onToggleEpisodeWatched = onToggleEpisodeWatched,
                 onAiInsightsClick = onAiInsightsClick,
                 onDismissAiInsights = onDismissAiInsights,
-                onSetRating = onSetRating,
+                onSetLiked = onSetLiked,
                 modifier = modifier,
             )
         }
@@ -162,13 +158,11 @@ private fun DetailContent(
     onToggleEpisodeWatched: (DetailEpisodeUi) -> Unit,
     onAiInsightsClick: () -> Unit,
     onDismissAiInsights: () -> Unit,
-    onSetRating: (Int?) -> Unit,
+    onSetLiked: (Boolean?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scroll = rememberScrollState()
     var expandedReview by remember { mutableStateOf<ReviewUi?>(null) }
-    var showRatingDialog by remember { mutableStateOf(false) }
-    var pendingRating by remember { mutableStateOf(0f) }
     var trailerPlaying by remember(state.trailers) { mutableStateOf(state.trailers.isNotEmpty()) }
     var trailerMuted by remember(state.trailers) { mutableStateOf(true) }
     var trailerFailed by remember(state.trailers) { mutableStateOf(false) }
@@ -179,67 +173,6 @@ private fun DetailContent(
         !trailerFailed &&
         state.trailers.isNotEmpty() &&
         scroll.value <= trailerStopScrollPx
-
-    if (showRatingDialog) {
-        androidx.compose.material3.MaterialTheme(
-            colorScheme = androidx.compose.material3.darkColorScheme(
-                primary = MaterialTheme.colorScheme.primary,
-                onPrimary = MaterialTheme.colorScheme.onPrimary,
-                secondaryContainer = MaterialTheme.colorScheme.secondaryContainer,
-                onSecondaryContainer = MaterialTheme.colorScheme.onSecondaryContainer,
-                background = MaterialTheme.colorScheme.surface,
-                onBackground = MaterialTheme.colorScheme.onSurface,
-                surface = MaterialTheme.colorScheme.surface,
-                onSurface = MaterialTheme.colorScheme.onSurface,
-                onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            AlertDialog(
-                onDismissRequest = { showRatingDialog = false },
-                title = { Text("Rate") },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = if (pendingRating.roundToInt() == 0) "No rating" else "${pendingRating.roundToInt()}/10",
-                        )
-                        Slider(
-                            value = pendingRating,
-                            onValueChange = { pendingRating = it },
-                            valueRange = 0f..10f,
-                            steps = 9,
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val ratingInt = pendingRating.roundToInt().coerceIn(0, 10)
-                            onSetRating(if (ratingInt == 0) null else ratingInt)
-                            showRatingDialog = false
-                        },
-                    ) {
-                        Text("Save")
-                    }
-                },
-                dismissButton = {
-                    Row {
-                        TextButton(
-                            onClick = {
-                                onSetRating(null)
-                                showRatingDialog = false
-                            },
-                            enabled = pendingRating.roundToInt() != 0,
-                        ) {
-                            Text("Clear")
-                        }
-                        TextButton(onClick = { showRatingDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                },
-            )
-        }
-    }
 
     if (state.aiStoryVisible && state.aiInsights != null) {
         AiInsightsStoryOverlay(
@@ -341,17 +274,16 @@ private fun DetailContent(
                         onClick = onToggleWatched,
                     )
                     HeaderActionButton(
-                        label = if (state.isRated && state.userRating != null) {
-                            "Rated ${state.userRating}"
-                        } else {
-                            "Rate"
-                        },
-                        icon = R.drawable.ic_star_filled,
-                        active = state.isRated,
-                        onClick = {
-                            pendingRating = (state.userRating ?: 0).toFloat()
-                            showRatingDialog = true
-                        },
+                        label = if (state.liked == true) "Liked" else "Like",
+                        icon = if (state.liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+                        active = state.liked == true,
+                        onClick = { onSetLiked(if (state.liked == true) null else true) },
+                    )
+                    HeaderActionButton(
+                        label = if (state.liked == false) "Disliked" else "Dislike",
+                        icon = if (state.liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+                        active = state.liked == false,
+                        onClick = { onSetLiked(if (state.liked == false) null else false) },
                     )
                     HeaderActionButton(
                         label = "Share",

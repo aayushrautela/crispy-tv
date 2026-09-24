@@ -112,27 +112,27 @@ class BackendWatchHistoryService(
         )
     }
 
-    override suspend fun setRating(
+    override suspend fun setLiked(
         request: WatchHistoryRequest,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult {
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
         val itemId = request.itemId?.trim()?.ifBlank { null }
             ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
         val action = try {
-            if (rating == null) {
+            if (liked == null) {
                 backend.deleteRating(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
                     itemId = itemId,
                 )
             } else {
-                backend.putRating(
+                backend.setLiked(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
                     itemId = itemId,
-                    rating = rating.coerceIn(1, 10),
+                    liked = liked,
                 )
             }
         } catch (error: Throwable) {
@@ -141,7 +141,11 @@ class BackendWatchHistoryService(
 
         return WatchHistoryResult(
             statusMessage = if (action.accepted) {
-                if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
+                when (liked) {
+                    true -> "Liked."
+                    false -> "Disliked."
+                    null -> "Vote removed."
+                }
             } else {
                 "Rating update failed."
             },
@@ -149,9 +153,9 @@ class BackendWatchHistoryService(
         )
     }
 
-    override suspend fun setTitleRating(
+    override suspend fun setTitleLiked(
         itemId: String,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult {
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
@@ -160,18 +164,18 @@ class BackendWatchHistoryService(
         }
 
         val action = try {
-            if (rating == null) {
+            if (liked == null) {
                 backend.deleteRating(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
                     itemId = normalizedItemId,
                 )
             } else {
-                backend.putRating(
+                backend.setLiked(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
                     itemId = normalizedItemId,
-                    rating = rating.coerceIn(1, 10),
+                    liked = liked,
                 )
             }
         } catch (error: Throwable) {
@@ -180,7 +184,11 @@ class BackendWatchHistoryService(
 
         return WatchHistoryResult(
             statusMessage = if (action.accepted) {
-                if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
+                when (liked) {
+                    true -> "Liked."
+                    false -> "Disliked."
+                    null -> "Vote removed."
+                }
             } else {
                 "Rating update failed."
             },
@@ -511,8 +519,7 @@ class BackendWatchHistoryService(
             isWatched = watched != null,
             watchedAtEpochMs = parseIsoToEpochMs(watched?.watchedAt),
             isInWatchlist = false,
-            isRated = false,
-            userRating = null,
+            liked = liked,
             playCount = playCount,
             resumePositionSeconds = resumePositionSeconds,
             durationSeconds = durationSeconds,

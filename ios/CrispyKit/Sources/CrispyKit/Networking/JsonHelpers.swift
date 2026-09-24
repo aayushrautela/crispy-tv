@@ -34,6 +34,19 @@ public func jsonBool(_ key: String, defaultValue: Bool) -> Bool {
         return defaultValue
     }
 
+    public func jsonBoolOptional(_ key: String) -> Bool? {
+        guard let value = self[key], !(value is NSNull) else { return nil }
+        if let number = value as? NSNumber { return number.boolValue }
+        if let string = value as? String {
+            switch string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "1": return true
+            case "false", "0": return false
+            default: return nil
+            }
+        }
+        return nil
+    }
+
 public func jsonObject(_ key: String) -> [String: Any]? {
         self[key] as? [String: Any]
     }

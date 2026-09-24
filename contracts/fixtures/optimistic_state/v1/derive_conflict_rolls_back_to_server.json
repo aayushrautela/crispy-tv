@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "optimistic_state",
   "case_id": "derive_conflict_rolls_back_to_server",
   "operation": "derive",
@@ -7,8 +7,7 @@
     "snapshot": {
       "is_in_watchlist": false,
       "is_watched": true,
-      "is_rated": true,
-      "user_rating": 7,
+      "liked": true,
       "episode_watched": {},
       "season_watched": {}
     },
@@ -31,7 +30,7 @@
         "attempt": 1,
         "status": "failed",
         "status_reason": "Network unavailable.",
-        "desired": 9
+        "desired": false
       }
     ]
   },
@@ -45,7 +44,7 @@
       "sync": "idle"
     },
     "rating": {
-      "value": 7,
+      "value": true,
       "sync": "error"
     },
     "episode_watched": {},

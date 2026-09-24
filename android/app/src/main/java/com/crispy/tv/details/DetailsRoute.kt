@@ -112,7 +112,7 @@ fun DetailsRoute(
         onStreamSelected = viewModel::onStreamSelected,
         onToggleWatchlist = viewModel::toggleWatchlist,
         onToggleWatched = viewModel::toggleWatched,
-        onSetRating = viewModel::setRating,
+        onSetLiked = viewModel::setLiked,
         onTrailerMutedChanged = playbackSettingsRepository::setTrailerMuted,
         onAiInsightsClick = viewModel::onAiInsightsClick,
         onDismissAiInsights = viewModel::dismissAiInsightsStory,

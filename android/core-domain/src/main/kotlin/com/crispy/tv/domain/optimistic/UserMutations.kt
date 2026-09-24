@@ -101,8 +101,8 @@ data class RatingMutation(
     override val attempt: Int,
     override val status: MutationStatus,
     override val nextAttemptAtMs: Long,
-    /** `null` means "remove rating". */
-    val desired: Int?,
+    /** `true` = like, `false` = dislike, `null` = clear the vote. */
+    val desired: Boolean?,
 ) : UserMutation {
     override val kind: MutationKind = MutationKind.RATING
 }
@@ -147,8 +147,7 @@ data class SeasonWatchedMutation(
 data class UserStateSnapshot(
     val isInWatchlist: Boolean = false,
     val isWatched: Boolean = false,
-    val isRated: Boolean = false,
-    val userRating: Int? = null,
+    val liked: Boolean? = null,
     val episodeWatched: Map<String, Boolean> = emptyMap(),
     val seasonWatched: Map<Int, Boolean> = emptyMap(),
 )
@@ -165,10 +164,10 @@ data class MutationSyncView(
 )
 
 data class DerivedUserState(
-    /** `value` is the rating (null == unrated); `isRated` is derived from it. */
     val watchlist: Pair<Boolean, MutationSyncView>,
     val titleWatched: Pair<Boolean, MutationSyncView>,
-    val rating: Pair<Int?, MutationSyncView>,
+    /** `value` is the vote (`true` = like, `false` = dislike, `null` = no vote). */
+    val rating: Pair<Boolean?, MutationSyncView>,
     val episodeWatched: Map<String, Pair<Boolean, MutationSyncView>>,
     val seasonWatched: Map<Int, Pair<Boolean, MutationSyncView>>,
 )
@@ -276,7 +275,7 @@ fun deriveUserState(
 
     val watchlist = reduce(snapshot.isInWatchlist, active(MutationKind.WATCHLIST)) { (it as WatchlistMutation).desired }
     val titleWatched = reduce(snapshot.isWatched, active(MutationKind.TITLE_WATCHED)) { (it as TitleWatchedMutation).desired }
-    val rating = reduce(snapshot.userRating, active(MutationKind.RATING)) { (it as RatingMutation).desired }
+    val rating = reduce(snapshot.liked, active(MutationKind.RATING)) { (it as RatingMutation).desired }
 
     val episodeWatched = snapshot.episodeWatched.toMutableMap()
     val episodeSync = mutableMapOf<String, MutationSyncView>()

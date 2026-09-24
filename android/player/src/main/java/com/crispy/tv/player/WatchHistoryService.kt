@@ -56,8 +56,7 @@ data class CanonicalWatchStateSnapshot(
     val isWatched: Boolean,
     val watchedAtEpochMs: Long?,
     val isInWatchlist: Boolean,
-    val isRated: Boolean,
-    val userRating: Int?,
+    val liked: Boolean?,
     val playCount: Int = 0,
     val resumePositionSeconds: Double? = null,
     val durationSeconds: Double? = null,
@@ -133,9 +132,9 @@ interface WatchHistoryService {
         return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
     }
 
-    suspend fun setRating(
+    suspend fun setLiked(
         request: WatchHistoryRequest,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Rating unavailable.")
     }
@@ -177,9 +176,9 @@ interface WatchHistoryService {
         return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
     }
 
-    suspend fun setTitleRating(
+    suspend fun setTitleLiked(
         itemId: String,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Rating unavailable.")
     }

@@ -242,6 +242,25 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         return parseWatchActionResponse(try perform(response))
     }
 
+    public func setLiked(accessToken: String, profileId: String, itemId: String, liked: Bool) async throws -> WatchActionResponse {
+        let normalizedItemId = itemId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let response = try await httpClient.putJson(
+            url: try requireURL(queryComponents(path: "/v1/profiles/\(profileId)/watch/rating/\(normalizedItemId)").url),
+            jsonBody: try JsonParser.encodeObject(["liked": liked]),
+            headers: authHeaders(accessToken)
+        )
+        return parseWatchActionResponse(try perform(response))
+    }
+
+    public func deleteRating(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+        let normalizedItemId = itemId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let response = try await httpClient.delete(
+            url: try requireURL(queryComponents(path: "/v1/profiles/\(profileId)/watch/rating/\(normalizedItemId)").url),
+            headers: authHeaders(accessToken)
+        )
+        return parseWatchActionResponse(try perform(response))
+    }
+
     public func deleteAccount(accessToken: String) async throws {
         let response = try await httpClient.delete(
             url: try requireURL(queryComponents(path: "/v1/account").url),
@@ -299,7 +318,8 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
             playCount: progress?.playCount ?? 0,
             resumePositionSeconds: progress?.positionSeconds.map(Double.init),
             durationSeconds: progress?.durationSeconds.map(Double.init),
-            progressPercent: progress?.percent ?? resolvedPercent(position: progress?.positionSeconds, duration: progress?.durationSeconds)
+            progressPercent: progress?.percent ?? resolvedPercent(position: progress?.positionSeconds, duration: progress?.durationSeconds),
+            liked: progress?.liked
         )
     }
 

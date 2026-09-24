@@ -64,17 +64,17 @@ class DefaultUserMediaRepository(
         return watchHistoryService.setTitleInWatchlist(itemId, inWatchlist)
     }
 
-    override suspend fun setRating(
+    override suspend fun setLiked(
         request: WatchHistoryRequest,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult {
-        return watchHistoryService.setRating(request, rating)
+        return watchHistoryService.setLiked(request, liked)
     }
 
-    override suspend fun setTitleRating(
+    override suspend fun setTitleLiked(
         itemId: String,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult {
-        return watchHistoryService.setTitleRating(itemId, rating)
+        return watchHistoryService.setTitleLiked(itemId, liked)
     }
 }

@@ -170,7 +170,7 @@ class CrispyBackendClient(
         val percent: Double?,
         val lastPlayedAt: String?,
         val watchlisted: Boolean,
-        val userRating: Double?,
+        val liked: Boolean?,
     )
 
     data class ClientParentImages(
@@ -270,6 +270,7 @@ class CrispyBackendClient(
         val played: Boolean,
         val watched: WatchedStateView?,
         val playCount: Int,
+        val liked: Boolean? = null,
         val resumePositionSeconds: Double? = null,
         val durationSeconds: Double? = null,
         val progressPercent: Double? = null,
@@ -800,19 +801,19 @@ class CrispyBackendClient(
         return deleteWatchlistApi(accessToken, profileId, itemId)
     }
 
-    suspend fun putRating(
+    suspend fun setLiked(
         accessToken: String,
         profileId: String,
         itemId: String,
-        rating: Int,
+        liked: Boolean,
         occurredAt: String? = null,
         payload: Map<String, Any?> = emptyMap(),
     ): WatchActionResponse {
-        return putRatingApi(
+        return setLikedApi(
             accessToken = accessToken,
             profileId = profileId,
             itemId = itemId,
-            rating = rating,
+            liked = liked,
             occurredAt = occurredAt,
             payload = payload,
         )

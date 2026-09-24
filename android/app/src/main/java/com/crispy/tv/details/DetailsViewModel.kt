@@ -141,8 +141,7 @@ class DetailsViewModel internal constructor(
             state.copy(
                 isInWatchlist = derived.watchlist.first,
                 isWatched = derived.titleWatched.first,
-                isRated = derived.rating.first != null,
-                userRating = derived.rating.first,
+                liked = derived.rating.first,
                 isShowFullyWatched = isShowFullyWatched,
                 episodeWatchStates = newEpisodeWatchStates,
                 seasonWatchStates = newSeasonWatchStates,
@@ -175,7 +174,7 @@ class DetailsViewModel internal constructor(
             when (mutation) {
                 is WatchlistMutation -> snapshot = snapshot.copy(isInWatchlist = mutation.desired)
                 is TitleWatchedMutation -> snapshot = snapshot.copy(isWatched = mutation.desired)
-                is RatingMutation -> snapshot = snapshot.copy(isRated = mutation.desired != null, userRating = mutation.desired)
+                is RatingMutation -> snapshot = snapshot.copy(liked = mutation.desired)
                 is EpisodeWatchedMutation -> episodeUpdates[mutation.videoId] = mutation.desired
                 is SeasonWatchedMutation -> seasonUpdates[mutation.seasonNumber] = mutation.desired
             }
@@ -269,8 +268,7 @@ class DetailsViewModel internal constructor(
                     statusMessage = result.statusMessage,
                     isWatched = result.providerState.isWatched,
                     isInWatchlist = result.providerState.isInWatchlist,
-                    isRated = result.providerState.isRated,
-                    userRating = result.providerState.userRating,
+                    liked = result.providerState.liked,
                     watchCta = result.watchCta,
                     continueVideoId = result.continueVideoId,
                     seasons = result.seasons,
@@ -286,8 +284,7 @@ class DetailsViewModel internal constructor(
             serverSnapshot = UserStateSnapshot(
                 isInWatchlist = result.providerState.isInWatchlist,
                 isWatched = result.providerState.isWatched,
-                isRated = result.providerState.isRated,
-                userRating = result.providerState.userRating,
+                liked = result.providerState.liked,
             )
             recomputeDerived()
 
@@ -1073,7 +1070,7 @@ class DetailsViewModel internal constructor(
         )
     }
 
-    fun setRating(rating: Int?) {
+    fun setLiked(liked: Boolean?) {
         val details = uiState.value.details ?: return
         val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
         val now = System.currentTimeMillis()
@@ -1086,7 +1083,7 @@ class DetailsViewModel internal constructor(
                 attempt = 0,
                 status = MutationStatus.Pending,
                 nextAttemptAtMs = now,
-                desired = rating,
+                desired = liked,
             ),
         )
     }

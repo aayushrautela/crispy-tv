@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "optimistic_state",
   "case_id": "plan_outbox_selects_due_pending_only",
   "operation": "plan_outbox",
@@ -7,8 +7,7 @@
     "snapshot": {
       "is_in_watchlist": false,
       "is_watched": false,
-      "is_rated": false,
-      "user_rating": null,
+      "liked": null,
       "episode_watched": {},
       "season_watched": {}
     },
@@ -32,7 +31,7 @@
         "attempt": 1,
         "status": "pending",
         "next_attempt_ms": 9999,
-        "desired": 8
+        "desired": true
       },
       {
         "kind": "title_watched",

@@ -13,8 +13,7 @@ internal data class ProviderState(
     val isWatched: Boolean,
     val watchedAtEpochMs: Long?,
     val isInWatchlist: Boolean,
-    val isRated: Boolean,
-    val userRating: Int?,
+    val liked: Boolean?,
     val progressPercent: Double? = null,
     val resumePositionSeconds: Double? = null,
     val durationSeconds: Double? = null,
@@ -47,8 +46,7 @@ internal class WatchCtaResolver(
                 isWatched = false,
                 watchedAtEpochMs = null,
                 isInWatchlist = false,
-                isRated = false,
-                userRating = null,
+                liked = null,
             )
         }
 
@@ -58,16 +56,14 @@ internal class WatchCtaResolver(
                 isWatched = false,
                 watchedAtEpochMs = null,
                 isInWatchlist = false,
-                isRated = false,
-                userRating = null,
+                liked = null,
             )
         } else {
             ProviderState(
                 isWatched = snapshot.isWatched,
                 watchedAtEpochMs = snapshot.watchedAtEpochMs,
                 isInWatchlist = snapshot.isInWatchlist,
-                isRated = snapshot.isRated,
-                userRating = snapshot.userRating,
+                liked = snapshot.liked,
                 progressPercent = snapshot.progressPercent,
                 resumePositionSeconds = snapshot.resumePositionSeconds,
                 durationSeconds = snapshot.durationSeconds,

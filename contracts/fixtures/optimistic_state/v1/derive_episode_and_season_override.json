@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "optimistic_state",
   "case_id": "derive_episode_and_season_override",
   "operation": "derive",
@@ -7,8 +7,7 @@
     "snapshot": {
       "is_in_watchlist": false,
       "is_watched": false,
-      "is_rated": false,
-      "user_rating": null,
+      "liked": null,
       "episode_watched": {
         "v1": false,
         "v2": true

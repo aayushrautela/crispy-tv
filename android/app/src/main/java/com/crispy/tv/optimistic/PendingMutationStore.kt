@@ -156,8 +156,8 @@ internal class FileBackedPendingMutationStore(
         }
     }
 
-    private fun desiredFrom(obj: JSONObject): Int? =
-        if (obj.isNull("desired")) null else obj.optInt("desired")
+    private fun desiredFrom(obj: JSONObject): Boolean? =
+        if (obj.isNull("desired")) null else obj.optBoolean("desired")
 
     private fun decodeStatus(obj: JSONObject): MutationStatus =
         when (obj.optString("status")) {

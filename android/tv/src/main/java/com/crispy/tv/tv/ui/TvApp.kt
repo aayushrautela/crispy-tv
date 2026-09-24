@@ -209,7 +209,7 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     onToggleEpisodeWatched = detailViewModel::toggleEpisodeWatched,
                     onAiInsightsClick = detailViewModel::onAiInsightsClick,
                     onDismissAiInsights = detailViewModel::dismissAiInsightsStory,
-                    onSetRating = detailViewModel::setRating,
+                    onSetLiked = detailViewModel::setLiked,
                     onPlay = { id ->
                         val target = detailState
                         if (target?.lookupMediaTypeName != null && !target.lookupId.isNullOrBlank()) {

@@ -107,7 +107,7 @@ internal fun DetailsScreen(
     onStreamSelected: (AddonStream) -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
-    onSetRating: (Int?) -> Unit,
+    onSetLiked: (Boolean?) -> Unit,
     onTrailerMutedChanged: (Boolean) -> Unit,
     onAiInsightsClick: () -> Unit,
     onDismissAiInsights: () -> Unit,
@@ -299,8 +299,7 @@ internal fun DetailsScreen(
                         details = visibleDetails,
                         isInWatchlist = visibleUiState.isInWatchlist,
                         isWatched = visibleUiState.isWatched || visibleUiState.isShowFullyWatched,
-                        isRated = visibleUiState.isRated,
-                        userRating = visibleUiState.userRating,
+                        liked = visibleUiState.liked,
                         optimisticSync = visibleUiState.optimisticSync,
                         palette = palette,
                         watchCta = visibleUiState.watchCta,
@@ -309,7 +308,7 @@ internal fun DetailsScreen(
                         onWatchNow = onOpenStreamSelector,
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
-                        onSetRating = onSetRating,
+                        onSetLiked = onSetLiked,
                         softFade = softFade,
                     )
                 }

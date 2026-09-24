@@ -45,8 +45,7 @@ final class UserMutationsContractTests: XCTestCase {
         return UserStateSnapshot(
             isInWatchlist: try requireBool(obj, "is_in_watchlist", fixture: fixture),
             isWatched: try requireBool(obj, "is_watched", fixture: fixture),
-            isRated: try requireBool(obj, "is_rated", fixture: fixture),
-            userRating: optionalInt(obj, "user_rating"),
+            liked: optionalBool(obj, "liked"),
             episodeWatched: episodeWatched,
             seasonWatched: seasonWatched
         )
@@ -80,7 +79,7 @@ final class UserMutationsContractTests: XCTestCase {
                 let contentType = MediaContentType(rawValue: optionalString(obj, "content_type") ?? "movie") ?? .movie
                 return TitleWatchedMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, contentType: contentType, desired: try requireBool(obj, "desired", fixture: fixture))
             case .rating:
-                return RatingMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, desired: optionalInt(obj, "desired"))
+                return RatingMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, desired: optionalBool(obj, "desired"))
             case .episodeWatched:
                 return EpisodeWatchedMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, itemId: entityId, season: try requireInt(obj, "season", fixture: fixture), episode: optionalInt(obj, "episode"), videoId: try requireString(obj, "video_id", fixture: fixture), desired: try requireBool(obj, "desired", fixture: fixture))
             case .seasonWatched:
@@ -147,8 +146,8 @@ final class UserMutationsContractTests: XCTestCase {
         XCTAssertEqual(try parseSync(try requireString(expected, "sync", fixture: URL(fileURLWithPath: label))), field.1.status, "\(label): sync")
     }
 
-    private func assertFieldRating(_ label: String, _ field: (Int?, MutationSyncView), _ expected: [String: Any]) throws {
-        XCTAssertEqual(optionalInt(expected, "value"), field.0, "\(label): value")
+    private func assertFieldRating(_ label: String, _ field: (Bool?, MutationSyncView), _ expected: [String: Any]) throws {
+        XCTAssertEqual(optionalBool(expected, "value"), field.0, "\(label): value")
         XCTAssertEqual(try parseSync(try requireString(expected, "sync", fixture: URL(fileURLWithPath: label))), field.1.status, "\(label): sync")
     }
 

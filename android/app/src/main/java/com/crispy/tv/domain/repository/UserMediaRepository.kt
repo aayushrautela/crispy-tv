@@ -41,13 +41,13 @@ interface UserMediaRepository {
         inWatchlist: Boolean,
     ): WatchHistoryResult
 
-    suspend fun setRating(
+    suspend fun setLiked(
         request: WatchHistoryRequest,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult
 
-    suspend fun setTitleRating(
+    suspend fun setTitleLiked(
         itemId: String,
-        rating: Int?,
+        liked: Boolean?,
     ): WatchHistoryResult
 }

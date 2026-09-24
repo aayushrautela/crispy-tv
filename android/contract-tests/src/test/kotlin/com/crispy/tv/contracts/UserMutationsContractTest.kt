@@ -69,8 +69,7 @@ class UserMutationsContractTest {
         return UserStateSnapshot(
             isInWatchlist = obj.requireBoolean("is_in_watchlist", path),
             isWatched = obj.requireBoolean("is_watched", path),
-            isRated = obj.requireBoolean("is_rated", path),
-            userRating = obj.optionalInt("user_rating", path),
+            liked = obj.optionalBoolean("liked", path),
             episodeWatched = episodeWatched,
             seasonWatched = seasonWatched,
         )
@@ -105,7 +104,7 @@ class UserMutationsContractTest {
                 )
                 MutationKind.RATING -> RatingMutation(
                     id, entityId, entityId, createdAtMs, attempt, status, nextAttemptAtMs,
-                    desired = obj.optionalInt("desired", path),
+                    desired = obj.optionalBoolean("desired", path),
                 )
                 MutationKind.EPISODE_WATCHED -> EpisodeWatchedMutation(
                     id, entityId, entityId, createdAtMs, attempt, status, nextAttemptAtMs,
@@ -187,10 +186,10 @@ class UserMutationsContractTest {
 
     private fun assertFieldRating(
         label: String,
-        field: Pair<Int?, com.crispy.tv.domain.optimistic.MutationSyncView>,
+        field: Pair<Boolean?, com.crispy.tv.domain.optimistic.MutationSyncView>,
         expected: JsonObject,
     ) {
-        assertEquals(expected.optionalInt("value", Path.of(label)), field.first, "$label: value")
+        assertEquals(expected.optionalBoolean("value", Path.of(label)), field.first, "$label: value")
         assertEquals(parseSync(expected.requireString("sync", Path.of(label))), field.second.status, "$label: sync")
     }
 
