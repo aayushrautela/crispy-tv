@@ -74,13 +74,3 @@ private func requireDouble(_ object: [String: Any], _ key: String, fixture: URL)
     }
     throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): missing double \(key)")
 }
-
-private func optionalBool(_ object: [String: Any], _ key: String) -> Bool? {
-    guard let value = object[key] else {
-        return nil
-    }
-    if value is NSNull {
-        return nil
-    }
-    return value as? Bool
-}

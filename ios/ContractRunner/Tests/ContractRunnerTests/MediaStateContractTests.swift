@@ -65,16 +65,6 @@ private func optionalDouble(_ object: [String: Any], _ key: String) -> Double? {
     return nil
 }
 
-private func optionalBool(_ object: [String: Any], _ key: String) -> Bool? {
-    guard let value = object[key] else {
-        return nil
-    }
-    if value is NSNull {
-        return nil
-    }
-    return value as? Bool
-}
-
 private func optionalArrayOfStrings(_ object: [String: Any], _ key: String, fixture: URL) throws -> [String]? {
     guard let value = object[key] else {
         return nil

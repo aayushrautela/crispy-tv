@@ -113,13 +113,6 @@ private func parseExpectedCalls(_ expected: [String: Any], fixture: URL) throws 
     }
 }
 
-private func optionalBool(_ object: [String: Any], _ key: String) -> Bool? {
-    guard let value = object[key], !(value is NSNull) else {
-        return nil
-    }
-    return value as? Bool
-}
-
 private func optionalInt64(_ object: [String: Any], _ key: String) -> Int64? {
     guard let value = object[key], !(value is NSNull) else {
         return nil
