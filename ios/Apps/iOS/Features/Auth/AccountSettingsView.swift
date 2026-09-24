@@ -27,6 +27,7 @@ struct AccountSettingsScreen: View {
             Section("Connected services") {
                 if isLoading && providers.isEmpty {
                     ProgressView()
+                        .tint(Theme.spinner)
                 } else if providers.isEmpty {
                     Text("No services connected.")
                         .foregroundStyle(.secondary)

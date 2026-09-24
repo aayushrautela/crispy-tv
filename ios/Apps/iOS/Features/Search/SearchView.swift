@@ -42,6 +42,7 @@ struct SearchScreen: View {
 
                 if viewModel.isSearching {
                     ProgressView()
+                        .tint(Theme.spinner)
                         .padding(.top, 24)
                 }
 

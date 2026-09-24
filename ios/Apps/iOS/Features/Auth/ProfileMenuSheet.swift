@@ -39,7 +39,7 @@ struct ProfileMenuSheet: View {
                                 Spacer()
                                 if profile.id == activeProfileId {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(Theme.accent)
+                                        .foregroundStyle(.primary)
                                 }
                             }
                         }

@@ -138,7 +138,7 @@ struct DiscoverScreen: View {
                         Spacer()
                         if option.id == viewModel.selectedCatalog?.id {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(Theme.accent)
+                                .foregroundStyle(.primary)
                         }
                     }
                 }

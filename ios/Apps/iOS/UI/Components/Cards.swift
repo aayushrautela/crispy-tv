@@ -20,7 +20,7 @@ struct RemoteImage: View {
                 case .empty:
                     ZStack {
                         Color(.secondarySystemBackground)
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.small).tint(Theme.spinner)
                     }
                 @unknown default:
                     Color(.secondarySystemBackground)
@@ -62,7 +62,7 @@ struct LandscapeCardView: View {
                         .font(.caption2.bold())
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Theme.accent.opacity(0.9), in: .rect(cornerRadius: 8))
+                        .background(.white.opacity(0.9), in: .rect(cornerRadius: 8))
                         .foregroundStyle(.black)
                         .padding(8)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -96,7 +96,7 @@ struct LandscapeCardView: View {
                             ZStack(alignment: .leading) {
                                 Capsule().fill(.white.opacity(0.25))
                                 Capsule()
-                                    .fill(Theme.accent)
+                                    .fill(.white)
                                     .frame(width: proxy.size.width * min(progressPercent / 100.0, 1.0))
                             }
                         }

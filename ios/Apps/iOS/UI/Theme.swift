@@ -20,19 +20,19 @@ enum Theme {
         }
     }
 
-    /// Yellow accent from the Android dark fallback palette.
-    static let accent = Color(red: 1.0, green: 0.769, blue: 0.0)
+    /// Spinner color mirroring `com.crispy.tv.ui.theme.CrispySpinner`.
+    static let spinner = Color(red: 0.961, green: 0.431, blue: 0.235)
 }
 
 extension View {
     /// Capsule chip matching the Android FilterChip styling used on Home/Discover/Library.
     func crispyChip(isSelected: Bool = false) -> some View {
         let glass: Glass = isSelected
-            ? .regular.tint(Theme.accent.opacity(0.35))
+            ? .regular.tint(Color.primary.opacity(0.35))
             : .regular
         return self
             .font(.subheadline.weight(isSelected ? .semibold : .medium))
-            .foregroundStyle(isSelected ? Theme.accent : Color.primary)
+            .foregroundStyle(Color.primary)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .glassEffect(glass.interactive(), in: .capsule)

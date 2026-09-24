@@ -18,6 +18,7 @@ struct DetailsScreen: View {
                 content(viewModel)
             } else {
                 ProgressView()
+                    .tint(Theme.spinner)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -47,6 +48,7 @@ struct DetailsScreen: View {
     private func content(_ viewModel: DetailsViewModel) -> some View {
         if viewModel.isLoadingDetail && viewModel.detail == nil {
             ProgressView()
+                .tint(Theme.spinner)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let detail = viewModel.detail {
             ScrollView {
@@ -310,6 +312,7 @@ struct DetailsScreen: View {
 
             if viewModel.isLoadingEpisodes {
                 ProgressView()
+                    .tint(Theme.spinner)
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
             } else {

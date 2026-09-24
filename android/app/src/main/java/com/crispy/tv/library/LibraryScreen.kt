@@ -58,6 +58,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.ui.graphics.Color
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
+import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -779,7 +780,7 @@ internal fun LibraryAppendState(
             modifier = Modifier.fillMaxWidth().padding(vertical = Dimensions.ListItemPadding),
             contentAlignment = Alignment.Center,
         ) {
-            LoadingIndicator()
+            LoadingIndicator(color = CrispySpinner)
         }
     } else if (appendState is LoadState.Error) {
         Box(

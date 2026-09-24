@@ -13,13 +13,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.details.DetailsPaletteColors
+import com.crispy.tv.ui.theme.CrispySpinner
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun PlayerLoadingCurtain(
     visible: Boolean,
-    palette: DetailsPaletteColors,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -34,7 +33,7 @@ internal fun PlayerLoadingCurtain(
         ) {
             LoadingIndicator(
                 modifier = Modifier.size(64.dp),
-                color = palette.accent,
+                color = CrispySpinner,
             )
         }
     }

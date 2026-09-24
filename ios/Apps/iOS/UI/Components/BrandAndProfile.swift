@@ -9,7 +9,7 @@ struct CrispyWordmark: View {
             Text("crispy")
                 .font(.title2.weight(.heavy))
             Circle()
-                .fill(Theme.accent)
+                .fill(.white)
                 .frame(width: 7, height: 7)
                 .padding(.top, 8)
         }

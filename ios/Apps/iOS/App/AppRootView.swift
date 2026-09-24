@@ -10,6 +10,7 @@ struct AppRootView: View {
             switch environment.bootstrap.state {
             case .loading:
                 ProgressView()
+                    .tint(Theme.spinner)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .needsAuth:
                 AuthScreen(onSignedIn: {
@@ -69,7 +70,7 @@ struct AuthScreen: View {
                 } label: {
                     Group {
                         if isBusy {
-                            ProgressView().controlSize(.small)
+                            ProgressView().controlSize(.small).tint(Theme.spinner)
                         } else {
                             Text(isSignUp ? "Create account" : "Sign in")
                                 .frame(maxWidth: .infinity)
@@ -145,6 +146,7 @@ struct ProfileSelectorScreen: View {
             Group {
                 if isLoading && profiles.isEmpty {
                     ProgressView()
+                        .tint(Theme.spinner)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if profiles.isEmpty {
                     setupForm
@@ -174,7 +176,7 @@ struct ProfileSelectorScreen: View {
             } label: {
                 Group {
                     if isCreating {
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.small).tint(Theme.spinner)
                     } else {
                         Text("Get started").frame(maxWidth: .infinity)
                     }

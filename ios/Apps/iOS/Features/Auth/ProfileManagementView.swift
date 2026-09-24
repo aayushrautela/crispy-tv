@@ -15,7 +15,7 @@ struct ProfileManagementScreen: View {
     var body: some View {
         Group {
             if isLoading && profiles.isEmpty {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView().tint(Theme.spinner).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
                     ForEach(profiles) { profile in
@@ -31,7 +31,7 @@ struct ProfileManagementScreen: View {
                                             .font(.caption2.weight(.semibold))
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 2)
-                                            .background(Theme.accent.opacity(0.25), in: .capsule)
+                                            .background(.white.opacity(0.25), in: .capsule)
                                     }
                                 }
                                 Spacer()
@@ -139,7 +139,7 @@ struct ProfileEditSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.small).tint(Theme.spinner)
                     } else {
                         Button("Save") { Task { await save() } }
                             .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -174,7 +174,7 @@ struct ProfileEditSheet: View {
                 }
                 if selectedAvatarId == id {
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Theme.accent, lineWidth: 3)
+                        .strokeBorder(.white, lineWidth: 3)
                 }
             }
             .frame(height: 56)

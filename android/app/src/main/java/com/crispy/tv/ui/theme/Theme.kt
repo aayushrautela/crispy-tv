@@ -5,12 +5,14 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+val CrispySpinner = Color(0xFFF56E3C)
+
 private val CrispyDarkColors = darkColorScheme(
-    primary = Color(0xFFF56E3C),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD95A30),
+    primary = Color(0xFFFFFFFF),
+    onPrimary = Color(0xFF141414),
+    primaryContainer = Color(0xFF2A2A2A),
     onPrimaryContainer = Color(0xFFFFFFFF),
-    inversePrimary = Color(0xFFF56E3C),
+    inversePrimary = Color(0xFFFFFFFF),
     secondary = Color(0xFFB3B3B3),
     onSecondary = Color(0xFF141414),
     secondaryContainer = Color(0xFF333333),
@@ -30,7 +32,7 @@ private val CrispyDarkColors = darkColorScheme(
     surfaceContainerHighest = Color(0xFF333333),
     surfaceContainerLow = Color(0xFF141414),
     surfaceContainerLowest = Color(0xFF0A0A0A),
-    surfaceTint = Color(0xFFF56E3C),
+    surfaceTint = Color(0xFFFFFFFF),
     surfaceDim = Color(0xFF0A0A0A),
     surfaceBright = Color(0xFF2A2A2A),
     outline = Color(0xFF333333),
