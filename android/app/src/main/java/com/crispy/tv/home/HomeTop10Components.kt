@@ -21,17 +21,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.PaintingStyle
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -43,6 +52,7 @@ import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 private const val TOP10_LIMIT = 10
 private val Top10PosterWidth: Dp = 150.dp
 private val Top10Overlap: Dp = 14.dp
+private val Top10LineWidth: Dp = 2.dp
 
 @Composable
 internal fun HomeTop10SectionRow(
@@ -60,10 +70,7 @@ internal fun HomeTop10SectionRow(
                 .padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                text = "TOP10",
-                style = hollowDisplayTextStyle(fontSize = 44.sp, letterSpacing = (-0.02f).sp),
-            )
+            Top10HollowMark(text = "TOP10", fontSize = 44.sp, letterSpacing = (-0.02f).sp)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -120,21 +127,33 @@ internal fun HomeTop10Card(
     rank: Int,
     onClick: () -> Unit,
 ) {
-    val rankStyle = hollowDisplayTextStyle(fontSize = 104.sp, letterSpacing = (-0.05f).sp)
-    val textMeasurer = rememberTextMeasurer()
-    val digitWidthPx = remember(rank, rankStyle) {
-        textMeasurer.measure(AnnotatedString(rank.toString()), style = rankStyle).size.width
-    }
     val density = LocalDensity.current
-    val digitWidth = remember(digitWidthPx) { with(density) { digitWidthPx.toDp() } }
-    val posterWidth = Top10PosterWidth
-    val posterOffset = (digitWidth - Top10Overlap).coerceAtLeast(0.dp)
+    val rankText = rank.toString()
+    val rankStyle = hollowTextStyle(fontSize = 104.sp, letterSpacing = (-0.05f).sp)
+    val rankLayout = rememberHollowLayout(rankText, rankStyle)
+    val glyphWidthPx = rankLayout.size.width
+    val glyphHeightPx = rankLayout.size.height
+    val glyphWidth = Dp(glyphWidthPx / density.density)
+    val posterOffset = (glyphWidth - Top10Overlap).coerceAtLeast(0.dp)
+    val lineWidthPx = Top10LineWidth.value * density.density
+    val outlineColor = MaterialTheme.colorScheme.primary
 
-    Box(modifier = Modifier.width(posterWidth + posterOffset)) {
-        Text(
-            text = rank.toString(),
-            style = rankStyle,
-            modifier = Modifier.align(Alignment.BottomStart),
+    Box(modifier = Modifier.width(Top10PosterWidth + posterOffset)) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .drawWithCache {
+                    val path = rankLayout.multiParagraph.getPathForRange(0, rankText.length)
+                    onDrawBehind {
+                        drawHollowPath(
+                            path = path,
+                            color = outlineColor,
+                            strokeWidthPx = lineWidthPx,
+                            dx = lineWidthPx,
+                            dy = size.height - glyphHeightPx - lineWidthPx,
+                        )
+                    }
+                },
         )
         HomeTop10Poster(
             item = item,
@@ -143,6 +162,79 @@ internal fun HomeTop10Card(
                 .align(Alignment.BottomStart)
                 .padding(start = posterOffset),
         )
+    }
+}
+
+@Composable
+private fun Top10HollowMark(
+    text: String,
+    fontSize: TextUnit,
+    letterSpacing: TextUnit,
+) {
+    val density = LocalDensity.current
+    val style = hollowTextStyle(fontSize = fontSize, letterSpacing = letterSpacing)
+    val layout = rememberHollowLayout(text, style)
+    val lineWidthPx = Top10LineWidth.value * density.density
+    val outlineColor = MaterialTheme.colorScheme.primary
+    val width = Dp((layout.size.width + lineWidthPx * 2) / density.density)
+    val height = Dp((layout.size.height + lineWidthPx * 2) / density.density)
+
+    Box(
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .drawWithCache {
+                val path = layout.multiParagraph.getPathForRange(0, text.length)
+                onDrawBehind {
+                    drawHollowPath(
+                        path = path,
+                        color = outlineColor,
+                        strokeWidthPx = lineWidthPx,
+                        dx = lineWidthPx,
+                        dy = lineWidthPx,
+                    )
+                }
+            },
+    )
+}
+
+private fun DrawScope.drawHollowPath(
+    path: Path,
+    color: Color,
+    strokeWidthPx: Float,
+    dx: Float,
+    dy: Float,
+) {
+    drawIntoCanvas { canvas ->
+        val paint = Paint().apply {
+            this.color = color
+            style = PaintingStyle.Stroke
+            strokeWidth = strokeWidthPx
+            strokeCap = StrokeCap.Round
+            strokeJoin = StrokeJoin.Round
+            isAntiAlias = true
+        }
+        canvas.save()
+        canvas.translate(dx, dy)
+        canvas.drawPath(path, paint)
+        canvas.restore()
+    }
+}
+
+private fun hollowTextStyle(
+    fontSize: TextUnit,
+    letterSpacing: TextUnit,
+): TextStyle = TextStyle(
+    fontSize = fontSize,
+    fontWeight = FontWeight.Black,
+    letterSpacing = letterSpacing,
+)
+
+@Composable
+private fun rememberHollowLayout(text: String, style: TextStyle): TextLayoutResult {
+    val textMeasurer = rememberTextMeasurer()
+    return remember(text, style) {
+        textMeasurer.measure(AnnotatedString(text), style = style)
     }
 }
 
@@ -255,19 +347,4 @@ private fun HomeTop10Poster(
             }
         }
     }
-}
-
-@Composable
-private fun hollowDisplayTextStyle(
-    fontSize: androidx.compose.ui.unit.TextUnit,
-    letterSpacing: androidx.compose.ui.unit.TextUnit,
-): TextStyle {
-    val strokeWidthPx = with(LocalDensity.current) { 2.dp.toPx() }
-    return TextStyle(
-        fontSize = fontSize,
-        fontWeight = FontWeight.Black,
-        letterSpacing = letterSpacing,
-        color = MaterialTheme.colorScheme.primary,
-        drawStyle = Stroke(width = strokeWidthPx),
-    )
 }
