@@ -136,7 +136,7 @@ internal fun rememberSeedColor(
     ) {
         val url = imageUrl?.trim()?.takeIf { it.isNotEmpty() }
         if (url == null) {
-            value = Color.Unspecified
+            value = fallbackSeed
             return@produceState
         }
         val cached = cachedDetailsSeedColor(url)
@@ -149,7 +149,7 @@ internal fun rememberSeedColor(
             imageUrl = url,
             fallbackSeed = fallbackSeed,
         )
-        value = loaded ?: Color.Unspecified
+        value = loaded ?: fallbackSeed
     }
 }
 
