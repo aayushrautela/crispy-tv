@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -46,7 +48,8 @@ import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 private const val TOP10_LIMIT = 10
 private val Top10PosterWidth: Dp = 150.dp
 private val Top10Overlap: Dp = 14.dp
-private val Top10FontFamily = FontFamily(Font(R.font.bungee_outline))
+private val Top10LineWidth: Dp = 2.dp
+private val Top10FontFamily = FontFamily(Font(R.font.archivo_top10))
 
 @Composable
 internal fun HomeTop10SectionRow(
@@ -64,7 +67,7 @@ internal fun HomeTop10SectionRow(
                 .padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.Bottom,
         ) {
-            Top10HollowMark(text = "TOP10", fontSize = 44.sp, letterSpacing = (-0.02f).sp)
+            Top10HollowMark(text = "TOP10", fontSize = 48.sp, letterSpacingEm = -0.02f)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -124,7 +127,7 @@ internal fun HomeTop10Card(
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
     val rankText = rank.toString()
-    val rankStyle = hollowTextStyle(fontSize = 104.sp, letterSpacing = (-0.05f).sp)
+    val rankStyle = hollowTextStyle(fontSize = 110.sp, letterSpacingEm = -0.05f)
     val digitWidthPx = remember(rankText, rankStyle) {
         textMeasurer.measure(AnnotatedString(rankText), style = rankStyle).size.width
     }
@@ -151,22 +154,30 @@ internal fun HomeTop10Card(
 private fun Top10HollowMark(
     text: String,
     fontSize: TextUnit,
-    letterSpacing: TextUnit,
+    letterSpacingEm: Float,
 ) {
-    val style = hollowTextStyle(fontSize = fontSize, letterSpacing = letterSpacing)
+    val style = hollowTextStyle(fontSize = fontSize, letterSpacingEm = letterSpacingEm)
     Text(text = text, style = style)
 }
 
 @Composable
 private fun hollowTextStyle(
     fontSize: TextUnit,
-    letterSpacing: TextUnit,
-): TextStyle = TextStyle(
-    fontFamily = Top10FontFamily,
-    fontSize = fontSize,
-    letterSpacing = letterSpacing,
-    color = MaterialTheme.colorScheme.primary,
-)
+    letterSpacingEm: Float,
+): TextStyle {
+    val density = LocalDensity.current
+    val strokeWidthPx = with(density) { Top10LineWidth.toPx() }
+    return TextStyle(
+        fontFamily = Top10FontFamily,
+        fontSize = fontSize,
+        letterSpacing = (fontSize.value * letterSpacingEm).sp,
+        color = MaterialTheme.colorScheme.primary,
+        drawStyle = Stroke(
+            width = strokeWidthPx,
+            join = StrokeJoin.Round,
+        ),
+    )
+}
 
 @Composable
 private fun HomeTop10Poster(
