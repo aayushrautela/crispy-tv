@@ -67,7 +67,7 @@ class BackendBrowseRepository(
 
         val items =
             requests.flatMap { request ->
-                responses[request.type].orEmpty().items.mapNotNull { it.toCatalogItem() }
+                responses[request.type]?.items.orEmpty().mapNotNull { it.toCatalogItem() }
             }
 
         return BrowsePagePayload(
