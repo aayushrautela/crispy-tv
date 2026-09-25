@@ -48,6 +48,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,6 +76,7 @@ import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.genreIcon
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
@@ -262,6 +265,10 @@ private fun DiscoverScreen(
     onScrollToTopConsumed: () -> Unit,
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
+    val filterSheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
     val gridState = rememberLazyGridState()
@@ -497,163 +504,101 @@ private fun DiscoverScreen(
         }
     if (activeSheet != null) {
         ModalBottomSheet(
-            onDismissRequest = { activeSheet = null }
+            onDismissRequest = { activeSheet = null },
+            sheetState = filterSheetState,
         ) {
             when (activeSheet) {
-                DiscoverSheet.Type -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = safeBottomPadding())
-                    ) {
-                            item {
-                                Text(
-                                    text = "Type",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
-                                )
-                            }
-                            items(DiscoverTypeFilter.entries) { filter ->
-                                ListItem(
-                                    trailingContent =
-                                        if (uiState.typeFilter == filter) {
-                                            {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.ic_check),
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onTypeFilterClick(filter)
-                                            activeSheet = null
-                                        }
-                                        .padding(horizontal = 4.dp)
-                                ) {
-                                    Text(filter.label) 
-                                }
-                            }
-                        }
-                    }
+                DiscoverSheet.Type -> DiscoverFilterList(
+                    title = "Type",
+                    options = DiscoverTypeFilter.entries,
+                    label = { it.label },
+                    isSelected = { uiState.typeFilter == it },
+                    onSelect = {
+                        onTypeFilterClick(it)
+                        activeSheet = null
+                    },
+                )
 
-                    DiscoverSheet.Genre -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = safeBottomPadding())
-                    ) {
-                            item {
-                                Text(
-                                    text = "Genre",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
-                                )
-                            }
-                            item {
-                                ListItem(
-                                    leadingContent = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_layers),
-                                            contentDescription = null
-                                        )
-                                    },
-                                    trailingContent =
-                                        if (uiState.genreKey == null) {
-                                            {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.ic_check),
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onGenreClick(null)
-                                            activeSheet = null
-                                        }
-                                        .padding(horizontal = 4.dp)
-                                ) {
-                                    Text("All genres")
-                                }
-                            }
-                            items(SearchGenreSuggestion.entries) { genre ->
-                                ListItem(
-                                    leadingContent = {
-                                        Icon(
-                                            painter = painterResource(genre.imageResId),
-                                            contentDescription = null
-                                        )
-                                    },
-                                    trailingContent =
-                                        if (uiState.genreKey == genre.key) {
-                                            {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.ic_check),
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onGenreClick(genre)
-                                            activeSheet = null
-                                        }
-                                        .padding(horizontal = 4.dp)
-                                ) {
-                                    Text(genre.label)
-                                }
-                            }
-                        }
-                    }
+                DiscoverSheet.Genre -> DiscoverFilterList(
+                    title = "Genre",
+                    options = listOf<SearchGenreSuggestion?>(null) + SearchGenreSuggestion.entries,
+                    label = { it?.label ?: "All genres" },
+                    leadingIcon = { it?.let { genre -> genreIcon(genre.key) } ?: R.drawable.ic_layers },
+                    isSelected = { uiState.genreKey == it?.key },
+                    onSelect = {
+                        onGenreClick(it)
+                        activeSheet = null
+                    },
+                )
 
-                    DiscoverSheet.Sort -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = safeBottomPadding())
-                    ) {
-                            item {
-                                Text(
-                                    text = "Sort by",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
-                                )
-                            }
-                            items(DiscoverSortFilter.entries) { filter ->
-                                ListItem(
-                                    trailingContent =
-                                        if (uiState.sortFilter == filter) {
-                                            {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.ic_check),
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-.clickable {
-                                            onSortClick(filter)
-                                            activeSheet = null
-                                        }
-                                        .padding(horizontal = 4.dp)
-                                ) {
-                                    Text(filter.label)
-                                }
-                            }
-                        }
-                    }
+                DiscoverSheet.Sort -> DiscoverFilterList(
+                    title = "Sort by",
+                    options = DiscoverSortFilter.entries,
+                    label = { it.label },
+                    isSelected = { uiState.sortFilter == it },
+                    onSelect = {
+                        onSortClick(it)
+                        activeSheet = null
+                    },
+                )
 
                 null -> Unit
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> DiscoverFilterList(
+    title: String,
+    options: List<T>,
+    label: (T) -> String,
+    isSelected: (T) -> Boolean,
+    onSelect: (T) -> Unit,
+    leadingIcon: (T) -> Int? = { null },
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = safeBottomPadding()),
+    ) {
+        item {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(
+                    horizontal = Dimensions.ListItemPadding,
+                    vertical = Dimensions.SmallSpacing,
+                ),
+            )
+        }
+        items(options) { option ->
+            ListItem(
+                leadingContent =
+                    leadingIcon(option)?.let { iconRes ->
+                        {
+                            Icon(
+                                painter = painterResource(iconRes),
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                trailingContent =
+                    if (isSelected(option)) {
+                        {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_check),
+                                contentDescription = null,
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelect(option) }
+                    .padding(horizontal = 4.dp),
+            ) {
+                Text(label(option))
             }
         }
     }
