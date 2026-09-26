@@ -30,9 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,11 +43,10 @@ import com.crispy.tv.ui.components.ItemActionSheet
 import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.components.sharedCardBackdropModifier
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
-import com.crispy.tv.ui.navigation.animateCardCornerRadius
-import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 import com.crispy.tv.ui.theme.Dimensions
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -270,40 +266,11 @@ internal fun HomeWideRailCard(
         memoryCacheKey = backdropKey,
     )
 
-    val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
-        val screenBackground = MaterialTheme.colorScheme.background
-        val bottomFadeBrush = remember(screenBackground) {
-            Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0f to Color.Transparent,
-                    0.66f to Color.Transparent,
-                    1f to screenBackground,
-                ),
-            )
-        }
-        val cornerRadius = with(animatedVisibilityScope) {
-            animateCardCornerRadius(20.dp)
-        }
-        val overlayAlpha = with(animatedVisibilityScope) {
-            animateCardOverlayAlpha()
-        }
-        with(sharedTransitionScope) {
-            Modifier
-                .sharedElement(
-                    rememberSharedContentState(key = backdropKey),
-                    animatedVisibilityScope = animatedVisibilityScope,
-                )
-                .clip(RoundedCornerShape(cornerRadius))
-                .drawWithContent {
-                    drawContent()
-                    if (overlayAlpha > 0.001f) {
-                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
-                    }
-                }
-        }
-    } else {
-        Modifier
-    }
+    val backdropModifier = sharedCardBackdropModifier(
+        sharedElementKey = backdropKey,
+        cornerRadius = 20.dp,
+        fillMaxSize = false,
+    )
 
     val cardInteractionModifier =
         if (hasItemActions) {
