@@ -32,8 +32,6 @@ import com.crispy.tv.backend.CrispyBackendClient.AddonDto
 import com.crispy.tv.backend.CrispyBackendClient.Avatar
 import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
-import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
-import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
@@ -248,47 +246,6 @@ internal fun CrispyBackendClient.parseBrowseTitlesResponse(json: JSONObject): Br
         items = parseClientMediaCards(itemsArray),
         total = total,
         hasMore = hasMore,
-    )
-}
-
-internal fun CrispyBackendClient.parseSearchSuggestionsResponse(json: JSONObject): SearchSuggestionsResponse {
-    return SearchSuggestionsResponse(
-        suggestions = parseSearchSuggestionItems(json.optJSONArray("suggestions")),
-    )
-}
-
-internal fun CrispyBackendClient.parseSearchSuggestionItems(array: JSONArray?): List<SearchSuggestionItem> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            add(parseSearchSuggestionItem(item))
-        }
-    }
-}
-
-internal fun CrispyBackendClient.parseSearchSuggestionItem(json: JSONObject): SearchSuggestionItem {
-    val itemId = json.optNullableString("itemId")
-    if (itemId.isNullOrBlank()) {
-        throw IllegalStateException("Search suggestion is missing itemId.")
-    }
-    val mediaType = json.optNullableString("mediaType")
-    if (mediaType.isNullOrBlank()) {
-        throw IllegalStateException("Search suggestion is missing mediaType.")
-    }
-    val title = json.optNullableString("title")
-    if (title.isNullOrBlank()) {
-        throw IllegalStateException("Search suggestion is missing title.")
-    }
-    val images = json.optJSONObject("images")
-    val primaryImage = images?.optJSONObject("artwork")
-    return SearchSuggestionItem(
-        itemId = itemId,
-        itemType = mediaType,
-        title = title,
-        year = json.optIntOrNull("year"),
-        artworkUrl = primaryImage?.optNullableString("medium") ?: primaryImage?.optNullableString("large") ?: primaryImage?.optNullableString("small"),
-        providerIds = parseProviderIds(json.optJSONObject("providerIds")),
     )
 }
 

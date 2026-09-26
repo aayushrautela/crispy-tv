@@ -147,19 +147,6 @@ class CrispyBackendClient(
         val people: List<PersonSearchResultItem>,
     )
 
-    data class SearchSuggestionItem(
-        val itemId: String,
-        val itemType: String,
-        val title: String,
-        val year: Int?,
-        val artworkUrl: String?,
-        val providerIds: MediaExternalIds,
-    )
-
-    data class SearchSuggestionsResponse(
-        val suggestions: List<SearchSuggestionItem>,
-    )
-
     // --- Home ---
 
     data class ClientProgress(
@@ -565,22 +552,6 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun searchSuggestions(
-        accessToken: String,
-        query: String,
-        filter: String = "all",
-        limit: Int = 8,
-        locale: String? = null,
-    ): SearchSuggestionsResponse {
-        return searchSuggestionsApi(
-            accessToken = accessToken,
-            query = query,
-            filter = filter,
-            limit = limit,
-            locale = locale,
-        )
-    }
-
     suspend fun getAiInsights(
         accessToken: String,
         profileId: String,
@@ -701,7 +672,6 @@ class CrispyBackendClient(
         genre: String? = null,
         sort: String = "popularity",
         page: Int = 0,
-        limit: Int = 60,
     ): BrowseTitlesResponse {
         return browseTitlesApi(
             accessToken = accessToken,
@@ -709,7 +679,6 @@ class CrispyBackendClient(
             genre = genre,
             sort = sort,
             page = page,
-            limit = limit,
         )
     }
 

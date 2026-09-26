@@ -39,7 +39,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -55,7 +54,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,7 +120,6 @@ fun SearchRoute(
             onSearch = viewModel::submitSearch,
             onAiSearch = viewModel::submitAiSearch,
             onClear = viewModel::clearSearch,
-            onSuggestionClick = viewModel::selectSuggestion,
             onGenreClick = viewModel::selectGenre,
             onRecentSearchClick = viewModel::submitSearch,
             onRemoveRecentSearch = viewModel::removeRecentSearch,
@@ -142,7 +139,6 @@ private fun SearchContent(
     onSearch: () -> Unit,
     onAiSearch: () -> Unit,
     onClear: () -> Unit,
-    onSuggestionClick: (SearchSuggestion) -> Unit,
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
@@ -181,14 +177,6 @@ private fun SearchContent(
                 pageHorizontalPadding = pageHorizontalPadding,
                 onItemClick = onItemClick,
                 emptyMessage = uiState.statusMessage,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            uiState.shouldShowSuggestions -> SearchSuggestionsContent(
-                suggestions = uiState.suggestions,
-                isLoading = uiState.isLoadingSuggestions,
-                onSuggestionClick = onSuggestionClick,
-                pageHorizontalPadding = pageHorizontalPadding,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -483,80 +471,6 @@ private fun GenreTab(
             color = Color.White,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-@Composable
-private fun SearchSuggestionsContent(
-    suggestions: List<SearchSuggestion>,
-    isLoading: Boolean,
-    onSuggestionClick: (SearchSuggestion) -> Unit,
-    pageHorizontalPadding: Dp,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(horizontal = pageHorizontalPadding),
-    ) {
-        if (isLoading && suggestions.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                LoadingIndicator(color = CrispySpinner)
-            }
-        } else if (suggestions.isEmpty()) {
-            Text(
-                text = "Keep typing to search",
-                modifier = Modifier.padding(vertical = 24.dp).fillMaxWidth(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            Spacer(Modifier.height(8.dp))
-            suggestions.forEach { suggestion ->
-                SearchSuggestionRow(
-                    suggestion = suggestion,
-                    onClick = { onSuggestionClick(suggestion) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchSuggestionRow(
-    suggestion: SearchSuggestion,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = suggestion.title,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitle = buildString {
-                append(if (suggestion.itemType == "show") "Series" else "Movie")
-                if (suggestion.year != null) {
-                    append(" · ${suggestion.year}")
-                }
-            }
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
     }
 }
 

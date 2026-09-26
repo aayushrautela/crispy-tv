@@ -20,7 +20,6 @@ data class BrowsePagePayload(
 class BackendBrowseRepository(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
-    private val pageSize: Int = DISCOVER_PAGE_SIZE,
 ) {
     suspend fun browsePage(
         type: String,
@@ -44,7 +43,6 @@ class BackendBrowseRepository(
                 genre = request.genre,
                 sort = request.sort,
                 page = request.page,
-                limit = pageSize,
             )
             request.type to result
         }
@@ -77,17 +75,14 @@ class BackendBrowseRepository(
     }
 
     companion object {
-        fun create(context: Context, pageSize: Int = DISCOVER_PAGE_SIZE): BackendBrowseRepository {
+        fun create(context: Context): BackendBrowseRepository {
             val appContext = context.applicationContext
             return BackendBrowseRepository(
                 supabase = SupabaseServicesProvider.accountClient(appContext),
                 backend = BackendServicesProvider.backendClient(appContext),
-                pageSize = pageSize,
             )
         }
     }
 }
 
 class BrowseRequiredSignInException : IllegalStateException("Sign in to browse titles.")
-
-private const val DISCOVER_PAGE_SIZE = 60

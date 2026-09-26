@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -29,14 +28,9 @@ data class SearchUiState(
     val recentSearches: List<String> = emptyList(),
     val resultBuckets: SearchResultBuckets = SearchResultBuckets(),
     val statusMessage: String? = null,
-    val suggestions: List<SearchSuggestion> = emptyList(),
-    val isLoadingSuggestions: Boolean = false,
 ) {
     val hasActiveResults: Boolean
         get() = isLoading || executedQuery.isNotBlank() || selectedGenre != null
-
-    val shouldShowSuggestions: Boolean
-        get() = query.trim().length >= 2 && executedQuery.isBlank() && selectedGenre == null
 }
 
 class SearchViewModel(
@@ -44,21 +38,16 @@ class SearchViewModel(
     private val aiSearchRepository: AiSearchRepository,
     private val searchHistoryStore: SearchHistoryStore,
     private val localeProvider: () -> Locale = { Locale.getDefault() },
-    private val suggestionDebounceMs: Long = SUGGESTION_DEBOUNCE_MS,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState(recentSearches = searchHistoryStore.load()))
     val uiState: StateFlow<SearchUiState> = _uiState
 
     private var searchJob: Job? = null
-    private var suggestionJob: Job? = null
     private var searchToken: Long = 0L
-    private var suggestionToken: Long = 0L
 
     fun updateQuery(query: String) {
-        val snapshot = _uiState.value
-
-        _uiState.value = snapshot.copy(
+        _uiState.value = _uiState.value.copy(
             query = query,
             executedQuery = "",
             selectedGenre = null,
@@ -67,28 +56,9 @@ class SearchViewModel(
             resultBuckets = SearchResultBuckets(),
             statusMessage = null,
         )
-
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank() || trimmedQuery.length < 2) {
-            clearSuggestions()
-            return
-        }
-
-        scheduleSuggestions(trimmedQuery)
-    }
-
-    fun selectSuggestion(suggestion: SearchSuggestion) {
-        executeQuerySearch(
-            rawQuery = suggestion.title,
-            mode = SearchMode.STANDARD,
-            recordInHistory = true,
-            immediate = true,
-        )
     }
 
     fun submitSearch(query: String = _uiState.value.query) {
-        cancelPendingSuggestions()
-        clearSuggestions()
         executeQuerySearch(
             rawQuery = query,
             mode = SearchMode.STANDARD,
@@ -98,8 +68,6 @@ class SearchViewModel(
     }
 
     fun submitAiSearch(query: String = _uiState.value.query) {
-        cancelPendingSuggestions()
-        clearSuggestions()
         executeQuerySearch(
             rawQuery = query,
             mode = SearchMode.AI,
@@ -109,8 +77,6 @@ class SearchViewModel(
     }
 
     fun clearSearch() {
-        cancelPendingSuggestions()
-        clearSuggestions()
         searchToken += 1
         cancelActiveSearch()
         _uiState.value = SearchUiState(recentSearches = searchHistoryStore.load())
@@ -120,8 +86,6 @@ class SearchViewModel(
         if (_uiState.value.selectedGenre == genreSuggestion) {
             return
         }
-        cancelPendingSuggestions()
-        clearSuggestions()
         launchSearch(
             updateState = {
                 copy(
@@ -149,64 +113,12 @@ class SearchViewModel(
         _uiState.value = _uiState.value.copy(recentSearches = searchHistoryStore.clear())
     }
 
-    private fun scheduleSuggestions(query: String) {
-        cancelPendingSuggestions()
-        suggestionJob =
-            viewModelScope.launch {
-                delay(suggestionDebounceMs)
-                loadSuggestions(query)
-            }
-    }
-
-    private suspend fun loadSuggestions(rawQuery: String) {
-        val normalizedQuery = rawQuery.trim()
-        if (normalizedQuery.length < 2) {
-            clearSuggestions()
-            return
-        }
-
-        suggestionToken += 1
-        val token = suggestionToken
-        _uiState.value = _uiState.value.copy(isLoadingSuggestions = true)
-
-        val locale = localeProvider()
-        val results =
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    searchRepository.suggest(
-                        query = normalizedQuery,
-                        locale = locale,
-                    )
-                }.getOrDefault(emptyList())
-            }
-
-        if (token != suggestionToken) {
-            return
-        }
-
-        if (_uiState.value.executedQuery.isNotBlank()) {
-            return
-        }
-
-        if (_uiState.value.query.trim() != normalizedQuery) {
-            return
-        }
-
-        _uiState.value = _uiState.value.copy(
-            suggestions = results,
-            isLoadingSuggestions = false,
-        )
-    }
-
     private fun executeQuerySearch(
         rawQuery: String,
         mode: SearchMode,
         recordInHistory: Boolean,
         immediate: Boolean,
     ) {
-        cancelPendingSuggestions()
-        clearSuggestions()
-
         val normalizedQuery = rawQuery.trim()
         if (normalizedQuery.isBlank()) {
             if (immediate) {
@@ -292,26 +204,12 @@ class SearchViewModel(
             }
     }
 
-    private fun cancelPendingSuggestions() {
-        suggestionJob?.cancel()
-        suggestionJob = null
-    }
-
-    private fun clearSuggestions() {
-        _uiState.value = _uiState.value.copy(
-            suggestions = emptyList(),
-            isLoadingSuggestions = false,
-        )
-    }
-
     private fun cancelActiveSearch() {
         searchJob?.cancel()
         searchJob = null
     }
 
     companion object {
-        private const val SUGGESTION_DEBOUNCE_MS = 300L
-
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
             return object : ViewModelProvider.Factory {

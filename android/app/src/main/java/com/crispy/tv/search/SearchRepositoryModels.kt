@@ -38,29 +38,6 @@ internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGen
     )
 }
 
-data class SearchSuggestion(
-    val title: String,
-    val itemType: String,
-    val year: Int?,
-    val itemId: String,
-)
-
-internal fun CrispyBackendClient.SearchSuggestionItem.toSearchSuggestion(): SearchSuggestion? {
-    val normalizedTitle = title.trim()
-    if (normalizedTitle.isBlank()) return null
-    val normalizedType = when (itemType) {
-        "tv" -> "show"
-        else -> "movie"
-    }
-    val itemId = itemId.trim().ifBlank { return null }
-    return SearchSuggestion(
-        title = normalizedTitle,
-        itemType = normalizedType,
-        year = year,
-        itemId = itemId,
-    )
-}
-
 internal fun CrispyBackendClient.ClientMediaCard.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val base = toCatalogItem() ?: return null
     if (defaultGenre.isNullOrBlank() || !base.genre.isNullOrBlank()) return base

@@ -45,28 +45,6 @@ class BackendSearchRepository(
         return payload.toSearchResultsPayload(defaultGenre = genreSuggestion.label)
     }
 
-    suspend fun suggest(
-        query: String,
-        locale: Locale = Locale.getDefault(),
-    ): List<SearchSuggestion> {
-        val normalizedQuery = query.trim()
-        if (normalizedQuery.length < 2) {
-            return emptyList()
-        }
-
-        val session = runCatching { supabase.ensureValidSession() }.getOrNull()
-            ?: return emptyList()
-
-        val payload = backend.searchSuggestions(
-            accessToken = session.accessToken,
-            query = normalizedQuery,
-            filter = "all",
-            limit = 8,
-            locale = locale.toLanguageTag(),
-        )
-        return payload.suggestions.mapNotNull { it.toSearchSuggestion() }
-    }
-
     companion object {
         fun create(context: Context): BackendSearchRepository {
             val appContext = context.applicationContext
