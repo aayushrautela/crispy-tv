@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -43,6 +44,7 @@ import com.crispy.tv.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.crispyImageRequest
+import com.crispy.tv.ui.components.sharedCardBackdropModifier
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 
 private const val TOP10_LIMIT = 10
@@ -108,10 +110,12 @@ internal fun HomeTop10SectionRow(
                 key = { _, item -> "${item.type}:${item.id}" },
                 contentType = { _, _ -> "top10Poster" },
             ) { index, item ->
+                val key = "homecatalog-top10-${sectionUi.section.key}-${item.itemId}"
                 HomeTop10Card(
                     item = item,
                     rank = index + 1,
-                    onClick = { onItemClick(item, "homecatalog-top10-${sectionUi.section.key}-${item.itemId}") },
+                    sharedElementKey = key,
+                    onClick = { onItemClick(item, key) },
                 )
             }
         }
@@ -123,6 +127,7 @@ internal fun HomeTop10Card(
     item: CatalogItem,
     rank: Int,
     onClick: () -> Unit,
+    sharedElementKey: String? = null,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -143,6 +148,7 @@ internal fun HomeTop10Card(
         HomeTop10Poster(
             item = item,
             onClick = onClick,
+            sharedElementKey = sharedElementKey,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = posterOffset),
@@ -183,21 +189,25 @@ private fun hollowTextStyle(
 private fun HomeTop10Poster(
     item: CatalogItem,
     onClick: () -> Unit,
+    sharedElementKey: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val posterWidth = Top10PosterWidth
     val posterHeight = (posterWidth.value * 3f / 2f).dp
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.itemId
+    val backdropKey = resolvedKey?.let { "backdrop-$it" }
+    val logoKey = resolvedKey?.let { "logo-$it" }
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val cardShape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
     val artworkUrl = item.artwork?.medium ?: item.artworkUrl
     val logoUrl = item.logo?.medium ?: item.logoUrl
     val artworkModel = if (artworkUrl != null) {
-        crispyImageRequest(url = artworkUrl, width = posterWidth, height = posterHeight, memoryCacheKey = "top10-${item.itemId}")
+        crispyImageRequest(url = artworkUrl, width = posterWidth, height = posterHeight, memoryCacheKey = backdropKey)
     } else {
         null
     }
     val logoModel = if (logoUrl != null) {
-        crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = "top10-logo-${item.itemId}")
+        crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
     } else {
         null
     }
@@ -227,7 +237,11 @@ private fun HomeTop10Poster(
             AsyncImage(
                 model = artworkModel,
                 contentDescription = item.title,
-                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                modifier = sharedCardBackdropModifier(
+                    sharedElementKey = backdropKey,
+                    cornerRadius = CardStyle.CardCornerRadiusDp.dp,
+                    animateOverlayFade = false,
+                ),
                 contentScale = ContentScale.Crop,
             )
         } else {
@@ -253,6 +267,7 @@ private fun HomeTop10Poster(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.Bottom,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (logoModel != null) {
                 AsyncImage(
@@ -262,7 +277,7 @@ private fun HomeTop10Poster(
                         .fillMaxWidth(0.60f)
                         .height(30.dp),
                     contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart,
+                    alignment = Alignment.Center,
                 )
             } else {
                 Text(
@@ -272,6 +287,7 @@ private fun HomeTop10Poster(
                     color = Color.White.copy(alpha = 0.95f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                 )
             }
 
@@ -283,6 +299,7 @@ private fun HomeTop10Poster(
                     color = metadataColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
