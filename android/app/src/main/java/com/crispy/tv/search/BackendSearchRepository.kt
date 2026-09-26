@@ -31,6 +31,26 @@ class BackendSearchRepository(
         return payload.toSearchResultsPayload()
     }
 
+    /**
+     * Keyword completions for the search box. A suggestion is only a name, so
+     * nothing is resolved here; the caller runs a real search to turn a picked
+     * suggestion into media. Returns an empty list when unauthenticated so a
+     * missing session never surfaces as an error while the user is typing.
+     */
+    suspend fun suggestions(query: String): List<String> {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) {
+            return emptyList()
+        }
+
+        val session = runCatching { supabase.ensureValidSession() }.getOrNull() ?: return emptyList()
+
+        return backend.searchSuggestions(
+            accessToken = session.accessToken,
+            query = normalizedQuery,
+        ).suggestions
+    }
+
     suspend fun discoverByGenre(
         genreSuggestion: SearchGenreSuggestion,
         @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),

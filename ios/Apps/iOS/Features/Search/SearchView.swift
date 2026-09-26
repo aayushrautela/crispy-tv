@@ -18,11 +18,9 @@ struct SearchScreen: View {
                 if viewModel.results.isEmpty && !viewModel.suggestions.isEmpty {
                     Text("Suggestions")
                         .font(.headline)
-                    chipsRow(items: viewModel.suggestions.map(\.title)) { title in
-                        if let match = viewModel.suggestions.first(where: { $0.title == title }) {
-                            Task { await viewModel.submitSuggestion(match, environment: environment) }
-                            fieldFocused = false
-                        }
+                    chipsRow(items: viewModel.suggestions) { suggestion in
+                        Task { await viewModel.submitSuggestion(suggestion, environment: environment) }
+                        fieldFocused = false
                     }
                 }
 

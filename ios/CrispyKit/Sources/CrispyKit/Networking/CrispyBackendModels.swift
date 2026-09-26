@@ -254,18 +254,11 @@ public var allTitles: [SearchMediaItem] {
     }
 }
 
-public struct SearchSuggestionItem: Equatable, Identifiable {
-    public let itemId: String
-    public let itemType: String
-    public let title: String
-    public let year: Int?
-    public let artworkUrl: String?
-
-    public var id: String { itemId }
-}
-
+/// A suggestion is a keyword name, not a resolvable item: the server returns
+/// plain strings and the client fills one into the search box, where
+/// `/v1/search/titles` resolves it into real media.
 public struct SearchSuggestionsResponse: Equatable {
-public let suggestions: [SearchSuggestionItem]
+    public let suggestions: [String]
 }
 
 // MARK: - Browse

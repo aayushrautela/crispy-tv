@@ -147,6 +147,15 @@ class CrispyBackendClient(
         val people: List<PersonSearchResultItem>,
     )
 
+    /**
+     * A suggestion is a keyword name, not a resolvable item. The server serves
+     * these from a curated table, so typing never spends search quota, and the
+     * client turns a suggestion into media only by running a real search.
+     */
+    data class SearchSuggestionsResponse(
+        val suggestions: List<String>,
+    )
+
     // --- Home ---
 
     data class ClientProgress(
@@ -520,6 +529,18 @@ class CrispyBackendClient(
         limit: Int = 20,
     ): SearchResultsResponse {
         return searchTitlesApi(
+            accessToken = accessToken,
+            query = query,
+            limit = limit,
+        )
+    }
+
+    suspend fun searchSuggestions(
+        accessToken: String,
+        query: String,
+        limit: Int = 8,
+    ): SearchSuggestionsResponse {
+        return searchSuggestionsApi(
             accessToken = accessToken,
             query = query,
             limit = limit,

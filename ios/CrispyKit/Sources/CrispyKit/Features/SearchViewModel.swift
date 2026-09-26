@@ -8,7 +8,7 @@ import Observation
 @Observable
 public final class SearchViewModel {
     public private(set) var query = ""
-    public private(set) var suggestions: [MediaCard] = []
+    public private(set) var suggestions: [String] = []
     public private(set) var results: [MediaCard] = []
     public private(set) var history: [String] = []
     public private(set) var isSearching = false
@@ -70,8 +70,10 @@ public func submit(environment: AppEnvironment) async {
         }
     }
 
-public func submitSuggestion(_ suggestion: MediaCard, environment: AppEnvironment) async {
-        query = suggestion.title
+    /// A suggestion is only a name; submitting it re-runs the real search,
+    /// which is what resolves the name into media.
+    public func submitSuggestion(_ suggestion: String, environment: AppEnvironment) async {
+        query = suggestion
         await submit(environment: environment)
     }
 
@@ -88,7 +90,7 @@ public func clearHistory() {
             limit: 8
         )
         if !Task.isCancelled {
-            suggestions = (response?.suggestions ?? []).map { MediaCard.from($0) }
+            suggestions = response?.suggestions ?? []
         }
     }
 

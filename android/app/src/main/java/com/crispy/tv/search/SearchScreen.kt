@@ -123,6 +123,7 @@ fun SearchRoute(
             onGenreClick = viewModel::selectGenre,
             onRecentSearchClick = viewModel::submitSearch,
             onRemoveRecentSearch = viewModel::removeRecentSearch,
+            onSuggestionClick = viewModel::submitSearch,
             onItemClick = onItemClick,
             modifier = contentModifier,
         )
@@ -142,6 +143,7 @@ private fun SearchContent(
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
+    onSuggestionClick: (String) -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -187,6 +189,7 @@ private fun SearchContent(
                 onGenreClick = onGenreClick,
                 onRecentSearchClick = onRecentSearchClick,
                 onRemoveRecentSearch = onRemoveRecentSearch,
+                onSuggestionClick = onSuggestionClick,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -201,6 +204,7 @@ private fun SearchBrowseContent(
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
+    onSuggestionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SearchGrid(
@@ -209,6 +213,14 @@ private fun SearchBrowseContent(
         pageHorizontalPadding = pageHorizontalPadding,
         modifier = modifier,
     ) {
+        if (uiState.suggestions.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                SuggestionStrip(
+                    suggestions = uiState.suggestions,
+                    onSuggestionClick = onSuggestionClick,
+                )
+            }
+        }
         if (uiState.recentSearches.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 RecentSearchStrip(
@@ -248,6 +260,41 @@ private fun RecentSearchStrip(
             )
         }
     }
+}
+
+@Composable
+private fun SuggestionStrip(
+    suggestions: List<String>,
+    onSuggestionClick: (String) -> Unit,
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(
+            items = suggestions,
+            key = { it.lowercase(Locale.ROOT) },
+        ) { suggestion ->
+            SuggestionChip(
+                suggestion = suggestion,
+                onClick = { onSuggestionClick(suggestion) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionChip(
+    suggestion: String,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = suggestion,
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    )
 }
 
 @Composable

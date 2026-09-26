@@ -32,6 +32,7 @@ import com.crispy.tv.backend.CrispyBackendClient.AddonDto
 import com.crispy.tv.backend.CrispyBackendClient.Avatar
 import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
@@ -236,6 +237,10 @@ internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): S
         series = parseClientMediaCards(json.optJSONArray("series")),
         people = parsePersonSearchResultItems(json.optJSONArray("people")),
     )
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionsResponse(json: JSONObject): SearchSuggestionsResponse {
+    return SearchSuggestionsResponse(suggestions = json.optStringList("suggestions"))
 }
 
 internal fun CrispyBackendClient.parseBrowseTitlesResponse(json: JSONObject): BrowseTitlesResponse {

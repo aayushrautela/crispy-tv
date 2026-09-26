@@ -81,24 +81,6 @@ public static func from(_ item: HomeCatalogItem) -> MediaCard {
         )
     }
 
-public static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
-        MediaCard(
-            itemId: suggestion.itemId,
-            type: suggestion.itemType,
-            title: suggestion.title,
-            artworkUrl: suggestion.artworkUrl,
-            logoUrl: nil,
-            ratingText: nil,
-            yearText: suggestion.year.map(String.init),
-            genre: nil,
-            maturityRating: nil,
-            description: nil,
-            progressPercent: nil,
-            parentSeriesId: nil,
-            watchlisted: false
-        )
-    }
-
 public static func from(_ item: SearchMediaItem) -> MediaCard {
         MediaCard(
             itemId: item.itemId,

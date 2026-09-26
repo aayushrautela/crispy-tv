@@ -144,14 +144,11 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
             path: "/v1/search/suggestions",
             queryItems: [
                 URLQueryItem(name: "query", value: query.trimmingCharacters(in: .whitespacesAndNewlines)),
-                URLQueryItem(name: "filter", value: "all"),
                 URLQueryItem(name: "limit", value: String(limit)),
             ],
             accessToken: accessToken
         )
-        return SearchSuggestionsResponse(
-            suggestions: json.jsonArray("suggestions").compactMap(parseSearchSuggestion)
-        )
+        return SearchSuggestionsResponse(suggestions: json.jsonStringList("suggestions"))
     }
 
     // MARK: - Browse
@@ -517,21 +514,6 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             name: name,
             knownForDepartment: json.jsonString("knownForDepartment"),
             profileUrl: json.jsonString("profileUrl")
-        )
-    }
-
-    private func parseSearchSuggestion(_ json: [String: Any]) -> SearchSuggestionItem? {
-        guard let itemId = json.jsonString("itemId"),
-              let mediaType = json.jsonString("mediaType"),
-              let title = json.jsonString("title") else { return nil }
-        let images = json.jsonObject("images")
-        let primary = images?.jsonObject("artwork")
-        return SearchSuggestionItem(
-            itemId: itemId,
-            itemType: mediaType,
-            title: title,
-            year: json.jsonInt("year"),
-            artworkUrl: primary?.jsonString("medium") ?? primary?.jsonString("large") ?? primary?.jsonString("small")
         )
     }
 

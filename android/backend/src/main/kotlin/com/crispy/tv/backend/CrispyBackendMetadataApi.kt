@@ -4,6 +4,7 @@ import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.BrowseTitlesResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
@@ -33,6 +34,25 @@ internal suspend fun CrispyBackendClient.searchTitlesApi(
     )
     val json = requireSuccess(response)
     return parseSearchResultsResponse(json)
+}
+
+internal suspend fun CrispyBackendClient.searchSuggestionsApi(
+    accessToken: String,
+    query: String,
+    limit: Int = 8,
+): SearchSuggestionsResponse {
+    checkConfigured()
+    val url = "$baseUrl/v1/search/suggestions".toHttpUrl().newBuilder()
+        .addQueryParameter("query", query.trim())
+        .addQueryParameter("limit", limit.toString())
+        .build()
+    val response = httpClient.get(
+        url = url,
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseSearchSuggestionsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(

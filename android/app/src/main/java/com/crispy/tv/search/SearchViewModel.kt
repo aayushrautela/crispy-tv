@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ data class SearchUiState(
     val searchMode: SearchMode = SearchMode.STANDARD,
     val isLoading: Boolean = false,
     val recentSearches: List<String> = emptyList(),
+    val suggestions: List<String> = emptyList(),
     val resultBuckets: SearchResultBuckets = SearchResultBuckets(),
     val statusMessage: String? = null,
 ) {
@@ -45,6 +47,8 @@ class SearchViewModel(
 
     private var searchJob: Job? = null
     private var searchToken: Long = 0L
+    private var suggestionJob: Job? = null
+    private var suggestionToken: Long = 0L
 
     fun updateQuery(query: String) {
         _uiState.value = _uiState.value.copy(
@@ -54,8 +58,10 @@ class SearchViewModel(
             searchMode = SearchMode.STANDARD,
             isLoading = false,
             resultBuckets = SearchResultBuckets(),
+            suggestions = emptyList(),
             statusMessage = null,
         )
+        scheduleSuggestions(query)
     }
 
     fun submitSearch(query: String = _uiState.value.query) {
@@ -79,6 +85,7 @@ class SearchViewModel(
     fun clearSearch() {
         searchToken += 1
         cancelActiveSearch()
+        cancelActiveSuggestions()
         _uiState.value = SearchUiState(recentSearches = searchHistoryStore.load())
     }
 
@@ -119,6 +126,7 @@ class SearchViewModel(
         recordInHistory: Boolean,
         immediate: Boolean,
     ) {
+        cancelActiveSuggestions()
         val normalizedQuery = rawQuery.trim()
         if (normalizedQuery.isBlank()) {
             if (immediate) {
@@ -153,6 +161,7 @@ class SearchViewModel(
                     recentSearches = updatedRecentSearches,
                     searchMode = mode,
                     isLoading = true,
+                    suggestions = emptyList(),
                     statusMessage = null,
                 )
             },
@@ -209,7 +218,45 @@ class SearchViewModel(
         searchJob = null
     }
 
+    /**
+     * Debounced so a burst of keystrokes issues one suggestion request. The
+     * token guards the ordering: a slow response for an older query is dropped
+     * instead of overwriting suggestions for the text now in the box.
+     */
+    private fun scheduleSuggestions(rawQuery: String) {
+        suggestionToken += 1
+        val token = suggestionToken
+        suggestionJob?.cancel()
+
+        val normalizedQuery = rawQuery.trim()
+        if (normalizedQuery.isBlank()) {
+            return
+        }
+
+        suggestionJob =
+            viewModelScope.launch {
+                delay(SUGGESTION_DEBOUNCE_MS)
+                val names =
+                    withContext(Dispatchers.IO) {
+                        runCatching { searchRepository.suggestions(normalizedQuery) }
+                            .getOrElse { emptyList() }
+                    }
+                if (token != suggestionToken) {
+                    return@launch
+                }
+                _uiState.value = _uiState.value.copy(suggestions = names)
+            }
+    }
+
+    private fun cancelActiveSuggestions() {
+        suggestionToken += 1
+        suggestionJob?.cancel()
+        suggestionJob = null
+    }
+
     companion object {
+        private const val SUGGESTION_DEBOUNCE_MS = 250L
+
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
             return object : ViewModelProvider.Factory {
