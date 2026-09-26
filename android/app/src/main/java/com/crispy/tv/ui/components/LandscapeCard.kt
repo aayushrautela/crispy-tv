@@ -34,8 +34,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.addons.util.formatRating
-import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
-import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -61,8 +59,6 @@ fun LandscapeCard(
     val resolvedLogoUrl = logo?.low ?: logoUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
     val logoKey = resolvedKey?.let { "logo-$it" }
@@ -154,25 +150,12 @@ fun LandscapeCard(
             verticalArrangement = Arrangement.Bottom,
         ) {
             if (logoModel != null) {
-                val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
-                    with(sharedTransitionScope) {
-                        Modifier
-                            .sharedElement(
-                                rememberSharedContentState(key = logoKey),
-                                animatedVisibilityScope = animatedVisibilityScope,
-                            )
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp)
-                    }
-                } else {
-                    Modifier
-                        .fillMaxWidth(0.60f)
-                        .height(30.dp)
-                }
                 AsyncImage(
                     model = logoModel,
                     contentDescription = title,
-                    modifier = logoModifier,
+                    modifier = Modifier
+                        .fillMaxWidth(0.60f)
+                        .height(30.dp),
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
                 )

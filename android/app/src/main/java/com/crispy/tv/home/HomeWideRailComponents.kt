@@ -45,8 +45,6 @@ import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.sharedCardBackdropModifier
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
-import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
-import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.theme.Dimensions
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -254,8 +252,6 @@ internal fun HomeWideRailCard(
 ) {
     val removeAction = onRemoveClick
     val hasItemActions = showActions && removeAction != null
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.detailsItemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
     val logoKey = resolvedKey?.let { "logo-$it" }
@@ -312,25 +308,12 @@ internal fun HomeWideRailCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 if (logoModel != null) {
-                    val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
-                        with(sharedTransitionScope) {
-                            Modifier
-                                .sharedElement(
-                                    rememberSharedContentState(key = logoKey),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                )
-                                .fillMaxWidth(0.60f)
-                                .height(30.dp)
-                        }
-                    } else {
-                        Modifier
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp)
-                    }
                     AsyncImage(
                         model = logoModel,
                         contentDescription = item.title,
-                        modifier = logoModifier,
+                        modifier = Modifier
+                            .fillMaxWidth(0.60f)
+                            .height(30.dp),
                         contentScale = ContentScale.Fit,
                         alignment = Alignment.CenterStart,
                     )
