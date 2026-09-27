@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload full build log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xcodebuild-log
           path: build/xcodebuild.log
@@ -83,7 +83,7 @@ jobs:
           zip -qry crispy-ios-unsigned.ipa Payload
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-ios-unsigned-ipa
           path: build/crispy-ios-unsigned.ipa

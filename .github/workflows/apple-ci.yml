@@ -1,0 +1,103 @@
+name: Apple CI
+
+# The only gate that can prove Apple work, because Apple targets cannot be built
+# on Linux. Extracted from android-debug-ci.yml so that master is verified on
+# push as well as on pull requests -- an Apple-only step that runs solely on
+# pull_request lets a bad merge sit on master until the next PR.
+#
+# Covers three things:
+#   1. The Kotlin Multiplatform Apple targets (:core-domain, :platform-core),
+#      which is the only place platform-freedom is actually proven.
+#   2. The Swift contract runner, which mirrors the domain rules in Swift.
+#   3. The placeholder iOS / tvOS app compile gate from ios/project.yml.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  apple:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select newest Xcode
+        run: |
+          LATEST_XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$LATEST_XCODE"
+          xcodebuild -version
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Check commonMain purity
+        run: python3 scripts/check_common_purity.py
+
+      - name: Compile Kotlin Multiplatform Apple targets
+        # This is the real gate. :core-domain and :platform-core declare
+        # iosArm64 / iosSimulatorArm64, and compiling them from commonMain is
+        # what proves no JVM or Android API leaked into shared code.
+        run: |
+          ./gradlew \
+            :android:core-domain:compileKotlinIosArm64 \
+            :android:core-domain:compileKotlinIosSimulatorArm64 \
+            :android:core-domain:compileTestKotlinIosSimulatorArm64 \
+            :android:platform-core:compileKotlinIosArm64 \
+            :android:platform-core:compileKotlinIosSimulatorArm64
+
+      - name: Run Kotlin Multiplatform unit tests on the iOS simulator
+        run: |
+          ./gradlew \
+            :android:core-domain:iosSimulatorArm64Test \
+            :android:platform-core:iosSimulatorArm64Test
+
+      - name: Upload KMP test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kmp-ios-test-results
+          path: |
+            android/*/build/test-results/iosSimulatorArm64Test/
+          if-no-files-found: warn
+
+      - name: Run Swift contract tests
+        run: swift test --package-path ios/ContractRunner
+
+      - name: Generate Apple project
+        run: |
+          rm -rf ios/CrispyRewriteApple.xcodeproj
+          cd ios
+          xcodegen generate --spec project.yml
+
+      - name: Build iOS app target
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/CrispyRewriteApple.xcodeproj \
+            -scheme CrispyRewriteiOS \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | xcbeautify --renderer github-actions --quiet
+
+      - name: Build tvOS target
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/CrispyRewriteApple.xcodeproj \
+            -scheme CrispyRewritetvOS \
+            -sdk appletvsimulator \
+            -destination 'generic/platform=tvOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | xcbeautify --renderer github-actions --quiet

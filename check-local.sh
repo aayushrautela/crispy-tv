@@ -6,7 +6,12 @@
 # Kotlin/Native cannot compile Apple targets on a Linux host. Aggregate tasks
 # reach those targets and fail for reasons unrelated to your change.
 #
-# Linux proves Android + desktop JVM. Apple targets are proven by macOS CI.
+# Linux proves Android + desktop JVM. Apple targets are proven by macOS CI
+# (.github/workflows/apple-ci.yml).
+#
+# :android:app:testPlayDebugUnitTest is the golden-screenshot gate. It verifies
+# by default; re-record with
+#   ./gradlew :android:app:testPlayDebugUnitTest -Proborazzi.record=true
 
 set -euo pipefail
 
@@ -29,6 +34,7 @@ fi
     :android:platform-core:compileKotlinDesktop \
     :android:contract-tests:test \
     :android:app:verifyDistributionExclusions \
+    :android:app:testPlayDebugUnitTest \
     :android:app:assemblePlayDebug \
     :android:app:assembleFossDebug \
     :android:tv:assembleDebug \

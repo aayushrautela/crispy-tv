@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # The `android` CLI accepts SDK licences itself; sdkmanager is deprecated.
           android sdk install "platforms;android-37.0" "build-tools;36.0.0"
 
       - name: Set up Gradle
@@ -59,6 +59,17 @@ jobs:
 
       - name: Verify store build excludes sideload-only engines
         run: ./gradlew :android:app:verifyDistributionExclusions
+
+      - name: Verify golden screenshots
+        run: ./gradlew :android:app:testPlayDebugUnitTest
+
+      - name: Upload screenshot diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshot-diffs-pr
+          path: android/app/build/outputs/roborazzi/
+          if-no-files-found: warn
 
       - name: Download TorrServer binaries
         run: |
@@ -82,7 +93,7 @@ jobs:
 
       - name: Upload plugins test reports
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: plugins-test-reports
           path: android/plugins/build/reports/tests/
@@ -93,7 +104,7 @@ jobs:
 
       - name: Upload lint reports
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: lint-reports-app-debug
           path: |
@@ -106,84 +117,36 @@ jobs:
         run: ./gradlew :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:app:assemblePlayDebugAndroidTest :android:app:assembleFossDebugAndroidTest
 
       - name: Upload play-flavor APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-debug-play-universal
           path: android/app/build/outputs/apk/play/debug/*-universal-*.apk
           if-no-files-found: warn
 
       - name: Upload foss-flavor APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-debug-foss-universal
           path: android/app/build/outputs/apk/foss/debug/*-universal-*.apk
           if-no-files-found: warn
 
       - name: Upload foss arm64-v8a APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-debug-foss-arm64-v8a
           path: android/app/build/outputs/apk/foss/debug/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
       - name: Upload foss armeabi-v7a APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-debug-foss-armeabi-v7a
           path: android/app/build/outputs/apk/foss/debug/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
       - name: Upload foss x86_64 APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-debug-foss-x86_64
           path: android/app/build/outputs/apk/foss/debug/*-x86_64-*.apk
           if-no-files-found: warn
-
-  apple:
-    runs-on: macos-26
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Select newest Xcode
-        run: |
-          LATEST_XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-          sudo xcode-select -s "$LATEST_XCODE"
-          xcodebuild -version
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Apple project
-        run: |
-          rm -rf ios/CrispyRewriteApple.xcodeproj
-          cd ios
-          xcodegen generate --spec project.yml
-
-      - name: Build iOS app target
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project ios/CrispyRewriteApple.xcodeproj \
-            -scheme CrispyRewriteiOS \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | xcbeautify --renderer github-actions --quiet
-
-      - name: Build tvOS target
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project ios/CrispyRewriteApple.xcodeproj \
-            -scheme CrispyRewritetvOS \
-            -sdk appletvsimulator \
-            -destination 'generic/platform=tvOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | xcbeautify --renderer github-actions --quiet
-
-      - name: Run Swift contract tests
-        run: swift test --package-path ios/ContractRunner

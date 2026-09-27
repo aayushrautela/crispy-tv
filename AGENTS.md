@@ -77,9 +77,17 @@ Gradle modules (common targets):
 - `:android:player`, `:android:network`, `:android:watchhistory`, `:android:native-engine`: Android libraries
 - `:android:torrent-engine`: sideload-only torrent engine. `:android:native-engine` holds the MPV/Media3 player and nothing else optional.
 
+Golden screenshots (`:android:app:testPlayDebugUnitTest`):
+- Robolectric + Roborazzi, running on a plain JVM. No emulator, no KVM, no `androidTest` device. This is the only rendering coverage in the repository.
+- **Verify is the default**; re-record with `./gradlew :android:app:testPlayDebugUnitTest -Proborazzi.record=true`. Goldens are committed under `android/app/src/test/screenshots/`, so a missing golden fails the build.
+- The Roborazzi Gradle plugin is deliberately NOT applied: 1.43.1 fails against AGP 9.3 with `Extension of type 'TestedExtension' does not exist`. Record/verify is driven by the `-Proborazzi.*` properties in `android/app/build.gradle.kts` instead.
+- Screenshot tests must set `application = ScreenshotTestApplication::class`. Robolectric otherwise boots `CrispyApplication`, whose `onCreate` reaches an `AndroidKeyStore` that cannot exist on a JVM.
+- Freeze the Compose clock (`mainClock.autoAdvance = false`) or animated content never matches.
+- **Host prerequisite:** a *failing* screenshot needs a host font, because Roborazzi labels the diff with Java2D. On a host with no font stack the failure reports `Fontconfig head is null` instead of the real difference. It still fails the build, but the diff is unreadable. `android/app/src/test/fonts/` bundles Roboto and a generated fontconfig, which covers hosts that have libfontconfig but no fonts; a host with **no** `libfontconfig.so.1` at all (such as a bare container) needs `fontconfig` + a font package installed with root, since the JDK cannot load one.
+
 Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
-- `:android:core-domain`: KMP (Android + `desktop` JVM). Its `commonMain` is free of `java.*`/`android.*`; `scripts/check_common_purity.py` enforces that with no allowlist. The `java.time` and `URLEncoder` call sites were replaced with portable equivalents pinned by unit tests against real JVM output, so `iosArm64` can now be declared when a macOS runner exists to compile it.
+- `:android:core-domain`: KMP (Android + `desktop` JVM + `iosArm64` + `iosSimulatorArm64`). Its `commonMain` is free of `java.*`/`android.*`; `scripts/check_common_purity.py` enforces that with no allowlist. The `java.time` and `URLEncoder` call sites were replaced with portable equivalents pinned by unit tests against real JVM output, which is what unblocked declaring the Apple targets.
 - AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`). Flavors live only in `:android:app`, `:android:network` and `:android:plugins`.
 - Distribution is a permanent two-flavor axis: `play` (store) and `foss` (sideload). Optional engines are excluded **structurally** — the torrent engine, the QuickJS plugin runtime and the YouTube extractor are separate modules that only `foss` depends on. Never reintroduce a null-returning stub for something the store build should simply not contain; `./gradlew :android:app:verifyDistributionExclusions` asserts this and runs in CI.
 - `:app` stays a `com.android.application` with flavors. It is **not** becoming a flavor-less KMP library: the KMP plugin cannot carry flavors, and the flavor axis is a product requirement.

@@ -38,7 +38,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # The `android` CLI accepts SDK licences itself; sdkmanager is deprecated.
           android sdk install "platforms;android-37.0" "build-tools;36.0.0"
 
       - name: Set up Gradle
@@ -63,6 +63,19 @@ jobs:
 
       - name: Verify store build excludes sideload-only engines
         run: ./gradlew :android:app:verifyDistributionExclusions
+
+      - name: Verify golden screenshots
+        # Verify mode is the default; a rendering regression fails here rather
+        # than reaching a user.
+        run: ./gradlew :android:app:testPlayDebugUnitTest
+
+      - name: Upload screenshot diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshot-diffs
+          path: android/app/build/outputs/roborazzi/
+          if-no-files-found: warn
 
       - name: Assemble play flavor
         run: ./gradlew :android:app:assemblePlayDebug

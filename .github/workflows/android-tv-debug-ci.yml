@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # The `android` CLI accepts SDK licences itself; sdkmanager is deprecated.
           android sdk install "platforms;android-37.0" "build-tools;36.0.0"
 
       - name: Set up Gradle
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload lint reports
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: lint-reports-tv-debug
           path: |
@@ -85,28 +85,28 @@ jobs:
         run: ./gradlew :android:tv:assembleDebug
 
       - name: Upload TV universal APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-tv-debug-universal
           path: android/tv/build/outputs/apk/debug/*-universal-*.apk
           if-no-files-found: error
 
       - name: Upload TV arm64-v8a APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-tv-debug-arm64-v8a
           path: android/tv/build/outputs/apk/debug/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
       - name: Upload TV armeabi-v7a APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-tv-debug-armeabi-v7a
           path: android/tv/build/outputs/apk/debug/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
       - name: Upload TV x86_64 APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-tv-debug-x86_64
           path: android/tv/build/outputs/apk/debug/*-x86_64-*.apk

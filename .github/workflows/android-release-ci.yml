@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null
+          # The `android` CLI accepts SDK licences itself; sdkmanager is deprecated.
           android sdk install "platforms;android-37.0" "build-tools;36.0.0"
 
       - name: Set up Gradle
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload plugins test reports
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: plugins-test-reports
           path: android/plugins/build/reports/tests/
@@ -90,7 +90,7 @@ jobs:
         run: ./gradlew :android:app:bundlePlayRelease
 
       - name: Upload play-flavor AAB
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-play-release-aab
           path: android/app/build/outputs/bundle/playRelease/*.aab
@@ -100,70 +100,22 @@ jobs:
         run: ./gradlew -PbuildFossApks :android:app:assembleFossRelease
 
       - name: Upload foss arm64-v8a APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-foss-release-arm64-v8a
           path: android/app/build/outputs/apk/foss/release/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
       - name: Upload foss armeabi-v7a APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-foss-release-armeabi-v7a
           path: android/app/build/outputs/apk/foss/release/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
       - name: Upload foss x86_64 APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: crispy-rewrite-app-foss-release-x86_64
           path: android/app/build/outputs/apk/foss/release/*-x86_64-*.apk
           if-no-files-found: warn
-
-  apple:
-    runs-on: macos-26
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Select newest Xcode
-        run: |
-          LATEST_XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-          sudo xcode-select -s "$LATEST_XCODE"
-          xcodebuild -version
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Apple project
-        run: |
-          rm -rf ios/CrispyRewriteApple.xcodeproj
-          cd ios
-          xcodegen generate --spec project.yml
-
-      - name: Build iOS app target
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project ios/CrispyRewriteApple.xcodeproj \
-            -scheme CrispyRewriteiOS \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | xcbeautify --renderer github-actions --quiet
-
-      - name: Build tvOS target
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project ios/CrispyRewriteApple.xcodeproj \
-            -scheme CrispyRewritetvOS \
-            -sdk appletvsimulator \
-            -destination 'generic/platform=tvOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | xcbeautify --renderer github-actions --quiet
-
-      - name: Run Swift contract tests
-        run: swift test --package-path ios/ContractRunner
