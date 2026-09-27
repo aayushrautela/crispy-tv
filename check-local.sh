@@ -8,7 +8,7 @@
 #
 # Linux proves Android, desktop JVM, and -- via the compile-only linuxX64
 # target -- Kotlin/Native. Apple targets are proven by macOS CI
-# (.github/workflows/apple-ci.yml).
+# .github/workflows/apple.yml.
 #
 # :android:app:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with

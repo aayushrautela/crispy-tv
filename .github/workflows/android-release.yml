@@ -1,12 +1,27 @@
-name: Android Release CI
+name: Android Release
+
+# Signed distributables for the phone/tablet app and the TV app. Manual only.
+#
+# Kept separate from android.yml because this is the only workflow that needs
+# the release signing secrets, and those should not sit in a workflow someone
+# runs casually after every change.
+#
+# Produces:
+#   - a store AAB for Google Play (app only; the TV app is not distributed there)
+#   - per-ABI sideload APKs for the app, with a -sideload version suffix
+#   - per-ABI release APKs for the TV app
+#
+# Note the asymmetry in how the distribution is asserted: the app's dex is
+# minified, so the store check here reads the resolved dependency graph rather
+# than scanning the dex. See verify_apk_distribution.py's docstring.
 
 on:
   workflow_dispatch:
 
 jobs:
-  android:
+  release:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       ORG_GRADLE_PROJECT_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
@@ -60,6 +75,8 @@ jobs:
           .github/scripts/fetch-torrserver-binaries.sh
 
       - name: Decode Android signing keystores
+        # Must run before any assemble: the RELEASE_KEYSTORE_* variables above are
+        # what create the release signingConfig, and it points at this file.
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
@@ -86,44 +103,42 @@ jobs:
           path: android/plugins/build/reports/tests/
           if-no-files-found: warn
 
+      # ---- phone / tablet app -----------------------------------------------
+
       - name: Build store bundle
         run: ./gradlew :android:app:bundleStoreRelease
-
-      - name: Upload store-flavor AAB
-        uses: actions/upload-artifact@v7
-        with:
-          name: crispy-rewrite-app-store-release-aab
-          path: android/app/build/outputs/bundle/storeRelease/*.aab
-          if-no-files-found: warn
 
       - name: Build sideload APKs
         run: ./gradlew -PbuildSideloadApks :android:app:assembleSideloadRelease
 
       - name: Assert store build excludes sideload-only engines
-        # The dependency graph, not the dex. Release is minified (R8 renames
-        # com.crispy.tv.plugins and friends), so scanning a release dex for
-        # package names proves nothing: absence would be guaranteed whether or
-        # not the code shipped. The graph is minification-proof. The dex-level
-        # check runs against the unminified debug builds in android-fast-ci.yml.
+        # The dependency graph, not the dex. Release is minified, so scanning the
+        # dex for package names proves nothing: absence would be guaranteed
+        # whether or not the code shipped. The graph is minification-proof.
         run: ./gradlew :android:app:verifyDistributionExclusions
 
-      - name: Upload sideload arm64-v8a APK
+      - name: Upload store AAB
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-sideload-release-arm64-v8a
-          path: android/app/build/outputs/apk/sideload/release/*-arm64-v8a-*.apk
-          if-no-files-found: warn
+          name: app-release-store-aab
+          path: android/app/build/outputs/bundle/storeRelease/*.aab
+          if-no-files-found: error
 
-      - name: Upload sideload armeabi-v7a APK
+      - name: Upload sideload APKs
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-sideload-release-armeabi-v7a
-          path: android/app/build/outputs/apk/sideload/release/*-armeabi-v7a-*.apk
-          if-no-files-found: warn
+          name: app-release-sideload
+          path: android/app/build/outputs/apk/sideload/release/*.apk
+          if-no-files-found: error
 
-      - name: Upload sideload x86_64 APK
+      # ---- TV ---------------------------------------------------------------
+
+      - name: Assemble Android TV
+        run: ./gradlew :android:tv:assembleRelease
+
+      - name: Upload TV release APKs
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-sideload-release-x86_64
-          path: android/app/build/outputs/apk/sideload/release/*-x86_64-*.apk
-          if-no-files-found: warn
+          name: tv-release
+          path: android/tv/build/outputs/apk/release/*.apk
+          if-no-files-found: error

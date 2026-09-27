@@ -1,8 +1,16 @@
-name: iOS unsigned IPA
+name: Apple Release
 
-# Builds the iOS app for arm64 devices WITHOUT code signing. The output is an
-# unsigned .ipa that must be re-signed on install (Sideloadly / AltStore with a
-# free Apple ID, or TrollStore). No Apple developer account required.
+# Builds the iOS app as an unsigned .ipa for sideloading. Manual only.
+#
+# Kept separate from apple.yml because it archives and packages a distributable
+# rather than verifying anything, and because it is the only workflow here that
+# produces something a user installs.
+#
+# The result is UNSIGNED and must be re-signed on install (Sideloadly /
+# AltStore with a free Apple ID, or TrollStore). No Apple developer account is
+# needed. If you want a properly signed build, that needs a different setup and
+# is not what this workflow does.
+
 on:
   workflow_dispatch:
 
@@ -62,7 +70,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: xcodebuild-log
+          name: ipa-xcodebuild-log
           path: build/xcodebuild.log
           if-no-files-found: warn
 
@@ -85,6 +93,6 @@ jobs:
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-ios-unsigned-ipa
+          name: ios-unsigned-ipa
           path: build/crispy-ios-unsigned.ipa
           if-no-files-found: error

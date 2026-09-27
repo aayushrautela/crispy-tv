@@ -1,0 +1,189 @@
+name: Android
+
+# Verification for the phone/tablet app and the TV app. Manual only, by
+# deliberate choice: nothing here runs unless someone clicks Run.
+#
+# This replaces three overlapping workflows (a push-triggered fast loop, an
+# Android-only gate, and a separate TV gate). They are named by platform and
+# intent rather than by Gradle build type, because "debug CI" and "debug build"
+# are different things and having both in the name was confusing.
+#
+# For signed distributables use android-release.yml. For Apple use apple.yml.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      ORG_GRADLE_PROJECT_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      ORG_GRADLE_PROJECT_CRISPY_BACKEND_URL: ${{ secrets.CRISPY_BACKEND_URL }}
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/.keystores/crispy-debug-key.jks
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+      ORG_GRADLE_PROJECT_DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+      ORG_GRADLE_PROJECT_DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: |
+          # The `android` CLI accepts SDK licences itself; sdkmanager is deprecated.
+          android sdk install "platforms;android-37.0" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install contract validation dependency
+        run: pip install jsonschema==4.23.0
+
+      # ---- cheap gates, fail fast -------------------------------------------
+
+      - name: Check commonMain purity
+        run: python scripts/check_common_purity.py
+
+      - name: Validate contract fixtures
+        run: python scripts/validate_contracts.py
+
+      - name: Verify store build excludes sideload-only engines
+        # Reads the resolved dependency graph, so it is valid for every variant.
+        run: ./gradlew :android:app:verifyDistributionExclusions
+
+      - name: Run JVM contract tests
+        run: ./gradlew :android:contract-tests:test
+
+      - name: Run domain unit tests
+        run: ./gradlew :android:core-domain:desktopTest
+
+      - name: Run plugins module unit tests
+        run: ./gradlew :android:plugins:testSideloadDebugUnitTest
+
+      - name: Upload plugins test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugins-test-reports
+          path: android/plugins/build/reports/tests/
+          if-no-files-found: warn
+
+      - name: Verify golden screenshots
+        # Verify mode is the default; a rendering regression fails here.
+        run: ./gradlew :android:app:testStoreDebugUnitTest
+
+      - name: Upload screenshot diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshot-diffs
+          path: android/app/build/outputs/roborazzi/
+          if-no-files-found: warn
+
+      # ---- build ------------------------------------------------------------
+
+      - name: Download TorrServer binaries
+        run: |
+          chmod +x .github/scripts/fetch-torrserver-binaries.sh
+          .github/scripts/fetch-torrserver-binaries.sh
+
+      - name: Decode Android debug keystore
+        # Must run before any assemble: the four DEBUG_KEYSTORE_* variables above
+        # are what switch :android:app to its custom debug signingConfig, and that
+        # config points at this file. Setting the variables without creating the
+        # keystore is what previously broke validateSigningStoreDebug.
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.keystores"
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/.keystores/crispy-debug-key.jks"
+          fi
+
+      - name: Lint Android app
+        run: ./gradlew :android:app:lintStoreDebug :android:app:lintSideloadDebug
+
+      - name: Upload app lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-reports-app
+          path: |
+            android/app/build/reports/lint-results-*Debug.txt
+            android/app/build/reports/lint-results-*Debug.html
+            android/app/build/intermediates/lint_intermediate_text_report/*/lintReport*/lint-results-*.txt
+          if-no-files-found: warn
+
+      - name: Lint Android TV
+        run: ./gradlew :android:tv:lintDebug
+
+      - name: Upload TV lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-reports-tv
+          path: |
+            android/tv/build/reports/lint-results-debug.txt
+            android/tv/build/reports/lint-results-debug.html
+            android/tv/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if-no-files-found: warn
+
+      - name: Assemble Android app
+        run: ./gradlew :android:app:assembleStoreDebug :android:app:assembleSideloadDebug :android:app:assembleStoreDebugAndroidTest :android:app:assembleSideloadDebugAndroidTest
+
+      - name: Assemble Android TV
+        run: ./gradlew :android:tv:assembleDebug
+
+      # ---- assertions on the built artefacts --------------------------------
+
+      - name: Assert store APKs exclude sideload-only engines
+        # Reads the dex, so it only means something on an unminified build --
+        # which is what debug is. The sideload APKs are the control that proves
+        # the markers still match; on a minified build that control fires and
+        # names the cause rather than letting a false pass through. Release
+        # builds use the graph check above instead.
+        run: |
+          python scripts/verify_apk_distribution.py \
+            --store android/app/build/outputs/apk/store/debug/*.apk \
+            --sideload android/app/build/outputs/apk/sideload/debug/*.apk
+
+      # ---- artefacts --------------------------------------------------------
+
+      - name: Upload store app APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-debug-store
+          path: android/app/build/outputs/apk/store/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload sideload app APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-debug-sideload
+          path: android/app/build/outputs/apk/sideload/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload TV APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: tv-debug
+          path: android/tv/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

@@ -1,24 +1,28 @@
-name: Apple CI
+name: Apple
 
-# The only gate that can prove Apple work, because Apple targets cannot be built
-# on Linux. Extracted from android-debug-ci.yml so that master is verified on
-# push as well as on pull requests -- an Apple-only step that runs solely on
-# pull_request lets a bad merge sit on master until the next PR.
+# Verification for everything Apple. Manual only, by deliberate choice.
 #
-# Covers three things:
-#   1. The Kotlin Multiplatform Apple targets (:core-domain, :platform-core),
-#      which is the only place platform-freedom is actually proven.
-#   2. The Swift contract runner, which mirrors the domain rules in Swift.
+# This is the ONLY place the Apple side can be checked, because Kotlin/Native
+# cannot compile iosArm64 or iosSimulatorArm64 on Linux. It covers three
+# separate things:
+#
+#   1. The Kotlin Multiplatform Apple targets. Compiling them from commonMain is
+#      what proves no JVM or Android API leaked into shared code -- the check
+#      scripts/check_common_purity.py cannot do, because a JVM-only member of the
+#      Kotlin stdlib ("x".format(y)) is `kotlin.*` and passes an import scan.
+#      :core-domain and :platform-core also declare a compile-only linuxX64
+#      target, which catches the same class of bug locally in seconds.
+#   2. ios/ContractRunner, the Swift implementation of the domain rules, which
+#      the iOS and tvOS apps actually consume via CrispyKit.
 #   3. The placeholder iOS / tvOS app compile gate from ios/project.yml.
+#
+# For the unsigned sideloading IPA use apple-release.yml.
 
 on:
-  push:
-    branches: [master]
-  pull_request:
   workflow_dispatch:
 
 jobs:
-  apple:
+  verify:
     runs-on: macos-26
     timeout-minutes: 90
 
@@ -39,11 +43,10 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
-        # :core-domain and :platform-core are Kotlin Multiplatform modules that
-        # carry an Android target, so AGP needs an SDK even when only the Apple
-        # tasks run. macos-26 happens to ship android-37.0, but relying on the
-        # runner image is how the JDK 17 toolchain requirement went unnoticed for
-        # months -- so install it explicitly, same as the Linux workflows.
+        # :core-domain and :platform-core are KMP modules carrying an Android
+        # target, so AGP needs an SDK even when only the Apple tasks run.
+        # macos-26 happens to ship android-37.0, but relying on the runner image
+        # is how the JDK 17 toolchain requirement went unnoticed for months.
         uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
@@ -68,9 +71,6 @@ jobs:
         run: python3 scripts/check_common_purity.py
 
       - name: Compile Kotlin Multiplatform Apple targets
-        # This is the real gate. :core-domain and :platform-core declare
-        # iosArm64 / iosSimulatorArm64, and compiling them from commonMain is
-        # what proves no JVM or Android API leaked into shared code.
         run: |
           ./gradlew \
             :android:core-domain:compileKotlinIosArm64 \
@@ -86,9 +86,10 @@ jobs:
             :android:platform-core:iosSimulatorArm64Test
 
       - name: Diagnose simulator test failure
-        # The simulator test is the one step here that depends on runner
-        # hardware state, so surface enough to tell a real regression from an
-        # unavailable device.
+        # iosSimulatorArm64Test is the only step that depends on runner hardware
+        # state, so surface enough to tell a real regression from an unavailable
+        # device. The compile gate above runs first and independently, so a
+        # simulator problem can never mask a platform-freedom failure.
         if: failure()
         run: |
           {
