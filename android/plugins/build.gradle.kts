@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.plugin.serialization")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -34,20 +34,20 @@ android {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.coroutines.android)
 
-    "fossImplementation"("io.github.dokar3:quickjs-kt:1.0.14")
-    "fossImplementation"("org.jsoup:jsoup:1.18.3")
-    "fossImplementation"("com.squareup.okhttp3:okhttp:5.5.0")
-    "fossImplementation"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    "fossImplementation"(libs.quickjs.kt)
+    "fossImplementation"(libs.jsoup)
+    "fossImplementation"(libs.okhttp)
+    "fossImplementation"(libs.serialization.json)
     "fossImplementation"(project(":android:addons"))
     "fossImplementation"(project(":android:player"))
 
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.org.json)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    "testFossImplementation"("io.github.dokar3:quickjs-kt-jvm:1.0.14")
+    "testFossImplementation"(libs.quickjs.kt.jvm)
 
     configurations.matching {
         it.name.startsWith("testFoss") &&

@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -27,9 +27,11 @@ android {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.coroutines.android)
 
-    api("com.squareup.okhttp3:okhttp:5.5.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+    api(libs.okhttp)
+    implementation(libs.okhttp.logging.interceptor)
+
+    // JitPack git-tag version, not a normal release — left out of the catalog.
     "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

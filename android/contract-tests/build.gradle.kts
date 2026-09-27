@@ -1,5 +1,5 @@
 plugins {
-    id("org.jetbrains.kotlin.jvm")
+    alias(libs.plugins.kotlin.jvm)
 }
 
 kotlin {
@@ -9,8 +9,8 @@ kotlin {
 dependencies {
     testImplementation(project(":android:core-domain"))
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.serialization.json)
 }
 
 tasks.test {

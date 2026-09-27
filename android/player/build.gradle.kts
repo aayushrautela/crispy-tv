@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -19,6 +19,6 @@ android {
 
 dependencies {
     implementation(project(":android:core-domain"))
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.coroutines.core)
 }

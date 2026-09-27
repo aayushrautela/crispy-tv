@@ -35,6 +35,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CRISPY_BACKEND_URL</key>
 	<string>$(CRISPY_BACKEND_URL)</string>
 	<key>SUPABASE_URL</key>

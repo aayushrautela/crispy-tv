@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -25,19 +25,21 @@ android {
 
 dependencies {
     implementation(project(":android:network"))
-    implementation("androidx.core:core-ktx:1.19.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    api("androidx.media3:media3-common:1.11.0")
-    implementation("androidx.media3:media3-datasource:1.11.0")
-    implementation("androidx.media3:media3-datasource-okhttp:1.11.0")
-    implementation("com.squareup.okhttp3:okhttp:5.5.0")
-    implementation("androidx.media3:media3-exoplayer:1.11.0")
-    implementation("androidx.media3:media3-exoplayer-hls:1.11.0")
-    implementation("androidx.media3:media3-exoplayer-dash:1.11.0")
-    implementation("androidx.media3:media3-extractor:1.11.0")
-    api("androidx.media3:media3-ui:1.11.0")
-    implementation("androidx.media3:media3-effect:1.11.0")
-    implementation("dev.jdtech.mpv:libmpv:1.0.0")
-    implementation("io.github.peerless2012:ass-media:0.5.1")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.coroutines.android)
+
+    api(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.datasource)
+    implementation(libs.androidx.media3.datasource.okhttp)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.media3.extractor)
+    api(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.effect)
+
+    implementation(libs.libmpv)
+    implementation(libs.ass.media)
 }

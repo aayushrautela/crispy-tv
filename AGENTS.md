@@ -9,7 +9,7 @@ Repo agent rules:
 ## Toolchain (match CI)
 
 - JDK 21; Android SDK `platforms;android-37.0` + `build-tools;36.0.0`
-- Gradle 9.7.1 via `gradle` (no wrapper checked in)
+- Gradle 9.7.1 via the committed wrapper: always use `./gradlew`, never a bare `gradle` (it is not installed, and a different Gradle version starts a second daemon that nothing reclaims)
 - Python 3.12 + `jsonschema==4.23.0`
 - Xcode + `xcodegen`; Swift tools 5.9
 
@@ -19,28 +19,28 @@ Contracts (fast):
 ```sh
 python3 -m pip install jsonschema==4.23.0
 python3 scripts/validate_contracts.py
-gradle :android:contract-tests:test
+./gradlew :android:contract-tests:test
 swift test --package-path ios/ContractRunner
 ```
 
 Other useful tasks:
 ```sh
 # JVM unit tests (if present)
-gradle :android:core-domain:test
-gradle :android:app:testDebugUnitTest
+./gradlew :android:core-domain:test
+./gradlew :android:app:testDebugUnitTest
 
 # Clean
-gradle clean
+./gradlew clean
 ```
 
 Single test (important):
 ```sh
 # Kotlin/JUnit5 (contract tests)
-gradle :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest
-gradle :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest.someTestName
+./gradlew :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest
+./gradlew :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest.someTestName
 
 # Kotlin/JUnit (unit tests in other modules)
-gradle :android:core-domain:test --tests com.crispy.tv.domain.SomeUnitTest
+./gradlew :android:core-domain:test --tests com.crispy.tv.domain.SomeUnitTest
 
 # SwiftPM
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests
@@ -49,10 +49,10 @@ swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTe
 
 Android builds/lint:
 ```sh
-gradle :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:tv:assembleDebug
-gradle :android:app:assembleRelease :android:tv:assembleRelease
-gradle :android:app:lintPlayDebug :android:app:lintFossDebug
-gradle :android:tv:lintDebug
+./gradlew :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:tv:assembleDebug
+./gradlew :android:app:assembleRelease :android:tv:assembleRelease
+./gradlew :android:app:lintPlayDebug :android:app:lintFossDebug
+./gradlew :android:tv:lintDebug
 ```
 
 Apple placeholder compile gate:
@@ -142,6 +142,6 @@ Python (tooling):
 ## Single-change checklist
 
 - `python3 scripts/validate_contracts.py`
-- `gradle :android:contract-tests:test`
+- `./gradlew :android:contract-tests:test`
 - `swift test --package-path ios/ContractRunner` (if Swift logic touched)
 - Ensure `:android:tv` and tvOS placeholder builds still compile

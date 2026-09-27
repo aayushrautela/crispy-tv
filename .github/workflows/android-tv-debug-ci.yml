@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -34,15 +34,13 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+          android sdk install "platforms;android-37.0" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "9.7.1"
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -67,10 +65,10 @@ jobs:
           fi
 
       - name: Run JVM contract tests
-        run: gradle :android:contract-tests:test
+        run: ./gradlew :android:contract-tests:test
 
       - name: Lint Android TV
-        run: gradle :android:tv:lintDebug
+        run: ./gradlew :android:tv:lintDebug
 
       - name: Upload lint reports
         if: failure()
@@ -84,7 +82,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Assemble Android TV
-        run: gradle :android:tv:assembleDebug
+        run: ./gradlew :android:tv:assembleDebug
 
       - name: Upload TV universal APK
         uses: actions/upload-artifact@v6

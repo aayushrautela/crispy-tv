@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -20,5 +20,6 @@ android {
 dependencies {
     implementation(project(":android:core-domain"))
     implementation(project(":android:network"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
+    implementation(libs.coroutines.android)
 }

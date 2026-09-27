@@ -22,6 +22,7 @@ ios/CrispyRewriteApple.xcodeproj/
 .opencode/
 
 # Kotlin
+.kotlin/
 *.kotlin_module
 
 # Python
