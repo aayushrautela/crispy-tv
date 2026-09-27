@@ -18,7 +18,10 @@ object AccountContracts {
  * src/modules/profiles/avatars.ts.
  */
 val SUPPORTED_AVATAR_IDS: List<String> =
-    (1..AccountContracts.AVATAR_COUNT).map { "avatar_%02d".format(it) }
+    (1..AccountContracts.AVATAR_COUNT).map { index ->
+        // String.format is JVM-only, so this pads by hand to stay in commonMain.
+        "avatar_" + index.toString().padStart(2, '0')
+    }
 
 fun isSupportedAvatarId(value: String?): Boolean {
     if (value == null) return false

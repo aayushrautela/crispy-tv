@@ -6,7 +6,8 @@
 # Kotlin/Native cannot compile Apple targets on a Linux host. Aggregate tasks
 # reach those targets and fail for reasons unrelated to your change.
 #
-# Linux proves Android + desktop JVM. Apple targets are proven by macOS CI
+# Linux proves Android, desktop JVM, and -- via the compile-only linuxX64
+# target -- Kotlin/Native. Apple targets are proven by macOS CI
 # (.github/workflows/apple-ci.yml).
 #
 # :android:app:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
@@ -28,10 +29,18 @@ fi
 "$PY" scripts/check_common_purity.py
 "$PY" scripts/validate_contracts.py
 
-./gradlew \
+# Metaspace is raised for this run only. ~/.gradle/gradle.properties caps it at
+# 512m, which the Kotlin/Native compiler overruns, and a user-level
+# gradle.properties overrides the committed one -- so the only place this can be
+# corrected is here. Drop the flag if you raise it in your own config.
+GRADLE_JVM_ARGS="-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+
+./gradlew "-Dorg.gradle.jvmargs=$GRADLE_JVM_ARGS" \
     :android:core-domain:compileKotlinDesktop \
     :android:core-domain:desktopTest \
+    :android:core-domain:compileKotlinLinuxX64 \
     :android:platform-core:compileKotlinDesktop \
+    :android:platform-core:compileKotlinLinuxX64 \
     :android:contract-tests:test \
     :android:app:verifyDistributionExclusions \
     :android:app:testStoreDebugUnitTest \

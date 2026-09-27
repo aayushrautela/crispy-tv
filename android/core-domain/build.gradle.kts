@@ -15,6 +15,13 @@ kotlin {
 
     jvm("desktop")
 
+    // Compile-only verification target. Kotlin/Native enforces exactly the same
+    // "no JVM API" rule as the Apple targets, and linuxX64 is the one Native
+    // target that builds on a Linux host. So `compileKotlinLinuxX64` in
+    // check-local.sh catches platform leakage in seconds instead of waiting
+    // for macOS CI. It is never shipped and never run.
+    linuxX64()
+
     // Declared, not merely intended. `commonMain` carries no java.* / android.*
     // imports, so these compile from the same sources as Android and desktop.
     // Apple targets cannot be built on Linux, so they are proven by the
