@@ -1,7 +1,5 @@
 package com.crispy.tv.domain.home
 
-import java.util.Locale
-
 data class HomeCatalogItem(
     val itemId: String,
     val title: String,
@@ -24,7 +22,7 @@ enum class HomeCatalogSource(val key: String) {
 
     companion object {
         fun fromRaw(raw: String?): HomeCatalogSource? {
-            return when (raw?.trim()?.lowercase(Locale.US)) {
+            return when (raw?.trim()?.lowercase()) {
                 PERSONAL.key,
                 "personal_home_feed",
                 -> PERSONAL
@@ -47,7 +45,7 @@ enum class HomeCatalogPresentation(val key: String) {
 
     companion object {
         fun fromRaw(raw: String?): HomeCatalogPresentation {
-            return when (raw?.trim()?.lowercase(Locale.US)) {
+            return when (raw?.trim()?.lowercase()) {
                 HERO.key -> HERO
                 PILL.key -> PILL
                 COLLECTION_SHELF.key -> COLLECTION_SHELF

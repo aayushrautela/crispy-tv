@@ -26,13 +26,18 @@ public struct NextEpisodeResult: Equatable {
     }
 }
 
+/// Returns the next episode worth watching, or nil when none is released yet.
+///
+/// `nowMs` is required rather than defaulted: a wall-clock fallback would make
+/// the result depend on when the caller happened to run, which domain rules
+/// must never do. Every fixture and every caller supplies it.
 public func findNextEpisode(
     currentSeason: Int,
     currentEpisode: Int,
     episodes: [EpisodeInfo],
     watchedSet: Set<String>? = nil,
     showId: String? = nil,
-    nowMs: Int64? = nil
+    nowMs: Int64
 ) -> NextEpisodeResult? {
     guard !episodes.isEmpty else {
         return nil
@@ -101,12 +106,12 @@ private var utcCalendar: Calendar {
     return calendar
 }
 
-private func isEpisodeReleased(_ released: String?, nowMs: Int64?) -> Bool {
+private func isEpisodeReleased(_ released: String?, nowMs: Int64) -> Bool {
     guard let trimmed = released?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
         return false
     }
 
-    let nowDate = nowMs.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000.0) } ?? Date()
+    let nowDate = Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000.0)
     if let releaseDate = parseReleaseDate(trimmed) {
         return releaseDate <= nowDate
     }

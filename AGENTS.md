@@ -75,12 +75,14 @@ Gradle modules (common targets):
 - `:android:core-domain`: pure domain rules (no Android types/IO)
 - `:android:contract-tests`: JUnit5 runner for `contracts/fixtures`
 - `:android:player`, `:android:network`, `:android:watchhistory`, `:android:native-engine`: Android libraries
+- `:android:torrent-engine`: sideload-only torrent engine. `:android:native-engine` holds the MPV/Media3 player and nothing else optional.
 
 Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
-- `:android:core-domain`: KMP (Android + `desktop` JVM). Its `commonMain` may use `java.*` only in the six files allowlisted in `scripts/check_common_purity.py`, which is what currently blocks adding `iosArm64`. Any other `java.*` import fails the gate.
-- AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`). Flavors live only in `:android:app`, `:android:tv` and `:android:plugins`.
-- `:app` still has `src/play` and `src/foss` source sets, and `src/main` calls into them in 6 places, 3 of them `internal`. Those flavor files must be collapsed into `DistributionCapabilities` before `:app` can become a flavor-less KMP library.
+- `:android:core-domain`: KMP (Android + `desktop` JVM). Its `commonMain` is free of `java.*`/`android.*`; `scripts/check_common_purity.py` enforces that with no allowlist. The `java.time` and `URLEncoder` call sites were replaced with portable equivalents pinned by unit tests against real JVM output, so `iosArm64` can now be declared when a macOS runner exists to compile it.
+- AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`). Flavors live only in `:android:app`, `:android:network` and `:android:plugins`.
+- Distribution is a permanent two-flavor axis: `play` (store) and `foss` (sideload). Optional engines are excluded **structurally** — the torrent engine, the QuickJS plugin runtime and the YouTube extractor are separate modules that only `foss` depends on. Never reintroduce a null-returning stub for something the store build should simply not contain; `./gradlew :android:app:verifyDistributionExclusions` asserts this and runs in CI.
+- `:app` stays a `com.android.application` with flavors. It is **not** becoming a flavor-less KMP library: the KMP plugin cannot carry flavors, and the flavor axis is a product requirement.
 - Apple targets are declared but cannot compile on Linux. Never run aggregate tasks (`build`, `check`, `allTests`); they reach the Kotlin/Native targets and fail. Use `./check-local.sh` or targeted tasks.
 
 Apple:

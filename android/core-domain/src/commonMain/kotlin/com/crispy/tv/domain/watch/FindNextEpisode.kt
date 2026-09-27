@@ -1,9 +1,5 @@
 package com.crispy.tv.domain.watch
 
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-
 /**
  * Episode metadata for a show.
  *
@@ -26,13 +22,20 @@ data class NextEpisodeResult(
     val title: String? = null,
 )
 
+/**
+ * Returns the next episode worth watching, or null when none is released yet.
+ *
+ * [nowMs] is required rather than defaulted: a wall-clock fallback would make
+ * the result depend on when the caller happened to run, which domain rules must
+ * never do. Every fixture and every caller supplies it.
+ */
 fun findNextEpisode(
     currentSeason: Int,
     currentEpisode: Int,
     episodes: List<EpisodeInfo>,
     watchedSet: Set<String>? = null,
     showId: String? = null,
-    nowMs: Long? = null,
+    nowMs: Long,
 ): NextEpisodeResult? {
     if (episodes.isEmpty()) return null
 
@@ -61,21 +64,14 @@ fun findNextEpisode(
     return null
 }
 
-private fun isEpisodeReleased(released: String?, nowMs: Long?): Boolean {
+private fun isEpisodeReleased(released: String?, nowMs: Long): Boolean {
     if (released.isNullOrBlank()) return false
     val trimmed = released.trim()
-    val nowInstant = nowMs?.let(Instant::ofEpochMilli) ?: Instant.now()
-    return try {
-        val releaseInstant = Instant.parse(trimmed)
-        !releaseInstant.isAfter(nowInstant)
-    } catch (_: Exception) {
-        try {
-            val date = LocalDate.parse(trimmed.take(10))
-            val nowDate = nowInstant.atZone(ZoneOffset.UTC).toLocalDate()
-            !date.isAfter(nowDate)
-        } catch (_: Exception) {
-            // Return false on parse errors
-            false
-        }
+
+    parseIso8601InstantToEpochMillis(trimmed)?.let { releaseMillis ->
+        return releaseMillis <= nowMs
     }
+
+    val releaseDay = parseIso8601DateToEpochDay(trimmed.take(10)) ?: return false
+    return releaseDay <= utcEpochDayOf(nowMs)
 }

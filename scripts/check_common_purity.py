@@ -29,26 +29,10 @@ FORBIDDEN_PREFIXES = (
     "com.google.android.",
 )
 
-# `java.*` is legal in a commonMain whose every target is JVM, because the JDK is
-# then on the common compile classpath. It stops being legal the moment an Apple
-# target is declared, so it is allowed per-file rather than per-module: adding a
-# java import to any other file, or to a module that also targets iOS, still
-# fails.
-#
-# These six files are the tracked debt that blocks iosArm64 on :core-domain.
-# Clearing them is the next step: `lowercase(Locale.X)` collapses to
-# `lowercase()`, and the URLEncoder and java.time call sites need common
-# replacements. Both are covered by the contract fixtures.
-JAVA_ALLOWED_IN = frozenset(
-    {
-        "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/catalog/CatalogUrlBuilder.kt",
-        "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/home/HomeCatalogPlanner.kt",
-        "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/metadata/MetadataTmdbEnhancer.kt",
-        "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/metadata/OmdbNormalizer.kt",
-        "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/sync/SyncPlanner.kt",
-        "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/watch/FindNextEpisode.kt",
-    }
-)
+# `java.*` was previously allowlisted in six :core-domain files while every
+# declared target was JVM. Those files are clear, so the exemption is gone: a
+# java import in any commonMain now fails everywhere, which is what an Apple
+# target on that module requires.
 
 # `import a.b.C` / `import a.b.C as D` at any indentation.
 IMPORT_RE = re.compile(
@@ -64,12 +48,9 @@ def common_main_roots() -> list[Path]:
 def scan(root: Path) -> list[tuple[Path, int, str]]:
     violations: list[tuple[Path, int, str]] = []
     for source in sorted(root.rglob("*.kt")):
-        rel = str(source.relative_to(REPO_ROOT))
         text = source.read_text(encoding="utf-8")
         for match in IMPORT_RE.finditer(text):
             token = match.group(1)
-            if token == "java." and rel in JAVA_ALLOWED_IN:
-                continue
             line = text.count("\n", 0, match.start()) + 1
             violations.append((source, line, token))
     return violations

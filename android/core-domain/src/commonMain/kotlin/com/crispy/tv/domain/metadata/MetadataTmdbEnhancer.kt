@@ -1,7 +1,5 @@
 package com.crispy.tv.domain.metadata
 
-import java.util.Locale
-
 enum class MetadataMediaType {
     MOVIE,
     SERIES,
@@ -132,7 +130,7 @@ private fun List<String>.distinctCaseInsensitive(): List<String> {
     val seen = mutableSetOf<String>()
     val deduped = mutableListOf<String>()
     for (candidate in this) {
-        val key = candidate.lowercase(Locale.ROOT)
+        val key = candidate.lowercase()
         if (seen.add(key)) {
             deduped += candidate
         }

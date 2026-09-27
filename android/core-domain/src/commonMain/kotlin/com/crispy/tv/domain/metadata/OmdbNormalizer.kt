@@ -1,7 +1,5 @@
 package com.crispy.tv.domain.metadata
 
-import java.util.Locale
-
 data class OmdbRatingInput(
     val source: String?,
     val value: String?,
@@ -21,7 +19,7 @@ data class OmdbDetails(
 )
 
 fun normalizeOmdbImdbId(value: String?): String? {
-    val normalized = value?.trim()?.lowercase(Locale.US).orEmpty()
+    val normalized = value?.trim()?.lowercase().orEmpty()
     return normalized.takeIf { IMDB_ID_REGEX.matches(it) }
 }
 
@@ -43,21 +41,21 @@ fun normalizeOmdbDetails(
     ratings.forEach { rating ->
         val source = rating.source.normalizedOmdbField() ?: return@forEach
         val value = rating.value.normalizedOmdbField() ?: return@forEach
-        val normalizedSource = source.lowercase(Locale.US)
+        val normalizedSource = source.lowercase()
         if (!seenSources.add(normalizedSource)) {
             return@forEach
         }
         dedupedRatings += OmdbRating(source = source, value = value)
     }
 
-    if (normalizedImdbRating != null && seenSources.add(INTERNET_MOVIE_DATABASE_SOURCE.lowercase(Locale.US))) {
+    if (normalizedImdbRating != null && seenSources.add(INTERNET_MOVIE_DATABASE_SOURCE.lowercase())) {
         dedupedRatings += OmdbRating(
             source = INTERNET_MOVIE_DATABASE_SOURCE,
             value = "$normalizedImdbRating/10",
         )
     }
 
-    if (normalizedMetascore != null && seenSources.add(METACRITIC_SOURCE.lowercase(Locale.US))) {
+    if (normalizedMetascore != null && seenSources.add(METACRITIC_SOURCE.lowercase())) {
         dedupedRatings += OmdbRating(
             source = METACRITIC_SOURCE,
             value = "$normalizedMetascore/100",

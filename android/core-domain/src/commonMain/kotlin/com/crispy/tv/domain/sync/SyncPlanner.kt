@@ -1,7 +1,5 @@
 package com.crispy.tv.domain.sync
 
-import java.util.Locale
-
 enum class HouseholdRole {
     OWNER,
     MEMBER,
@@ -135,7 +133,7 @@ fun normalizeAddonsForCloud(addons: List<RawAddonInstall>): List<CloudAddonInsta
 
         sortable.add(
             Sortable(
-                urlLower = url.lowercase(Locale.ROOT),
+                urlLower = url.lowercase(),
                 urlRaw = url,
                 index = index,
                 addon = addon,
