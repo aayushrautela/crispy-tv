@@ -1,7 +1,7 @@
 package com.crispy.tv.backend
 
 import android.content.Context
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.network.AppHttp
 
 object BackendServicesProvider {
@@ -15,7 +15,7 @@ object BackendServicesProvider {
             val appContext = context.applicationContext
             val created = CrispyBackendClient(
                 httpClient = AppHttp.client(appContext),
-                backendUrl = BuildConfig.CRISPY_BACKEND_URL,
+                backendUrl = AppConfig.CRISPY_BACKEND_URL,
                 aiHttpClient = AppHttp.aiClient(appContext),
             )
             backendClient = created

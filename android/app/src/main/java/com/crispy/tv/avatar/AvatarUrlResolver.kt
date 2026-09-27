@@ -1,12 +1,12 @@
 package com.crispy.tv.avatar
 
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.domain.account.builtInAvatarUrl
 import com.crispy.tv.domain.account.isSupportedAvatarId
 
 object AvatarUrlResolver {
     private val backendBaseUrl: String
-        get() = BuildConfig.CRISPY_BACKEND_URL.trim().trimEnd('/')
+        get() = AppConfig.CRISPY_BACKEND_URL.trim().trimEnd('/')
 
     fun isBuiltInAvatarId(raw: String?): Boolean = isSupportedAvatarId(raw)
 

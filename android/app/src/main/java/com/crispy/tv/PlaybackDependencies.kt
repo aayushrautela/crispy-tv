@@ -7,6 +7,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
@@ -52,7 +53,7 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(
-                appVersion = BuildConfig.VERSION_NAME,
+                appVersion = AppConfig.VERSION_NAME,
             ),
     )
 }
@@ -173,7 +174,7 @@ object PlaybackDependencies {
         val appContext = context.applicationContext
         RemoteIntroSkipService(
             httpClient = AppHttp.client(appContext),
-            introDbBaseUrl = BuildConfig.INTRODB_API_URL,
+            introDbBaseUrl = AppConfig.INTRODB_API_URL,
         )
     }
 
@@ -215,7 +216,7 @@ object PlaybackDependencies {
             val appContext = context.applicationContext
             RemoteIntroSkipService(
                 httpClient = AppHttp.client(appContext),
-                introDbBaseUrl = BuildConfig.INTRODB_API_URL,
+                introDbBaseUrl = AppConfig.INTRODB_API_URL,
             )
         }
         streamResolverFactory = { context -> StreamResolverProvider.get(context) }

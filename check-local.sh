@@ -10,6 +10,9 @@
 # target -- Kotlin/Native. Apple targets are proven by macOS CI
 # .github/workflows/apple.yml.
 #
+# :android:sharedUI has no linuxX64 target on purpose: Compose Multiplatform
+# publishes no linuxX64 artifacts, so desktop JVM is its local purity gate.
+#
 # :android:app:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
 #   ./gradlew :android:app:testStoreDebugUnitTest -Proborazzi.record=true
@@ -39,6 +42,8 @@ fi
     :android:core-domain:compileKotlinLinuxX64 \
     :android:platform-core:compileKotlinDesktop \
     :android:platform-core:compileKotlinLinuxX64 \
+    :android:sharedUI:compileKotlinDesktop \
+    :android:sharedUI:compileAndroidMain \
     :android:contract-tests:test \
     :android:app:verifyDistributionExclusions \
     :android:app:testStoreDebugUnitTest \

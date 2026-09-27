@@ -1,7 +1,6 @@
 package com.crispy.tv.streams
 
 import android.content.Context
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.addons.streams.AddonStreamsService
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.network.AppHttp

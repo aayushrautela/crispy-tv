@@ -2,7 +2,6 @@ package com.crispy.tv.app
 
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.CrispyApplication
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider

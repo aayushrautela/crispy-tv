@@ -1,7 +1,7 @@
 package com.crispy.tv.accounts
 
 import android.content.Context
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
@@ -45,8 +45,8 @@ object SupabaseServicesProvider {
                 SupabaseAccountClient(
                     appContext = appContext,
                     httpClient = AppHttp.client(appContext),
-                    supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
+                    supabaseUrl = AppConfig.SUPABASE_URL,
+                    supabasePublishableKey = AppConfig.SUPABASE_PUBLISHABLE_KEY,
                     tokenStore = secureTokenStore(appContext),
                 )
             supabaseAccountClient = created

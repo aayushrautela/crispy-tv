@@ -18,9 +18,34 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Imports that cannot resolve in a platform-neutral source set.
+#
+# `androidx.compose.*` is deliberately NOT forbidden. Compose Multiplatform
+# 1.11.x republishes the androidx.compose packages for every target -- verified
+# by unzipping the resolved AARs: 790 androidx/compose classes in
+# runtime-android, 1336 in ui-android, and zero org/jetbrains/compose classes
+# in any of them. JetBrains converged the two namespaces, so `org.jetbrains.compose.*`
+# imports are the ones that are actually wrong now, and those do not compile
+# anywhere. :android:sharedUI is a Compose module and legitimately imports them
+# from commonMain.
+#
+# Consequence, and it is an accepted one: an *Android-only* androidx.compose API
+# in a commonMain (e.g. LocalConfiguration) passes this grep and is caught by the
+# compiler instead, because :android:sharedUI declares desktop and iOS targets
+# that do not have it. check-local.sh compiles the desktop target, so the inner
+# loop still fails fast on a Linux host.
 FORBIDDEN_PREFIXES = (
     "android.",
-    "androidx.",
+    "androidx.activity",
+    "androidx.annotation",
+    "androidx.appcompat",
+    "androidx.core",
+    "androidx.fragment",
+    "androidx.lifecycle",
+    "androidx.media3",
+    "androidx.navigation",
+    "androidx.paging",
+    "androidx.room",
+    "androidx.work",
     "dalvik.",
     "java.",
     "javax.",
