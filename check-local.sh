@@ -28,6 +28,7 @@ fi
     :android:core-domain:desktopTest \
     :android:platform-core:compileKotlinDesktop \
     :android:contract-tests:test \
+    :android:app:verifyDistributionExclusions \
     :android:app:assemblePlayDebug \
     :android:app:assembleFossDebug \
     :android:tv:assembleDebug \

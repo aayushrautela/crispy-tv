@@ -140,6 +140,45 @@ android {
     }
 }
 
+/**
+ * Store builds must not ship the sideload-only engines. The modules are simply
+ * not declared for the store flavor, so this asserts the resolved graph rather
+ * than trusting the build files to stay that way.
+ */
+val storeExclusionForbidden = listOf(
+    ":android:torrent-engine",
+    ":android:plugins",
+    "NewPipeExtractor",
+    "quickjs-kt",
+)
+
+tasks.register("verifyStoreBuildExclusions") {
+    group = "verification"
+    description = "Asserts store variants exclude the torrent engine and plugin runtime."
+
+    val storeVariants = listOf("playDebug", "playRelease")
+
+    doLast {
+        storeVariants.forEach { variant ->
+            val configuration = configurations.findByName("${variant}RuntimeClasspath")
+                ?: error("No ${variant}RuntimeClasspath configuration")
+            val offenders = configuration.incoming.resolutionResult.allComponents
+                .mapNotNull { it.id.displayName }
+                .filter { id -> storeExclusionForbidden.any { id.contains(it) } }
+                .distinct()
+            check(offenders.isEmpty()) {
+                "Store variant $variant must not contain: ${offenders.joinToString()}"
+            }
+        }
+    }
+}
+
+tasks.register("verifyDistributionExclusions") {
+    group = "verification"
+    description = "Runs every distribution exclusion check."
+    dependsOn("verifyStoreBuildExclusions")
+}
+
 dependencies {
     implementation(project(":android:core-domain"))
     implementation(project(":android:platform-core"))
@@ -152,6 +191,7 @@ dependencies {
     implementation(project(":android:addons"))
     implementation(project(":android:ui-assets"))
     "fossImplementation"(project(":android:plugins"))
+    "fossImplementation"(project(":android:torrent-engine"))
 
     coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
 
@@ -186,7 +226,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation(libs.coroutines.android)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))

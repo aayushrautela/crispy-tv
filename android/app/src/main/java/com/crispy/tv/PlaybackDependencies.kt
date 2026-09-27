@@ -20,35 +20,14 @@ import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.nativeengine.playback.LibassRenderType
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
-import com.crispy.tv.nativeengine.torrent.TorrentEngineClient
 import com.crispy.tv.player.CoreDomainMetadataLabResolver
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabResolver
 import com.crispy.tv.player.SupabaseSyncLabService
+import com.crispy.tv.player.TorrentResolver
+import com.crispy.tv.player.TorrentSupportUnavailableException
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
-
-interface TorrentResolver {
-    suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String
-    fun stopAndClear()
-    fun close()
-}
-
-private class NativeTorrentResolver(context: Context) : TorrentResolver {
-    private val client = TorrentEngineClient(context)
-
-    override suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String {
-        return client.startTorrentAndResolveStreamUrl(magnetLink = magnetLink, sessionId = sessionId)
-    }
-
-    override fun stopAndClear() {
-        client.stopAllIfConnected(clearStorage = true)
-    }
-
-    override fun close() {
-        client.close()
-    }
-}
 
 private fun newMetadataResolver(context: Context): MetadataLabResolver {
     val appContext = context.applicationContext
@@ -111,10 +90,22 @@ object PlaybackDependencies {
             )
         }
 
-    @Volatile
-    var torrentResolverFactory: (Context) -> TorrentResolver = { context ->
-        NativeTorrentResolver(context)
+    /**
+     * Store builds: the torrent engine module is not on the classpath, so every
+     * magnet link fails fast instead of silently doing nothing.
+     */
+    private class UnavailableTorrentResolver : TorrentResolver {
+        override suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String {
+            throw TorrentSupportUnavailableException()
+        }
+
+        override fun stopAndClear() = Unit
+
+        override fun close() = Unit
     }
+
+    @Volatile
+    var torrentResolverFactory: (Context) -> TorrentResolver = { UnavailableTorrentResolver() }
 
     @Volatile
     private var torrentResolverInstance: TorrentResolver? = null
@@ -205,7 +196,7 @@ object PlaybackDependencies {
                 libassRenderType = LibassRenderType.fromName(settings.libassRenderType),
             )
         }
-        torrentResolverFactory = { context -> NativeTorrentResolver(context) }
+        installTorrentResolver(this)
         resetTorrentResolver()
         resetAudioFocusManager()
         metadataResolverFactory = { context ->

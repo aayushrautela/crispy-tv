@@ -61,6 +61,9 @@ jobs:
       - name: Run JVM contract tests
         run: ./gradlew :android:contract-tests:test
 
+      - name: Verify store build excludes sideload-only engines
+        run: ./gradlew :android:app:verifyDistributionExclusions
+
       - name: Assemble play flavor
         run: ./gradlew :android:app:assemblePlayDebug
 

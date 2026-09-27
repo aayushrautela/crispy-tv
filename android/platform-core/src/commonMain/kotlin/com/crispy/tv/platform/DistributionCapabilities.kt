@@ -28,4 +28,13 @@ interface DistributionCapabilities {
 
     /** Whether YouTube trailers may play inline in the details hero. */
     val youtubeInHeroPlaybackSupported: Boolean
+
+    /**
+     * Whether the torrent engine ships in this build.
+     *
+     * False on store builds: the engine is a separate module that only the
+     * sideload flavor depends on, so this is a build-time fact rather than a
+     * runtime check.
+     */
+    val torrentPlaybackSupported: Boolean
 }

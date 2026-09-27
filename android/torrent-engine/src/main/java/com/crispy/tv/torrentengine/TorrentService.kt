@@ -1,4 +1,4 @@
-package com.crispy.tv.nativeengine.torrent
+package com.crispy.tv.torrentengine
 
 import android.app.Notification
 import android.app.NotificationChannel

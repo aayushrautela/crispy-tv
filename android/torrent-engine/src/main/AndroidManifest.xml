@@ -3,7 +3,7 @@
 
     <application>
         <service
-            android:name=".torrent.TorrentService"
+            android:name=".TorrentService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync|mediaPlayback" />

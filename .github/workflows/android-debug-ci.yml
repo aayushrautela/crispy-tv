@@ -57,6 +57,9 @@ jobs:
       - name: Check commonMain purity
         run: python scripts/check_common_purity.py
 
+      - name: Verify store build excludes sideload-only engines
+        run: ./gradlew :android:app:verifyDistributionExclusions
+
       - name: Download TorrServer binaries
         run: |
           chmod +x .github/scripts/fetch-torrserver-binaries.sh

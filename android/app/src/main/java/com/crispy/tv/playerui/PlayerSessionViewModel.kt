@@ -44,10 +44,10 @@ import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
-import com.crispy.tv.TorrentResolver
 import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.player.TorrentResolver
 import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.addons.streams.AddonStream
