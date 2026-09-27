@@ -8,7 +8,8 @@ Repo agent rules:
 
 ## Toolchain (match CI)
 
-- JDK 21; Android SDK `platforms;android-37.0` + `build-tools;36.0.0`
+- JDK 21 **everywhere**, including `jvmToolchain` in `:android:core-domain` and `:android:contract-tests`. Do not reintroduce a 17 toolchain: neither module is published, `:contract-tests` is a leaf, and every consumer of `:core-domain` is an Android module already compiling at 21, so 17 bytecode bought nothing while making the build depend on a JDK CI does not install.
+- Android SDK `platforms;android-37.0` + `build-tools;36.0.0`
 - Gradle 9.7.1 via the committed wrapper: always use `./gradlew`, never a bare `gradle` (it is not installed, and a different Gradle version starts a second daemon that nothing reclaims)
 - Python 3.12 + `jsonschema==4.23.0`
 - Xcode + `xcodegen`; Swift tools 5.9
