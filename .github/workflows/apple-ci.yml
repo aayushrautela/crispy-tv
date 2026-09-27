@@ -20,7 +20,7 @@ on:
 jobs:
   apple:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -38,8 +38,31 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Set up Android SDK
+        # :core-domain and :platform-core are Kotlin Multiplatform modules that
+        # carry an Android target, so AGP needs an SDK even when only the Apple
+        # tasks run. macos-26 happens to ship android-37.0, but relying on the
+        # runner image is how the JDK 17 toolchain requirement went unnoticed for
+        # months -- so install it explicitly, same as the Linux workflows.
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: |
+          # The `android` CLI accepts SDK licences itself; sdkmanager is deprecated.
+          android sdk install "platforms;android-37.0" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        # Not optional here. Without it every run re-downloads the Kotlin/Native
+        # toolchain, which is over a gigabyte and dominates the job's runtime.
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Install Apple tooling
+        # xcodegen is not on the runner image. xcbeautify is, but installing it
+        # is a no-op when present and turns a future image change from a broken
+        # pipe into a no-op instead.
+        run: brew install xcodegen xcbeautify
 
       - name: Check commonMain purity
         run: python3 scripts/check_common_purity.py
@@ -61,6 +84,31 @@ jobs:
           ./gradlew \
             :android:core-domain:iosSimulatorArm64Test \
             :android:platform-core:iosSimulatorArm64Test
+
+      - name: Diagnose simulator test failure
+        # The simulator test is the one step here that depends on runner
+        # hardware state, so surface enough to tell a real regression from an
+        # unavailable device.
+        if: failure()
+        run: |
+          {
+            echo "## Available simulators"
+            echo '```'
+            xcrun simctl list devices available || echo "(simctl unavailable)"
+            echo '```'
+            echo "## iOS test result files"
+            find android -type d -name iosSimulatorArm64Test -path '*test-results*' 2>/dev/null \
+              | while read -r dir; do
+                  echo "### $dir"
+                  for xml in "$dir"/*.xml; do
+                    [ -e "$xml" ] || continue
+                    if grep -q '<failure' "$xml"; then
+                      echo "FAILING: $xml"
+                      grep -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$xml" | head -1
+                    fi
+                  done
+                done
+          } >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Upload KMP test results on failure
         if: failure()
