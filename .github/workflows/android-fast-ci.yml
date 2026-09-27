@@ -67,7 +67,7 @@ jobs:
       - name: Verify golden screenshots
         # Verify mode is the default; a rendering regression fails here rather
         # than reaching a user.
-        run: ./gradlew :android:app:testPlayDebugUnitTest
+        run: ./gradlew :android:app:testStoreDebugUnitTest
 
       - name: Upload screenshot diffs on failure
         if: failure()
@@ -94,6 +94,6 @@ jobs:
       - name: Upload store-flavor APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-store-universal
-          path: android/app/build/outputs/apk/store/debug/*-universal-*.apk
+          name: crispy-rewrite-app-debug-store
+          path: android/app/build/outputs/apk/store/debug/*.apk
           if-no-files-found: warn

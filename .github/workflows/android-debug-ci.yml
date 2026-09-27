@@ -61,7 +61,7 @@ jobs:
         run: ./gradlew :android:app:verifyDistributionExclusions
 
       - name: Verify golden screenshots
-        run: ./gradlew :android:app:testPlayDebugUnitTest
+        run: ./gradlew :android:app:testStoreDebugUnitTest
 
       - name: Upload screenshot diffs on failure
         if: failure()
@@ -127,34 +127,14 @@ jobs:
       - name: Upload store-flavor APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-store-universal
-          path: android/app/build/outputs/apk/store/debug/*-universal-*.apk
+          name: crispy-rewrite-app-debug-store
+          path: android/app/build/outputs/apk/store/debug/*.apk
           if-no-files-found: warn
 
       - name: Upload sideload-flavor APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-sideload-universal
-          path: android/app/build/outputs/apk/sideload/debug/*-universal-*.apk
+          name: crispy-rewrite-app-debug-sideload
+          path: android/app/build/outputs/apk/sideload/debug/*.apk
           if-no-files-found: warn
 
-      - name: Upload sideload arm64-v8a APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: crispy-rewrite-app-debug-sideload-arm64-v8a
-          path: android/app/build/outputs/apk/sideload/debug/*-arm64-v8a-*.apk
-          if-no-files-found: warn
-
-      - name: Upload sideload armeabi-v7a APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: crispy-rewrite-app-debug-sideload-armeabi-v7a
-          path: android/app/build/outputs/apk/sideload/debug/*-armeabi-v7a-*.apk
-          if-no-files-found: warn
-
-      - name: Upload sideload x86_64 APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: crispy-rewrite-app-debug-sideload-x86_64
-          path: android/app/build/outputs/apk/sideload/debug/*-x86_64-*.apk
-          if-no-files-found: warn
