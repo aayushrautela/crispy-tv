@@ -42,10 +42,6 @@ gradle :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachin
 # Kotlin/JUnit (unit tests in other modules)
 gradle :android:core-domain:test --tests com.crispy.tv.domain.SomeUnitTest
 
-# Android instrumentation (connected device/emulator)
-gradle :android:app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.crispy.tv.PlaybackLabSmokeTest
-
 # SwiftPM
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests.testSomeCaseName
@@ -53,9 +49,9 @@ swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTe
 
 Android builds/lint:
 ```sh
-gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:tv:assembleDebug
+gradle :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:tv:assembleDebug
 gradle :android:app:assembleRelease :android:tv:assembleRelease
-gradle :android:app:lintDebug
+gradle :android:app:lintPlayDebug :android:app:lintFossDebug
 gradle :android:tv:lintDebug
 ```
 

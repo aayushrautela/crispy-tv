@@ -168,10 +168,8 @@ dependencies {
 
     implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.5.0-alpha26")
-    implementation("com.woowla.compose.icon.collections:simpleicons:16.6.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
@@ -188,8 +186,6 @@ dependencies {
     implementation("androidx.media3:media3-session:1.11.0")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-
-    implementation("androidx.work:work-runtime-ktx:2.11.2")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.08.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
