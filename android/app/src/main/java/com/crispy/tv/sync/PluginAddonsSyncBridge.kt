@@ -4,7 +4,7 @@ import com.crispy.tv.backend.CrispyBackendClient
 
 /**
  * Flavor-injected hook that reconciles jsplugin addon records between the server
- * and the local plugin repository store. foss builds install a real bridge; play
+ * and the local plugin repository store. Sideload builds install a real bridge; store
  * builds pass null so plugin records are never touched.
  */
 internal interface PluginAddonsSyncBridge {

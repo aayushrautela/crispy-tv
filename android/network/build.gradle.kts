@@ -12,10 +12,10 @@ android {
 
     flavorDimensions += "distribution"
     productFlavors {
-        create("play") {
+        create("store") {
             dimension = "distribution"
         }
-        create("foss") {
+        create("sideload") {
             dimension = "distribution"
         }
     }
@@ -33,5 +33,5 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
 
     // JitPack git-tag version, not a normal release — left out of the catalog.
-    "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    "sideloadImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

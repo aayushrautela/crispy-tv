@@ -22,7 +22,7 @@ Reads the dex directly rather than shelling out to aapt/dexdump, so it needs
 nothing but a Python interpreter and works the same for debug and release.
 
 Usage:
-    verify_apk_distribution.py --store app-play-release.apk --sideload app-foss-release.apk
+    verify_apk_distribution.py --store app-store-release.aab --sideload app-sideload-release.apk
 """
 
 import argparse

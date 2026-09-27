@@ -6,4 +6,4 @@ import com.crispy.tv.backend.CrispyBackendClient
 internal fun createPluginSyncBridge(
     appContext: Context,
     backend: CrispyBackendClient,
-): PluginAddonsSyncBridge = FossPluginAddonsSyncBridge.create(appContext, backend)
+): PluginAddonsSyncBridge = SideloadPluginAddonsSyncBridge.create(appContext, backend)

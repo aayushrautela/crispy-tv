@@ -8,7 +8,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        missingDimensionStrategy("distribution", "foss")
+        missingDimensionStrategy("distribution", "sideload")
         minSdk = 26
     }
 

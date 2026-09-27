@@ -43,7 +43,7 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "Plugins are only available in the open-source (FOSS) build.",
+                text = "Plugins are only available in the sideload build.",
                 style = MaterialTheme.typography.bodyLarge,
             )
         }

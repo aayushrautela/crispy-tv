@@ -1,20 +1,21 @@
 package com.crispy.tv.platform
 
 /**
- * Replaces the per-flavor `src/play` and `src/foss` source sets in `:app`.
+ * Replaces the per-flavor `src/store` and `src/sideload` source sets in `:app`.
  *
- * All three capabilities currently track the same axis — they are all `true` on
- * `foss` and `false` on `play` — but they are modelled separately so a future
+ * All four capabilities currently track the same axis — they are all `true` on
+ * `sideload` and `false` on `store` — but they are modelled separately so a future
  * distribution can enable one without the others, and so no build-time flavor
  * dimension is needed to read them.
  *
  * Current values, for audit against the source sets this replaces:
  *
- * | capability                        | play | foss |
- * |-----------------------------------|------|------|
- * | [pluginsUiSupported]              | false| true |
- * | [pluginsRuntimeAvailable]         | false| true |
- * | [youtubeInHeroPlaybackSupported]  | false| true |
+ * | capability                        | store | sideload |
+ * |-----------------------------------|-------|----------|
+ * | [pluginsUiSupported]              | false | true     |
+ * | [pluginsRuntimeAvailable]         | false | true     |
+ * | [youtubeInHeroPlaybackSupported]  | false | true     |
+ * | [torrentPlaybackSupported]        | false | true     |
  *
  * [pluginsRuntimeAvailable] subsumes both former `null`-returning factories:
  * `PluginStreamLoaderProvider.get` and `createPluginSyncBridge`.

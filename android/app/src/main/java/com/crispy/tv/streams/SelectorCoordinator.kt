@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * selector (Player, Details, Home). It resolves streams via [StreamResolver] and, when given
  * [open] with a non-null [itemIdForMetadata], enriches the header metadata from the backend in
  * parallel with the addon lookup. Surfaces that already hold [fallbackDetails] avoid that fetch.
- * When [pluginStreamLoader] is set (foss builds), JS plugin providers are resolved in parallel
+ * When [pluginStreamLoader] is set (sideload builds), JS plugin providers are resolved in parallel
  * with the addon lookup and merged through the same provider-result pipeline.
  */
 class SelectorCoordinator(

@@ -7,7 +7,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.plugins.repo.PluginRepoClient
 import java.util.Locale
 
-internal class FossPluginAddonsSyncBridge(
+internal class SideloadPluginAddonsSyncBridge(
     private val repoClient: PluginRepoClient,
     private val backend: CrispyBackendClient,
 ) : PluginAddonsSyncBridge {
@@ -203,8 +203,8 @@ internal class FossPluginAddonsSyncBridge(
 
         private const val LOG_TAG = "CrispyPlugins"
 
-        fun create(appContext: Context, backend: CrispyBackendClient): FossPluginAddonsSyncBridge =
-            FossPluginAddonsSyncBridge(
+        fun create(appContext: Context, backend: CrispyBackendClient): SideloadPluginAddonsSyncBridge =
+            SideloadPluginAddonsSyncBridge(
                 repoClient = PluginRepoClient(appContext, AppHttp.okHttp(appContext)),
                 backend = backend,
             )

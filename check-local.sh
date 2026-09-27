@@ -9,9 +9,9 @@
 # Linux proves Android + desktop JVM. Apple targets are proven by macOS CI
 # (.github/workflows/apple-ci.yml).
 #
-# :android:app:testPlayDebugUnitTest is the golden-screenshot gate. It verifies
+# :android:app:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
-#   ./gradlew :android:app:testPlayDebugUnitTest -Proborazzi.record=true
+#   ./gradlew :android:app:testStoreDebugUnitTest -Proborazzi.record=true
 
 set -euo pipefail
 
@@ -34,9 +34,9 @@ fi
     :android:platform-core:compileKotlinDesktop \
     :android:contract-tests:test \
     :android:app:verifyDistributionExclusions \
-    :android:app:testPlayDebugUnitTest \
-    :android:app:assemblePlayDebug \
-    :android:app:assembleFossDebug \
+    :android:app:testStoreDebugUnitTest \
+    :android:app:assembleStoreDebug \
+    :android:app:assembleSideloadDebug \
     :android:tv:assembleDebug \
     "$@"
 
@@ -45,5 +45,5 @@ fi
 # extractor. Every ABI split is checked, and the sideload APKs act as the
 # control that proves the markers still match.
 "$PY" scripts/verify_apk_distribution.py \
-    --store android/app/build/outputs/apk/play/debug/*.apk \
-    --sideload android/app/build/outputs/apk/foss/debug/*.apk
+    --store android/app/build/outputs/apk/store/debug/*.apk \
+    --sideload android/app/build/outputs/apk/sideload/debug/*.apk

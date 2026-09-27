@@ -76,7 +76,7 @@ jobs:
         run: ./gradlew :android:contract-tests:test
 
       - name: Run plugins module unit tests
-        run: ./gradlew :android:plugins:testFossUnitTest
+        run: ./gradlew :android:plugins:testSideloadDebugUnitTest
 
       - name: Upload plugins test reports
         if: failure()
@@ -86,45 +86,45 @@ jobs:
           path: android/plugins/build/reports/tests/
           if-no-files-found: warn
 
-      - name: Build Play bundle
-        run: ./gradlew :android:app:bundlePlayRelease
+      - name: Build store bundle
+        run: ./gradlew :android:app:bundleStoreRelease
 
-      - name: Upload play-flavor AAB
+      - name: Upload store-flavor AAB
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-play-release-aab
-          path: android/app/build/outputs/bundle/playRelease/*.aab
+          name: crispy-rewrite-app-store-release-aab
+          path: android/app/build/outputs/bundle/storeRelease/*.aab
           if-no-files-found: warn
 
-      - name: Build foss APKs
-        run: ./gradlew -PbuildFossApks :android:app:assembleFossRelease
+      - name: Build sideload APKs
+        run: ./gradlew -PbuildSideloadApks :android:app:assembleSideloadRelease
 
       - name: Assert store bundle excludes sideload-only engines
         # Last gate before publication, and the only one that reads the shipped
-        # artefact. Reads the bundle's base/dex; the foss APKs above are the
+        # artefact. Reads the bundle's base/dex; the sideload APKs above are the
         # control that proves the markers still match.
         run: |
           python scripts/verify_apk_distribution.py \
-            --store android/app/build/outputs/bundle/playRelease/*.aab \
-            --sideload android/app/build/outputs/apk/foss/release/*.apk
+            --store android/app/build/outputs/bundle/storeRelease/*.aab \
+            --sideload android/app/build/outputs/apk/sideload/release/*.apk
 
-      - name: Upload foss arm64-v8a APK
+      - name: Upload sideload arm64-v8a APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-foss-release-arm64-v8a
-          path: android/app/build/outputs/apk/foss/release/*-arm64-v8a-*.apk
+          name: crispy-rewrite-app-sideload-release-arm64-v8a
+          path: android/app/build/outputs/apk/sideload/release/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
-      - name: Upload foss armeabi-v7a APK
+      - name: Upload sideload armeabi-v7a APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-foss-release-armeabi-v7a
-          path: android/app/build/outputs/apk/foss/release/*-armeabi-v7a-*.apk
+          name: crispy-rewrite-app-sideload-release-armeabi-v7a
+          path: android/app/build/outputs/apk/sideload/release/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
-      - name: Upload foss x86_64 APK
+      - name: Upload sideload x86_64 APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-foss-release-x86_64
-          path: android/app/build/outputs/apk/foss/release/*-x86_64-*.apk
+          name: crispy-rewrite-app-sideload-release-x86_64
+          path: android/app/build/outputs/apk/sideload/release/*-x86_64-*.apk
           if-no-files-found: warn

@@ -47,7 +47,7 @@ libmpv = "1.0.0"
 assMedia = "0.5.1"
 androidyoutubeplayer = "13.0.0"
 
-# --- Plugin runtime (foss flavor) ---
+# --- Plugin runtime (sideload flavor) ---
 quickjsKt = "1.0.14"
 jsoup = "1.18.3"
 

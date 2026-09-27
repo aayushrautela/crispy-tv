@@ -89,7 +89,7 @@ jobs:
         run: ./gradlew :android:contract-tests:test
 
       - name: Run plugins module unit tests
-        run: ./gradlew :android:plugins:testFossUnitTest
+        run: ./gradlew :android:plugins:testSideloadDebugUnitTest
 
       - name: Upload plugins test reports
         if: failure()
@@ -100,7 +100,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Lint Android app
-        run: ./gradlew :android:app:lintPlayDebug :android:app:lintFossDebug
+        run: ./gradlew :android:app:lintStoreDebug :android:app:lintSideloadDebug
 
       - name: Upload lint reports
         if: failure()
@@ -114,47 +114,47 @@ jobs:
           if-no-files-found: warn
 
       - name: Assemble Android app
-        run: ./gradlew :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:app:assemblePlayDebugAndroidTest :android:app:assembleFossDebugAndroidTest
+        run: ./gradlew :android:app:assembleStoreDebug :android:app:assembleSideloadDebug :android:app:assembleStoreDebugAndroidTest :android:app:assembleSideloadDebugAndroidTest
 
       - name: Assert store APKs exclude sideload-only engines
         # Graph-level check is above; this reads the built dex of every ABI
-        # split. The foss APKs are the control that proves the markers match.
+        # split. The sideload APKs are the control that proves the markers match.
         run: |
           python scripts/verify_apk_distribution.py \
-            --store android/app/build/outputs/apk/play/debug/*.apk \
-            --sideload android/app/build/outputs/apk/foss/debug/*.apk
+            --store android/app/build/outputs/apk/store/debug/*.apk \
+            --sideload android/app/build/outputs/apk/sideload/debug/*.apk
 
-      - name: Upload play-flavor APK
+      - name: Upload store-flavor APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-play-universal
-          path: android/app/build/outputs/apk/play/debug/*-universal-*.apk
+          name: crispy-rewrite-app-debug-store-universal
+          path: android/app/build/outputs/apk/store/debug/*-universal-*.apk
           if-no-files-found: warn
 
-      - name: Upload foss-flavor APK
+      - name: Upload sideload-flavor APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-foss-universal
-          path: android/app/build/outputs/apk/foss/debug/*-universal-*.apk
+          name: crispy-rewrite-app-debug-sideload-universal
+          path: android/app/build/outputs/apk/sideload/debug/*-universal-*.apk
           if-no-files-found: warn
 
-      - name: Upload foss arm64-v8a APK
+      - name: Upload sideload arm64-v8a APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-foss-arm64-v8a
-          path: android/app/build/outputs/apk/foss/debug/*-arm64-v8a-*.apk
+          name: crispy-rewrite-app-debug-sideload-arm64-v8a
+          path: android/app/build/outputs/apk/sideload/debug/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
-      - name: Upload foss armeabi-v7a APK
+      - name: Upload sideload armeabi-v7a APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-foss-armeabi-v7a
-          path: android/app/build/outputs/apk/foss/debug/*-armeabi-v7a-*.apk
+          name: crispy-rewrite-app-debug-sideload-armeabi-v7a
+          path: android/app/build/outputs/apk/sideload/debug/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
-      - name: Upload foss x86_64 APK
+      - name: Upload sideload x86_64 APK
         uses: actions/upload-artifact@v7
         with:
-          name: crispy-rewrite-app-debug-foss-x86_64
-          path: android/app/build/outputs/apk/foss/debug/*-x86_64-*.apk
+          name: crispy-rewrite-app-debug-sideload-x86_64
+          path: android/app/build/outputs/apk/sideload/debug/*-x86_64-*.apk
           if-no-files-found: warn

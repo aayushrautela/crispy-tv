@@ -98,18 +98,18 @@ android {
 
     flavorDimensions += "distribution"
     productFlavors {
-        create("play") {
+        create("store") {
             dimension = "distribution"
         }
-        create("foss") {
+        create("sideload") {
             dimension = "distribution"
-            versionNameSuffix = "-foss"
+            versionNameSuffix = "-sideload"
         }
     }
 
     splits {
         abi {
-            isEnable = project.hasProperty("buildFossApks")
+            isEnable = project.hasProperty("buildSideloadApks")
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86_64")
         }
@@ -236,7 +236,7 @@ tasks.register("verifyStoreBuildExclusions") {
     group = "verification"
     description = "Asserts store variants exclude the torrent engine and plugin runtime."
 
-    val storeVariants = listOf("playDebug", "playRelease")
+    val storeVariants = listOf("storeDebug", "storeRelease")
 
     doLast {
         storeVariants.forEach { variant ->
@@ -270,8 +270,8 @@ dependencies {
     implementation(project(":android:backend"))
     implementation(project(":android:addons"))
     implementation(project(":android:ui-assets"))
-    "fossImplementation"(project(":android:plugins"))
-    "fossImplementation"(project(":android:torrent-engine"))
+    "sideloadImplementation"(project(":android:plugins"))
+    "sideloadImplementation"(project(":android:torrent-engine"))
 
     coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
 
@@ -306,7 +306,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
-    "fossImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    "sideloadImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation(libs.coroutines.android)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
