@@ -4,20 +4,14 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(17)
-
     android {
-        namespace = "com.crispy.tv.domain"
+        namespace = "com.crispy.tv.platform"
         compileSdk = 37
         minSdk = 26
-        withHostTest {}
     }
 
     jvm("desktop")
 
-    sourceSets {
-        commonTest.dependencies {
-            implementation(kotlin("test"))
-        }
-    }
+    iosArm64()
+    iosSimulatorArm64()
 }

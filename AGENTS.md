@@ -76,6 +76,13 @@ Gradle modules (common targets):
 - `:android:contract-tests`: JUnit5 runner for `contracts/fixtures`
 - `:android:player`, `:android:network`, `:android:watchhistory`, `:android:native-engine`: Android libraries
 
+Kotlin Multiplatform modules (in progress; see `check-local.sh`):
+- `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
+- `:android:core-domain`: KMP (Android + `desktop` JVM). Its `commonMain` may use `java.*` only in the six files allowlisted in `scripts/check_common_purity.py`, which is what currently blocks adding `iosArm64`. Any other `java.*` import fails the gate.
+- AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`). Flavors live only in `:android:app`, `:android:tv` and `:android:plugins`.
+- `:app` still has `src/play` and `src/foss` source sets, and `src/main` calls into them in 6 places, 3 of them `internal`. Those flavor files must be collapsed into `DistributionCapabilities` before `:app` can become a flavor-less KMP library.
+- Apple targets are declared but cannot compile on Linux. Never run aggregate tasks (`build`, `check`, `allTests`); they reach the Kotlin/Native targets and fail. Use `./check-local.sh` or targeted tasks.
+
 Apple:
 - `ios/ContractRunner`: SwiftPM contract runner (mirrors `android/core-domain` behavior)
 - `ios/project.yml`: XcodeGen spec for placeholder iOS/tvOS apps (compile gate)
@@ -90,6 +97,7 @@ Contracts:
 - Do not commit secrets; use `~/.gradle/gradle.properties` for Trakt/Simkl ids+redirect URIs, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `CRISPY_BACKEND_URL`.
 - GitHub Android workflows pass the same values through `ORG_GRADLE_PROJECT_*`; set repository secret `CRISPY_BACKEND_URL` so CI builds embed the backend base URL in `BuildConfig.CRISPY_BACKEND_URL`.
 - Signing: release uses `RELEASE_KEYSTORE_*` if present; otherwise debug signing. Debug can be overridden via `DEBUG_KEYSTORE_*`.
+- Daemon memory/lifetime (heap, metaspace, idle timeouts) is tuned in `~/.gradle/gradle.properties`, which overrides this repo's `org.gradle.jvmargs`; that is deliberate, so leave the committed `-Xmx4g` alone.
 
 ## Code Style
 

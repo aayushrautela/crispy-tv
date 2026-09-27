@@ -55,6 +55,9 @@ jobs:
       - name: Validate contract fixtures
         run: python scripts/validate_contracts.py
 
+      - name: Check commonMain purity
+        run: python scripts/check_common_purity.py
+
       - name: Run JVM contract tests
         run: ./gradlew :android:contract-tests:test
 
