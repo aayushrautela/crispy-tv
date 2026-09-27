@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.ui.components.ItemActionSheet
 import com.crispy.tv.ui.components.ItemActionSheetItem
 import androidx.compose.ui.unit.dp
@@ -206,7 +207,7 @@ internal fun DetailsScreen(
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
         if (!playbackSettings.trailerAutoplayEnabled) return@LaunchedEffect
-        if (!YouTubeInHeroPlaybackSupported &&
+        if (!AppDistribution.capabilities.youtubeInHeroPlaybackSupported &&
             heroTrailerSources.firstOrNull()?.source == TrailerSource.YOUTUBE
         ) {
             return@LaunchedEffect
@@ -277,7 +278,7 @@ internal fun DetailsScreen(
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
                                 val primary = heroTrailerSources.firstOrNull()
-                                if (!YouTubeInHeroPlaybackSupported && primary?.source == TrailerSource.YOUTUBE) {
+                                if (!AppDistribution.capabilities.youtubeInHeroPlaybackSupported && primary?.source == TrailerSource.YOUTUBE) {
                                     selectedTrailerEmbed = primary.toEmbeddedVideo()
                                 } else if (!showTrailer) {
                                     showTrailer = true

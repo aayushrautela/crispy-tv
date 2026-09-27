@@ -34,6 +34,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -114,7 +115,7 @@ fun SettingsScreen(
                 title = "INTEGRATIONS",
                 items =
                     buildList {
-                        if (PluginsUiSupported) {
+                        if (AppDistribution.capabilities.pluginsUiSupported) {
                             add(
                                 SettingsItem(
                                     label = "Plugins",
