@@ -16,10 +16,12 @@ jobs:
       ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       ORG_GRADLE_PROJECT_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
       ORG_GRADLE_PROJECT_CRISPY_BACKEND_URL: ${{ secrets.CRISPY_BACKEND_URL }}
-      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/.keystores/crispy-debug-key.jks
-      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
-      ORG_GRADLE_PROJECT_DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
-      ORG_GRADLE_PROJECT_DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+      # Deliberately no DEBUG_KEYSTORE_* here. The fast push loop exists to catch
+      # regressions, not to produce a distributable artefact, so it uses the
+      # stock Android debug keystore. This workflow set all four values without
+      # ever creating the .jks, which activated the custom debug signingConfig
+      # and failed :android:app:validateSigningStoreDebug on every push.
+      # android-debug-ci.yml does decode a real keystore and keeps them.
 
     steps:
       - name: Checkout

@@ -99,14 +99,13 @@ jobs:
       - name: Build sideload APKs
         run: ./gradlew -PbuildSideloadApks :android:app:assembleSideloadRelease
 
-      - name: Assert store bundle excludes sideload-only engines
-        # Last gate before publication, and the only one that reads the shipped
-        # artefact. Reads the bundle's base/dex; the sideload APKs above are the
-        # control that proves the markers still match.
-        run: |
-          python scripts/verify_apk_distribution.py \
-            --store android/app/build/outputs/bundle/storeRelease/*.aab \
-            --sideload android/app/build/outputs/apk/sideload/release/*.apk
+      - name: Assert store build excludes sideload-only engines
+        # The dependency graph, not the dex. Release is minified (R8 renames
+        # com.crispy.tv.plugins and friends), so scanning a release dex for
+        # package names proves nothing: absence would be guaranteed whether or
+        # not the code shipped. The graph is minification-proof. The dex-level
+        # check runs against the unminified debug builds in android-fast-ci.yml.
+        run: ./gradlew :android:app:verifyDistributionExclusions
 
       - name: Upload sideload arm64-v8a APK
         uses: actions/upload-artifact@v7

@@ -19,10 +19,19 @@ repackaged -- would quietly turn the store check into a no-op that always
 passes. Here it fails instead.
 
 Reads the dex directly rather than shelling out to aapt/dexdump, so it needs
-nothing but a Python interpreter and works the same for debug and release.
+nothing but a Python interpreter.
 
-Usage:
-    verify_apk_distribution.py --store app-store-release.aab --sideload app-sideload-release.apk
+**Only meaningful on builds that are not minified.** `:android:app` sets
+`isMinifyEnabled = true` for release with no keep rules for these packages, so
+R8 renames the classes and every marker disappears from a release dex. In that
+state the store side would report "absent" and look like a pass while proving
+nothing. The positive control is what saves it: asked to check a minified
+sideload APK, the control reports the markers as missing and names this exact
+cause. For release builds use `./gradlew :android:app:verifyDistributionExclusions`,
+which reads the resolved dependency graph and is therefore minification-proof.
+
+Usage (globs are fine; a split release expands to several paths):
+    verify_apk_distribution.py --store app-store-debug.apk --sideload app-sideload-debug.apk
 """
 
 import argparse
@@ -84,19 +93,23 @@ def check(path: Path, must_be_absent: bool) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--store", action="append", required=True, type=Path,
-                        metavar="APK", help="APK that must NOT contain the sideload engines")
-    parser.add_argument("--sideload", action="append", required=True, type=Path,
-                        metavar="APK", help="APK that MUST contain them (control)")
+    # nargs="+" matters: the shell expands these globs, and a release build
+    # with ABI splits produces three files, not one. With a plain append the
+    # extra paths arrive as stray positionals and argparse rejects the whole
+    # invocation -- which is exactly what happened in the release workflow.
+    parser.add_argument("--store", action="append", nargs="+", required=True, type=Path,
+                        metavar="APK", help="APK(s) that must NOT contain the sideload engines")
+    parser.add_argument("--sideload", action="append", nargs="+", required=True, type=Path,
+                        metavar="APK", help="APK(s) that MUST contain them (control)")
     args = parser.parse_args()
 
+    store_apks = [apk for group in args.store for apk in group]
+    sideload_apks = [apk for group in args.sideload for apk in group]
+
     problems: list[str] = []
-    checked = 0
-    for apk in args.store:
-        checked += 1
+    for apk in store_apks:
         problems += check(apk, must_be_absent=True)
-    for apk in args.sideload:
-        checked += 1
+    for apk in sideload_apks:
         problems += check(apk, must_be_absent=False)
 
     if problems:
@@ -104,10 +117,10 @@ def main() -> int:
         print("\n".join(problems), file=sys.stderr)
         return 1
 
-    print(f"verify_apk_distribution: {checked} APK(s) OK")
-    for apk in args.store:
+    print(f"verify_apk_distribution: {len(store_apks) + len(sideload_apks)} APK(s) OK")
+    for apk in store_apks:
         print(f"  store    {apk}  - no sideload-only engine present")
-    for apk in args.sideload:
+    for apk in sideload_apks:
         print(f"  sideload {apk}  - all sideload-only engines present")
     return 0
 
