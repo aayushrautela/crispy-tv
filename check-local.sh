@@ -39,3 +39,11 @@ fi
     :android:app:assembleFossDebug \
     :android:tv:assembleDebug \
     "$@"
+
+# Assert the built artefacts, not just the dependency graph: a store APK must
+# not contain the torrent engine, the QuickJS plugin runtime or the YouTube
+# extractor. Every ABI split is checked, and the sideload APKs act as the
+# control that proves the markers still match.
+"$PY" scripts/verify_apk_distribution.py \
+    --store android/app/build/outputs/apk/play/debug/*.apk \
+    --sideload android/app/build/outputs/apk/foss/debug/*.apk

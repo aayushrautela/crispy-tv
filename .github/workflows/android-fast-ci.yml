@@ -80,6 +80,17 @@ jobs:
       - name: Assemble play flavor
         run: ./gradlew :android:app:assemblePlayDebug
 
+      - name: Assemble foss flavor
+        run: ./gradlew :android:app:assembleFossDebug
+
+      - name: Assert store APKs exclude sideload-only engines
+        # Graph-level check is above; this reads the built dex. The foss APKs
+        # are the control that proves the markers still match.
+        run: |
+          python scripts/verify_apk_distribution.py \
+            --store android/app/build/outputs/apk/play/debug/*.apk \
+            --sideload android/app/build/outputs/apk/foss/debug/*.apk
+
       - name: Upload play-flavor APK
         uses: actions/upload-artifact@v7
         with:
