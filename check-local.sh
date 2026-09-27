@@ -29,13 +29,11 @@ fi
 "$PY" scripts/check_common_purity.py
 "$PY" scripts/validate_contracts.py
 
-# Metaspace is raised for this run only. ~/.gradle/gradle.properties caps it at
-# 512m, which the Kotlin/Native compiler overruns, and a user-level
-# gradle.properties overrides the committed one -- so the only place this can be
-# corrected is here. Drop the flag if you raise it in your own config.
-GRADLE_JVM_ARGS="-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+# JVM args (including MaxMetaspaceSize=1g for the Kotlin/Native compiler) are
+# set in ~/.gradle/gradle.properties. Passing -Dorg.gradle.jvmargs here would
+# spawn a second daemon with different opts, so we let the user-level config apply.
 
-./gradlew "-Dorg.gradle.jvmargs=$GRADLE_JVM_ARGS" \
+./gradlew \
     :android:core-domain:compileKotlinDesktop \
     :android:core-domain:desktopTest \
     :android:core-domain:compileKotlinLinuxX64 \
