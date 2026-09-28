@@ -8,7 +8,7 @@ Repo agent rules:
 
 ## Toolchain (match CI)
 
-- JDK 21 **everywhere**, including `jvmToolchain` in `:android:core-domain` and `:android:contract-tests`. Do not reintroduce a 17 toolchain: neither module is published, `:contract-tests` is a leaf, and every consumer of `:core-domain` is an Android module already compiling at 21, so 17 bytecode bought nothing while making the build depend on a JDK CI does not install.
+- JDK 21 **everywhere**, including `jvmToolchain` in `:android:core-domain` and `:android:app`. Do not reintroduce a 17 toolchain: neither module is published and every consumer is already compiling at 21, so 17 bytecode bought nothing while making the build depend on a JDK CI does not install.
 - Android SDK `platforms;android-37.0` + `build-tools;36.0.0`
 - Gradle 9.7.1 via the committed wrapper: always use `./gradlew`, never a bare `gradle` (it is not installed, and a different Gradle version starts a second daemon that nothing reclaims)
 - Python 3.12 + `jsonschema==4.23.0`
@@ -20,7 +20,7 @@ Contracts (fast):
 ```sh
 python3 -m pip install jsonschema==4.23.0
 python3 scripts/validate_contracts.py
-./gradlew :android:contract-tests:test
+./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest
 swift test --package-path ios/ContractRunner
 ```
 
@@ -36,12 +36,11 @@ Other useful tasks:
 
 Single test (important):
 ```sh
-# Kotlin/JUnit5 (contract tests)
-./gradlew :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest
-./gradlew :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest.someTestName
-
-# Kotlin/JUnit (unit tests in other modules)
-./gradlew :android:core-domain:test --tests com.crispy.tv.domain.SomeUnitTest
+# Contract suite (all 96 fixtures). It is one suite compiled for every target, so
+# a single test filter is applied to the target you want:
+./gradlew :android:core-domain:desktopTest --tests 'com.crispy.tv.contracts.PlayerMachineContractTest'
+./gradlew :android:core-domain:desktopTest --tests 'com.crispy.tv.contracts.PlayerMachineContractTest.playerMachineFixtures'
+./gradlew :android:core-domain:testAndroidHostTest --tests 'com.crispy.tv.contracts.PlayerMachineContractTest'
 
 # SwiftPM
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests
@@ -75,8 +74,7 @@ Gradle modules (common targets):
 - `:android:app`: the shared UI and presentation layer, a Kotlin Multiplatform library whose sources are still all in `androidMain`
 - `:android:youtube-extractor`: sideload-only YouTube stream extraction (NewPipeExtractor)
 - `:android:tv`: Android TV placeholder app (must compile)
-- `:android:core-domain`: pure domain rules (no Android types/IO)
-- `:android:contract-tests`: JUnit5 runner for `contracts/fixtures`
+- `:android:core-domain`: pure domain rules (no Android types/IO), **and** the contract suite in `commonTest` (see below)
 - `:android:player`, `:android:network`, `:android:watchhistory`, `:android:native-engine`: Android libraries
 - `:android:torrent-engine`: sideload-only torrent engine. `:android:native-engine` holds the MPV/Media3 player and nothing else optional.
 
@@ -87,12 +85,13 @@ Golden screenshots (`:android:androidApp:testStoreDebugUnitTest`):
 - The Roborazzi Gradle plugin is deliberately NOT applied: 1.43.1 fails against AGP 9.3 with `Extension of type 'TestedExtension' does not exist`. Record/verify is driven by the `-Proborazzi.*` properties in `android/androidApp/build.gradle.kts` instead.
 - Screenshot tests must set `application = ScreenshotTestApplication::class`. Robolectric otherwise boots `CrispyApplication`, whose `onCreate` reaches an `AndroidKeyStore` that cannot exist on a JVM.
 - Freeze the Compose clock (`mainClock.autoAdvance = false`) or animated content never matches.
-- **Host prerequisite:** a *failing* screenshot needs a host font, because Roborazzi labels the diff with Java2D. On a host with no font stack the failure reports `Fontconfig head is null` instead of the real difference. It still fails the build, but the diff is unreadable. `android/androidApp/src/test/fonts/` bundles Roboto and a generated fontconfig, which covers hosts that have libfontconfig but no fonts; a host with **no** `libfontconfig.so.1` at all (such as a bare container) needs `fontconfig` + a font package installed with root, since the JDK cannot load one.
+- **Host prerequisite:** a *failing* screenshot needs a host font, because Roborazzi labels the diff with Java2D. On a host with no font stack the failure reports `Fontconfig head is null` instead of the real difference. It still fails the build, but the diff is unreadable. `test-fonts/` at the repository root bundles Roboto and a generated fontconfig, which covers hosts that have libfontconfig but no fonts; a host with **no** `libfontconfig.so.1` at all needs the library supplied some other way, and root is not required: `dnf download --resolve --alldeps mesa-libGL libX11 fontconfig` then extract each rpm with `rpm2cpio | cpio -idm` into a scratch directory and point `LD_LIBRARY_PATH` at it. That is how the bare Fedora container this was last verified on runs both rendering suites. Note that `cpio -idm` applies the payload's directory modes, so a single shared target directory makes the *second* rpm fail on a read-only directory — stage each one separately and merge.
 
 Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
 - `:android:core-domain`: KMP (Android + `desktop` JVM + `linuxX64` + `iosArm64` + `iosSimulatorArm64`). Its `commonMain` is free of `java.*`/`android.*`; `scripts/check_common_purity.py` enforces that with no allowlist. The `java.time` and `URLEncoder` call sites were replaced with portable equivalents pinned by unit tests against real JVM output, which is what unblocked declaring the Apple targets.
 - `linuxX64` on the pure-Kotlin KMP modules is a **compile-only verification target**, never shipped and never run. It is the one Kotlin/Native target that builds on a Linux host, so `compileKotlinLinuxX64` in `check-local.sh` enforces the same "no JVM API" rule as the Apple targets in seconds instead of waiting for macOS CI. The import-based purity gate cannot see this class of bug: `"x".format(y)` is `kotlin.*`, so it passes the import scan and then fails only when an Apple target compiles. Prefer the native compile gate for anything touching `commonMain`.
+- `:android:desktopApp`: the desktop entry point and the **seam proof** (plan §3) — one JVM module for Windows, macOS and Linux. Renders `:android:sharedUI`'s design system over `:android:core-domain`'s real `planContinueWatching`, seeded from a real contract fixture. It is a semantic-assertion test, not a golden: a Skia raster varies by Skia version and font availability, and the Android Roborazzi gate is already the rendering gate. **Host prerequisites:** Skia needs `libGL.so.1`, `libX11.so.6` and `libfontconfig.so.1`, and needs at least one font. The font is bundled in `test-fonts/` (repository root, shared with `:android:androidApp`) and reached through a generated `fonts.conf`. Without those the test reports a Skiko native-load error or `IllegalStateException: Could not load font` — neither says anything about the seam. CI's `ubuntu-latest` has all of them.
 - `:android:sharedUI`: KMP + Compose Multiplatform `1.11.1`, targeting Android + `desktop` JVM + `iosArm64` + `iosSimulatorArm64`, and producing the `CrispyUI` iOS framework. Holds the design system in `commonMain`. Three rules that are expensive to relearn:
   - **`android { }` is current; `androidLibrary { }` is deprecated** as of Kotlin `2.4.10`, which says so outright: *"'androidLibrary' block is deprecated. Please use 'android' instead."* Earlier guidance — the JetBrains migration guide, and earlier revisions of this file — said the opposite and described a real failure with `android { }`. That failure is gone; JetBrains converged the two blocks. Write `android { }` on new code. `:sharedUI` still uses `androidLibrary { }` and compiles, with a deprecation warning.
   - **CMP 1.11.x ships `androidx.compose.*`, not `org.jetbrains.compose.*`.** Verified by unzipping the resolved AARs: 790 `androidx/compose` classes in `runtime-android`, 1336 in `ui-android`, and **zero** `org/jetbrains/compose` in any of them. The `org.jetbrains.compose.*` coordinates are thin aliases. So moving a Compose file from `:app` to `:sharedUI` changes the **artifact coordinates in `build.gradle.kts`**, never the imports in the file, and `import org.jetbrains.compose.*` does not compile anywhere.
@@ -120,6 +119,23 @@ Apple:
 
 Contracts:
 - `contracts/SPEC.md`: source of truth for heuristics + deterministic rules
+- Fixtures are **compiled in, not read from disk**. `generateContractFixtures` in
+  `android/core-domain/build.gradle.kts` turns `contracts/fixtures/**/*.json`
+  into a Kotlin source file under `build/generated/`, wired as a source directory
+  of `commonTest`. Do not "simplify" this back to `java.nio.file` or okio: the
+  suite is in `commonTest` so it runs on Android, desktop and the Apple targets,
+  and there is no single path to the fixtures that is correct on all of them. The
+  old `:android:contract-tests` module worked around that by walking up from the
+  working directory looking for `settings.gradle.kts`.
+- The generator sorts by relative path, so identical inputs give a byte-identical
+  file and there is no spurious diff between machines.
+- `scripts/validate_contracts.py` stays the authority on fixture *validity* (JSON
+  Schemas). The generated file is only about getting the bytes readable on any
+  target. `ContractFixturesSanityTest` is the guard that the fixtures actually
+  reached the compilation, which Python cannot check.
+- `compileTestKotlinLinuxX64` is the gate that proves `commonTest` holds no JVM
+  API. The import-based purity gate only scans `commonMain`, so it cannot see a
+  `java.nio.file` in test code, and the Apple targets would fail on macOS instead.
 - `contracts/fixtures/` + `contracts/schemas/`: versioned JSON fixtures + schemas
 
 ## Configuration / Secrets
@@ -181,6 +197,6 @@ Python (tooling):
 ## Single-change checklist
 
 - `python3 scripts/validate_contracts.py`
-- `./gradlew :android:contract-tests:test`
+- `./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest`
 - `swift test --package-path ios/ContractRunner` (if Swift logic touched)
 - Ensure `:android:tv` and tvOS placeholder builds still compile

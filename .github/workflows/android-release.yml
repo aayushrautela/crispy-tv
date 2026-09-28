@@ -90,7 +90,8 @@ jobs:
           fi
 
       - name: Run JVM contract tests
-        run: ./gradlew :android:contract-tests:test
+        run: ./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest
+        run: ./gradlew :android:desktopApp:test
 
       - name: Run plugins module unit tests
         run: ./gradlew :android:plugins:testDebugUnitTest

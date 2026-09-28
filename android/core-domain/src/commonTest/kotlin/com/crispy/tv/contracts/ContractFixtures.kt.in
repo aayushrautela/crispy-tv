@@ -1,0 +1,88 @@
+// GENERATED FILE -- DO NOT EDIT.
+//
+// Produced by the `generateContractFixtures` task in android/core-domain/build.gradle.kts
+// from contracts/fixtures/**/*.json. It is wired as a source directory of
+// `commonTest`, so any :android:core-domain test task regenerates it first; there is
+// nothing to invoke by hand.
+
+package com.crispy.tv.contracts
+
+/**
+ * Every contract fixture, compiled in as source.
+ *
+ * ## Why the fixtures are compiled in rather than read from disk
+ *
+ * This suite lives in `commonTest` so it runs on every target `:android:core-domain`
+ * declares: Android, desktop JVM, and the Apple targets once macOS CI can reach
+ * them. Reading the fixtures from the filesystem was the one thing that could not
+ * survive that move:
+ *
+ * - `java.nio.file` does not exist on Kotlin/Native, so `Files.walk` was out.
+ * - Even with okio the *path* is the problem, not the API. An Android unit test
+ *   starts in the module directory, a desktop test in the root project, and an
+ *   iOS simulator test in a container path that is neither. The old support code
+ *   papered over this by walking up from the working directory looking for
+ *   `settings.gradle.kts`, which means the suite only passed when Gradle happened
+ *   to be invoked from the expected place.
+ *
+ * Embedding the JSON removes the whole category. There is no path to guess, no
+ * filesystem dependency, and no way for a fixture to be present on one target and
+ * missing on another. It also makes the suite hermetic in the stricter sense: the
+ * inputs are part of the compilation, so a fixture edit cannot reach a test run
+ * without a rebuild.
+ *
+ * The cost is a generated file under `build/generated/`. At 96 fixtures totalling
+ * ~83 KB that is cheap, and the task declares `contracts/fixtures` as an input, so
+ * editing a fixture re-triggers it.
+ *
+ * `scripts/validate_contracts.py` stays the authority on fixture *validity*; it
+ * checks every fixture against `contracts/schemas/`. This file is only about
+ * getting the bytes into a form that is readable on any target.
+ */
+internal object ContractFixtures {
+
+    /** Suite names — the first path segment of each fixture — sorted. */
+    val suites: List<String> = listOf(
+        __SUITES__
+    )
+
+    /** Versioned directories, e.g. `player_machine/v2`, sorted. */
+    val versionDirectories: List<String> = listOf(
+        __VERSION_DIRECTORIES__
+    )
+
+    /** Every fixture, sorted by [ContractFixture.path]. */
+    val all: List<ContractFixture> = listOf(
+        __FIXTURES__
+    )
+
+    /**
+     * Every fixture in [suite], across all its version directories.
+     *
+     * Every suite currently has exactly one version directory, which
+     * `ContractFixturesSanityTest` asserts, so for today this is the same as
+     * asking for the suite's single `inDirectory`.
+     */
+    fun inSuite(suite: String): List<ContractFixture> {
+        require(suite in suites) {
+            "Unknown contract suite '$suite'. Known suites: $suites"
+        }
+        return all.filter { it.suite == suite }
+    }
+
+    /**
+     * Every fixture directly inside `contracts/fixtures/<directory>/`, where
+     * `directory` is a versioned directory such as `player_machine/v2`.
+     *
+     * The old implementation walked the tree and filtered on `.json`, so
+     * "everything under here" also swept in any nested subdirectory. None
+     * existed, and now "directly inside" is the stated contract instead of an
+     * accident of the walk.
+     */
+    fun inDirectory(directory: String): List<ContractFixture> {
+        require(directory in versionDirectories) {
+            "Unknown fixture directory '$directory'. Known directories: $versionDirectories"
+        }
+        return all.filter { it.versionDirectory == directory }
+    }
+}

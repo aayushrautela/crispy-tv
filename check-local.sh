@@ -18,6 +18,18 @@
 # use linuxX64, because that is the one Kotlin/Native target a Linux host can
 # build and it enforces the same "no JVM API" rule for them.
 #
+# The contract suite lives in :android:core-domain's commonTest, not a module of
+# its own, so `desktopTest` and `testAndroidHostTest` both run all 96 fixtures.
+# `compileTestKotlinLinuxX64` is the gate that proves the suite holds no JVM API,
+# which is what lets the Apple targets compile it at all -- and the import-based
+# purity gate cannot see that class of bug, because it only scans commonMain.
+#
+# :android:desktopApp is the seam proof: a real Compose Multiplatform render on a
+# plain JVM. It needs libGL.so.1, libX11.so.6 and libfontconfig.so.1 for Skia, and
+# a font (bundled in test-fonts/, pointed at by a generated fonts.conf). A bare
+# container with none of those reports `Could not load font` or a Skiko native-load
+# error, neither of which says anything about the seam -- see AGENTS.md.
+#
 # :android:app is a KMP library whose sources are all still in androidMain (Phase
 # 1 of kmp-migration-plan.md proves the module graph; Phase 4 moves them). Its
 # commonMain is empty, so the purity gate has nothing to scan there yet -- but
@@ -51,14 +63,17 @@ fi
 ./gradlew \
     :android:core-domain:compileKotlinDesktop \
     :android:core-domain:desktopTest \
+    :android:core-domain:testAndroidHostTest \
     :android:core-domain:compileKotlinLinuxX64 \
+    :android:core-domain:compileTestKotlinLinuxX64 \
     :android:platform-core:compileKotlinDesktop \
     :android:platform-core:compileKotlinLinuxX64 \
     :android:sharedUI:compileKotlinDesktop \
     :android:sharedUI:compileAndroidMain \
     :android:app:compileAndroidMain \
     :android:app:compileKotlinDesktop \
-    :android:contract-tests:test \
+    :android:desktopApp:compileKotlin \
+    :android:desktopApp:test \
     :android:androidApp:verifyDistributionExclusions \
     :android:androidApp:testStoreDebugUnitTest \
     :android:androidApp:testSideloadDebugUnitTest \

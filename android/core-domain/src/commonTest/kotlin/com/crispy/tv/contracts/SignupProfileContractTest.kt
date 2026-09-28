@@ -1,0 +1,45 @@
+package com.crispy.tv.contracts
+
+import com.crispy.tv.domain.account.validateSignupProfile
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class SignupProfileContractTest {
+    @Test
+    fun signupProfileFixtures() {
+        ContractTestSupport.fixtureFiles("signup_profile").forEach { path ->
+            val root = ContractTestSupport.parseFixture(path)
+            assertEquals("signup_profile", root.requireString("suite", path), "Wrong suite in $path")
+
+            val input = root.requireJsonObject("input", path)
+            val expected = root.requireJsonObject("expected", path)
+
+            val rawName = input.requireString("raw_name", path)
+            val rawLanguage = input.optionalString("raw_language", path)
+            val rawRegion = input.optionalString("raw_region", path)
+            val rawAvatarUrl = input.optionalString("raw_avatar_url", path)
+
+            val result = validateSignupProfile(
+                rawName = rawName,
+                rawLanguage = rawLanguage,
+                rawRegion = rawRegion,
+                rawAvatarUrl = rawAvatarUrl,
+            )
+
+            val expectedComplete = expected.requireBoolean("is_complete", path)
+            val expectedMissing = expected.optionalJsonArray("missing", path)?.toStringList(path) ?: emptyList()
+            val expectedName = expected.optionalString("normalized_name", path)
+            val expectedLanguage = expected.optionalString("normalized_language", path)
+            val expectedRegion = expected.optionalString("normalized_region", path)
+            val expectedAvatarUrl = expected.optionalString("normalized_avatar_url", path)
+
+            assertEquals(expectedComplete, result.isComplete, "isComplete mismatch in $path")
+            assertEquals(expectedMissing, result.missing, "missing mismatch in $path")
+            assertEquals(expectedName, result.normalizedName, "name mismatch in $path")
+            assertEquals(expectedLanguage, result.normalizedLanguage, "language mismatch in $path")
+            assertEquals(expectedRegion, result.normalizedRegion, "region mismatch in $path")
+            assertEquals(expectedAvatarUrl, result.normalizedAvatarUrl, "avatarUrl mismatch in $path")
+        }
+    }
+}
+

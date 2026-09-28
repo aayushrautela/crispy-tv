@@ -47,7 +47,7 @@ val roborazziRecord = providers.gradleProperty("roborazzi.record").orNull == "tr
  * than committed because fontconfig requires an absolute <dir>.
  */
 val testFontsConfig = layout.buildDirectory.file("test-fonts/fonts.conf")
-val testFontsDir = layout.projectDirectory.dir("src/test/fonts")
+val testFontsDir = rootProject.layout.projectDirectory.dir("test-fonts")
 
 val generateTestFontsConfig by tasks.registering {
     val fontsDirectory = testFontsDir.asFile.absolutePath
