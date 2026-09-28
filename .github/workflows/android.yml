@@ -54,8 +54,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install contract validation dependency
-        run: pip install jsonschema==4.23.0
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
 
       # ---- cheap gates, fail fast -------------------------------------------
 

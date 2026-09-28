@@ -36,13 +36,6 @@ jobs:
       ORG_GRADLE_PROJECT_DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
 
     steps:
-      - name: Validate workflow YAML
-        # A duplicate key makes a workflow fail to *load*, which produces a run
-        # that fails in under a second with an empty log. That reads as "the tests
-        # failed" when no test ever ran, and nothing inside the workflow can report
-        # it. Checked first so a malformed file is named as the problem it is.
-        run: python3 scripts/validate_workflows.py
-
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -70,8 +63,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install contract validation dependency
-        run: pip install jsonschema==4.23.0
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate workflow YAML
+        # A duplicate key makes a workflow fail to *load*, which produces a run
+        # that fails in under a second with an empty log. That reads as "the tests
+        # failed" when no test ever ran, and nothing inside the workflow can report
+        # it. Checked right after the dependencies so a malformed file is named as
+        # the problem it is. It cannot come before Checkout: the script would not
+        # be on disk yet, which is its own silent failure.
+        run: python3 scripts/validate_workflows.py
 
       - name: Validate contract fixtures
         run: python scripts/validate_contracts.py

@@ -20,15 +20,24 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Python dependencies
+        # After Checkout, because it installs from requirements.txt in the working
+        # tree. --user because this workflow uses the runner's system python3,
+        # not a setup-python toolchain, and that python may be externally managed
+        # (PEP 668) and refuse a bare install.
+        run: python3 -m pip install --user -r requirements.txt
+
       - name: Validate workflow YAML
         # A duplicate key makes a workflow fail to *load*, which produces a run
         # that fails in under a second with an empty log. That reads as "the tests
         # failed" when no test ever ran, and nothing inside the workflow can report
-        # it. Checked first so a malformed file is named as the problem it is.
+        # it. Checked right after the dependencies so a malformed file is named as
+        # the problem it is. It cannot come before Checkout: the script would not
+        # be on disk yet, which is its own silent failure.
         run: python3 scripts/validate_workflows.py
-
-      - name: Checkout
-        uses: actions/checkout@v7
 
       - name: Select newest Xcode
         run: |

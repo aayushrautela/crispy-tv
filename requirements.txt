@@ -1,0 +1,8 @@
+# Python tooling dependencies, shared by the local venv and CI.
+#
+# CI's workflows install from this file rather than pinning inline, because an
+# inline pin in four workflows is four places for the versions to drift apart.
+# scripts/validate_contracts.py is the reason jsonschema is here;
+# scripts/validate_workflows.py is the reason PyYAML is.
+jsonschema==4.23.0
+PyYAML>=6.0

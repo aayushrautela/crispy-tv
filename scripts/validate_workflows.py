@@ -34,7 +34,14 @@ Usage:
 import pathlib
 import sys
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError as error:  # pragma: no cover - environment guard
+    sys.exit(
+        "validate_workflows: PyYAML is required. Install the tooling dependencies with "
+        "`pip install -r requirements.txt` (or use the repo venv).\n"
+        f"  import error: {error}"
+    )
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
