@@ -1,5 +1,7 @@
 package com.crispy.tv.backend
 
+import com.crispy.tv.images.ResponsiveImageSet
+
 /**
  * The backend's response and request types.
  *
@@ -14,10 +16,11 @@ package com.crispy.tv.backend
  *
  * 38 files across 8 modules reference these types. Before the move, every one of
  * them was pinned to `androidMain` because of where a data class happened to be
- * declared. That is what kept `:android:home`'s `ResponsiveImageSet`,
- * `:android:addons`' `MediaDetailMappings`, `:android:backend`'s
- * `AiInsightsModels` and `:app`'s 1,423-line `ui/components` library out of
- * `commonMain`.
+ * declared. That is what kept `:android:addons`' `MediaDetailMappings`,
+ * `:android:backend`'s `AiInsightsModels` and `:app`'s 1,423-line `ui/components`
+ * library out of `commonMain`. The `:android:home` image model is no longer on
+ * that list: it was a second, identically shaped `ResponsiveImageSet`, and the
+ * two are now one type in `:android:core-domain`.
  *
  * The client and its parsers stay in `androidMain`. Only the vocabulary moves.
  */
@@ -121,14 +124,10 @@ data class MediaExternalIds(
     val tvdb: Int?,
 )
 
-data class ResponsiveImageSet(
-    val small: String?,
-    val medium: String?,
-    val large: String?,
-) {
-    val isEmpty: Boolean
-        get() = small.isNullOrBlank() && medium.isNullOrBlank() && large.isNullOrBlank()
-}
+// `ResponsiveImageSet` used to be declared here as the wire DTO. It is now
+// `com.crispy.tv.images.ResponsiveImageSet` in `:android:core-domain` -- one type
+// instead of two identically shaped ones -- and `CrispyBackendParsers` maps the
+// wire's `small`/`medium`/`large` onto it where the JSON is read.
 
 // --- Search ---
 

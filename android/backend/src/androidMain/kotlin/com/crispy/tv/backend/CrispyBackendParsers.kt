@@ -7,6 +7,7 @@ import com.crispy.tv.ai.AiInsightSlideKind
 import com.crispy.tv.ai.AiInsightStandoutTag
 import org.json.JSONArray
 import org.json.JSONObject
+import com.crispy.tv.images.ResponsiveImageSet
 
 internal fun CrispyBackendClient.parseUser(json: JSONObject): User {
     val id = json.optString("id").trim()
@@ -246,9 +247,9 @@ private fun parseBackdropImageUrl(imageTags: JSONObject?): ResponsiveImageSet {
 
 private fun parseResponsiveImageSet(json: JSONObject?): ResponsiveImageSet {
     return ResponsiveImageSet(
-        small = json.optNullableString("small"),
+        low = json.optNullableString("small"),
         medium = json.optNullableString("medium"),
-        large = json.optNullableString("large"),
+        high = json.optNullableString("large"),
     )
 }
 

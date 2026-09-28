@@ -7,7 +7,6 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.backend.ClientMediaCard
 import com.crispy.tv.backend.ClientMediaCardQueryResult
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.images.toUiResponsiveImageSet
 import com.crispy.tv.addons.util.formatRating
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -129,15 +128,15 @@ private fun ClientMediaCard.toCatalogItem(
     val showTitle = if (isEpisode) parent?.seriesTitle else null
     val seriesArtwork = if (isEpisode) parent?.images?.artwork?.takeIf { !it.isEmpty } else null
     val cardArtwork = seriesArtwork ?: images.artwork
-    val logoUrl = images.logo.medium ?: images.logo.large ?: images.logo.small
+    val logoUrl = images.logo.medium ?: images.logo.high ?: images.logo.low
     return CatalogItem(
         id = itemId,
         itemId = showItemId ?: itemId,
         title = showTitle ?: title,
         artworkUrl = cardArtwork.medium,
         logoUrl = logoUrl,
-        artwork = cardArtwork.toUiResponsiveImageSet(),
-        logo = images.logo.toUiResponsiveImageSet(),
+artwork = cardArtwork,
+logo = images.logo,
         addonId = "backend",
         type = mediaType.toCatalogType(),
         rating = formatRating(rating),

@@ -1,31 +1,19 @@
 package com.crispy.tv.images
 
-// Aliased: this module's own `ResponsiveImageSet` is in `commonMain` and the
-// backend DTO carries the same name, so the wire type has to be named here.
-import com.crispy.tv.backend.ResponsiveImageSet as BackendResponsiveImageSet
-
 /**
- * Bridging between the backend's wire shape and this module's model.
+ * Persistence for [ResponsiveImageSet], on the map format the disk caches use.
  *
- * `androidMain` rather than `commonMain` because these are the only things in
- * `:android:home` that reach for `:android:backend`, and a domain source set has
- * no business depending on an HTTP adapter. The DTO stays a DTO: renaming its
- * `small`/`medium`/`large` fields to match `ImageQuality` would put a UI
- * preference in the wire contract.
+ * `androidMain` because those caches are: `HomeCatalogService` and
+ * `RecommendationCatalogDiskCacheStore` are `androidMain` for `org.json` and
+ * `Context`. The keys stay `small`/`medium`/`large` because they are an
+ * on-disk format, not a Kotlin field name -- renaming them would invalidate
+ * every cache already on disk.
  */
-fun BackendResponsiveImageSet.toUiResponsiveImageSet(): ResponsiveImageSet {
-    return ResponsiveImageSet(
-        low = small,
-        medium = medium,
-        high = large,
-    )
-}
-
-internal fun BackendResponsiveImageSet.toDomainMap(): Map<String, String?> {
+internal fun ResponsiveImageSet.toDomainMap(): Map<String, String?> {
     return mapOf(
-        "small" to small,
+        "small" to low,
         "medium" to medium,
-        "large" to large,
+        "large" to high,
     )
 }
 

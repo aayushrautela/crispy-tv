@@ -40,7 +40,7 @@ plugins {
  * |---|---|---|
  * | `HomeRefreshBus`, `HomeTop10`, `HomeWatchActivityService`, `ImageQuality` | `commonMain` | no platform coupling. `HomeWatchActivityService` needs only `CanonicalContinueWatchingItem` / `...Result`, which live in `:android:player`'s `commonMain`, so that dependency is portable |
  * | `HomeLayoutBuilder` | `androidMain` | builds the UI model types in `HomeUiModels`, which are Compose-bound. Same-package, so no import revealed the dependency -- it only surfaced when the file failed to compile |
- * | `ResponsiveImageSet` | `androidMain` | the data class is portable, but the same file holds `CrispyBackendClient.ResponsiveImageSet.toUiResponsiveImageSet()`, so the file cannot be. Third module where an extension on a backend type pins the whole file |
+ * | `ResponsiveImageSet`, `ImageQuality` | gone | both moved to `:android:core-domain`. The row used to say `androidMain` because the file held an extension on a backend type; that extension was the wire-to-model mapping, and it became unnecessary when the two identically shaped `ResponsiveImageSet`s were merged into one |
  * | `HomeUiModels` | `androidMain` | Compose runtime only; moves in Phase 4 with the UI |
  * | `HomeRefreshCoordinator` | `androidMain` | consumes `HomeCatalogService`, `CalendarService` and `UpNextService`, all of which are `androidMain`. The injected clock is the part that had to change, and it did |
  * | `CalendarService`, `HomeCatalogService`, `UpNextService` | `androidMain` | `org.json`, Compose, and the backend client |

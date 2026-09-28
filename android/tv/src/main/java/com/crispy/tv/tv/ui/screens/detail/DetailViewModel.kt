@@ -290,12 +290,12 @@ class DetailViewModel(
                 itemRating = item.rating,
                 subtitleMeta = metaParts.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                 overview = item.overview,
-                artworkUrl = item.images.artwork.large
+                artworkUrl = item.images.artwork.high
                     ?: item.images.artwork.medium
-                    ?: item.images.artwork.small,
-                logoUrl = item.images.logo.large
+                    ?: item.images.artwork.low,
+                logoUrl = item.images.logo.high
                     ?: item.images.logo.medium
-                    ?: item.images.logo.small,
+                    ?: item.images.logo.low,
                 genres = item.genres,
                 certification = item.maturityRating,
                 status = null,
@@ -410,9 +410,9 @@ class DetailViewModel(
         CrispyCardItem(
             id = itemId,
             title = title,
-            imageUrl = images.artwork.large
+            imageUrl = images.artwork.high
                 ?: images.artwork.medium
-                ?: images.artwork.small,
+                ?: images.artwork.low,
             rating = rating?.let { roundToOne(it) },
             year = year?.toString(),
             genre = genres.firstOrNull(),

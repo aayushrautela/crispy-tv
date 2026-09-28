@@ -1,6 +1,6 @@
 package com.crispy.tv.ai
 
-import com.crispy.tv.backend.ResponsiveImageSet
+import com.crispy.tv.images.ResponsiveImageSet
 
 
 enum class AiInsightSlideKey(val wire: String) {

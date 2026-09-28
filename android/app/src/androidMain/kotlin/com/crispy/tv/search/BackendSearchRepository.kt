@@ -5,7 +5,6 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.images.toUiResponsiveImageSet
 import java.util.Locale
 
 class BackendSearchRepository(
