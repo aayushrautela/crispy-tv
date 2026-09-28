@@ -4,7 +4,6 @@ import android.content.Context
 import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.addons.registry.MetadataAddonRegistry

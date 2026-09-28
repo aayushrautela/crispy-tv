@@ -1,29 +1,24 @@
 #!/usr/bin/env python3
 """Assert that no compiled Kotlin class outlives the declaration that produced it.
 
-## The lie this catches
+## What this is guarding against
 
-Gradle's incremental Kotlin compilation can report `BUILD SUCCESSFUL` while the
-output tree still holds classes the current sources cannot produce. The migration
-hits this constantly, because its single most common edit is *moving a file from
-`androidMain` to `commonMain`*:
+A class file in `build/classes/kotlin` with no declaration behind it binds a
+reference that should have failed to compile. When that happens a later
+`BUILD SUCCESSFUL` certifies nothing, and every other gate in this repository
+becomes unreliable at the same time.
 
-    $ git mv Foo.kt android/x/src/androidMain/... android/x/src/commonMain/...
-    $ ./gradlew :android:x:compileAndroidMain
-    BUILD SUCCESSFUL
-    $ ls android/x/build/classes/kotlin/android/main/com/crispy/tv/backend/
-    CrispyBackendClient$ResponsiveImageSet.class     <-- still there, 7 hours old
+This was observed once, during the extraction of the 52 backend response types out
+of `CrispyBackendClient`: `CrispyBackendClient$ResponsiveImageSet.class` sat in the
+output with a timestamp seven hours older than the change that removed the nested
+type. It was found by reading an `ls -l` by hand.
 
-`git mv` preserves mtime, and even without that, the Kotlin incremental compiler
-does not reliably delete the class file of a declaration that has been *removed
-from* a file it still sees as current. Either way the result is the same, and it
-is the worst kind of defect: **every other gate in this repository becomes
-unreliable**, because a reference that should fail to resolve instead binds to a
-class that no longer has a source. A later `BUILD SUCCESSFUL` then means nothing.
-
-This was not hypothetical. It happened during the extraction of the 52 backend
-response types out of `CrispyBackendClient`, and it was only caught by noticing a
-class file's mtime by hand.
+**The cause was never established, and the two obvious candidates are false.** Both
+were tested on this build: removing a nested declaration and recompiling
+incrementally deletes its class correctly, and `git mv`-ing a file between source
+sets does not make Gradle skip it. So this script is a *detector*, not a fix. It
+is here because the failure it catches is silent, not because the mechanism is
+known -- anyone who trips it has found the thing that was missing.
 
 ## What it asserts
 
@@ -35,11 +30,7 @@ For every module under `android/`:
 * list every class file in each compiled Kotlin output directory
   (`build/classes/kotlin/<variant>/<sourceSet>`);
 * **fail if the output holds a top-level class that no source declaration
-  accounts for.**
-
-Nested classes, lambdas, companions and `when`/`in`-generated helpers are all
-skipped by the `$` rule, because Kotlin nests every one of them inside its owner
-and they cannot outlive it independently.
+  accounts for, or a nested class its owner no longer refers to.**
 
 The direction is deliberate. A *missing* class fails the build loudly and needs
 no check. An *extra* class is silent, and silent is what this exists to stop.
