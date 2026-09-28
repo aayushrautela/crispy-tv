@@ -126,4 +126,62 @@ class Iso8601Test {
             assertEquals(millis, parseIso8601InstantToEpochMillis(formatIso8601Instant(millis)))
         }
     }
+
+    /**
+     * Pins [parseIso8601DateToEpochMillis] against
+     * `LocalDate.parse(s).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()`.
+     *
+     * Generated from a real JDK 21 run. The rejection cases matter as much as the
+     * accepted ones: the old code got them by catching a `DateTimeParseException`, so
+     * a parser that accepted `2024-02-31` would silently start labelling a nonsense
+     * date instead of returning null.
+     */
+    @Test
+    fun parsesCalendarDatesToUtcMidnight() {
+        assertEquals(1_710_374_400_000L, parseIso8601DateToEpochMillis("2024-03-14"))
+        assertEquals(1_709_164_800_000L, parseIso8601DateToEpochMillis("2024-02-29"))
+        assertEquals(4_107_542_400_000L, parseIso8601DateToEpochMillis("2100-03-01"))
+        assertEquals(1_735_603_200_000L, parseIso8601DateToEpochMillis("2024-12-31"))
+        assertEquals(1_704_067_200_000L, parseIso8601DateToEpochMillis("2024-01-01"))
+
+        assertNull(parseIso8601DateToEpochMillis("2024-02-31"))
+        assertNull(parseIso8601DateToEpochMillis("2024-13-01"))
+        assertNull(parseIso8601DateToEpochMillis("2024-00-10"))
+        assertNull(parseIso8601DateToEpochMillis("not-a-date"))
+        assertNull(parseIso8601DateToEpochMillis("2024-3-4"))
+    }
+
+    /**
+     * A full instant is not a calendar date. `Instant.parse` rejects a bare date, and
+     * the old code relied on that by only falling back to `LocalDate` when the instant
+     * parse failed — so accepting one here would change which path a caller takes.
+     */
+    @Test
+    fun rejectsAnInstantWhenAskedForACalendarDate() {
+        assertEquals(null, parseIso8601InstantToEpochMillis("2024-03-14"))
+        assertEquals(null, parseIso8601InstantToEpochMillis("2024-02-31"))
+    }
+
+    /** The calendar badge label, pinned against `Month.name.take(3)` from a JDK run. */
+    @Test
+    fun labelsMonthsTheWayTheCalendarBadgeDid() {
+        assertEquals("Jan", iso8601MonthLabel("2024-01-15"))
+        assertEquals("Feb", iso8601MonthLabel("2024-02-15"))
+        assertEquals("Mar", iso8601MonthLabel("2024-03-14"))
+        assertEquals("Apr", iso8601MonthLabel("2024-04-02"))
+        assertEquals("May", iso8601MonthLabel("2024-05-31"))
+        assertEquals("Jun", iso8601MonthLabel("2024-06-01"))
+        assertEquals("Jul", iso8601MonthLabel("2024-07-04"))
+        assertEquals("Aug", iso8601MonthLabel("2024-08-20"))
+        assertEquals("Sep", iso8601MonthLabel("2024-09-09"))
+        assertEquals("Oct", iso8601MonthLabel("2024-10-31"))
+        assertEquals("Nov", iso8601MonthLabel("2024-11-11"))
+        assertEquals("Dec", iso8601MonthLabel("2024-12-25"))
+
+        // An invalid day must not produce a label the old `try`/`catch` would have
+        // rejected, so "Feb 31" yields nothing rather than a plausible-looking badge.
+        assertNull(iso8601MonthLabel("2024-02-31"))
+        assertNull(iso8601MonthLabel("2024-13-01"))
+        assertNull(iso8601MonthLabel("not-a-date"))
+    }
 }

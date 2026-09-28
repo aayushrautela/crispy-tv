@@ -4,11 +4,13 @@ import android.util.Log
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import java.time.Instant
+import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
+import com.crispy.tv.platform.TimeSource
 
 class UpNextService constructor(
     private val backendClient: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
+    private val timeSource: TimeSource,
 ) {
     suspend fun loadUpNext(nowMs: Long): HomeWideRailSectionUi? {
         val backendContext = backendContextResolver.resolve()
@@ -55,11 +57,18 @@ class UpNextService constructor(
         )
     }
 
+    /**
+     * A missing or unparseable timestamp becomes "now".
+     *
+     * The clock is injected rather than read inline, so a caller that already has a
+     * reading for this load passes the same instant to `loadUpNext` and gets the same
+     * fallback here. Reading `System.currentTimeMillis()` twice meant a row with no
+     * timestamp could be sorted as newer than one that genuinely was.
+     */
     private fun parseUpNextDate(raw: String?): Long {
         val value = raw?.trim().orEmpty()
-        if (value.isBlank()) return System.currentTimeMillis()
-        return runCatching { Instant.parse(value).toEpochMilli() }
-            .getOrDefault(System.currentTimeMillis())
+        if (value.isBlank()) return timeSource.nowMs()
+        return parseIso8601InstantToEpochMillis(value) ?: timeSource.nowMs()
     }
 
     companion object {

@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.crispy.tv.platform.android.AndroidTimeSource
 
 class TvHomeViewModel internal constructor(
     appContext: Context,
@@ -71,7 +72,7 @@ class TvHomeViewModel internal constructor(
                             homeCatalogService = HomeCatalogService(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
-                                diskCacheStore = RecommendationCatalogDiskCacheStore(appContext),
+                                diskCacheStore = RecommendationCatalogDiskCacheStore(appContext, AndroidTimeSource()),
                             ),
                             homeWatchActivityService = com.crispy.tv.home.HomeWatchActivityService(),
                             watchHistoryService = watchHistoryService,
@@ -82,8 +83,10 @@ class TvHomeViewModel internal constructor(
                             upNextService = UpNextService(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
+                                timeSource = AndroidTimeSource(),
                             ),
                             suppressionStore = suppressionStore,
+                            timeSource = AndroidTimeSource(),
                         ),
                         watchHistoryService = watchHistoryService,
                         suppressionStore = suppressionStore,

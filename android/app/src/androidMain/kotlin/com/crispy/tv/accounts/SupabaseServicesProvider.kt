@@ -13,6 +13,7 @@ import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.PluginSyncBridgeProvider
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
+import com.crispy.tv.platform.android.AndroidTimeSource
 
 object SupabaseServicesProvider {
     @Volatile
@@ -109,7 +110,7 @@ object SupabaseServicesProvider {
                 HomeCatalogService(
                     backendClient = BackendServicesProvider.backendClient(appContext),
                     backendContextResolver = BackendContextResolverProvider.get(appContext),
-                    diskCacheStore = RecommendationCatalogDiskCacheStore(appContext),
+                    diskCacheStore = RecommendationCatalogDiskCacheStore(appContext, AndroidTimeSource()),
                 )
             homeCatalogService = created
             return created

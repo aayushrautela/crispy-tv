@@ -29,8 +29,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.Instant
 import java.util.Locale
+import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
 // Home snapshots are reused as a stale-while-revalidate fallback: keep the last
@@ -192,7 +192,7 @@ class HomeCatalogService constructor(
             val expiresAt = runCatching { JSONObject(payload) }.getOrNull()
                 ?.optString("expires_at")?.trim()?.takeIf { it.isNotEmpty() }
                 ?: continue
-            val parsed = runCatching { Instant.parse(expiresAt).toEpochMilli() }.getOrNull()
+            val parsed = parseIso8601InstantToEpochMillis(expiresAt)
                 ?: continue
             return parsed
         }

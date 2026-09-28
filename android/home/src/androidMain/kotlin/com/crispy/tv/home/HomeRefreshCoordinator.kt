@@ -1,5 +1,6 @@
 package com.crispy.tv.home
 
+import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
 
@@ -10,6 +11,7 @@ class HomeRefreshCoordinator(
     private val calendarService: CalendarService,
     private val upNextService: UpNextService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
+    private val timeSource: TimeSource,
 ) {
     private val continueWatchingLimit = 30
 
@@ -89,14 +91,16 @@ class HomeRefreshCoordinator(
 
     suspend fun loadContinueWatching(): HomeWideRailSectionUi? {
         val suppressionMap = suppressionStore.read()
-        // The clock is read here rather than defaulted inside the interface, which
-        // stopped the moment :android:player became multiplatform. This module still
-        // reads it in three other places in this file; injecting platform-core's
-        // `TimeSource` for all four is part of this module's own Phase 2 step, and
-        // doing it once there beats doing it twice.
+        // Read once, then reused. The two calls below used to read the system clock
+        // independently, so one refresh could see three different "now" values a
+        // millisecond apart — and a continue-watching entry could be filtered against
+        // one instant and then rendered against another. Pinning them to a single
+        // reading is also what makes this testable, which reading the clock inline
+        // never was.
+        val nowMs = timeSource.nowMs()
         val canonicalResult = watchHistoryService.getCanonicalContinueWatching(
             limit = continueWatchingLimit,
-            nowMs = System.currentTimeMillis(),
+            nowMs = nowMs,
         )
         val filtered = canonicalResult.copy(
             entries = applyProviderSuppressionFilter(canonicalResult.entries, suppressionMap),
@@ -110,7 +114,7 @@ class HomeRefreshCoordinator(
             throw IllegalStateException(result.statusMessage.ifBlank { "Unable to load continue watching." })
         }
 
-        val items = result.entries.map { item -> item.toWideRailItem(System.currentTimeMillis()) }
+        val items = result.entries.map { item -> item.toWideRailItem(nowMs) }
         if (items.isEmpty()) return null
 
         return defaultWideRailSection(
@@ -121,10 +125,10 @@ class HomeRefreshCoordinator(
         )
     }
 
-    suspend fun loadUpNext(): HomeWideRailSectionUi? = upNextService.loadUpNext(System.currentTimeMillis())
+    suspend fun loadUpNext(): HomeWideRailSectionUi? = upNextService.loadUpNext(timeSource.nowMs())
 
     suspend fun loadThisWeekSection(): HomeWideRailSectionUi? {
-        val thisWeekResult = calendarService.loadThisWeek(System.currentTimeMillis())
+        val thisWeekResult = calendarService.loadThisWeek(timeSource.nowMs())
         if (thisWeekResult.isError) {
             throw IllegalStateException(thisWeekResult.statusMessage ?: "Unable to load this week.")
         }

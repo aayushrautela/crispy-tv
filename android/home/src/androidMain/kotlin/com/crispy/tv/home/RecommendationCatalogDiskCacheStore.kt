@@ -3,12 +3,16 @@ package com.crispy.tv.home
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.crispy.tv.platform.TimeSource
 import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-class RecommendationCatalogDiskCacheStore(appContext: Context) {
+class RecommendationCatalogDiskCacheStore(
+    appContext: Context,
+    private val timeSource: TimeSource,
+) {
     private val cacheDirectory = appContext.filesDir.resolve(CACHE_DIRECTORY_NAME).also { directory ->
         if (!directory.exists()) {
             directory.mkdirs()
@@ -19,7 +23,10 @@ class RecommendationCatalogDiskCacheStore(appContext: Context) {
         val payload: String,
         val timestampMs: Long,
     ) {
-        fun ageMs(nowMs: Long = System.currentTimeMillis()): Long {
+        /** [nowMs] is required. A defaulting `System.currentTimeMillis()` here would be
+         * invisible at every call site and untestable; `:android:player` shipped exactly
+         * that once and the Kotlin/Native compile gate is what caught it. */
+        fun ageMs(nowMs: Long): Long {
             return (nowMs - timestampMs).coerceAtLeast(0L)
         }
     }
@@ -35,10 +42,12 @@ class RecommendationCatalogDiskCacheStore(appContext: Context) {
         }
         val entry = CachedPayload(payload = payload, timestampMs = timestampMs)
         val limit = maxAgeMs?.takeIf { it > 0L }
-        return@withContext if (limit != null && entry.ageMs() > limit) null else entry
+        val age = entry.ageMs(timeSource.nowMs())
+          return@withContext if (limit != null && age > limit) null else entry
     }
 
-    suspend fun write(cacheKey: String, payload: String, timestampMs: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {
+    suspend fun write(cacheKey: String, payload: String) = withContext(Dispatchers.IO) {
+        val timestampMs = timeSource.nowMs()
         val normalizedPayload = payload.trim()
         if (normalizedPayload.isEmpty()) {
             return@withContext

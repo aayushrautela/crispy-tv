@@ -5,8 +5,8 @@ import androidx.compose.runtime.Immutable
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
-import java.time.Instant
-import java.time.LocalDate
+import com.crispy.tv.domain.watch.parseIso8601DateToEpochMillis
+import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
 
 @Immutable
 data class CalendarEpisodeItem(
@@ -308,14 +308,10 @@ class CalendarService constructor(
     private fun parseCalendarReleaseToEpochMs(raw: String?): Long? {
         val value = raw?.trim().orEmpty()
         if (value.isBlank()) return null
-        return runCatching { Instant.parse(value).toEpochMilli() }
-            .recoverCatching {
-                LocalDate.parse(value.take(10))
-                    .atStartOfDay(java.time.ZoneOffset.UTC)
-                    .toInstant()
-                    .toEpochMilli()
-            }
-            .getOrNull()
+        // Instant first, then a bare date. The order is the contract: a full instant
+        // must not be reinterpreted as a date, and a date has no time to lose, so
+        // trying the more specific shape first is what makes the fallback safe.
+        return parseIso8601InstantToEpochMillis(value) ?: parseIso8601DateToEpochMillis(value)
     }
 
     companion object {

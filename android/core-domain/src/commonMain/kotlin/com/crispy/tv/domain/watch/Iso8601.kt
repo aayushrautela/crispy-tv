@@ -107,6 +107,66 @@ internal fun parseIso8601DateToEpochDay(value: String): Long? {
  * `epochMillis - day * MILLIS_PER_DAY` is always in `0 until 86400000` and
  * formats as a positive time rather than a negative one.
  */
+/**
+ * The UTC midnight at the start of the calendar date in [value], in epoch
+ * milliseconds, or null if [value] is not a `YYYY-MM-DD` date.
+ *
+ * The portable replacement for `LocalDate.parse(s).atStartOfDay(ZoneOffset.UTC)
+ * .toInstant().toEpochMilli()`, which is the shape the calendar code used. A release
+ * date with no time on it is read as midnight **UTC**, not in the device's zone, and
+ * that choice is load-bearing: reading it locally would move a release to the
+ * previous day for anyone west of UTC. Preserved exactly rather than tidied.
+ *
+ * Accepts a full instant and truncates to its date, because the callers pass
+ * `value.take(10)` today and a backend may send either shape.
+ */
+fun parseIso8601DateToEpochMillis(value: String): Long? {
+    val epochDay = parseIso8601DateToEpochDay(value) ?: return null
+    return epochDay * MILLIS_PER_DAY
+}
+
+/**
+ * The three-letter month label for a `YYYY-MM-DD` date: `Jan`, `Feb`, …, `Dec`.
+ *
+ * The portable replacement for `LocalDate.parse(s).month.name.take(3).lowercase()
+ * .replaceFirstChar { it.uppercase() }`, which is how a calendar badge reads "Mar 14".
+ * Returns null for anything that is not a valid date, matching the `try`/`catch` the
+ * old expression sat in.
+ */
+fun iso8601MonthLabel(value: String): String? {
+    val month = parseIso8601MonthNumber(value) ?: return null
+    return MONTH_LABELS.getOrNull(month - 1)
+}
+
+/** The 1-12 month number of a `YYYY-MM-DD` date, or null if it is not a valid date. */
+private fun parseIso8601MonthNumber(value: String): Int? {
+    if (value.length < 10) return null
+    val year = value.readDigits(0, 4) ?: return null
+    val month = value.readDigits(5, 7) ?: return null
+    val day = value.readDigits(8, 10) ?: return null
+    if (month !in 1..12) return null
+    // Validate the day as well as the month, so "2024-02-31" is rejected the way
+    // LocalDate rejects it rather than labelling it "Feb".
+    if (!isValidDate(year, month, day)) return null
+    return month
+}
+
+/**
+ * English three-letter month names.
+ *
+ * A table rather than a derivation. The label is user-visible text, so deriving it
+ * from a locale-sensitive source would make it drift per device — and this file
+ * already hard-codes its grammar for the same reason: the output is a contract.
+ */
+private val MONTH_LABELS = listOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)
+
+/**
+ * Formats [epochMillis] to a UTC ISO-8601 instant, byte-for-byte as
+ * `java.time.Instant.ofEpochMilli(ms).toString()` renders it.
+ */
 fun formatIso8601Instant(epochMillis: Long): String {
     val day = utcEpochDayOf(epochMillis)
     val millisIntoDay = epochMillis - day * MILLIS_PER_DAY

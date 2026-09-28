@@ -6,8 +6,8 @@ import androidx.compose.runtime.Immutable
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import org.json.JSONObject
-import java.time.LocalDate
 import java.util.Locale
+import com.crispy.tv.domain.watch.iso8601MonthLabel
 
 @Immutable
 data class HeroState(
@@ -103,12 +103,12 @@ fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
 private fun CalendarEpisodeItem.buildCalendarBadgeLabel(): String? {
     if (isReleased) return "Released"
     val normalizedReleaseDate = releaseDate ?: return null
-    return try {
-        val date = LocalDate.parse(normalizedReleaseDate.take(10))
-        "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
-    } catch (_: Exception) {
-        null
-    }
+    // The label and the day are read from the same validated parse. Splitting them
+    // would mean validating the month with one parser and the day with another, and
+    // "Feb 31" would then render a badge instead of nothing.
+    val monthLabel = iso8601MonthLabel(normalizedReleaseDate) ?: return null
+    val dayOfMonth = normalizedReleaseDate.substring(8, 10).toInt()
+    return "$monthLabel $dayOfMonth"
 }
 
 private fun CalendarEpisodeItem.buildCalendarSecondaryText(): String {

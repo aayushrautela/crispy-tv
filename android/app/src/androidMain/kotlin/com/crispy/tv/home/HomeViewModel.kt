@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.crispy.tv.platform.android.AndroidTimeSource
 
 private const val RAIL_LOAD_ATTEMPTS = 3
 private const val RAIL_RETRY_BACKOFF_MS = 400L
@@ -66,8 +67,10 @@ class HomeViewModel internal constructor(
                                     UpNextService(
                                         backendClient = BackendServicesProvider.backendClient(appContext),
                                         backendContextResolver = BackendContextResolverProvider.get(appContext),
+                                        timeSource = AndroidTimeSource(),
                                     ),
                                 suppressionStore = suppressionStore,
+                                timeSource = AndroidTimeSource(),
                             ),
                             watchHistoryService = watchHistoryService,
                             suppressionStore = suppressionStore,
