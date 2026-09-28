@@ -96,12 +96,23 @@ kotlin {
 
     sourceSets {
         commonMain {
-            // The KMP source-set API accepts a Provider and infers the task
-            // dependency from it, so this needs no explicit dependsOn. (The
-            // Android SourceSet API does not accept Providers at all, which is
-            // why generating into :app's application-module source sets did not
-            // work; here it is the supported path.)
-            kotlin.srcDir(generatedConfigDir)
+            // The *task provider*, not the directory.
+            //
+            // An earlier version passed `generatedConfigDir` and carried a comment
+            // claiming the KMP source-set API infers the task dependency from the
+            // Provider. It does not: `layout.buildDirectory.dir(...)` is a Provider
+            // of a path and carries no task information, so nothing ordered
+            // `generateAppConfig` before compilation and the task never ran. It
+            // worked locally for weeks only because a previous run had left
+            // `build/generated/appconfig/.../AppConfig.kt` on disk, so the
+            // compiler found a class that nothing in the current build produced.
+            //
+            // CI has no such residue, so the first run on a clean machine failed
+            // with `Unresolved reference 'AppConfig'` across eight files. Passing
+            // the TaskProvider registers the task's outputs as the source dir and
+            // infers the dependency, which is why `srcDir(taskProvider)` is the
+            // idiom everywhere else in this build.
+            kotlin.srcDir(generateAppConfig)
         }
     }
 }
