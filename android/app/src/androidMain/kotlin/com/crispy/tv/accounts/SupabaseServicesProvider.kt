@@ -12,6 +12,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.PluginSyncBridgeProvider
 import com.crispy.tv.sync.ProfileDataCloudSync
+import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 
 object SupabaseServicesProvider {
     @Volatile
@@ -58,7 +59,7 @@ object SupabaseServicesProvider {
         activeProfileStore?.let { return it }
         synchronized(this) {
             activeProfileStore?.let { return it }
-            val created = ActiveProfileStore(context.applicationContext)
+            val created = ActiveProfileStore(SharedPreferencesKeyValueStore(context.applicationContext, "supabase_sync_lab"))
             activeProfileStore = created
             return created
         }

@@ -8,12 +8,14 @@ import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_MUTED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_PREFS_NAME
+import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 
 class ProfileDataCloudSync(
     private val context: Context,
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
-    private val activeProfileStore: ActiveProfileStore = ActiveProfileStore(context),
+    private val activeProfileStore: ActiveProfileStore =
+        ActiveProfileStore(SharedPreferencesKeyValueStore(context, "supabase_sync_lab")),
     private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
 ) {
     suspend fun pullForActiveProfile(): Result<Unit> {

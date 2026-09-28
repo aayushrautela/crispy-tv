@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.crispy.tv.platform.SecretStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,7 +26,7 @@ import javax.crypto.spec.GCMParameterSpec
  * If the secure store cannot be opened (e.g. Keystore unavailable after an OS upgrade) we fail
  * closed: the error is surfaced rather than silently falling back to plaintext storage.
  */
-class SecureTokenStore(private val context: Context) {
+class SecureTokenStore(private val context: Context) : SecretStore {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
@@ -45,17 +46,37 @@ class SecureTokenStore(private val context: Context) {
         return generator.generateKey()
     }
 
-    private fun encrypt(plain: String): String {
+    /**
+     * The stored form is `$PREFIX<base64 iv>:<base64 ciphertext>`.
+     *
+     * The prefix is what makes [isEncrypted] answerable. Before it, the value was
+     * a bare `iv:ciphertext` pair, and a two-part colon-separated string is not
+     * evidence of anything — a plaintext token could look like one. Prefixing
+     * makes the format self-identifying, so a value can be tested before it is
+     * trusted and so a future key rotation can be told apart from a corrupt read.
+     *
+     * Reads stay backward compatible: [decrypt] accepts the unprefixed legacy form
+     * so tokens written by an earlier build still load. They are never *written*
+     * again, so a user who signs in after upgrading is on the new format and
+     * everyone else is on the old one until then. That is a deliberate one-way
+     * migration rather than a re-encryption pass, which would need the old key
+     * alive and would be a much larger change for no security gain.
+     */
+    override fun encrypt(plaintext: String): String {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val iv = cipher.iv
-        val ciphertext = cipher.doFinal(plain.toByteArray(StandardCharsets.UTF_8))
-        return Base64.encodeToString(iv, Base64.NO_WRAP) + IV_SEPARATOR +
+        val ciphertext = cipher.doFinal(plaintext.toByteArray(StandardCharsets.UTF_8))
+        return PREFIX +
+            Base64.encodeToString(iv, Base64.NO_WRAP) + IV_SEPARATOR +
             Base64.encodeToString(ciphertext, Base64.NO_WRAP)
     }
 
-    private fun decrypt(stored: String): String? = runCatching {
-        val parts = stored.split(IV_SEPARATOR)
+    override fun isEncrypted(value: String): Boolean = value.startsWith(PREFIX)
+
+    override fun decrypt(stored: String): String? = runCatching {
+        val payload = if (stored.startsWith(PREFIX)) stored.removePrefix(PREFIX) else stored
+        val parts = payload.split(IV_SEPARATOR)
         if (parts.size != 2) return@runCatching null
         val iv = Base64.decode(parts[0], Base64.NO_WRAP)
         val ciphertext = Base64.decode(parts[1], Base64.NO_WRAP)
@@ -112,6 +133,7 @@ class SecureTokenStore(private val context: Context) {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "crispy_secure_token_key"
         private const val IV_SEPARATOR = ":"
+        private const val PREFIX = "enc_v1:"
         private const val GCM_TAG_LENGTH_BITS = 128
     }
 }

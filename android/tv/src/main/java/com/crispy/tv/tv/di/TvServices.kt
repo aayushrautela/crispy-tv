@@ -71,7 +71,7 @@ object TvServices {
         activeProfileStore?.let { return it }
         synchronized(this) {
             activeProfileStore?.let { return it }
-            val created = ActiveProfileStore(context.applicationContext)
+            val created = ActiveProfileStore(SharedPreferencesKeyValueStore(context.applicationContext, "supabase_sync_lab"))
             activeProfileStore = created
             return created
         }
