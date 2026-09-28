@@ -2,7 +2,6 @@ package com.crispy.tv.addons.streams
 
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
-import java.util.Locale
 
 data class StreamProviderUiState(
     val providerId: String,
@@ -40,10 +39,10 @@ fun List<StreamProviderUiState>.visibleProviders(): List<StreamProviderUiState> 
  */
 fun List<StreamProviderUiState>.seedProviders(descriptors: List<StreamProviderDescriptor>): List<StreamProviderUiState> {
     if (descriptors.isEmpty()) return this
-    val knownIds = map { provider -> provider.providerId.lowercase(Locale.US) }.toSet()
+    val knownIds = map { provider -> provider.providerId.lowercase() }.toSet()
     val seeded =
         descriptors
-            .filter { descriptor -> !knownIds.contains(descriptor.providerId.lowercase(Locale.US)) }
+            .filter { descriptor -> !knownIds.contains(descriptor.providerId.lowercase()) }
             .map { descriptor ->
                 StreamProviderUiState(
                     providerId = descriptor.providerId,

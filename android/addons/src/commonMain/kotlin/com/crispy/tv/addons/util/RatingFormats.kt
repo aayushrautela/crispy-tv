@@ -1,11 +1,10 @@
 package com.crispy.tv.addons.util
 
-import java.util.Locale
-
+import com.crispy.tv.domain.util.formatOneDecimal
 fun formatRating(value: Double?): String? {
     val rating = value ?: return null
     if (!rating.isFinite() || rating <= 0.0) return null
-    return String.format(Locale.US, "%.1f", rating)
+    return formatOneDecimal(rating)
 }
 
 fun normalizeRatingText(value: String?): String? {

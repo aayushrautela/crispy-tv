@@ -11,7 +11,6 @@ import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamProviderUiState
 import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.addons.streams.ProviderStreamsResult
-import java.util.Locale
 
 data class StreamLookupTarget(
     val mediaType: MetadataLabMediaType,
@@ -162,9 +161,9 @@ fun List<StreamProviderUiState>.applyProviderResult(result: ProviderStreamsResul
 }
 
 fun List<StreamProviderUiState>.finalizeFrom(results: List<ProviderStreamsResult>): List<StreamProviderUiState> {
-    val knownProviderIds = map { provider -> provider.providerId.lowercase(Locale.US) }.toSet()
+    val knownProviderIds = map { provider -> provider.providerId.lowercase() }.toSet()
     val appended = results
-        .filter { result -> !knownProviderIds.contains(result.providerId.lowercase(Locale.US)) }
+        .filter { result -> !knownProviderIds.contains(result.providerId.lowercase()) }
         .map { result -> result.toUiState() }
     return this + appended
 }
