@@ -24,16 +24,20 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        // Must be first. AppDistribution is read by PlaybackDependencies.reset(),
-        // by every view-model factory and while the nav graph is built, all of
-        // which can run before appGraph is touched. Reading it before this line
-        // throws by design rather than defaulting to a variant.
+        // Must be first. AppDistribution is read by the view-model factories and
+        // while the nav graph is built, both of which can run before appGraph is
+        // touched. Reading it before this line throws by design rather than
+        // defaulting to a variant.
         //
         // BuildDistributionComponents is the only name that resolves to a
         // variant: each of src/store and src/sideload defines its own object
         // under that exact name, so this line is the single place the codebase
         // names a variant and neither definition is visible to the other build.
+        // Also activates the components -- AppDistribution.install pushes the
+        // variant's torrent resolver into PlaybackDependencies. It is the only
+        // place the codebase names a variant.
         AppDistribution.install(BuildDistributionComponents)
+
         appGraph.userMutationOutbox.start()
     }
 

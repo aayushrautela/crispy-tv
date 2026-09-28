@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
@@ -126,11 +125,6 @@ object PlaybackDependencies {
         }
     }
 
-    fun resetTorrentResolver() {
-        torrentResolverInstance?.close()
-        torrentResolverInstance = null
-    }
-
     @Volatile
     private var audioFocusManagerInstance: AudioFocusManager? = null
 
@@ -146,10 +140,6 @@ object PlaybackDependencies {
                 created
             }
         }
-    }
-
-    fun resetAudioFocusManager() {
-        audioFocusManagerInstance = null
     }
 
     @Volatile
@@ -187,40 +177,5 @@ object PlaybackDependencies {
     @Volatile
     var episodeListProviderFactory: (Context) -> EpisodeListProvider = { context ->
         newEpisodeListProvider(context)
-    }
-
-    fun reset() {
-        playbackControllerFactory = { context ->
-            val settings = PlaybackSettingsRepositoryProvider.get(context).settings.value
-            NativePlaybackController(
-                context = context,
-                useLibass = settings.useLibass,
-                libassRenderType = LibassRenderType.fromName(settings.libassRenderType),
-            )
-        }
-        AppDistribution.current.installTorrentResolver(this)
-        resetTorrentResolver()
-        resetAudioFocusManager()
-        metadataResolverFactory = { context ->
-            newMetadataResolver(context)
-        }
-        watchHistoryServiceFactory = { context ->
-            newWatchHistoryService(context)
-        }
-        supabaseSyncServiceFactory = { context, watchHistoryService ->
-            newSupabaseSyncService(
-                context = context,
-                watchHistoryService = watchHistoryService
-            )
-        }
-        introSkipServiceFactory = { context ->
-            val appContext = context.applicationContext
-            RemoteIntroSkipService(
-                httpClient = AppHttp.client(appContext),
-                introDbBaseUrl = AppConfig.INTRODB_API_URL,
-            )
-        }
-        streamResolverFactory = { context -> StreamResolverProvider.get(context) }
-        episodeListProviderFactory = { context -> newEpisodeListProvider(context) }
     }
 }

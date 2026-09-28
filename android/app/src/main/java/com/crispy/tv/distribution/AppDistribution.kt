@@ -1,5 +1,7 @@
 package com.crispy.tv.distribution
 
+import com.crispy.tv.PlaybackDependencies
+
 /**
  * The build's single read point for everything the variant supplies.
  *
@@ -36,17 +38,27 @@ internal object AppDistribution {
     private var components: DistributionComponents? = null
 
     /**
-     * Installs the variant's components. Called once, from `CrispyApplication`.
+     * Installs the variant's components and activates them.
      *
-     * Re-installing is a programming error rather than a supported update: the
-     * components hold lazily-created singletons (the plugin stream loader), so
-     * swapping them at runtime would leave those stale.
+     * This does more than store a reference, and that is deliberate. The torrent
+     * resolver has to be pushed into `PlaybackDependencies` rather than picked up
+     * lazily, and it used to be installed from `PlaybackDependencies.reset()` --
+     * a method with no callers. The result was a sideload build that shipped
+     * `:android:torrent-engine` and then never installed it, so every torrent
+     * link threw, while the dex-level check still reported the engine as present
+     * because the class genuinely was in the APK.
+     *
+     * Making activation part of installation means there is no second call to
+     * forget. Anything that installs components gets a working build.
+     *
+     * Called once, from `CrispyApplication.onCreate`.
      */
     fun install(components: DistributionComponents) {
         check(this.components == null) {
             "AppDistribution.install called twice; components are installed once in " +
                 "CrispyApplication.onCreate and must not be replaced."
         }
+        components.installTorrentResolver(PlaybackDependencies)
         this.components = components
     }
 
