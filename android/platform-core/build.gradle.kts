@@ -37,10 +37,17 @@ val generateAppConfig by tasks.registering {
     val publishableKey = supabasePublishableKey
     val backendUrl = crispyBackendUrl
     val introDb = introDbApiUrl
-    // Kept in step with versionName in :android:app/build.gradle.kts. AGP 9
-    // gives neither module a shared source of truth, so this is asserted
-    // rather than assumed -- see the check in :android:app.
-    val versionName = "0.1.0"
+    // Read from the shared `crispyVersionName` Gradle property, which
+    // :androidApp also reads for `defaultConfig.versionName`. One source, so the
+    // version the APK reports and the version the app sends to the backend cannot
+    // drift -- which is what a hand-kept second copy silently invites.
+    //
+    // This is the base version and carries no flavour suffix. :androidApp gives the
+    // `sideload` flavour a `versionNameSuffix` so the store and sideload APKs can be
+    // installed side by side; that suffix is a packaging concern and is deliberately
+    // not reported to the backend, which is told `appVersion` and separately
+    // `source = "android"`.
+    val versionName = providers.gradleProperty("crispyVersionName").get()
 
     inputs.property("supabaseUrl", url)
     inputs.property("supabasePublishableKey", publishableKey)

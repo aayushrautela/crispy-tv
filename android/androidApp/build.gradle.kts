@@ -96,7 +96,10 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        // The same `crispyVersionName` property :android:platform-core reads when it
+        // generates `AppConfig.VERSION_NAME`, so the APK's version and the
+        // `appVersion` the app reports to the backend come from one place.
+        versionName = providers.gradleProperty("crispyVersionName").get()
     }
 
     flavorDimensions += "distribution"
