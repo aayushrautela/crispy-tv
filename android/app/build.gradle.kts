@@ -134,7 +134,12 @@ kotlin {
             implementation(libs.androidx.compose.runtime)
             implementation(libs.androidx.compose.foundation)
             implementation(libs.androidx.compose.ui)
-            implementation(libs.androidx.compose.material3)
+            // No material3 here on purpose. It is declared once, as `api`, by
+            // :android:sharedUI, and this module already depends on it. Declaring
+            // the androidx coordinate here as well is what would put two material3
+            // implementations -- this one at 1.5.0-alpha26 and the shared one --
+            // in the same graph, and the goldens would then be verifying a version
+            // no other target resolves.
 
             implementation(project(":android:home"))
             implementation(project(":android:player"))

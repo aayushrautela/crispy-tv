@@ -36,12 +36,25 @@ kotlin {
     }
 
     sourceSets {
+        // `api`, not `implementation`: this module's public surface *is* Compose --
+        // every exported declaration is a `@Composable` function whose signature
+        // names `Modifier`, and callers in `:app` call them directly. With
+        // `implementation` the Compose types would be absent from a consumer's
+        // compile classpath, so consumers would be forced to re-declare the very
+        // versions this module already picked. One module owns the Compose
+        // versions; see the comment on `composeMaterial3` in the version catalog.
         commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
+            api(compose.runtime)
+            api(compose.foundation)
+            api(compose.ui)
+            api(compose.components.resources)
+
+            // Deliberately NOT `compose.material3`. The alias tracks the latest
+            // stable Material3 (1.4.0), which has no Expressive. This explicit
+            // coordinate resolves to androidx material3 on Android and the
+            // JetBrains fork on desktop/iOS, so one declaration covers all four
+            // targets and there is only ever one material3 on the classpath.
+            api(libs.compose.material3)
         }
 
         commonTest.dependencies {

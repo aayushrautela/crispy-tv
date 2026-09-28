@@ -11,17 +11,58 @@ activityCompose = "1.13.0"
 
 # --- Compose ---
 composeBom = "2026.08.00"
-material3 = "1.5.0-alpha26"
 material = "1.12.0"
 
-# The androidx.compose.* version the BOM above resolves to, pinned explicitly on
-# the four artifacts :app needs. A KMP source set's dependency handler has no
-# `platform()`, so the BOM cannot be applied in :app. Without these versions the
-# Compose Multiplatform accessors supply material3 1.4.0, which lacks the
-# Material3 Expressive APIs this app uses (LoadingIndicator, MaterialShapes,
-# rememberBottomSheetState). They match the BOM, so :tv and :androidApp are
-# unaffected -- an explicit version and a platform both resolve to 1.12.0.
-composeAndroidx = "1.12.0"
+# Material3 Expressive, on every target, via one coordinate.
+#
+# ## Why not `compose.material3`, and why not `androidx.compose.material3`
+#
+# The `compose.material3` Gradle-accessor alias deliberately tracks the latest
+# *stable* Material3, which is 1.4.0 -- and 1.4.0 has no Expressive. CMP decoupled
+# Material3 versioning from the plugin in 1.9.0 precisely so a project can opt
+# forward; the documented way is to replace the alias with an explicit coordinate.
+# See the CMP 1.9.3 whats-new, "Material 3 Expressive theme".
+#
+# `org.jetbrains.compose.material3:material3` is the coordinate that works
+# everywhere, because it is a thin alias that delegates per target:
+#
+#   android -> androidx.compose.material3:material3-android:1.5.0-alpha27  (real AndroidX)
+#   desktop -> org.jetbrains.compose.material3:material3-desktop:1.13.0-alpha01 (real fork)
+#   ios*    -> org.jetbrains.compose.material3:material3-iosarm64:1.13.0-alpha01
+#
+# So there is never more than one material3 on the classpath, the
+# `androidx.compose.material3` package and imports are identical on every target,
+# and desktop/iOS get the Expressive widgets (`LoadingIndicator`, `MaterialShapes`,
+# `WavyProgressIndicator`) that Android already had. Verified by resolving the
+# dependency graph, not inferred.
+#
+# ## Why 1.13.0-alpha01 and not the nearer 1.12.0-alpha03
+#
+# Because the choice is between moving forward and moving *backward*:
+#
+# | version  | AndroidX material3 | AndroidX Compose | direction        |
+# |----------|--------------------|------------------|------------------|
+# | 1.9.0    | 1.4.0 (stable)     | 1.7.x            | no Expressive    |
+# | 1.12.0-3 | 1.5.0-alpha22      | 1.12.0-beta01     | BACKWARD         |
+# | 1.13.0-1 | 1.5.0-alpha27      | 1.13.0-alpha02    | forward          |
+#
+# `1.12.0-beta01` is *older* than the `1.12.0` stable this repo was on -- publication
+# order is alpha01..alpha03, beta01, beta02, rc01, 1.12.0 -- so that option
+# downgrades both material3 and the whole Compose stack. The app's goldens were
+# recorded against `1.5.0-alpha26`, and 1.13.0-alpha01 is the only published
+# JetBrains material3 at or ahead of it.
+#
+# The cost is that the Compose stack leaves stable for `1.13.0-alpha02`. That is
+# accepted deliberately, and the golden screenshots are the check on it.
+composeMaterial3 = "1.13.0-alpha01"
+
+# The androidx.compose.* version. Set to what `composeMaterial3` requires on
+# Android (1.13.0-alpha02) rather than left lower, so the resolved graph has one
+# Compose version instead of a resolved-up surprise. A KMP source set's dependency
+# handler has no `platform()`, so the BOM cannot be applied in a KMP module; the
+# plain Android modules still apply `androidx-compose-bom` for everything else.
+# AGENTS.md: bump this with `composeMaterial3`, never alone.
+composeAndroidx = "1.13.0-alpha02"
 
 # Compose Multiplatform. Pinned to the generation that ships with the Kotlin
 # version above: Kotlin 2.4.x pairs with CMP 1.11.x. Do not bump this independently
@@ -89,7 +130,10 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+# The one material3 every module uses, on every target. See the comment on
+# `composeMaterial3` for why this is the JetBrains coordinate and not the
+# androidx one, and why it is not `compose.material3`.
+compose-material3 = { group = "org.jetbrains.compose.material3", name = "material3", version.ref = "composeMaterial3" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeAndroidx" }
 androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "composeAndroidx" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "composeAndroidx" }

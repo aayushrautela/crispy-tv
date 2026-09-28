@@ -29,23 +29,29 @@ kotlin {
  * themselves migrate into `:app`'s `appUi` source set in Phase 4, and this
  * module then renders those instead.
  *
- * ## Why it cannot render `:app`'s screens yet
+ * ## The blocker that used to stop this, and how it was removed
  *
- * `:app` is written against Material3 Expressive (`androidx.compose.material3`
- * 1.5.0-alpha26) for `LoadingIndicator`, `MaterialShapes` and
- * `rememberBottomSheetState`. That version publishes no `material3-desktop`
- * artifact -- only the `android` one -- so a Compose Multiplatform module that
- * declares it cannot resolve for desktop. `:app` therefore pins AndroidX Compose
- * explicitly and does not apply `org.jetbrains.compose` at all.
+ * This module could not render `:app`'s screens because `:app` was written against
+ * Material3 Expressive via `androidx.compose.material3:1.5.0-alpha26`, which
+ * publishes no `material3-desktop` artifact -- only the `android` one -- so a
+ * Compose Multiplatform module declaring it could not resolve for desktop. An
+ * earlier revision of this comment concluded that Phase 4 therefore "has to drop or
+ * replace Material3 Expressive", and `:app`'s own dependency comment said the same.
  *
- * This is the single most consequential finding of the migration and it is the
- * gate on Phase 4: before any screen can move into `appUi`, Material3 Expressive
- * has to be dropped or replaced with something that exists for desktop and iOS.
- * `:app`'s own comments say the same thing at the dependency block.
+ * **That was wrong**, and the cost of leaving it recorded was that a shipping design
+ * feature was about to be deleted to work around a version pin. Expressive is
+ * supported on desktop and iOS. `org.jetbrains.compose.material3:material3` is a thin
+ * alias that delegates to `androidx.compose.material3:material3-android` on Android
+ * and ships the real implementation -- `LoadingIndicator`, `MaterialShapes` and all
+ * -- on desktop and iOS. So there is exactly one material3 on the classpath, the
+ * `androidx.compose.material3` package and imports are identical on every target, and
+ * nothing had to be dropped.
  *
- * `:android:sharedUI` is the module that *does* compile for desktop today
- * (Compose Multiplatform 1.11.1 / material3 1.4.0), which is why the design
- * system and not a screen is what this renders.
+ * The `compose.material3` alias could not be used because it deliberately tracks the
+ * latest *stable* Material3 (1.4.0), which has no Expressive; declaring the
+ * coordinate explicitly is the whole fix. See the comment on `composeMaterial3` in
+ * the version catalog for the version choice, and why the one nearby version that
+ * would have moved the whole Compose stack *backwards* was rejected.
  */
 
 dependencies {
@@ -60,9 +66,13 @@ dependencies {
     // Compose Multiplatform accessors rather than AndroidX coordinates, because
     // this module is desktop-only and does not have the Material3 Expressive
     // problem described above.
+    // Compose Multiplatform accessors for runtime/foundation/ui, which resolve
+    // identically on every target. material3 is NOT taken from an accessor: the
+    // `compose.material3` alias tracks the latest *stable* Material3 (1.4.0) and
+    // has no Expressive, and Gradle now deprecates it outright. It comes from
+    // `:android:sharedUI`, which declares the one shared coordinate as `api`.
     implementation(compose.runtime)
     implementation(compose.foundation)
-    implementation(compose.material3)
     implementation(compose.ui)
 
     implementation(compose.desktop.currentOs)
