@@ -59,6 +59,9 @@ jobs:
 
       # ---- cheap gates, fail fast -------------------------------------------
 
+      - name: Validate workflow YAML
+        run: python3 scripts/validate_workflows.py
+
       - name: Check commonMain purity
         run: python scripts/check_common_purity.py
 
@@ -70,8 +73,15 @@ jobs:
         run: ./gradlew :android:androidApp:verifyDistributionExclusions
 
       - name: Run JVM contract tests
-        run: ./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest
-        run: ./gradlew :android:desktopApp:test
+        # The contract suite lives in :core-domain's commonTest, so one suite
+        # runs on both the Android host JVM and desktop. :desktopApp is the
+        # Compose Multiplatform seam proof; it needs a real render, which is
+        # why it is a separate task rather than folded into the line above.
+        run: |
+          ./gradlew \
+            :android:core-domain:desktopTest \
+            :android:core-domain:testAndroidHostTest \
+            :android:desktopApp:test
 
       - name: Run domain unit tests
         run: ./gradlew :android:core-domain:desktopTest

@@ -20,6 +20,13 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Validate workflow YAML
+        # A duplicate key makes a workflow fail to *load*, which produces a run
+        # that fails in under a second with an empty log. That reads as "the tests
+        # failed" when no test ever ran, and nothing inside the workflow can report
+        # it. Checked first so a malformed file is named as the problem it is.
+        run: python3 scripts/validate_workflows.py
+
       - name: Checkout
         uses: actions/checkout@v7
 

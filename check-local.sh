@@ -56,6 +56,11 @@ fi
 "$PY" scripts/check_common_purity.py
 "$PY" scripts/validate_contracts.py
 
+# Workflow YAML is checked before the expensive tasks because a duplicate key
+# makes a workflow fail to load: it produces a run that fails in under a second
+# with an empty log, which reads as "the tests failed" when no test ever ran.
+"$PY" scripts/validate_workflows.py
+
 # JVM args (including MaxMetaspaceSize=1g for the Kotlin/Native compiler) are
 # set in ~/.gradle/gradle.properties. Passing -Dorg.gradle.jvmargs here would
 # spawn a second daemon with different opts, so we let the user-level config apply.
