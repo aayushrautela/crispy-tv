@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -40,7 +39,6 @@ import com.crispy.tv.ui.navigation.TopLevelDestination
 
 private const val IntroTimeoutMs = 3_000L
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppRoot() {
     val context = LocalContext.current

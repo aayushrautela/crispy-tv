@@ -8,7 +8,6 @@ import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.BackendContext
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource
 import com.crispy.tv.home.HomeRefreshBus
@@ -23,6 +22,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.crispy.tv.backend.ClientMediaCard
+import com.crispy.tv.backend.MetadataProductionInfoView
+import com.crispy.tv.backend.MetadataTitleRatings
+import com.crispy.tv.backend.MetadataVideoView
 
 data class TvTrailerEntry(
     val id: String,
@@ -77,7 +80,7 @@ data class DetailUiState(
     val status: String? = null,
     val seasonCount: Int? = null,
     val episodeCount: Int? = null,
-    val seasons: List<CrispyBackendClient.ClientMediaCard> = emptyList(),
+    val seasons: List<ClientMediaCard> = emptyList(),
     val selectedSeason: Int? = null,
     val episodes: List<DetailEpisodeUi> = emptyList(),
     val episodesLoading: Boolean = false,
@@ -93,7 +96,7 @@ data class DetailUiState(
     val aiStoryVisible: Boolean = false,
     val aiUnavailable: Boolean = false,
     val extraVideos: List<ExtraVideoUi> = emptyList(),
-    val titleRatings: CrispyBackendClient.MetadataTitleRatings? = null,
+    val titleRatings: MetadataTitleRatings? = null,
     val itemRating: Double? = null,
     val trailers: List<TvTrailerEntry> = emptyList(),
     val reviews: List<ReviewUi> = emptyList(),
@@ -346,7 +349,7 @@ class DetailViewModel(
     }
 
     private fun buildTrailerSources(
-        videos: List<CrispyBackendClient.MetadataVideoView>,
+        videos: List<MetadataVideoView>,
     ): List<TvTrailerEntry> {
         val trailerVideo = videos.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
             ?: videos.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
@@ -356,8 +359,8 @@ class DetailViewModel(
     }
 
     private fun resolveWatchCta(
-        item: CrispyBackendClient.ClientMediaCard,
-        nextEpisode: CrispyBackendClient.ClientMediaCard?,
+        item: ClientMediaCard,
+        nextEpisode: ClientMediaCard?,
         watchState: com.crispy.tv.player.CanonicalWatchStateSnapshot?,
         isSeries: Boolean,
     ): Triple<String, String, Int?> {
@@ -403,7 +406,7 @@ class DetailViewModel(
         return Triple(label, kind, remaining)
     }
 
-    private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem =
+    private fun ClientMediaCard.toCardItem(): CrispyCardItem =
         CrispyCardItem(
             id = itemId,
             title = title,
@@ -415,7 +418,7 @@ class DetailViewModel(
             genre = genres.firstOrNull(),
         )
 
-    private fun CrispyBackendClient.MetadataVideoView.toExtraVideo(): ExtraVideoUi? {
+    private fun MetadataVideoView.toExtraVideo(): ExtraVideoUi? {
         val resolvedUrl = when {
             !url.isNullOrBlank() -> url
             site.equals("YouTube", ignoreCase = true) -> "https://youtu.be/$key"
@@ -520,9 +523,9 @@ class DetailViewModel(
         kotlin.math.round(value * 10.0).div(10.0).toString()
 
     private fun buildDetailRows(
-        item: CrispyBackendClient.ClientMediaCard,
+        item: ClientMediaCard,
         detailsModel: com.crispy.tv.addons.model.MediaDetails,
-        production: CrispyBackendClient.MetadataProductionInfoView,
+        production: MetadataProductionInfoView,
         isSeries: Boolean,
         seasonCount: Int?,
     ): List<Pair<String, String>> = buildList {

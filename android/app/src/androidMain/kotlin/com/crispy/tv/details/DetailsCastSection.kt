@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import com.crispy.tv.backend.CrispyBackendClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +36,9 @@ import com.crispy.tv.ui.components.PersonCircleCard
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.initials
 import com.crispy.tv.ui.components.rememberCrispyImageModel
+import com.crispy.tv.backend.MetadataCompanyView
+import com.crispy.tv.backend.MetadataPersonRefView
+import com.crispy.tv.backend.MetadataReviewView
 
 @Composable
 internal fun SimpleCastItem(
@@ -78,7 +80,7 @@ internal fun SimpleCastItem(
 
 @Composable
 internal fun MetadataCastCard(
-    member: CrispyBackendClient.MetadataPersonRefView,
+    member: MetadataPersonRefView,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -94,7 +96,7 @@ internal fun MetadataCastCard(
 
 @Composable
 internal fun MetadataProductionCard(
-    entity: CrispyBackendClient.MetadataCompanyView,
+    entity: MetadataCompanyView,
     modifier: Modifier = Modifier,
 ) {
     val logo = entity.logoUrl?.trim().orEmpty()
@@ -135,7 +137,7 @@ internal fun MetadataProductionCard(
 
 @Composable
 internal fun MetadataReviewCard(
-    review: CrispyBackendClient.MetadataReviewView,
+    review: MetadataReviewView,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {

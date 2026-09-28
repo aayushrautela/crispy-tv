@@ -22,20 +22,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.home.LandscapeArtworkFrame
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.backend.MetadataVideoView
 
 private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers")
 
 @Composable
 internal fun MakingOfVideosSection(
-    videos: List<CrispyBackendClient.MetadataVideoView>,
+    videos: List<MetadataVideoView>,
     baseTitle: String,
     horizontalPadding: Dp,
     contentPadding: PaddingValues,
-    onVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit,
+    onVideoClick: (MetadataVideoView) -> Unit,
 ) {
     val filtered = remember(videos) {
         videos
@@ -66,7 +66,7 @@ internal fun MakingOfVideosSection(
 
 @Composable
 private fun MakingOfCard(
-    video: CrispyBackendClient.MetadataVideoView,
+    video: MetadataVideoView,
     onClick: () -> Unit,
 ) {
     val imageModel = rememberCrispyImageModel(

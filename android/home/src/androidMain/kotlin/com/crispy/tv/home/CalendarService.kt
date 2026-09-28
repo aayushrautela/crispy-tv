@@ -7,6 +7,7 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.watch.parseIso8601DateToEpochMillis
 import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
+import com.crispy.tv.backend.CalendarItem
 
 @Immutable
 data class CalendarEpisodeItem(
@@ -176,7 +177,7 @@ class CalendarService constructor(
         )
     }
 
-    private fun List<CrispyBackendClient.CalendarItem>.toCalendarSections(nowMs: Long): List<CalendarSection> {
+    private fun List<CalendarItem>.toCalendarSections(nowMs: Long): List<CalendarSection> {
         val thisWeek = mutableListOf<CalendarEpisodeItem>()
         val upcoming = mutableListOf<CalendarEpisodeItem>()
         val recentlyReleased = mutableListOf<CalendarEpisodeItem>()
@@ -216,7 +217,7 @@ class CalendarService constructor(
         }
     }
 
-    private fun CrispyBackendClient.CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem {
+    private fun CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem {
         val card = card
         val season = card.parent?.seasonNumber
         val episode = card.parent?.episodeNumber
@@ -257,7 +258,7 @@ class CalendarService constructor(
         )
     }
 
-    private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
+    private fun CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
         val card = card
         val localKey = card.parent?.seriesItemId ?: card.itemId
         return CalendarSeriesItem(

@@ -30,11 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.Profile
 
 @Composable
 fun ProfilePickerScreen(
-    profiles: List<CrispyBackendClient.Profile>,
+    profiles: List<Profile>,
     onSelect: (profileId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {

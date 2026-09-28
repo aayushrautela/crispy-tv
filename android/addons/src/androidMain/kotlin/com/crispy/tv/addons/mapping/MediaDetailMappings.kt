@@ -4,9 +4,12 @@ import com.crispy.tv.addons.lookup.buildAddonEpisodeLookupId
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.util.formatRating
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.ClientMediaCard
+import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.backend.MetadataTitleExtrasResponse
+import com.crispy.tv.backend.MetadataVideoView
 
-fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
+fun MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
     val itemDetails = item.toMediaDetails()
     val episodeVideos = listOfNotNull(nextEpisode?.toMediaVideo())
     val mergedVideos = (episodeVideos + videos.mapNotNull { it.toMediaVideo() }).distinctBy { it.id }
@@ -20,12 +23,12 @@ fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetai
     )
 }
 
-fun CrispyBackendClient.MetadataTitleExtrasResponse.seasonNumbers(): List<Int> {
+fun MetadataTitleExtrasResponse.seasonNumbers(): List<Int> {
     val seasonNumbers = seasons.mapNotNull { it.parent?.seasonNumber }.filter { it > 0 }.distinct().sorted()
     return seasonNumbers
 }
 
-fun CrispyBackendClient.ClientMediaCard.toMediaDetails(): MediaDetails {
+fun ClientMediaCard.toMediaDetails(): MediaDetails {
     return MediaDetails(
         id = itemId,
         itemId = itemId,
@@ -52,7 +55,7 @@ fun CrispyBackendClient.ClientMediaCard.toMediaDetails(): MediaDetails {
     )
 }
 
-fun CrispyBackendClient.ClientMediaCard.toMediaVideo(): MediaVideo? {
+fun ClientMediaCard.toMediaVideo(): MediaVideo? {
     val canonicalId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
     val season = parent?.seasonNumber
     val episode = parent?.episodeNumber
@@ -75,7 +78,7 @@ fun CrispyBackendClient.ClientMediaCard.toMediaVideo(): MediaVideo? {
     )
 }
 
-fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
+fun MetadataVideoView.toMediaVideo(): MediaVideo? {
     val canonicalId = id.trim().ifBlank { key.trim() }.ifBlank { return null }
     val titleText = name?.trim()?.takeIf { it.isNotBlank() } ?: type?.trim()?.takeIf { it.isNotBlank() } ?: canonicalId
     return MediaVideo(
@@ -90,7 +93,7 @@ fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
     )
 }
 
-fun CrispyBackendClient.ClientMediaCard.normalizedCatalogMediaType(): String {
+fun ClientMediaCard.normalizedCatalogMediaType(): String {
     return when {
         mediaType.equals("anime", ignoreCase = true) -> "anime"
         mediaType.equals("episode", ignoreCase = true) -> "episode"

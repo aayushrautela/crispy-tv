@@ -25,6 +25,8 @@ import com.crispy.tv.platform.MonotonicClock
 import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.watchhistory.progress.WatchProgress
 import com.crispy.tv.watchhistory.progress.WatchProgressStore
+import com.crispy.tv.backend.ClientMediaCard
+import com.crispy.tv.backend.WatchStateResponse
 
 /**
  * The backend-backed [WatchHistoryService].
@@ -530,7 +532,7 @@ class BackendWatchHistoryService(
         return ItemLookupInput(itemId = itemId)
     }
 
-    private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
+    private fun WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
         return CanonicalWatchStateSnapshot(
             isWatched = watched != null,
             watchedAtEpochMs = parseIsoToEpochMs(watched?.watchedAt),
@@ -567,7 +569,7 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun List<CrispyBackendClient.ClientMediaCard>.toCanonicalContinueWatchingItems(
+    private fun List<ClientMediaCard>.toCanonicalContinueWatchingItems(
         nowMs: Long,
         limit: Int,
     ): List<CanonicalContinueWatchingItem> {
@@ -578,7 +580,7 @@ class BackendWatchHistoryService(
             .toList()
     }
 
-    private fun CrispyBackendClient.ClientMediaCard.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
+    private fun ClientMediaCard.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
         val progress = progress
         if (progress == null) {
             logger.debug("CWParse", "drop(itemId=${itemId}, name=${title}): progress null")

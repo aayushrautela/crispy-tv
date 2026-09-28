@@ -76,6 +76,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.crispy.tv.backend.WatchGenerationsResponse
 
 private const val LIBRARY_PAGE_SIZE = 60
 internal const val LIBRARY_SECTION_HISTORY = "history"
@@ -129,7 +130,7 @@ class LibraryViewModel internal constructor(
 
     // The most recent server generations snapshot, used to stamp fresh cache
     // writes so the next open can tell whether the cached page is stale.
-    private var latestGenerations: CrispyBackendClient.WatchGenerationsResponse? = null
+    private var latestGenerations: WatchGenerationsResponse? = null
 
     init {
         viewModelScope.launch {
@@ -302,7 +303,7 @@ class LibraryViewModel internal constructor(
     }
 }
 
-internal fun CrispyBackendClient.WatchGenerationsResponse.generationMsFor(sectionId: String): Long? {
+internal fun WatchGenerationsResponse.generationMsFor(sectionId: String): Long? {
     return when (sectionId) {
         LIBRARY_SECTION_HISTORY -> historyMs
         LIBRARY_SECTION_WATCHLIST -> watchlistMs

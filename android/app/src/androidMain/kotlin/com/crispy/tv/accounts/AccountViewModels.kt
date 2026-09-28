@@ -389,11 +389,11 @@ class AccountSettingsViewModel internal constructor(
         appContext.startActivity(intent)
     }
 
-    private fun parseImportProvider(value: String): com.crispy.tv.backend.CrispyBackendClient.ImportProvider? {
+    private fun parseImportProvider(value: String): com.crispy.tv.backend.ImportProvider? {
         val normalized = value.trim().lowercase()
         return when (normalized) {
-            "trakt" -> com.crispy.tv.backend.CrispyBackendClient.ImportProvider.TRAKT
-            "simkl" -> com.crispy.tv.backend.CrispyBackendClient.ImportProvider.SIMKL
+            "trakt" -> com.crispy.tv.backend.ImportProvider.TRAKT
+            "simkl" -> com.crispy.tv.backend.ImportProvider.SIMKL
             else -> null
         }
     }

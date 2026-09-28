@@ -1,6 +1,5 @@
 @file:OptIn(
     androidx.compose.material3.ExperimentalMaterial3Api::class,
-    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
 )
 
 package com.crispy.tv.person
@@ -53,7 +52,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.crispy.tv.backend.CrispyBackendClient.PersonSocials
+import com.crispy.tv.backend.PersonSocials
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.domain.person.KnownForRail

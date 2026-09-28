@@ -41,13 +41,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
 import com.crispy.tv.ui.assets.R
 
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.backend.MetadataReviewView
+import com.crispy.tv.backend.MetadataVideoView
 
 internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
@@ -59,8 +60,8 @@ internal fun LazyListScope.detailsBodyContent(
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
-    onMakingOfVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit = {},
-    onReviewClick: (CrispyBackendClient.MetadataReviewView) -> Unit = {},
+    onMakingOfVideoClick: (MetadataVideoView) -> Unit = {},
+    onReviewClick: (MetadataReviewView) -> Unit = {},
     onEpisodeLongPress: (MediaVideo) -> Unit = {},
 ) {
     val details = uiState.details

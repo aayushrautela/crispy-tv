@@ -5,7 +5,6 @@ import com.crispy.tv.addons.streams.StreamProviderUiState
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.addons.streams.seedProviders
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.mapping.toMediaDetails
@@ -21,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.crispy.tv.backend.MetadataTitleDetailResponse
 
 /**
  * Single source of truth for stream-selector state. Used by every surface that opens the
@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 class SelectorCoordinator(
     private val scope: CoroutineScope,
     private val streamResolver: StreamResolver,
-    private val getMetadataItemDetail: suspend (accessToken: String, itemId: String) -> CrispyBackendClient.MetadataTitleDetailResponse,
+    private val getMetadataItemDetail: suspend (accessToken: String, itemId: String) -> MetadataTitleDetailResponse,
     private val sessionTokenProvider: suspend () -> String?,
     private val pluginStreamLoader: PluginStreamLoader? = null,
 ) {

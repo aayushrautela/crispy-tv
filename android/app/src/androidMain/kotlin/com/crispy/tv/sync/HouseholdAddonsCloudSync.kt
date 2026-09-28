@@ -7,6 +7,7 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import java.util.Locale
+import com.crispy.tv.backend.AddonDto
 
 class HouseholdAddonsCloudSync(
     private val supabase: SupabaseAccountClient,
@@ -111,7 +112,7 @@ class HouseholdAddonsCloudSync(
         else -> pluginResult
     }
 
-    private fun toLocalRow(dto: CrispyBackendClient.AddonDto): CloudAddonRow? {
+    private fun toLocalRow(dto: AddonDto): CloudAddonRow? {
         if (dto.type != ADDON_TYPE_STREMIO) {
             return null
         }

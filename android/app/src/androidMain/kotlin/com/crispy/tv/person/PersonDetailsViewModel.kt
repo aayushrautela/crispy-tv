@@ -7,8 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.CrispyBackendClient.PersonSocials
+import com.crispy.tv.backend.PersonSocials
 import com.crispy.tv.addons.mapping.normalizedCatalogMediaType
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.domain.person.KnownForRail
@@ -20,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.crispy.tv.backend.MetadataPersonDetail
 
 @Immutable
 data class PersonKnownForRail(
@@ -124,7 +124,7 @@ class PersonDetailsViewModel internal constructor(
     }
 }
 
-private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails {
+private fun MetadataPersonDetail.toUiModel(): PersonDetails {
     val rails = com.crispy.tv.domain.person.KnownForPartitioner.partition(
         items = knownFor,
         typeOf = { it.normalizedCatalogMediaType() },

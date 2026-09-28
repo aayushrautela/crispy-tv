@@ -31,6 +31,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
+import com.crispy.tv.backend.ClientMediaCard
+import com.crispy.tv.backend.ProfileHomeResponse
+import com.crispy.tv.backend.ProfileHomeSection
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
 // Home snapshots are reused as a stale-while-revalidate fallback: keep the last
@@ -218,7 +221,7 @@ class HomeCatalogService constructor(
         )
     }
 
-    private fun CrispyBackendClient.ProfileHomeResponse.toSnapshot(): HomeCatalogSnapshot {
+    private fun ProfileHomeResponse.toSnapshot(): HomeCatalogSnapshot {
         return HomeCatalogSnapshot(
             profileId = profileId.takeIf { it.isNotBlank() },
             lists = buildList {
@@ -230,7 +233,7 @@ class HomeCatalogService constructor(
         )
     }
 
-    private fun CrispyBackendClient.ProfileHomeSection.toCatalogList(): HomeCatalogList? {
+    private fun ProfileHomeSection.toCatalogList(): HomeCatalogList? {
         val catalogItems = items.mapNotNull { item -> item.toCatalogItem() }
         if (catalogItems.isEmpty()) return null
         val normalizedListKey = listKey.normalizedKind()
@@ -249,7 +252,7 @@ class HomeCatalogService constructor(
         )
     }
 
-    private fun CrispyBackendClient.ClientMediaCard.toCatalogItem(): HomeCatalogItem? {
+    private fun ClientMediaCard.toCatalogItem(): HomeCatalogItem? {
         val normalizedItemId = itemId.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
         val artwork = images.artwork

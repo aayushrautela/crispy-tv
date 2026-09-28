@@ -45,15 +45,15 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.Abs
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.backend.MetadataVideoView
 
 private const val YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v="
 
 @Composable
 internal fun YouTubeExtraVideoDialog(
-    video: CrispyBackendClient.MetadataVideoView?,
+    video: MetadataVideoView?,
     onDismiss: () -> Unit,
 ) {
     val videoKey = video?.key?.trim().orEmpty()

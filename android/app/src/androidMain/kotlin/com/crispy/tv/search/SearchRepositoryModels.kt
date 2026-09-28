@@ -1,8 +1,10 @@
 package com.crispy.tv.search
 
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.toCatalogItem
+import com.crispy.tv.backend.ClientMediaCard
+import com.crispy.tv.backend.PersonSearchResultItem
+import com.crispy.tv.backend.SearchResultsResponse
 
 data class SearchResultBuckets(
     val movies: List<SearchCatalogItem> = emptyList(),
@@ -21,7 +23,7 @@ data class SearchResultsPayload(
 
 typealias SearchCatalogItem = CatalogItem
 
-internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
+internal fun PersonSearchResultItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedName = name.trim().ifBlank { return null }
     val normalizedPersonId = personId.trim().ifBlank { return null }
     return SearchCatalogItem(
@@ -38,13 +40,13 @@ internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGen
     )
 }
 
-internal fun CrispyBackendClient.ClientMediaCard.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
+internal fun ClientMediaCard.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val base = toCatalogItem() ?: return null
     if (defaultGenre.isNullOrBlank() || !base.genre.isNullOrBlank()) return base
     return base.copy(genre = defaultGenre)
 }
 
-internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(defaultGenre: String? = null): SearchResultsPayload {
+internal fun SearchResultsResponse.toSearchResultsPayload(defaultGenre: String? = null): SearchResultsPayload {
     return SearchResultsPayload(
         query = query,
         buckets = SearchResultBuckets(

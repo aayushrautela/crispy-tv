@@ -1,6 +1,8 @@
 package com.crispy.tv.images
 
-import com.crispy.tv.backend.CrispyBackendClient
+// Aliased: this file declares a `ResponsiveImageSet` of its own, and the backend DTO
+// of the same name has to be reachable as a receiver on the mapping functions below.
+import com.crispy.tv.backend.ResponsiveImageSet as BackendResponsiveImageSet
 import com.crispy.tv.settings.ImageQuality
 
 data class ResponsiveImageSet(
@@ -30,7 +32,7 @@ data class ResponsiveImageSet(
     }
 }
 
-fun CrispyBackendClient.ResponsiveImageSet.toUiResponsiveImageSet(): ResponsiveImageSet {
+fun BackendResponsiveImageSet.toUiResponsiveImageSet(): ResponsiveImageSet {
     return ResponsiveImageSet(
         low = small,
         medium = medium,
@@ -38,7 +40,7 @@ fun CrispyBackendClient.ResponsiveImageSet.toUiResponsiveImageSet(): ResponsiveI
     )
 }
 
-internal fun CrispyBackendClient.ResponsiveImageSet.toDomainMap(): Map<String, String?> {
+internal fun BackendResponsiveImageSet.toDomainMap(): Map<String, String?> {
     return mapOf(
         "small" to small,
         "medium" to medium,

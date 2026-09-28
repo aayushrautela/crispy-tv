@@ -16,10 +16,14 @@ import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import com.crispy.tv.backend.ClientMediaCard
+import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.backend.MetadataTitleExtrasResponse
+import com.crispy.tv.backend.MetadataTitleRatingsResponse
 
 internal data class DetailsScreenLoadResult(
     val details: MediaDetails?,
-    val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
+    val titleDetail: MetadataTitleDetailResponse?,
     val statusMessage: String,
     val providerState: ProviderState,
     val watchCta: WatchCta,
@@ -28,11 +32,11 @@ internal data class DetailsScreenLoadResult(
 )
 
 internal data class DetailsExtrasLoadResult(
-    val titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
+    val titleExtras: MetadataTitleExtrasResponse?,
 )
 
 internal data class DetailsRatingsLoadResult(
-    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
+    val titleRatings: MetadataTitleRatingsResponse?,
 )
 
 data class RuntimeDetailsEntry(
@@ -241,7 +245,7 @@ internal class DetailsUseCases(
             Log.w(TAG, "Failed to load series episodes for itemId=$itemId", error)
         }.getOrNull()
             ?.items
-            ?.mapNotNull(CrispyBackendClient.ClientMediaCard::toMediaVideo)
+            ?.mapNotNull(ClientMediaCard::toMediaVideo)
             .orEmpty()
     }
 
@@ -312,7 +316,7 @@ internal class DetailsUseCases(
 
         val videos = response
             ?.items
-            ?.mapNotNull(CrispyBackendClient.ClientMediaCard::toMediaVideo)
+            ?.mapNotNull(ClientMediaCard::toMediaVideo)
             .orEmpty()
         if (videos.isEmpty()) {
             return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")

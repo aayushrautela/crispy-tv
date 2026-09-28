@@ -1,6 +1,7 @@
 package com.crispy.tv.sync
 
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.AddonDto
+
 
 /**
  * Flavor-injected hook that reconciles jsplugin addon records between the server
@@ -8,11 +9,11 @@ import com.crispy.tv.backend.CrispyBackendClient
  * builds pass null so plugin records are never touched.
  */
 interface PluginAddonsSyncBridge {
-    suspend fun reconcilePull(serverAddons: List<CrispyBackendClient.AddonDto>): Result<Unit>
+    suspend fun reconcilePull(serverAddons: List<AddonDto>): Result<Unit>
 
     suspend fun reconcilePush(
         accessToken: String,
         profileId: String,
-        serverAddons: List<CrispyBackendClient.AddonDto>,
+        serverAddons: List<AddonDto>,
     ): Result<Unit>
 }

@@ -5,7 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.accounts.Session
 import com.crispy.tv.backend.BackendContext
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.tv.BuildConfig
 import com.crispy.tv.tv.di.TvServices
@@ -13,11 +12,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.crispy.tv.backend.Profile
 
 sealed interface TvSessionState {
     data object Loading : TvSessionState
     data class SignedOut(val configError: Boolean = false) : TvSessionState
-    data class NeedsProfile(val profiles: List<CrispyBackendClient.Profile>) : TvSessionState
+    data class NeedsProfile(val profiles: List<Profile>) : TvSessionState
     data class SignedIn(val context: BackendContext) : TvSessionState
 }
 
@@ -219,7 +219,7 @@ class TvSessionViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = TvSessionState.NeedsProfile(currentProfiles())
     }
 
-    private suspend fun currentProfiles(): List<CrispyBackendClient.Profile> {
+    private suspend fun currentProfiles(): List<Profile> {
         val appContext = getApplication<Application>()
         val session = pendingSession ?: return emptyList()
         return runCatching {

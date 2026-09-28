@@ -6,6 +6,7 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.images.clearImageCache
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.crispy.tv.backend.Profile
 
 data class BootstrapResult(
     val signedIn: Boolean,
@@ -50,7 +51,7 @@ class AccountBootstrapRepository(
         interfaceLanguage: String,
         avatarUrl: String,
         region: String? = null,
-    ): CrispyBackendClient.Profile {
+    ): Profile {
         val session = supabase.ensureValidSession() ?: throw IllegalStateException("Not signed in.")
         val profile = backendClient.bootstrapAccount(session.accessToken, name, interfaceLanguage, avatarUrl, region)
         session.userId?.takeIf { it.isNotBlank() }?.let { userId ->
@@ -100,10 +101,10 @@ class SyncProviderRepository(
 
     suspend fun startImport(
         accessToken: String,
-        provider: com.crispy.tv.backend.CrispyBackendClient.ImportProvider,
+        provider: com.crispy.tv.backend.ImportProvider,
         action: String,
         returnTo: String,
-    ): com.crispy.tv.backend.CrispyBackendClient.StartImportResult {
+    ): com.crispy.tv.backend.StartImportResult {
         val context = backendContextResolver.resolve()
             ?: throw IllegalStateException("No active profile.")
         return backendClient.startImport(
@@ -118,7 +119,7 @@ class SyncProviderRepository(
 
     suspend fun disconnectImportConnection(
         accessToken: String,
-        provider: com.crispy.tv.backend.CrispyBackendClient.ImportProvider,
+        provider: com.crispy.tv.backend.ImportProvider,
     ) {
         val context = backendContextResolver.resolve() ?: return
         backendClient.disconnectImportConnection(accessToken, context.profileId, provider)
@@ -133,7 +134,7 @@ class ProfileRepository(
     private val backendContextResolver: BackendContextResolver,
     private val backendClient: com.crispy.tv.backend.CrispyBackendClient,
 ) {
-    suspend fun listProfiles(accessToken: String): List<com.crispy.tv.backend.CrispyBackendClient.Profile> {
+    suspend fun listProfiles(accessToken: String): List<com.crispy.tv.backend.Profile> {
         return backendClient.listProfiles(accessToken)
     }
 
@@ -143,7 +144,7 @@ class ProfileRepository(
         isKids: Boolean,
         avatarKey: String?,
         interfaceLanguage: String? = null,
-    ): com.crispy.tv.backend.CrispyBackendClient.Profile {
+    ): com.crispy.tv.backend.Profile {
         return backendClient.createProfile(
             accessToken = accessToken,
             name = name,
@@ -159,11 +160,11 @@ class ProfileRepository(
         name: String?,
         isKids: Boolean?,
         avatarKey: String?,
-    ): com.crispy.tv.backend.CrispyBackendClient.Profile {
+    ): com.crispy.tv.backend.Profile {
         return backendClient.updateProfile(
             accessToken = accessToken,
             profileId = profileId,
-            input = com.crispy.tv.backend.CrispyBackendClient.UpdateProfileInput(
+            input = com.crispy.tv.backend.UpdateProfileInput(
                 name = name,
                 isKids = isKids,
                 avatarKey = avatarKey,
@@ -183,14 +184,14 @@ class ProfileRepository(
 class AccountSettingsRepository(
     private val backendClient: com.crispy.tv.backend.CrispyBackendClient,
 ) {
-    suspend fun getAccountSettings(accessToken: String): com.crispy.tv.backend.CrispyBackendClient.AccountSettings {
+    suspend fun getAccountSettings(accessToken: String): com.crispy.tv.backend.AccountSettings {
         return backendClient.getAccountSettings(accessToken)
     }
 
     suspend fun patchSettings(
         accessToken: String,
         settings: Map<String, String>,
-    ): com.crispy.tv.backend.CrispyBackendClient.AccountSettings {
+    ): com.crispy.tv.backend.AccountSettings {
         return backendClient.patchAccountSettings(accessToken = accessToken, settings = settings)
     }
 

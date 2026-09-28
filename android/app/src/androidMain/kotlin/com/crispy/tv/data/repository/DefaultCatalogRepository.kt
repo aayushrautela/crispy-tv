@@ -2,6 +2,10 @@ package com.crispy.tv.data.repository
 
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.CatalogRepository
+import com.crispy.tv.backend.MetadataSeriesEpisodesResponse
+import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.backend.MetadataTitleExtrasResponse
+import com.crispy.tv.backend.MetadataTitleRatingsResponse
 
 class DefaultCatalogRepository(
     private val backendClient: CrispyBackendClient,
@@ -9,14 +13,14 @@ class DefaultCatalogRepository(
     override suspend fun getTitleDetail(
         accessToken: String,
         itemId: String,
-    ): CrispyBackendClient.MetadataTitleDetailResponse {
+    ): MetadataTitleDetailResponse {
         return backendClient.getMetadataItemDetail(accessToken = accessToken, itemId = itemId)
     }
 
     override suspend fun getTitleExtras(
         accessToken: String,
         itemId: String,
-    ): CrispyBackendClient.MetadataTitleExtrasResponse {
+    ): MetadataTitleExtrasResponse {
         return backendClient.getMetadataItemExtras(accessToken = accessToken, itemId = itemId)
     }
 
@@ -24,7 +28,7 @@ class DefaultCatalogRepository(
         accessToken: String,
         seriesItemId: String,
         season: Int?,
-    ): CrispyBackendClient.MetadataSeriesEpisodesResponse {
+    ): MetadataSeriesEpisodesResponse {
         return backendClient.getSeriesEpisodes(
             accessToken = accessToken,
             seriesItemId = seriesItemId,
@@ -36,7 +40,7 @@ class DefaultCatalogRepository(
         accessToken: String,
         profileId: String,
         itemId: String,
-    ): CrispyBackendClient.MetadataTitleRatingsResponse {
+    ): MetadataTitleRatingsResponse {
         return backendClient.getMetadataItemRatings(
             accessToken = accessToken,
             profileId = profileId,

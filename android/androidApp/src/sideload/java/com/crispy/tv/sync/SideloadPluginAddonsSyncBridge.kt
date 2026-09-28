@@ -6,6 +6,7 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.plugins.repo.PluginRepoClient
 import java.util.Locale
+import com.crispy.tv.backend.AddonDto
 
 class SideloadPluginAddonsSyncBridge(
     private val repoClient: PluginRepoClient,
@@ -22,7 +23,7 @@ class SideloadPluginAddonsSyncBridge(
      * were installed manually on this device are never touched: another device
      * may still own them. Mirrors the Nuvio empty-remote guard.
      */
-    override suspend fun reconcilePull(serverAddons: List<CrispyBackendClient.AddonDto>): Result<Unit> {
+    override suspend fun reconcilePull(serverAddons: List<AddonDto>): Result<Unit> {
         val errors = mutableListOf<String>()
         val serverRowsByRepo = serverAddons
             .filter { it.type == ADDON_TYPE_JSPLUGIN }
@@ -90,7 +91,7 @@ class SideloadPluginAddonsSyncBridge(
     override suspend fun reconcilePush(
         accessToken: String,
         profileId: String,
-        serverAddons: List<CrispyBackendClient.AddonDto>,
+        serverAddons: List<AddonDto>,
     ): Result<Unit> {
         val errors = mutableListOf<String>()
         val serverPlugins = serverAddons.filter { it.type == ADDON_TYPE_JSPLUGIN }

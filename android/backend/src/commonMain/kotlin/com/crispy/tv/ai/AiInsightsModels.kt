@@ -1,6 +1,7 @@
 package com.crispy.tv.ai
 
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.ResponsiveImageSet
+
 
 enum class AiInsightSlideKey(val wire: String) {
     THE_GOOD_STUFF("the_good_stuff"),
@@ -48,7 +49,7 @@ data class AiInsightSlide(
     val tag: AiInsightStandoutTag?,
     val focus: String?,
     val context: String?,
-    val backdrop: CrispyBackendClient.ResponsiveImageSet,
+    val backdrop: ResponsiveImageSet,
     val accent: String,
 )
 

@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import com.crispy.tv.backend.CrispyBackendClient
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,11 +36,12 @@ import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.addons.util.normalizeRatingText
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.backend.MetadataTitleRatings
 
 @Composable
 internal fun RatingsSection(
     tmdbRating: String?,
-    titleRatings: CrispyBackendClient.MetadataTitleRatings?,
+    titleRatings: MetadataTitleRatings?,
     isLoading: Boolean,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
@@ -170,7 +170,7 @@ private data class DetailsRatingPill(
 
 private fun buildRatings(
     tmdbRating: String?,
-    titleRatings: CrispyBackendClient.MetadataTitleRatings?,
+    titleRatings: MetadataTitleRatings?,
 ): List<DetailsRatingPill> {
     val resolvedTitleRatings = titleRatings
 

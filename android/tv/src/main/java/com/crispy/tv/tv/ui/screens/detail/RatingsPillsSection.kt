@@ -33,8 +33,8 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.addons.util.normalizeRatingText
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ui.assets.R
+import com.crispy.tv.backend.MetadataTitleRatings
 
 private data class TvRatingPill(
     val key: String,
@@ -49,7 +49,7 @@ private data class TvRatingPill(
 @Composable
 internal fun RatingsPillsSection(
     itemRating: Double?,
-    titleRatings: CrispyBackendClient.MetadataTitleRatings?,
+    titleRatings: MetadataTitleRatings?,
     modifier: Modifier = Modifier,
 ) {
     val pills = remember(itemRating, titleRatings) {
@@ -134,7 +134,7 @@ private fun RatingPill(pill: TvRatingPill) {
 
 private fun buildRatingPills(
     itemRating: Double?,
-    titleRatings: CrispyBackendClient.MetadataTitleRatings?,
+    titleRatings: MetadataTitleRatings?,
 ): List<TvRatingPill> = listOfNotNull(
     buildPill(
         key = "tmdb",

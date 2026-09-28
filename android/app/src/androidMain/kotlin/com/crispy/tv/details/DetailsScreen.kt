@@ -1,6 +1,5 @@
 @file:OptIn(
     androidx.compose.material3.ExperimentalMaterial3Api::class,
-    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
 )
 
 package com.crispy.tv.details
@@ -69,7 +68,6 @@ import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.addons.model.MediaDetails
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.StreamSelectorSheet
@@ -82,6 +80,8 @@ import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
+import com.crispy.tv.backend.MetadataReviewView
+import com.crispy.tv.backend.MetadataVideoView
 
 private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 
@@ -239,9 +239,9 @@ internal fun DetailsScreen(
     val containerColor = palette.pageBackground.copy(alpha = topBarAlpha)
     val contentColor = lerp(Color.White, palette.onPageBackground, topBarAlpha)
 
-    var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
-    var selectedTrailerEmbed by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
-    var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
+    var selectedMakingOfVideo by remember { mutableStateOf<MetadataVideoView?>(null) }
+    var selectedTrailerEmbed by remember { mutableStateOf<MetadataVideoView?>(null) }
+    var expandedReview by remember { mutableStateOf<MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
     val reviewSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val episodeSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -538,8 +538,8 @@ internal fun DetailsScreen(
     }
 }
 
-private fun HeroTrailerSource.toEmbeddedVideo(): CrispyBackendClient.MetadataVideoView =
-    CrispyBackendClient.MetadataVideoView(
+private fun HeroTrailerSource.toEmbeddedVideo(): MetadataVideoView =
+    MetadataVideoView(
         id = id,
         key = extractYouTubeVideoId(id) ?: id,
         name = "Trailer",

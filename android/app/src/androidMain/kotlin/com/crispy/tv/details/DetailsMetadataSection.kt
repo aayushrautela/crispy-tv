@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import com.crispy.tv.backend.CrispyBackendClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,11 +21,13 @@ import com.crispy.tv.addons.model.MediaDetails
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.backend.MetadataTitleExtrasResponse
 
 internal fun buildDetailsRows(
     details: MediaDetails,
-    titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
-    titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
+    titleDetail: MetadataTitleDetailResponse?,
+    titleExtras: MetadataTitleExtrasResponse?,
 ): List<Pair<String, String>> {
     val rows = mutableListOf<Pair<String, String>>()
     val item = titleDetail?.item

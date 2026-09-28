@@ -1,16 +1,6 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
-import com.crispy.tv.backend.CrispyBackendClient.BrowseTitlesResponse
-import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
-import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataSeriesEpisodesResponse
-import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
-import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -208,7 +198,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
     }
 }
 
-internal fun CrispyBackendClient.parseMetadataExtrasLists(array: JSONArray?): List<CrispyBackendClient.MetadataExtrasList> {
+internal fun CrispyBackendClient.parseMetadataExtrasLists(array: JSONArray?): List<MetadataExtrasList> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
@@ -217,7 +207,7 @@ internal fun CrispyBackendClient.parseMetadataExtrasLists(array: JSONArray?): Li
             val title = list.optString("title").trim()
             if (key.isBlank() || title.isBlank()) continue
             add(
-                CrispyBackendClient.MetadataExtrasList(
+                MetadataExtrasList(
                     key = key,
                     title = title,
                     items = parseClientMediaCards(list.optJSONArray("items")),

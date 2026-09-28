@@ -1,16 +1,5 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.ImportJobsResponse
-import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
-import com.crispy.tv.backend.CrispyBackendClient.MeResponse
-import com.crispy.tv.backend.CrispyBackendClient.Profile
-import com.crispy.tv.backend.CrispyBackendClient.ProfileSettings
-import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
-import com.crispy.tv.backend.CrispyBackendClient.AddonDto
-import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
-import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
-import com.crispy.tv.backend.CrispyBackendClient.UpdateProfileInput
-import com.crispy.tv.backend.CrispyBackendClient.Avatar
 import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -193,7 +182,7 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     accessToken: String,
     profileId: String,
     provider: ImportProvider,
-): CrispyBackendClient.ProviderState {
+): ProviderState {
     checkConfigured()
     val response = httpClient.delete(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections/${provider.apiValue}".toHttpUrl(),

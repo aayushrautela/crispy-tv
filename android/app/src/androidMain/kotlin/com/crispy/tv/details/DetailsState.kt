@@ -1,13 +1,15 @@
 package com.crispy.tv.details
 
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.domain.optimistic.FieldSync
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.backend.MetadataTitleExtrasResponse
+import com.crispy.tv.backend.MetadataTitleRatingsResponse
 
 @Immutable
 data class EpisodeWatchState(
@@ -38,9 +40,9 @@ data class DetailsUiState(
     val extrasIsLoading: Boolean = false,
     val ratingsIsLoading: Boolean = false,
     val details: MediaDetails? = null,
-    val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
-    val titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse? = null,
-    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse? = null,
+    val titleDetail: MetadataTitleDetailResponse? = null,
+    val titleExtras: MetadataTitleExtrasResponse? = null,
+    val titleRatings: MetadataTitleRatingsResponse? = null,
     val statusMessage: String = "",
     val extrasStatusMessage: String = "",
     val ratingsStatusMessage: String = "",

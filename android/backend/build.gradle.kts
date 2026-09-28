@@ -8,7 +8,7 @@ plugins {
  * stores.
  *
  * The largest Phase 2 module at 3,422 lines, and the one where the honest split is
- * narrow. Eight of its twelve files are HTTP or JSON adapters over
+ * narrow. Nine of its thirteen files are HTTP or JSON adapters over
  * `CrispyBackendClient`, and they stay in `androidMain` for the same two reasons
  * documented on `:android:network` and `:android:watchhistory`: OkHttp and
  * `org.json` have no Kotlin/Native artifact, and replacing `org.json` with
@@ -18,16 +18,16 @@ plugins {
  * | file | where | why |
  * |---|---|---|
  * | `Session` | `commonMain` | a data class, portable as-is |
- * | `ActiveProfileStore` | `commonMain` | `KeyValueStore` only, once `:android:platform-core` is a `commonMain` dependency; the `Context` is gone |
- * | `BackendContextResolver` | `commonMain` | coroutines only, once `ActiveProfileStore` and `SupabaseAccountClient` are; `SupabaseAccountClient` is OkHttp, so this follows it rather than leading it |
- * | `AiInsightsModels` | `androidMain` | names `CrispyBackendClient.ResponsiveImageSet`. That type is three nullable strings and would itself be portable, but it is one of ~40 nested types inside the client; pulling out that single one so a 57-line file looks portable would be arbitrary. It moves when the client does |
+ * | `ActiveProfileStore` | `commonMain` | `KeyValueStore` only; the `Context` is gone |
+ * | `BackendTypes` | `commonMain` | the 52 response and request types that used to be nested in `CrispyBackendClient`. Pure data; lifted out because 38 files across 8 modules referenced them, and the client is `androidMain`, so a data class's nesting was pinning all of them to `androidMain` |
+ * | `AiInsightsModels` | `commonMain` | moved once `BackendTypes` was. It was blocked by naming `CrispyBackendClient.ResponsiveImageSet` and by nothing else, so it became portable the moment that type did |
  * | `SecureTokenStore` | `androidMain` | Android keystore crypto and `javax.crypto`. It is the `SecretStore` implementation |
- * | the six `CrispyBackend*` files, `SupabaseAccountClient` | `androidMain` | OkHttp and `org.json` |
+ * | `BackendContextResolver`, the six `CrispyBackend*` files, `SupabaseAccountClient` | `androidMain` | OkHttp and `org.json` |
  *
- * The dependency direction matters for the migration: `BackendContextResolver` and
- * `AiInsightsModels` are *consumers* of the adapters, so they cannot move until the
- * adapters do. They are listed with their blocker rather than moved optimistically
- * and left failing to compile.
+ * The dependency direction matters for the migration: `BackendContextResolver` is a
+ * *consumer* of `SupabaseAccountClient`, which is OkHttp, so it follows that adapter
+ * rather than leading it. It is listed with its blocker rather than moved
+ * optimistically and left failing to compile.
  */
 kotlin {
     jvmToolchain(21)

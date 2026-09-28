@@ -6,6 +6,7 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
 import com.crispy.tv.platform.TimeSource
+import com.crispy.tv.backend.UpNextItem
 
 class UpNextService constructor(
     private val backendClient: CrispyBackendClient,
@@ -39,7 +40,7 @@ class UpNextService constructor(
         )
     }
 
-    private fun toCanonicalContinueWatchingItem(view: CrispyBackendClient.UpNextItem): CanonicalContinueWatchingItem? {
+    private fun toCanonicalContinueWatchingItem(view: UpNextItem): CanonicalContinueWatchingItem? {
         val episode = view.nextEpisode ?: return null
         val seriesId = view.show?.itemId ?: return null
         return CanonicalContinueWatchingItem(
