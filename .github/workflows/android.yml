@@ -176,6 +176,14 @@ jobs:
             --store android/androidApp/build/outputs/apk/store/debug/*.apk \
             --sideload android/androidApp/build/outputs/apk/sideload/debug/*.apk
 
+      - name: Assert no compiled class outlives its declaration
+        # A stale class in build/classes/kotlin binds a reference that should fail
+        # to compile, so it can make every other assertion in this workflow report
+        # a false pass. A fresh runner never sees one, which is the point: this is
+        # a guard for the day output caching or a warm build directory arrives, and
+        # it keeps the script itself honest in an environment built from scratch.
+        run: python scripts/verify_kmp_outputs.py
+
       # ---- artefacts --------------------------------------------------------
 
       - name: Upload store app APK

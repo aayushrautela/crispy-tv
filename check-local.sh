@@ -94,3 +94,15 @@ fi
 "$PY" scripts/verify_apk_distribution.py \
     --store android/androidApp/build/outputs/apk/store/debug/*.apk \
     --sideload android/androidApp/build/outputs/apk/sideload/debug/*.apk
+
+# Assert the compiled output matches the sources, not just that the tasks
+# reported success. An incremental compile can leave a class behind that no
+# declaration produces any more -- `git mv` preserves mtime, and the Kotlin
+# incremental compiler does not reliably delete the class of a declaration
+# removed from a file it still considers current. A stale class binds a
+# reference that should fail to compile, so it makes every other gate here
+# meaningless. This is the same "verify the artefact" rule as the two above,
+# applied to compilation; it reads build/classes/kotlin, so it runs after
+# the gradle tasks. A CI runner is always clean and never sees this, which is
+# exactly why the check belongs to the local gate.
+"$PY" scripts/verify_kmp_outputs.py
