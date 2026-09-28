@@ -143,9 +143,24 @@ interface WatchHistoryService {
         return WatchHistoryResult(statusMessage = "Playback removal unavailable.")
     }
 
+    /**
+     * `nowMs` has no default, and that is deliberate.
+     *
+     * It used to default to `System.currentTimeMillis()`, which is the only
+     * platform-specific expression in this file and the reason
+     * `compileKotlinLinuxX64` failed when this module became multiplatform. The
+     * import-based purity gate passed it, because `System` is in `java.lang` and
+     * needs no import on the JVM -- so it is invisible to any check that reads
+     * import lines, and only a real Kotlin/Native compile catches it. That is the
+     * whole argument for keeping the `linuxX64` target.
+     *
+     * Reading the clock inside a default argument also hides the read from
+     * callers, which is the opposite of what the rest of this repository does: it
+     * passes `nowMs` explicitly so behaviour is a function of the inputs.
+     */
     suspend fun getCanonicalContinueWatching(
-        limit: Int = 20,
-        nowMs: Long = System.currentTimeMillis(),
+        limit: Int,
+        nowMs: Long,
     ): CanonicalContinueWatchingResult {
         return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
     }

@@ -89,7 +89,15 @@ class HomeRefreshCoordinator(
 
     suspend fun loadContinueWatching(): HomeWideRailSectionUi? {
         val suppressionMap = suppressionStore.read()
-        val canonicalResult = watchHistoryService.getCanonicalContinueWatching(limit = continueWatchingLimit)
+        // The clock is read here rather than defaulted inside the interface, which
+        // stopped the moment :android:player became multiplatform. This module still
+        // reads it in three other places in this file; injecting platform-core's
+        // `TimeSource` for all four is part of this module's own Phase 2 step, and
+        // doing it once there beats doing it twice.
+        val canonicalResult = watchHistoryService.getCanonicalContinueWatching(
+            limit = continueWatchingLimit,
+            nowMs = System.currentTimeMillis(),
+        )
         val filtered = canonicalResult.copy(
             entries = applyProviderSuppressionFilter(canonicalResult.entries, suppressionMap),
         )
