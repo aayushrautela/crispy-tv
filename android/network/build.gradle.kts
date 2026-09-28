@@ -10,15 +10,21 @@ android {
         minSdk = 26
     }
 
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("store") {
-            dimension = "distribution"
-        }
-        create("sideload") {
-            dimension = "distribution"
-        }
-    }
+    // No flavour axis, deliberately.
+    //
+    // This module used to carry `store` / `sideload` so that
+    // `YouTubeTrailerExtractor` could have two implementations and
+    // NewPipeExtractor could be declared `sideloadImplementation`. That was the
+    // only reason for the axis, and it made the module unconsumable by
+    // `:app` once `:app` became a Kotlin Multiplatform library: the KMP library
+    // plugin is single-variant, so it expressed no preference between
+    // `storeDebugApiElements` and `sideloadDebugApiElements` and Gradle failed
+    // with an ambiguous-variant error.
+    //
+    // The axis now lives only in `:androidApp`. The interface is
+    // `TrailerExtractor` in this module's main source set; the sideload-only
+    // implementation is `:android:youtube-extractor`. Six modules depend on
+    // this one, and none of them wants to know about a distribution.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
@@ -31,7 +37,4 @@ dependencies {
 
     api(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
-
-    // JitPack git-tag version, not a normal release — left out of the catalog.
-    "sideloadImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

@@ -1,333 +1,192 @@
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.kotlin.compose)
+
+    // Deliberately NOT alias(libs.plugins.compose.multiplatform) yet. It would
+    // only be used for the `compose.*` dependency accessors, and this module
+    // cannot use them: they resolve material3 to 1.4.0 while the app is written
+    // against 1.5.0-alpha26's Material3 Expressive APIs. :android:sharedUI is
+    // where CMP is applied, and `:app` depends on it. The plugin comes back in
+    // Phase 4, with the material3 dependency that goes with it.
 }
 
 /**
- * Golden-screenshot mode. Off by default (verify); pass -Proborazzi.record=true
- * to re-record the committed PNGs under src/test/screenshots.
- */
-val roborazziRecord = providers.gradleProperty("roborazzi.record").orNull == "true"
-
-/**
- * Generates a fontconfig file pointing at the font committed in
- * `src/test/fonts`, and points the unit-test JVM at it.
+ * The shared UI and presentation layer.
  *
- * Roborazzi draws a label onto its diff canvas with Java2D, so a *failing*
- * screenshot test needs a host font. Without this a bare container reports
- * `Fontconfig head is null` instead of the real difference. Generated rather
- * than committed because fontconfig requires an absolute <dir>.
+ * Created by the Phase 1 split. `:app` used to be the Android application and
+ * owned the manifest, `res/`, signing, flavours and 159 source files; all of
+ * that is now in `:androidApp`, which is a thin entry point on top of this.
+ *
+ * ## Nothing here is in `commonMain` yet
+ *
+ * Every file still lives in `androidMain`. That is deliberate: the split
+ * proves the module graph compiles before any code is moved across a source-set
+ * boundary, and moving 31k lines of Compose at the same time as restructuring
+ * the modules would make a failure impossible to attribute. Phase 4 moves the
+ * screens into `commonMain` one vertical slice at a time.
+ *
+ * ## What this module deliberately does not know
+ *
+ * The build variant. It is a single-variant library, so it has no `store` /
+ * `sideload` source sets and depends on neither `:android:plugins` nor
+ * `:android:torrent-engine`. The five things a variant used to supply now come
+ * through `DistributionComponents`, installed by `:androidApp`. `:app` holds
+ * the interface and reads through `AppDistribution`; neither flavour's
+ * implementation is on its classpath.
+ *
+ * ## `androidLibrary { }`, not `android { }`
+ *
+ * `org.jetbrains.compose` wires itself to `androidLibrary` specifically. With
+ * `android { }` the compose dependencies resolve onto `androidCompileClasspath`
+ * and are then invisible to the Kotlin compiler, which fails with
+ * `Unresolved reference 'org.jetbrains.compose'`. The Gradle task succeeds and
+ * only compilation fails, so it presents as a dependency bug and is not one.
+ *
+ * ## No `linuxX64` here
+ *
+ * Unlike :core-domain and :platform-core, this is a Compose module. Compose
+ * Multiplatform publishes no `linuxX64` artifacts -- its targets are Android,
+ * iOS and Desktop (JVM) only -- so declaring it makes every `compose.*`
+ * dependency fail to resolve. `jvm("desktop")` is the local purity gate
+ * instead.
  */
-val testFontsConfig = layout.buildDirectory.file("test-fonts/fonts.conf")
-val testFontsDir = layout.projectDirectory.dir("src/test/fonts")
+kotlin {
+    jvmToolchain(21)
 
-val generateTestFontsConfig by tasks.registering {
-    val fontsDirectory = testFontsDir.asFile.absolutePath
-    val outputFile = testFontsConfig
-    inputs.dir(testFontsDir)
-    outputs.file(outputFile)
-    doLast {
-        val file = outputFile.get().asFile
-        file.parentFile.mkdirs()
-        file.writeText(
-            """
-            <?xml version="1.0"?>
-            <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-            <fontconfig>
-              <dir>$fontsDirectory</dir>
-              <cachedir>${file.parentFile.absolutePath}/cache</cachedir>
-              <match target="pattern">
-                <edit name="family" mode="append_last"><string>Roboto</string></edit>
-              </match>
-            </fontconfig>
-            """.trimIndent()
-        )
-    }
-}
-
-val supabaseUrl =
-    (providers.gradleProperty("SUPABASE_URL").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
-val supabasePublishableKey =
-    (providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
-val crispyBackendUrl =
-    (providers.gradleProperty("CRISPY_BACKEND_URL").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
-val introDbApiUrl =
-    (providers.gradleProperty("INTRODB_API_URL").orNull ?: "https://api.introdb.app")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
-val releaseKeystorePath = providers.gradleProperty("RELEASE_KEYSTORE_PATH").orNull
-val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASSWORD").orNull
-val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull
-val releaseKeyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").orNull
-
-val debugKeystorePath = providers.gradleProperty("DEBUG_KEYSTORE_PATH").orNull
-val debugKeystorePassword = providers.gradleProperty("DEBUG_KEYSTORE_PASSWORD").orNull
-val debugKeyAlias = providers.gradleProperty("DEBUG_KEY_ALIAS").orNull
-val debugKeyPassword = providers.gradleProperty("DEBUG_KEY_PASSWORD").orNull
-
-android {
-    namespace = "com.crispy.tv"
-    compileSdk {
-        version = release(37) {
-            minorApiLevel = 0
-        }
-    }
-
-    defaultConfig {
-        applicationId = "com.crispy.tv"
+    android {
+        // `com.crispy.tv.app`, not `com.crispy.tv`. The Android namespace decides
+        // the package of the generated `R` class, and AGP rejects two modules
+        // sharing one. `:androidApp` holds the real `com.crispy.tv` namespace
+        // because that is the applicationId in the shipped APK; this module is a
+        // library beneath it and only had `com.crispy.tv` by inheritance from
+        // when it *was* the application.
+        //
+        // The Kotlin packages are unaffected: they are still `com.crispy.tv.*`.
+        // Five files referenced `com.crispy.tv.R` and now use `com.crispy.tv.app.R`.
+        namespace = "com.crispy.tv.app"
+        compileSdk = 37
         minSdk = 26
-        targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
-        buildConfigField("String", "CRISPY_BACKEND_URL", "\"$crispyBackendUrl\"")
-        buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
-    }
-
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("store") {
-            dimension = "distribution"
-        }
-        create("sideload") {
-            dimension = "distribution"
-            versionNameSuffix = "-sideload"
+        androidResources {
+            enable = true
         }
     }
 
-    splits {
-        abi {
-            isEnable = project.hasProperty("buildSideloadApks")
-            reset()
-            include("armeabi-v7a", "arm64-v8a", "x86_64")
-        }
-    }
+    jvm("desktop")
 
-    signingConfigs {
-        val hasReleaseSigning =
-            !releaseKeystorePath.isNullOrBlank() &&
-                !releaseKeystorePassword.isNullOrBlank() &&
-                !releaseKeyAlias.isNullOrBlank() &&
-                !releaseKeyPassword.isNullOrBlank()
+    // No linuxX64(), unlike :core-domain and :platform-core. This is a Compose
+    // module, and Compose Multiplatform publishes no linuxX64 artifacts -- its
+    // targets are Android, iOS and Desktop (JVM) only -- so declaring it makes
+    // every compose dependency fail to resolve. `jvm("desktop")` is the local
+    // purity gate instead.
 
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = file(releaseKeystorePath!!)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
-            }
-        }
+    listOf(iosArm64(), iosSimulatorArm64())
 
-        val hasDebugSigning =
-            !debugKeystorePath.isNullOrBlank() &&
-                !debugKeystorePassword.isNullOrBlank() &&
-                !debugKeyAlias.isNullOrBlank() &&
-                !debugKeyPassword.isNullOrBlank()
+    // No `binaries.framework` here. `:android:sharedUI` already exports the
+    // `CrispyUI` framework that the Swift shell imports, and two modules
+    // cannot export the same framework name. When Phase 4 moves screens into
+    // `commonMain` and the Swift shell needs *those* APIs, the framework moves
+    // to this module and `:sharedUI` stops exporting one.
 
-        if (hasDebugSigning) {
-            getByName("debug") {
-                storeFile = file(debugKeystorePath!!)
-                storePassword = debugKeystorePassword
-                keyAlias = debugKeyAlias
-                keyPassword = debugKeyPassword
-            }
-        }
-    }
+    // The default hierarchy template builds commonMain -> nativeMain ->
+    // appleMain -> iosMain automatically. Writing dependsOn by hand cancels it.
+    applyDefaultHierarchyTemplate()
 
-    buildTypes {
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
-        }
-    }
+    sourceSets {
+        // Compose UI shared by phone, tablet and desktop -- everything except
+        // the 10-foot TV surface, which :android:tv owns outright.
+        val appUi = create("appUi") { dependsOn(commonMain.get()) }
+        androidMain.get().dependsOn(appUi)
+        jvmMain.get().dependsOn(appUi)
+        iosMain.get().dependsOn(appUi)
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-        isCoreLibraryDesugaringEnabled = true
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    testOptions {
-        unitTests {
-            // Robolectric needs the merged resources and manifest to inflate
-            // themes, so it renders against the real app theme rather than a
-            // stub. Without this the golden screenshots are meaningless.
-            isIncludeAndroidResources = true
-
-            all {
-                it.dependsOn(generateTestFontsConfig)
-
-                // Roborazzi writes PNGs to disk and Robolectric reaches for
-                // android-all jars; neither tolerates a narrow heap.
-                it.maxHeapSize = "2g"
-                it.systemProperty("robolectric.graphicsMode", "NATIVE")
-
-                // Verify is the DEFAULT, so an ordinary test run is a rendering
-                // gate. Recording is explicit (`-Proborazzi.record=true`) and
-                // the resulting PNGs under src/test/screenshots are committed,
-                // which is what makes a missing golden a build failure rather
-                // than a silently accepted new baseline.
-                it.systemProperty("roborazzi.test.record", roborazziRecord.toString())
-                it.systemProperty("roborazzi.test.verify", (!roborazziRecord).toString())
-                // Keep the rendered diff image. Roborazzi builds the diff canvas
-                // on any mismatch regardless, so this only controls whether the
-                // artefact is written -- which is what CI uploads.
-                it.systemProperty("roborazzi.test.compare", (!roborazziRecord).toString())
-
-                // Gives the diff canvas a real font, so a mismatch reports the
-                // actual difference instead of dying in fontconfig.
-                it.environment("FONTCONFIG_FILE", testFontsConfig.get().asFile.absolutePath)
-
-                // Relative to the test JVM working directory, which Gradle
-                // sets to the project dir. CI uploads this tree on failure.
-                it.systemProperty("roborazzi.output.dir", "build/outputs/roborazzi")
-            }
-        }
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // What every target needs. Nothing is declared here yet: all 158 files
+        // are still in `androidMain`, and moving code into `commonMain` is
+        // Phase 4's work. Declaring more would advertise a portability that the
+        // source layout does not have yet.
+        commonMain.dependencies {
+            implementation(project(":android:core-domain"))
+            implementation(project(":android:platform-core"))
+            implementation(project(":android:sharedUI"))
         }
 
-        jniLibs {
-            useLegacyPackaging = true
-            pickFirsts += setOf("**/libc++_shared.so")
+        // Everything the current code actually needs. Listed as `androidMain`
+        // rather than at module level so it is obvious which of these are the
+        // ones Phase 4 has to replace with a portable equivalent.
+        androidMain.dependencies {
+            // AndroidX Compose, pinned explicitly, NOT via `compose.*` and NOT
+            // via `platform(libs.androidx.compose.bom)`. Two independent
+            // reasons, either of which alone would be enough:
+            //
+            //  - A KMP source set's dependency handler has no `platform()`, so
+            //    the BOM cannot be applied here. See the `composeAndroidx` entry
+            //    in gradle/libs.versions.toml.
+            //  - The `compose.*` accessors resolve material3 to 1.4.0, and this
+            //    app is written against Material3 Expressive in 1.5.0-alpha26:
+            //    LoadingIndicator, MaterialShapes, rememberBottomSheetState and
+            //    ExperimentalMaterial3ExpressiveApi all fail to resolve against
+            //    1.4.0. The catalog's `material3` version is the authoritative
+            //    one and the BOM agrees with it on the other three artifacts.
+            //
+            // Phase 4 replaces this block with the `compose.*` accessors, which
+            // is also when Material3 Expressive has to be dropped or replaced
+            // with something that exists on desktop and iOS.
+            implementation(libs.androidx.compose.runtime)
+            implementation(libs.androidx.compose.foundation)
+            implementation(libs.androidx.compose.ui)
+            implementation(libs.androidx.compose.material3)
+
+            implementation(project(":android:home"))
+            implementation(project(":android:player"))
+            implementation(project(":android:native-engine"))
+            implementation(project(":android:network"))
+            implementation(project(":android:watchhistory"))
+            implementation(project(":android:backend"))
+            implementation(project(":android:addons"))
+            implementation(project(":android:ui-assets"))
+
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.lifecycle.runtime.ktx)
+            implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation(libs.androidx.lifecycle.viewmodel.compose)
+            implementation(libs.androidx.activity.compose)
+
+            implementation(libs.androidx.navigation.compose)
+
+            implementation(libs.androidx.paging.runtime)
+            implementation(libs.androidx.paging.compose)
+
+            // No `platform(libs.androidx.compose.bom)` here: `platform()` is not
+            // available on a KMP source set's dependency handler, and declaring
+            // the AndroidX Compose artifacts alongside the `compose.*` accessors
+            // would double-declare the same modules. The accessors resolve to the
+            // same androidx artifacts at the version the plugin pins, so they are
+            // the only declaration needed. :androidApp keeps the BOM for its own
+            // test dependencies, where `platform()` does work.
+            //
+            // The old `ui-tooling-preview` dependency is gone: no file under
+            // src/androidMain imports @Preview, and CMP 1.11.1 does not expose a
+            // `compose.uiToolingPreview` accessor to replace it with. Add it back
+            // with an explicit version if a @Preview is ever actually used.
+            implementation(libs.google.material)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.okhttp)
+            implementation(libs.coil.svg)
+            implementation(libs.coil.core)
+            implementation(libs.material.kolor)
+            implementation(libs.metrics.performance)
+
+            implementation(libs.androidyoutubeplayer)
+
+            implementation(libs.androidx.media3.common)
+            implementation(libs.androidx.media3.exoplayer)
+            implementation(libs.androidx.media3.ui)
+            implementation(libs.androidx.media3.session)
+            implementation(libs.coroutines.android)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
     }
-}
-
-/**
- * Store builds must not ship the sideload-only engines. The modules are simply
- * not declared for the store flavor, so this asserts the resolved graph rather
- * than trusting the build files to stay that way.
- */
-val storeExclusionForbidden = listOf(
-    ":android:torrent-engine",
-    ":android:plugins",
-    "NewPipeExtractor",
-    "quickjs-kt",
-)
-
-tasks.register("verifyStoreBuildExclusions") {
-    group = "verification"
-    description = "Asserts store variants exclude the torrent engine and plugin runtime."
-
-    val storeVariants = listOf("storeDebug", "storeRelease")
-
-    doLast {
-        storeVariants.forEach { variant ->
-            val configuration = configurations.findByName("${variant}RuntimeClasspath")
-                ?: error("No ${variant}RuntimeClasspath configuration")
-            val offenders = configuration.incoming.resolutionResult.allComponents
-                .mapNotNull { it.id.displayName }
-                .filter { id -> storeExclusionForbidden.any { id.contains(it) } }
-                .distinct()
-            check(offenders.isEmpty()) {
-                "Store variant $variant must not contain: ${offenders.joinToString()}"
-            }
-        }
-    }
-}
-
-tasks.register("verifyDistributionExclusions") {
-    group = "verification"
-    description = "Runs every distribution exclusion check."
-    dependsOn("verifyStoreBuildExclusions")
-}
-
-dependencies {
-    implementation(project(":android:core-domain"))
-    implementation(project(":android:platform-core"))
-    implementation(project(":android:home"))
-    implementation(project(":android:player"))
-    implementation(project(":android:native-engine"))
-    implementation(project(":android:network"))
-    implementation(project(":android:watchhistory"))
-    implementation(project(":android:backend"))
-    implementation(project(":android:addons"))
-    implementation(project(":android:ui-assets"))
-    "sideloadImplementation"(project(":android:plugins"))
-    "sideloadImplementation"(project(":android:torrent-engine"))
-
-    coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
-
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.core.splashscreen)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.activity.compose)
-
-    implementation(libs.androidx.navigation.compose)
-
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.compose)
-
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.google.material)
-    implementation(libs.coil.compose)
-    implementation(libs.coil.network.okhttp)
-    implementation(libs.coil.svg)
-    implementation(libs.coil.core)
-    implementation(libs.material.kolor)
-    implementation(libs.metrics.performance)
-
-    implementation(libs.androidyoutubeplayer)
-
-    implementation(libs.androidx.media3.common)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
-    implementation(libs.androidx.media3.session)
-    "sideloadImplementation"("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
-    implementation(libs.coroutines.android)
-
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.compose.ui.test)
-    androidTestImplementation(libs.androidx.test.core.ktx)
-    androidTestImplementation(libs.androidx.test.ext.junit)
-    androidTestImplementation(libs.androidx.test.rules)
-    androidTestImplementation(libs.espresso.core)
-
-    // Golden-screenshot tests. These run on a plain JVM (no emulator, no KVM),
-    // which is the only way a rendering regression gets caught in CI on this
-    // repository. See android/app/src/test/.../screenshot for the harness.
-    testImplementation(platform(libs.androidx.compose.bom))
-    testImplementation(libs.junit4)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.compose.ui.test.junit4)
-    testImplementation(libs.androidx.compose.ui.test)
-    testImplementation(libs.roborazzi)
-    testImplementation(libs.roborazzi.compose)
-
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

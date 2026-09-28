@@ -26,7 +26,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.TrailerSource
-import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
+import com.crispy.tv.youtubetractor.YouTubeTrailerExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

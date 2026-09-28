@@ -67,7 +67,7 @@ jobs:
 
       - name: Verify store build excludes sideload-only engines
         # Reads the resolved dependency graph, so it is valid for every variant.
-        run: ./gradlew :android:app:verifyDistributionExclusions
+        run: ./gradlew :android:androidApp:verifyDistributionExclusions
 
       - name: Run JVM contract tests
         run: ./gradlew :android:contract-tests:test
@@ -76,7 +76,7 @@ jobs:
         run: ./gradlew :android:core-domain:desktopTest
 
       - name: Run plugins module unit tests
-        run: ./gradlew :android:plugins:testSideloadDebugUnitTest
+        run: ./gradlew :android:plugins:testDebugUnitTest
 
       - name: Upload plugins test reports
         if: failure()
@@ -88,14 +88,14 @@ jobs:
 
       - name: Verify golden screenshots
         # Verify mode is the default; a rendering regression fails here.
-        run: ./gradlew :android:app:testStoreDebugUnitTest
+        run: ./gradlew :android:androidApp:testStoreDebugUnitTest
 
       - name: Upload screenshot diffs on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: screenshot-diffs
-          path: android/app/build/outputs/roborazzi/
+          path: android/androidApp/build/outputs/roborazzi/
           if-no-files-found: warn
 
       # ---- build ------------------------------------------------------------
@@ -107,7 +107,7 @@ jobs:
 
       - name: Decode Android debug keystore
         # Must run before any assemble: the four DEBUG_KEYSTORE_* variables above
-        # are what switch :android:app to its custom debug signingConfig, and that
+        # are what switch :android:androidApp to its custom debug signingConfig, and
         # config points at this file. Setting the variables without creating the
         # keystore is what previously broke validateSigningStoreDebug.
         env:
@@ -119,7 +119,7 @@ jobs:
           fi
 
       - name: Lint Android app
-        run: ./gradlew :android:app:lintStoreDebug :android:app:lintSideloadDebug
+        run: ./gradlew :android:androidApp:lintStoreDebug :android:androidApp:lintSideloadDebug
 
       - name: Upload app lint reports
         if: failure()
@@ -127,9 +127,9 @@ jobs:
         with:
           name: lint-reports-app
           path: |
-            android/app/build/reports/lint-results-*Debug.txt
-            android/app/build/reports/lint-results-*Debug.html
-            android/app/build/intermediates/lint_intermediate_text_report/*/lintReport*/lint-results-*.txt
+            android/androidApp/build/reports/lint-results-*Debug.txt
+            android/androidApp/build/reports/lint-results-*Debug.html
+            android/androidApp/build/intermediates/lint_intermediate_text_report/*/lintReport*/lint-results-*.txt
           if-no-files-found: warn
 
       - name: Lint Android TV
@@ -147,7 +147,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Assemble Android app
-        run: ./gradlew :android:app:assembleStoreDebug :android:app:assembleSideloadDebug :android:app:assembleStoreDebugAndroidTest :android:app:assembleSideloadDebugAndroidTest
+        run: ./gradlew :android:androidApp:assembleStoreDebug :android:androidApp:assembleSideloadDebug
 
       - name: Assemble Android TV
         run: ./gradlew :android:tv:assembleDebug
@@ -162,8 +162,8 @@ jobs:
         # builds use the graph check above instead.
         run: |
           python scripts/verify_apk_distribution.py \
-            --store android/app/build/outputs/apk/store/debug/*.apk \
-            --sideload android/app/build/outputs/apk/sideload/debug/*.apk
+            --store android/androidApp/build/outputs/apk/store/debug/*.apk \
+            --sideload android/androidApp/build/outputs/apk/sideload/debug/*.apk
 
       # ---- artefacts --------------------------------------------------------
 
@@ -171,14 +171,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: app-debug-store
-          path: android/app/build/outputs/apk/store/debug/*.apk
+          path: android/androidApp/build/outputs/apk/store/debug/*.apk
           if-no-files-found: error
 
       - name: Upload sideload app APK
         uses: actions/upload-artifact@v7
         with:
           name: app-debug-sideload
-          path: android/app/build/outputs/apk/sideload/debug/*.apk
+          path: android/androidApp/build/outputs/apk/sideload/debug/*.apk
           if-no-files-found: error
 
       - name: Upload TV APKs

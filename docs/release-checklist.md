@@ -117,8 +117,8 @@ If you are testing `sideload`, all of them do.
 ## 11. Build and packaging
 
 - [ ] `./check-local.sh` is green.
-- [ ] `./gradlew :android:app:assembleRelease :android:tv:assembleRelease` green.
-- [ ] Lint clean: `:android:app:lintPlayDebug :android:app:lintFossDebug :android:tv:lintDebug`.
+- [ ] `./gradlew :android:androidApp:assembleStoreRelease :android:androidApp:assembleSideloadRelease :android:tv:assembleRelease` green.
+- [ ] Lint clean: `:android:androidApp:lintStoreDebug :android:androidApp:lintSideloadDebug :android:tv:lintDebug`.
 - [ ] Store AAB uploads to Play Console and passes pre-launch report.
 - [ ] Sideload APK installs over the previous version without a signature error.
 - [ ] Release signing uses the release keystore, not the debug one.

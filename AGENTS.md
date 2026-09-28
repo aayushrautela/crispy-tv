@@ -28,7 +28,7 @@ Other useful tasks:
 ```sh
 # JVM unit tests (if present)
 ./gradlew :android:core-domain:test
-./gradlew :android:app:testDebugUnitTest
+./gradlew :android:androidApp:testStoreDebugUnitTest
 
 # Clean
 ./gradlew clean
@@ -50,9 +50,9 @@ swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTe
 
 Android builds/lint:
 ```sh
-./gradlew :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:tv:assembleDebug
-./gradlew :android:app:assembleRelease :android:tv:assembleRelease
-./gradlew :android:app:lintPlayDebug :android:app:lintFossDebug
+./gradlew :android:androidApp:assembleStoreDebug :android:androidApp:assembleSideloadDebug :android:tv:assembleDebug
+./gradlew :android:androidApp:assembleStoreRelease :android:androidApp:assembleSideloadRelease :android:tv:assembleRelease
+./gradlew :android:androidApp:lintStoreDebug :android:androidApp:lintSideloadDebug
 ./gradlew :android:tv:lintDebug
 ```
 
@@ -71,30 +71,35 @@ bash .github/scripts/fetch-torrserver-binaries.sh
 ## Project Layout
 
 Gradle modules (common targets):
-- `:android:app`: main Android app (Compose)
+- `:android:androidApp`: the Android entry point (`com.android.application`) — manifest, `res/` that only the application needs, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden-screenshot tests
+- `:android:app`: the shared UI and presentation layer, a Kotlin Multiplatform library whose sources are still all in `androidMain`
+- `:android:youtube-extractor`: sideload-only YouTube stream extraction (NewPipeExtractor)
 - `:android:tv`: Android TV placeholder app (must compile)
 - `:android:core-domain`: pure domain rules (no Android types/IO)
 - `:android:contract-tests`: JUnit5 runner for `contracts/fixtures`
 - `:android:player`, `:android:network`, `:android:watchhistory`, `:android:native-engine`: Android libraries
 - `:android:torrent-engine`: sideload-only torrent engine. `:android:native-engine` holds the MPV/Media3 player and nothing else optional.
 
-Golden screenshots (`:android:app:testPlayDebugUnitTest`):
+Golden screenshots (`:android:androidApp:testStoreDebugUnitTest`):
 - Robolectric + Roborazzi, running on a plain JVM. No emulator, no KVM, no `androidTest` device. This is the only rendering coverage in the repository.
-- **Verify is the default**; re-record with `./gradlew :android:app:testPlayDebugUnitTest -Proborazzi.record=true`. Goldens are committed under `android/app/src/test/screenshots/`, so a missing golden fails the build.
-- The Roborazzi Gradle plugin is deliberately NOT applied: 1.43.1 fails against AGP 9.3 with `Extension of type 'TestedExtension' does not exist`. Record/verify is driven by the `-Proborazzi.*` properties in `android/app/build.gradle.kts` instead.
+- **Verify is the default**; re-record with `./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true`. Goldens are committed under `android/androidApp/src/test/screenshots/`, so a missing golden fails the build.
+- The tests live in `:androidApp`, not `:app`, and that is not arbitrary: they need `isIncludeAndroidResources = true` to inflate the real app theme, which only an application module has. They still render composables that live in `:app`.
+- The Roborazzi Gradle plugin is deliberately NOT applied: 1.43.1 fails against AGP 9.3 with `Extension of type 'TestedExtension' does not exist`. Record/verify is driven by the `-Proborazzi.*` properties in `android/androidApp/build.gradle.kts` instead.
 - Screenshot tests must set `application = ScreenshotTestApplication::class`. Robolectric otherwise boots `CrispyApplication`, whose `onCreate` reaches an `AndroidKeyStore` that cannot exist on a JVM.
 - Freeze the Compose clock (`mainClock.autoAdvance = false`) or animated content never matches.
-- **Host prerequisite:** a *failing* screenshot needs a host font, because Roborazzi labels the diff with Java2D. On a host with no font stack the failure reports `Fontconfig head is null` instead of the real difference. It still fails the build, but the diff is unreadable. `android/app/src/test/fonts/` bundles Roboto and a generated fontconfig, which covers hosts that have libfontconfig but no fonts; a host with **no** `libfontconfig.so.1` at all (such as a bare container) needs `fontconfig` + a font package installed with root, since the JDK cannot load one.
+- **Host prerequisite:** a *failing* screenshot needs a host font, because Roborazzi labels the diff with Java2D. On a host with no font stack the failure reports `Fontconfig head is null` instead of the real difference. It still fails the build, but the diff is unreadable. `android/androidApp/src/test/fonts/` bundles Roboto and a generated fontconfig, which covers hosts that have libfontconfig but no fonts; a host with **no** `libfontconfig.so.1` at all (such as a bare container) needs `fontconfig` + a font package installed with root, since the JDK cannot load one.
 
 Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
 - `:android:core-domain`: KMP (Android + `desktop` JVM + `linuxX64` + `iosArm64` + `iosSimulatorArm64`). Its `commonMain` is free of `java.*`/`android.*`; `scripts/check_common_purity.py` enforces that with no allowlist. The `java.time` and `URLEncoder` call sites were replaced with portable equivalents pinned by unit tests against real JVM output, which is what unblocked declaring the Apple targets.
 - `linuxX64` on the pure-Kotlin KMP modules is a **compile-only verification target**, never shipped and never run. It is the one Kotlin/Native target that builds on a Linux host, so `compileKotlinLinuxX64` in `check-local.sh` enforces the same "no JVM API" rule as the Apple targets in seconds instead of waiting for macOS CI. The import-based purity gate cannot see this class of bug: `"x".format(y)` is `kotlin.*`, so it passes the import scan and then fails only when an Apple target compiles. Prefer the native compile gate for anything touching `commonMain`.
 - `:android:sharedUI`: KMP + Compose Multiplatform `1.11.1`, targeting Android + `desktop` JVM + `iosArm64` + `iosSimulatorArm64`, and producing the `CrispyUI` iOS framework. Holds the design system in `commonMain`. Three rules that are expensive to relearn:
-  - **`androidLibrary { }`, not `android { }`.** `org.jetbrains.compose` wires itself to `androidLibrary` specifically. With `android { }` the compose dependencies resolve onto `androidCompileClasspath` but are invisible to the Kotlin compiler, and the build fails with `Unresolved reference 'org.jetbrains.compose'`. The Gradle task succeeds; only compilation fails, so it reads as a dependency bug and is not one.
+  - **`android { }` is current; `androidLibrary { }` is deprecated** as of Kotlin `2.4.10`, which says so outright: *"'androidLibrary' block is deprecated. Please use 'android' instead."* Earlier guidance — the JetBrains migration guide, and earlier revisions of this file — said the opposite and described a real failure with `android { }`. That failure is gone; JetBrains converged the two blocks. Write `android { }` on new code. `:sharedUI` still uses `androidLibrary { }` and compiles, with a deprecation warning.
   - **CMP 1.11.x ships `androidx.compose.*`, not `org.jetbrains.compose.*`.** Verified by unzipping the resolved AARs: 790 `androidx/compose` classes in `runtime-android`, 1336 in `ui-android`, and **zero** `org/jetbrains/compose` in any of them. The `org.jetbrains.compose.*` coordinates are thin aliases. So moving a Compose file from `:app` to `:sharedUI` changes the **artifact coordinates in `build.gradle.kts`**, never the imports in the file, and `import org.jetbrains.compose.*` does not compile anywhere.
   - **No `linuxX64` on Compose modules.** CMP publishes no linuxX64 artifacts — its targets are Android, iOS and Desktop (JVM) only — so declaring it makes every `compose.*` dependency fail to resolve. `jvm("desktop")` is the local purity gate for Compose modules instead. This is why the `linuxX64` rule above is scoped to pure-Kotlin modules.
   - `LocalConfiguration` is Android-only even under CMP (it lives in `AndroidCompositionLocals_androidKt`). Use `LocalWindowInfo.current.containerDpSize` — `containerSize` is `IntSize` px, `containerDpSize` is `DpSize`.
+  - **The `compose.*` accessors cannot be used where the app needs Material3 Expressive.** `compose.material3` resolves to `androidx.compose.material3:1.4.0`, but this app is written against `1.5.0-alpha26`: `LoadingIndicator`, `MaterialShapes`, `rememberBottomSheetState` and `ExperimentalMaterial3ExpressiveApi` all fail to resolve against 1.4.0, and the compiler reports them as "it is internal in file" rather than as a version problem. `:app` therefore declares `androidx.compose.{ui,foundation,runtime,material3}` explicitly, pinned by the `composeAndroidx` and `material3` versions in the catalog, and does not apply `org.jetbrains.compose` yet. Phase 4 replaces that with the accessors, which means it also has to drop or replace Material3 Expressive.
+  - **`platform(libs.androidx.compose.bom)` does not exist on a KMP source set.** `KotlinDependencyHandler` has no `platform()`, so a KMP library cannot apply a BOM and must pin versions itself. A plain Android module like `:androidApp` can, and does.
   - Pin CMP `1.11.1` to Kotlin `2.4.10`; bump them together or not at all.
 
 GitHub Actions (`.github/workflows/`), all `workflow_dispatch`-only by deliberate choice:
@@ -104,9 +109,9 @@ GitHub Actions (`.github/workflows/`), all `workflow_dispatch`-only by deliberat
 - `apple-release.yml` — unsigned sideloading IPA.
 - Names are platform + intent, not Gradle build type. Do not reintroduce `debug`/`release` into workflow names; "debug CI" and "debug build" are different things.
 - `verify_apk_distribution.py` reads the **dex** and is only valid on unminified builds, so it runs in `android.yml` (debug) and not in `android-release.yml`. Release asserts via `verifyDistributionExclusions`, which reads the dependency graph and is minification-proof.
-- AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`). Flavors live only in `:android:app`, `:android:network` and `:android:plugins`.
-- Distribution is a permanent two-flavor axis: `store` (Play/App Store) and `sideload` (APK/IPA). Optional engines are excluded **structurally** — the torrent engine, the QuickJS plugin runtime and the YouTube extractor are separate modules that only `sideload` depends on. Never reintroduce a null-returning stub for something the store build should simply not contain. Two guards enforce this: `./gradlew :android:app:verifyDistributionExclusions` reads the resolved dependency graph, and `scripts/verify_apk_distribution.py` reads the built dex and asserts in both directions.
-- `:app` stays a `com.android.application` with flavors. It is **not** becoming a flavor-less KMP library: the KMP plugin cannot carry flavors, and the flavor axis is a product requirement.
+- **Flavors live only in `:androidApp`, and that is not negotiable.** AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`), and a KMP library cannot even *consume* a flavored `com.android.library`: the library plugin is single-variant, so it states no preference between a dependency's `store*` and `sideload*` variants and Gradle fails with an ambiguous-variant error naming every candidate. Two modules were forced off that axis by this and both losses turned out to be dead weight: `:android:network` (the YouTube extractor, now the sideload-only module `:android:youtube-extractor` reached through the `TrailerExtractor` interface) and `:android:plugins`, whose entire `store` source set was one unread `internal val PluginsRuntimeSupported = false` that was never even compiled. Do not reintroduce `matchingFallbacks` to paper over this — it would compile `:app` against the store variant while a sideload APK shipped the sideload one, the same class of lie as the unwired torrent resolver fixed in `911f8d75`.
+- Distribution is a permanent two-flavor axis: `store` (Play/App Store) and `sideload` (APK/IPA). Optional engines are excluded **structurally** — the torrent engine, the QuickJS plugin runtime and the YouTube extractor are separate modules that only `sideload` depends on. Never reintroduce a null-returning stub for something the store build should simply not contain. Two guards enforce this: `./gradlew :android:androidApp:verifyDistributionExclusions` reads the resolved dependency graph, and `scripts/verify_apk_distribution.py` reads the built dex and asserts in both directions.
+- The flavour axis does not stop the migration; it moves with the entry point. `:app` *is* now a flavor-less KMP library, because the KMP plugin cannot carry `productFlavors` while the flavour axis is a product requirement. `:androidApp` is the `com.android.application` that declares them, and `:app` reaches the variant through the `DistributionComponents` seam rather than through source sets.
 - Apple targets are declared but cannot compile on Linux. Never run aggregate tasks (`build`, `check`, `allTests`); they reach the Kotlin/Native targets and fail. Use `./check-local.sh` or targeted tasks.
 
 Apple:

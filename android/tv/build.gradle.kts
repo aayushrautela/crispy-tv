@@ -43,7 +43,6 @@ android {
 
     defaultConfig {
         applicationId = "com.crispy.tv"
-        missingDimensionStrategy("distribution", "sideload")
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -137,6 +136,10 @@ dependencies {
     implementation(project(":android:player"))
     implementation(project(":android:native-engine"))
     implementation(project(":android:network"))
+    // TV is a sideload-only surface, so it takes the YouTube extractor directly
+    // rather than through a distribution seam. It used to get it transitively
+    // from :android:network's sideload variant; that flavour axis is gone.
+    implementation(project(":android:youtube-extractor"))
     implementation(project(":android:watchhistory"))
     implementation(project(":android:backend"))
     implementation(project(":android:addons"))

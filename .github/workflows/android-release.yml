@@ -93,7 +93,7 @@ jobs:
         run: ./gradlew :android:contract-tests:test
 
       - name: Run plugins module unit tests
-        run: ./gradlew :android:plugins:testSideloadDebugUnitTest
+        run: ./gradlew :android:plugins:testDebugUnitTest
 
       - name: Upload plugins test reports
         if: failure()
@@ -106,29 +106,29 @@ jobs:
       # ---- phone / tablet app -----------------------------------------------
 
       - name: Build store bundle
-        run: ./gradlew :android:app:bundleStoreRelease
+        run: ./gradlew :android:androidApp:bundleStoreRelease
 
       - name: Build sideload APKs
-        run: ./gradlew -PbuildSideloadApks :android:app:assembleSideloadRelease
+        run: ./gradlew -PbuildSideloadApks :android:androidApp:assembleSideloadRelease
 
       - name: Assert store build excludes sideload-only engines
         # The dependency graph, not the dex. Release is minified, so scanning the
         # dex for package names proves nothing: absence would be guaranteed
         # whether or not the code shipped. The graph is minification-proof.
-        run: ./gradlew :android:app:verifyDistributionExclusions
+        run: ./gradlew :android:androidApp:verifyDistributionExclusions
 
       - name: Upload store AAB
         uses: actions/upload-artifact@v7
         with:
           name: app-release-store-aab
-          path: android/app/build/outputs/bundle/storeRelease/*.aab
+          path: android/androidApp/build/outputs/bundle/storeRelease/*.aab
           if-no-files-found: error
 
       - name: Upload sideload APKs
         uses: actions/upload-artifact@v7
         with:
           name: app-release-sideload
-          path: android/app/build/outputs/apk/sideload/release/*.apk
+          path: android/androidApp/build/outputs/apk/sideload/release/*.apk
           if-no-files-found: error
 
       # ---- TV ---------------------------------------------------------------

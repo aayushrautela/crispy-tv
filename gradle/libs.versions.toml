@@ -14,6 +14,15 @@ composeBom = "2026.08.00"
 material3 = "1.5.0-alpha26"
 material = "1.12.0"
 
+# The androidx.compose.* version the BOM above resolves to, pinned explicitly on
+# the four artifacts :app needs. A KMP source set's dependency handler has no
+# `platform()`, so the BOM cannot be applied in :app. Without these versions the
+# Compose Multiplatform accessors supply material3 1.4.0, which lacks the
+# Material3 Expressive APIs this app uses (LoadingIndicator, MaterialShapes,
+# rememberBottomSheetState). They match the BOM, so :tv and :androidApp are
+# unaffected -- an explicit version and a platform both resolve to 1.12.0.
+composeAndroidx = "1.12.0"
+
 # Compose Multiplatform. Pinned to the generation that ships with the Kotlin
 # version above: Kotlin 2.4.x pairs with CMP 1.11.x. Do not bump this independently
 # of `kotlin` -- a mismatch surfaces as an opaque compose-compiler error.
@@ -81,9 +90,9 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
-androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
-androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
-androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeAndroidx" }
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "composeAndroidx" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "composeAndroidx" }
 androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
@@ -118,6 +127,9 @@ okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-i
 
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-core = { group = "io.coil-kt.coil3", name = "coil-core", version.ref = "coil" }
+# `SingletonImageLoader` lives in the `coil` artifact, not `coil-core`.
+# CrispyApplication installs the process-wide ImageLoader through it.
+coil-singleton = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 coil-svg = { group = "io.coil-kt.coil3", name = "coil-svg", version.ref = "coil" }
 
