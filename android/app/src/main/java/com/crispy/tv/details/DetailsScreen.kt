@@ -207,7 +207,7 @@ internal fun DetailsScreen(
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
         if (!playbackSettings.trailerAutoplayEnabled) return@LaunchedEffect
-        if (!AppDistribution.capabilities.youtubeInHeroPlaybackSupported &&
+        if (!AppDistribution.current.capabilities.youtubeInHeroPlaybackSupported &&
             heroTrailerSources.firstOrNull()?.source == TrailerSource.YOUTUBE
         ) {
             return@LaunchedEffect
@@ -278,7 +278,7 @@ internal fun DetailsScreen(
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
                                 val primary = heroTrailerSources.firstOrNull()
-                                if (!AppDistribution.capabilities.youtubeInHeroPlaybackSupported && primary?.source == TrailerSource.YOUTUBE) {
+                                if (!AppDistribution.current.capabilities.youtubeInHeroPlaybackSupported && primary?.source == TrailerSource.YOUTUBE) {
                                     selectedTrailerEmbed = primary.toEmbeddedVideo()
                                 } else if (!showTrailer) {
                                     showTrailer = true

@@ -16,11 +16,16 @@ import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import com.crispy.tv.settings.ImageSettingsScreen
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
-import com.crispy.tv.settings.PluginsSettingsRoute
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
 internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostController) {
+    // Read once here rather than per-destination: this function runs while the
+    // graph is being built, and the components are installed in
+    // CrispyApplication.onCreate, well before any NavHost exists.
+    val distribution = AppDistribution.current
+
     composable(AppRoutes.SettingsRoute) { entry ->
         SettingsScreen(
             onNavigateToAddonsSettings = {
@@ -46,8 +51,13 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
         AddonsSettingsRoute(onBack = { navController.popBackStack() })
     }
 
-    composable(AppRoutes.PluginsSettingsRoute) {
-        PluginsSettingsRoute(onBack = { navController.popBackStack() })
+    // The plugins destination is registered only when the build has a plugins
+    // screen. On store there is no screen to show, and an always-registered
+    // destination would let a deep link to it land on a blank page.
+    distribution.pluginsSettingsScreen?.let { pluginsScreen ->
+        composable(AppRoutes.PluginsSettingsRoute) {
+            pluginsScreen { navController.popBackStack() }
+        }
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {

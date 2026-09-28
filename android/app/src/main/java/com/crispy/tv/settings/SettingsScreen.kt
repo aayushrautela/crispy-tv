@@ -115,7 +115,7 @@ fun SettingsScreen(
                 title = "INTEGRATIONS",
                 items =
                     buildList {
-                        if (AppDistribution.capabilities.pluginsUiSupported) {
+                        if (AppDistribution.current.capabilities.pluginsUiSupported) {
                             add(
                                 SettingsItem(
                                     label = "Plugins",

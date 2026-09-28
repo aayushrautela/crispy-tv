@@ -20,7 +20,7 @@ import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.streams.SelectorCoordinator
-import com.crispy.tv.streams.PluginStreamLoaderProvider
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.streams.StreamResolverProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -53,7 +53,7 @@ internal class HomeSelectorViewModel(
                 backendClient.getMetadataItemDetail(accessToken = token, itemId = itemId)
             },
             sessionTokenProvider = { supabase.ensureValidSession()?.accessToken },
-            pluginStreamLoader = PluginStreamLoaderProvider.get(appContext),
+            pluginStreamLoader = AppDistribution.current.pluginStreamLoader(appContext),
         )
 
     private val _playStream = MutableSharedFlow<HomeStreamSelection>(extraBufferCapacity = 1)

@@ -12,6 +12,8 @@ import coil3.request.CachePolicy
 import coil3.request.allowHardware
 import coil3.request.crossfade
 import com.crispy.tv.app.AppGraph
+import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.distribution.BuildDistributionComponents
 import com.crispy.tv.network.AppHttp
 import okio.Path.Companion.toOkioPath
 
@@ -22,6 +24,16 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        // Must be first. AppDistribution is read by PlaybackDependencies.reset(),
+        // by every view-model factory and while the nav graph is built, all of
+        // which can run before appGraph is touched. Reading it before this line
+        // throws by design rather than defaulting to a variant.
+        //
+        // BuildDistributionComponents is the only name that resolves to a
+        // variant: each of src/store and src/sideload defines its own object
+        // under that exact name, so this line is the single place the codebase
+        // names a variant and neither definition is visible to the other build.
+        AppDistribution.install(BuildDistributionComponents)
         appGraph.userMutationOutbox.start()
     }
 

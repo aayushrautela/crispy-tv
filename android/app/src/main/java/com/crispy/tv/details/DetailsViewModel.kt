@@ -25,7 +25,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.addons.streams.AddonStream
-import com.crispy.tv.streams.PluginStreamLoaderProvider
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.streams.StreamResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
@@ -67,7 +67,7 @@ class DetailsViewModel internal constructor(
             sessionTokenProvider = {
                 SupabaseServicesProvider.accountClient(appContext).ensureValidSession()?.accessToken
             },
-            pluginStreamLoader = PluginStreamLoaderProvider.get(appContext),
+            pluginStreamLoader = AppDistribution.current.pluginStreamLoader(appContext),
         )
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))

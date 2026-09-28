@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
@@ -197,7 +198,7 @@ object PlaybackDependencies {
                 libassRenderType = LibassRenderType.fromName(settings.libassRenderType),
             )
         }
-        installTorrentResolver(this)
+        AppDistribution.current.installTorrentResolver(this)
         resetTorrentResolver()
         resetAudioFocusManager()
         metadataResolverFactory = { context ->
