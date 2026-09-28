@@ -141,6 +141,7 @@ kotlin {
             implementation(project(":android:native-engine"))
             implementation(project(":android:network"))
             implementation(project(":android:watchhistory"))
+            implementation(project(":android:platform-android"))
             implementation(project(":android:backend"))
             implementation(project(":android:addons"))
             implementation(project(":android:ui-assets"))

@@ -1,7 +1,5 @@
 package com.crispy.tv.watchhistory
 
-import android.content.Context
-import android.util.Log
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
@@ -19,22 +17,40 @@ import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProgressSnapshot
 import com.crispy.tv.domain.watch.PlaybackProgressPolicy
+import com.crispy.tv.domain.watch.formatIso8601Instant
+import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
+import com.crispy.tv.platform.AppLogger
+import com.crispy.tv.platform.KeyValueStore
+import com.crispy.tv.platform.MonotonicClock
+import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.watchhistory.progress.WatchProgress
 import com.crispy.tv.watchhistory.progress.WatchProgressStore
-import java.time.Instant
-import java.util.Locale
 
+/**
+ * The backend-backed [WatchHistoryService].
+ *
+ * Takes its collaborators as interfaces rather than a `Context`, so it holds no
+ * Android type of its own; the platform wiring is the caller's. It still builds
+ * the [WatchProgressStore] itself, because the store's *name* is this service's
+ * private business: two callers passing a `WatchProgressStore` in would each have
+ * to know the same preferences file name, and nothing would stop them disagreeing.
+ */
 class BackendWatchHistoryService(
-    context: Context,
+    progressStore: KeyValueStore,
+    private val timeSource: TimeSource,
+    monotonicClock: MonotonicClock,
+    private val logger: AppLogger,
     private val backend: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
     private val episodeListProvider: EpisodeListProvider,
     private val config: WatchHistoryConfig = WatchHistoryConfig(),
 ) : WatchHistoryService {
-    private val appContext = context.applicationContext
     private val watchProgressStore =
         WatchProgressStore(
-            prefs = appContext.getSharedPreferences(WATCH_PROGRESS_PREFS_NAME, Context.MODE_PRIVATE),
+            store = progressStore,
+            timeSource = timeSource,
+            monotonicClock = monotonicClock,
+            logger = logger,
         )
     private val appVersion = config.appVersion.trim().ifBlank { "dev" }
 
@@ -439,7 +455,7 @@ class BackendWatchHistoryService(
             durationSeconds = if (durationMs > 0L) durationMs.toDouble() / 1000.0 else null,
             seasonNumber = identity.season,
             episodeNumber = identity.episode,
-            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+            occurredAt = formatIso8601Instant(timeSource.nowMs()),
             payload = mapOf(
                 "source" to "android",
                 "appVersion" to appVersion,
@@ -448,7 +464,7 @@ class BackendWatchHistoryService(
             ),
         )
 
-        Log.d(
+        logger.debug(
             "WatchEvent",
             "sendPlaybackEvent: eventType=$eventType itemId=${identity.itemId} season=${identity.season} episode=${identity.episode} " +
                 "posSec=${playbackInput.positionSeconds} durSec=${playbackInput.durationSeconds} payload=${playbackInput.payload}",
@@ -461,7 +477,7 @@ class BackendWatchHistoryService(
                 input = playbackInput,
             )
         } catch (error: Throwable) {
-            Log.w("WatchEvent", "Failed to send playback event ($eventType) for ${identity.itemId}", error)
+            logger.warn("WatchEvent", "Failed to send playback event ($eventType) for ${identity.itemId}", error)
         }
     }
 
@@ -475,7 +491,7 @@ class BackendWatchHistoryService(
             ).filterNot { it.isBlank() }
                 .joinToString(":")
                 .ifBlank { identity.title.trim().replace(' ', '_') }
-        return "$eventType:$suffix:${System.currentTimeMillis()}"
+        return "$eventType:$suffix:${timeSource.nowMs()}"
     }
 
     private suspend fun getBackendContext(): BackendContext? {
@@ -530,13 +546,13 @@ class BackendWatchHistoryService(
 
     private fun buildWatchMutationInput(request: WatchHistoryRequest): WatchMutationInput? {
         val itemId = request.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        Log.d(
+        logger.debug(
             "WatchMutation",
             "buildWatchMutationInput: itemId=$itemId season=${request.season} episode=${request.episode} contentType=${request.contentType.label}",
         )
         return WatchMutationInput(
             itemId = itemId,
-            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+            occurredAt = formatIso8601Instant(timeSource.nowMs()),
             seasonNumber = request.season,
             episodeNumber = request.episode,
             payload = mapOf(
@@ -565,7 +581,7 @@ class BackendWatchHistoryService(
     private fun CrispyBackendClient.ClientMediaCard.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
         val progress = progress
         if (progress == null) {
-            Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progress null")
+            logger.debug("CWParse", "drop(itemId=${itemId}, name=${title}): progress null")
             return null
         }
         val progressPercent = progress.percent
@@ -578,11 +594,11 @@ class BackendWatchHistoryService(
             val hasResume = (positionSeconds != null && positionSeconds > 0)
                 || progress.lastPlayedAt != null
             if (!hasResume) {
-                Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progressPercent null and no resume (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
+                logger.debug("CWParse", "drop(itemId=${itemId}, name=${title}): progressPercent null and no resume (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
                 return null
             }
         } else if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-            Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): percent=$progressPercent out of [0, $CONTINUE_WATCHING_COMPLETION_PERCENT]")
+            logger.debug("CWParse", "drop(itemId=${itemId}, name=${title}): percent=$progressPercent out of [0, $CONTINUE_WATCHING_COMPLETION_PERCENT]")
             return null
         }
         val parentData = parent
@@ -646,11 +662,11 @@ class BackendWatchHistoryService(
     private fun parseIsoToEpochMs(raw: String?): Long? {
         val value = raw?.trim().orEmpty()
         if (value.isBlank()) return null
-        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
+        return parseIso8601InstantToEpochMillis(value)
     }
 
     private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
-        return when (trim().lowercase(Locale.US)) {
+        return when (trim().lowercase()) {
             "show", "series", "tv", "episode" -> MetadataLabMediaType.SERIES
             "anime" -> MetadataLabMediaType.ANIME
             else -> MetadataLabMediaType.MOVIE
@@ -659,6 +675,5 @@ class BackendWatchHistoryService(
 
     private companion object {
         private const val CONTINUE_WATCHING_COMPLETION_PERCENT = 85.0
-        private const val WATCH_PROGRESS_PREFS_NAME = "watch_progress"
     }
 }

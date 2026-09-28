@@ -60,6 +60,8 @@ class SharedPreferencesKeyValueStore(
 
     override fun contains(key: String): Boolean = prefs.contains(key)
 
+    override fun keys(): Set<String> = prefs.all.keys
+
     override fun remove(key: String) {
         prefs.edit().remove(key).apply()
     }

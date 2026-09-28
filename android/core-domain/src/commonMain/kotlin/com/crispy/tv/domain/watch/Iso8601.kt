@@ -6,9 +6,9 @@ private const val MILLIS_PER_HOUR = 60L * MILLIS_PER_MINUTE
 private const val MILLIS_PER_DAY = 24L * MILLIS_PER_HOUR
 
 /**
- * Portable ISO-8601 handling for [findNextEpisode], replacing `java.time`.
+ * Portable ISO-8601 handling, replacing `java.time`.
  *
- * Only what the release-date contract exercises is supported: a calendar date
+ * Parsing covers only what the release-date contract exercises: a calendar date
  * (`YYYY-MM-DD`) and an instant (`YYYY-MM-DDTHH:mm[:ss[.fff]]` closed by `Z` or
  * a numeric offset). Anything else returns null, which the caller treats exactly
  * as it treated the previous `Instant.parse` / `LocalDate.parse` failure.
@@ -17,8 +17,12 @@ private const val MILLIS_PER_DAY = 24L * MILLIS_PER_HOUR
  * precision, but `findNextEpisode` receives its clock as epoch milliseconds, so
  * a release instant finer than a millisecond was never distinguishable in that
  * comparison. The fraction is therefore truncated, not rounded.
+ *
+ * Formatting goes the other way, for callers that send an instant to the backend
+ * as text. That is a separate concern from the release-date contract, so it is a
+ * separate top-level function rather than a mode of this one.
  */
-internal fun parseIso8601InstantToEpochMillis(value: String): Long? {
+fun parseIso8601InstantToEpochMillis(value: String): Long? {
     if (value.length < 19) return null
 
     val year = value.readDigits(0, 4) ?: return null
@@ -76,6 +80,77 @@ internal fun parseIso8601DateToEpochDay(value: String): Long? {
     if (!isValidDate(year, month, day)) return null
 
     return epochDayOf(year, month, day)
+}
+
+/**
+ * Formats [epochMillis] as a UTC ISO-8601 instant, byte-for-byte as
+ * `java.time.Instant.ofEpochMilli(ms).toString()` renders it.
+ *
+ * ## Why byte-for-byte
+ *
+ * This value goes to the backend as `occurredAt`, so the previous JVM
+ * implementation is the wire contract. Emitting `1970-01-01T00:00:00.000Z` where
+ * the old code sent `1970-01-01T00:00:00Z` would be a silent format change on a
+ * field the server reads, and one that only shows up in production data. The
+ * omitted-zero-fraction rule is therefore reproduced deliberately, not
+ * incidentally:
+ *
+ * - millisecond precision 0 renders no fraction: `2000-02-29T00:00:00Z`
+ * - otherwise exactly three digits: `2000-02-29T00:00:00.001Z`
+ *
+ * `Instant` also renders 6 or 9 fraction digits, but it only has those to offer
+ * when the instant actually carries that precision. An instant built from epoch
+ * milliseconds never does, so three digits is the only fraction this can produce.
+ *
+ * Pre-epoch instants work because the day and the time-of-day are computed with
+ * floor semantics separately: `utcEpochDayOf` floors, so the remainder
+ * `epochMillis - day * MILLIS_PER_DAY` is always in `0 until 86400000` and
+ * formats as a positive time rather than a negative one.
+ */
+fun formatIso8601Instant(epochMillis: Long): String {
+    val day = utcEpochDayOf(epochMillis)
+    val millisIntoDay = epochMillis - day * MILLIS_PER_DAY
+    val (year, month, dayOfMonth) = civilFromEpochDay(day)
+    val hour = millisIntoDay / MILLIS_PER_HOUR
+    val minute = (millisIntoDay / MILLIS_PER_MINUTE) % 60L
+    val second = (millisIntoDay / MILLIS_PER_SECOND) % 60L
+    val millisOfSecond = millisIntoDay % MILLIS_PER_SECOND
+    val fraction = if (millisOfSecond == 0L) "" else ".${millisOfSecond.toString().padStart(3, '0')}"
+    return buildString(24) {
+        append(year.toString().padStart(4, '0'))
+        append('-')
+        append(month.toString().padStart(2, '0'))
+        append('-')
+        append(dayOfMonth.toString().padStart(2, '0'))
+        append('T')
+        append(hour.toString().padStart(2, '0'))
+        append(':')
+        append(minute.toString().padStart(2, '0'))
+        append(':')
+        append(second.toString().padStart(2, '0'))
+        append(fraction)
+        append('Z')
+    }
+}
+
+/**
+ * The proleptic Gregorian date for a day count from 1970-01-01.
+ *
+ * Howard Hinnant's `civil_from_days`, the inverse of [epochDayOf]. Exact for the
+ * full range this module deals in, including negative day counts.
+ */
+private fun civilFromEpochDay(epochDay: Long): Triple<Int, Int, Int> {
+    val shifted = epochDay + 719_468L
+    val era = (if (shifted >= 0L) shifted else shifted - 146_096L) / 146_097L
+    val dayOfEra = shifted - era * 146_097L
+    val yearOfEra =
+        (dayOfEra - dayOfEra / 1_460L + dayOfEra / 36_524L - dayOfEra / 146_096L) / 365L
+    val year = yearOfEra + era * 400L
+    val dayOfYear = dayOfEra - (365L * yearOfEra + yearOfEra / 4L - yearOfEra / 100L)
+    val shiftedMonth = (5L * dayOfYear + 2L) / 153L
+    val dayOfMonth = (dayOfYear - (153L * shiftedMonth + 2L) / 5L + 1L).toInt()
+    val month = (if (shiftedMonth < 10L) shiftedMonth + 3L else shiftedMonth - 9L).toInt()
+    return Triple((if (month <= 2) year + 1L else year).toInt(), month, dayOfMonth)
 }
 
 /** The UTC calendar day containing [epochMillis]. */

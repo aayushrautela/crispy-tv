@@ -75,4 +75,55 @@ class Iso8601Test {
         assertEquals(-1L, utcEpochDayOf(-86_400_000L))
         assertEquals(20_129L, utcEpochDayOf(1_739_145_600_000L))
     }
+
+    /**
+     * Pinned against `java.time.Instant.ofEpochMilli(ms).toString()` on a JDK 21
+     * JVM, one expectation per line of that run.
+     *
+     * The pairing matters: the format is only correct if formatting and parsing
+     * agree, so several entries are fed back through [parseIso8601InstantToEpochMillis]
+     * below rather than only being compared to a literal.
+     */
+    @Test
+    fun formatsInstantsAsJavaTimeDid() {
+        // The epoch itself, and the two millisecond values either side of a second
+        // boundary, which is where the omitted-fraction rule is easiest to get wrong.
+        assertEquals("1970-01-01T00:00:00Z", formatIso8601Instant(0L))
+        assertEquals("1970-01-01T00:00:00.001Z", formatIso8601Instant(1L))
+        assertEquals("1970-01-01T00:00:00.999Z", formatIso8601Instant(999L))
+        assertEquals("1970-01-01T00:00:01Z", formatIso8601Instant(1_000L))
+
+        // A real event timestamp: the value `BackendWatchHistoryService` sends as
+        // `occurredAt`, with and without a fraction.
+        assertEquals("2024-01-02T03:04:05.123Z", formatIso8601Instant(1_704_164_645_123L))
+        assertEquals("2024-01-02T03:04:05Z", formatIso8601Instant(1_704_164_645_000L))
+
+        // Pre-epoch. The day and the time-of-day must be floored separately or these
+        // render as negative times.
+        assertEquals("1969-12-31T23:59:59.999Z", formatIso8601Instant(-1L))
+        assertEquals("1969-12-31T23:59:59.001Z", formatIso8601Instant(-999L))
+        assertEquals("1969-12-31T23:59:59Z", formatIso8601Instant(-1_000L))
+        assertEquals("1969-12-31T00:00:00Z", formatIso8601Instant(-86_400_000L))
+
+        // Leap day, a year that is divisible by 4 but not a leap year, the start of a
+        // UTC day, and the last millisecond of year 9999.
+        assertEquals("2000-02-29T00:00:00Z", formatIso8601Instant(951_782_400_000L))
+        assertEquals("2100-01-01T00:00:00Z", formatIso8601Instant(4_102_444_800_000L))
+        assertEquals("2021-01-01T00:00:00.123Z", formatIso8601Instant(1_609_459_200_123L))
+        assertEquals("2033-05-18T03:33:20Z", formatIso8601Instant(2_000_000_000_000L))
+        assertEquals("9999-12-31T23:59:59.999Z", formatIso8601Instant(253_402_300_799_999L))
+    }
+
+    /** Formatting and parsing must be inverses, or a formatted timestamp cannot be read back. */
+    @Test
+    fun formattedInstantsRoundTripThroughTheParser() {
+        val samples = listOf(
+            0L, 1L, 999L, 1_000L, -1L, -999L, -1_000L, -86_400_000L,
+            1_704_164_645_123L, 1_609_459_200_123L, 951_782_400_000L,
+            4_102_444_800_000L, 2_000_000_000_000L, 253_402_300_799_999L,
+        )
+        for (millis in samples) {
+            assertEquals(millis, parseIso8601InstantToEpochMillis(formatIso8601Instant(millis)))
+        }
+    }
 }

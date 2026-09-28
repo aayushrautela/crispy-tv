@@ -15,9 +15,9 @@ plugins {
  * | file | where | why |
  * |---|---|---|
  * | `WatchHistoryConfig` | `commonMain` | a data class, portable as-is |
- * | `WatchProgressStore` | `androidMain` | `SharedPreferences` + `SystemClock.elapsedRealtime()`; the migration is onto `KeyValueStore` and an injected `MonotonicClock` |
- * | `BackendWatchHistoryService` | `androidMain` | `Context`, `java.time.Instant`, `Log`; the migration is onto an `Iso8601` formatter, `AppLogger` and `TimeSource` |
- * | `WatchSyncSource` | `androidMain` | OkHttp and okio; `commonMain` keeps only the interface once the implementation splits off |
+ * | `WatchProgressStore` | `androidMain` | already on `KeyValueStore`, `TimeSource`, `MonotonicClock` and `AppLogger`. Only `org.json` keeps it here |
+ * | `BackendWatchHistoryService` | `androidMain` | already free of `Context`, `java.time` and `Log`, via `formatIso8601Instant`, `AppLogger` and `TimeSource`. It reaches `:android:backend` and `:android:player`, neither of which is portable yet |
+ * | `WatchSyncSource` | `androidMain` | one concrete class over an OkHttp/okio server-sent-event stream. There is no interface to split out, and inventing one with a single implementation would be the "helper just to link to it" this plan exists to avoid. It becomes portable when the transport does, i.e. with `HttpClientPort` |
  */
 kotlin {
     jvmToolchain(21)

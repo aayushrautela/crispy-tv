@@ -141,6 +141,7 @@ dependencies {
     // from :android:network's sideload variant; that flavour axis is gone.
     implementation(project(":android:youtube-extractor"))
     implementation(project(":android:watchhistory"))
+    implementation(project(":android:platform-android"))
     implementation(project(":android:backend"))
     implementation(project(":android:addons"))
     implementation(project(":android:ui-assets"))

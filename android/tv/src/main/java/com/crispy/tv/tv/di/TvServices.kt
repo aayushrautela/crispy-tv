@@ -10,6 +10,10 @@ import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.AppHttp
+import com.crispy.tv.platform.android.AndroidAppLogger
+import com.crispy.tv.platform.android.AndroidMonotonicClock
+import com.crispy.tv.platform.android.AndroidTimeSource
+import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.tv.BuildConfig
 
 object TvServices {
@@ -125,7 +129,10 @@ object TvServices {
             watchHistoryService?.let { return it }
             val appContext = context.applicationContext
             val created = BackendWatchHistoryService(
-                context = appContext,
+                progressStore = SharedPreferencesKeyValueStore(appContext, "watch_progress"),
+                timeSource = AndroidTimeSource(),
+                monotonicClock = AndroidMonotonicClock(),
+                logger = AndroidAppLogger(appContext),
                 backend = backendClient(appContext),
                 backendContextResolver = contextResolver(appContext),
                 episodeListProvider = BackendEpisodeListProvider(

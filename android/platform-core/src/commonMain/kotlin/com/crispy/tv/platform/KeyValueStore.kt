@@ -21,6 +21,22 @@ interface KeyValueStore {
     fun putFloat(key: String, value: Float)
 
     fun contains(key: String): Boolean
+
+    /**
+     * Every key currently stored, in no guaranteed order.
+     *
+     * Present because scanning a key prefix is a real requirement rather than a
+     * convenience: `WatchProgressStore` keeps one entry per watched item under a
+     * single prefix and has to enumerate them. `SharedPreferences.all` and
+     * `NSUserDefaults.dictionaryRepresentation` both offer this; without it the
+     * portable side would have to maintain a separate per-item index, which is
+     * more state to keep consistent than a scan of keys that are already indexed.
+     *
+     * Callers must not depend on the order, and must re-read each value they need
+     * rather than treating the key set as a snapshot of the data.
+     */
+    fun keys(): Set<String>
+
     fun remove(key: String)
     fun clear()
 }

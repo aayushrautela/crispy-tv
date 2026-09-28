@@ -1,8 +1,9 @@
 package com.crispy.tv.watchhistory.progress
 
-import android.content.SharedPreferences
-import android.os.SystemClock
-import android.util.Log
+import com.crispy.tv.platform.AppLogger
+import com.crispy.tv.platform.KeyValueStore
+import com.crispy.tv.platform.MonotonicClock
+import com.crispy.tv.platform.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,7 +14,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -32,10 +32,11 @@ data class WatchProgress(
 }
 
 class WatchProgressStore(
-    private val prefs: SharedPreferences,
-    private val nowEpochMs: () -> Long = System::currentTimeMillis,
+    private val store: KeyValueStore,
+    private val timeSource: TimeSource,
+    private val monotonicClock: MonotonicClock,
+    private val logger: AppLogger,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-    private val logTag: String = "WatchProgressStore",
 ) {
     private var notificationJob: Job? = null
     private var lastNotificationAtElapsedMs: Long = 0L
@@ -59,11 +60,11 @@ class WatchProgressStore(
     )
 
     fun setContentDuration(id: String, type: String, durationSeconds: Double, episodeId: String? = null) {
-        prefs.edit().putString(getContentDurationPrefKey(id = id, type = type, episodeId = episodeId), durationSeconds.toString()).apply()
+        store.putString(getContentDurationPrefKey(id = id, type = type, episodeId = episodeId), durationSeconds.toString())
     }
 
     fun getContentDurationSeconds(id: String, type: String, episodeId: String? = null): Double? {
-        return prefs.getString(getContentDurationPrefKey(id = id, type = type, episodeId = episodeId), null)
+        return store.getString(getContentDurationPrefKey(id = id, type = type, episodeId = episodeId), null)
             ?.trim()
             ?.toDoubleOrNull()
     }
@@ -77,7 +78,7 @@ class WatchProgressStore(
         val updated = existing.copy(
             currentTimeSeconds = newCurrentTime,
             durationSeconds = newDurationSeconds,
-            lastUpdatedEpochMs = nowEpochMs(),
+            lastUpdatedEpochMs = timeSource.nowMs(),
         )
         setWatchProgress(id = id, type = type, progress = updated, episodeId = episodeId)
     }
@@ -85,7 +86,7 @@ class WatchProgressStore(
     fun addWatchProgressTombstone(id: String, type: String, episodeId: String? = null, deletedAtEpochMs: Long? = null) {
         val tombstones = getWatchProgressTombstones().toMutableMap()
         val key = buildWpKeyString(id = id, type = type, episodeId = episodeId)
-        tombstones[key] = deletedAtEpochMs ?: nowEpochMs()
+        tombstones[key] = deletedAtEpochMs ?: timeSource.nowMs()
         writeTombstones(tombstones)
     }
 
@@ -98,7 +99,7 @@ class WatchProgressStore(
     }
 
     fun getWatchProgressTombstones(): Map<String, Long> {
-        val raw = prefs.getString(WP_TOMBSTONES_KEY, null) ?: return emptyMap()
+        val raw = store.getString(WP_TOMBSTONES_KEY, null) ?: return emptyMap()
         val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
         val result = LinkedHashMap<String, Long>(obj.length())
         for (key in obj.keys()) {
@@ -112,7 +113,7 @@ class WatchProgressStore(
 
     fun addContinueWatchingRemoved(id: String, type: String, removedAtEpochMs: Long? = null) {
         val removed = getContinueWatchingRemoved().toMutableMap()
-        removed[buildWpKeyString(id = id, type = type)] = removedAtEpochMs ?: nowEpochMs()
+        removed[buildWpKeyString(id = id, type = type)] = removedAtEpochMs ?: timeSource.nowMs()
         writeContinueWatchingRemoved(removed)
     }
 
@@ -124,7 +125,7 @@ class WatchProgressStore(
     }
 
     fun getContinueWatchingRemoved(): Map<String, Long> {
-        val raw = prefs.getString(CONTINUE_WATCHING_REMOVED_KEY, null) ?: return emptyMap()
+        val raw = store.getString(CONTINUE_WATCHING_REMOVED_KEY, null) ?: return emptyMap()
         val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
         val result = LinkedHashMap<String, Long>(obj.length())
         for (key in obj.keys()) {
@@ -157,13 +158,13 @@ class WatchProgressStore(
 
         // Reporting cadence/floor is enforced upstream (PlayerSessionViewModel +
         // BackendWatchHistoryService), so every accepted call is a meaningful write.
-        val timestamp = nowEpochMs()
+        val timestamp = timeSource.nowMs()
 
         maybeRestoreContinueWatchingVisibility(id = id, type = type, episodeId = episodeId, timestampEpochMs = timestamp)
 
         val updated = progress.copy(lastUpdatedEpochMs = timestamp)
         val prefKey = getWatchProgressPrefKey(id = id, type = type, episodeId = episodeId)
-        prefs.edit().putString(prefKey, updated.toJson().toString()).apply()
+        store.putString(prefKey, updated.toJson().toString())
         invalidateCache()
 
         if (options.forceNotify) {
@@ -174,17 +175,17 @@ class WatchProgressStore(
     }
 
     fun getWatchProgress(id: String, type: String, episodeId: String? = null): WatchProgress? {
-        val raw = prefs.getString(getWatchProgressPrefKey(id = id, type = type, episodeId = episodeId), null) ?: return null
+        val raw = store.getString(getWatchProgressPrefKey(id = id, type = type, episodeId = episodeId), null) ?: return null
         return try {
             WatchProgressJson.fromJson(JSONObject(raw))
         } catch (e: JSONException) {
-            Log.w(logTag, "Failed to parse watch progress JSON", e)
+            logger.warn(LOG_TAG, "Failed to parse watch progress JSON", e)
             null
         }
     }
 
     fun removeWatchProgress(id: String, type: String, episodeId: String? = null) {
-        prefs.edit().remove(getWatchProgressPrefKey(id = id, type = type, episodeId = episodeId)).apply()
+        store.remove(getWatchProgressPrefKey(id = id, type = type, episodeId = episodeId))
         addWatchProgressTombstone(id = id, type = type, episodeId = episodeId)
         invalidateCache()
         notifyNow()
@@ -192,17 +193,23 @@ class WatchProgressStore(
     }
 
     fun getAllWatchProgress(): Map<String, WatchProgress> {
-        val now = nowEpochMs()
+        val now = timeSource.nowMs()
         val cached = cache
         if (cached != null && now - cacheAtEpochMs < WATCH_PROGRESS_CACHE_TTL_MS) {
             return cached
         }
 
-        val all = prefs.all
         val result = LinkedHashMap<String, WatchProgress>()
-        for ((key, v) in all) {
+        // Sorted, because `keys()` carries no order guarantee and this map is
+        // consumed by the continue-watching planner. The old code iterated
+        // `prefs.all`, a `HashMap`, so the order it produced was arbitrary; sorting
+        // makes the result deterministic rather than merely different per platform.
+        for (key in store.keys().sorted()) {
             if (!key.startsWith(WATCH_PROGRESS_KEY_PREFIX)) continue
-            val raw = v as? String ?: continue
+            // `getString` rather than reading a snapshot value: the port dropped
+            // `prefs.all`'s untyped map, and a key that somehow holds a non-string
+            // must be skipped exactly as the old `as? String ?: continue` did.
+            val raw = runCatching { store.getString(key) }.getOrNull() ?: continue
             val stripped = key.removePrefix(WATCH_PROGRESS_KEY_PREFIX)
             val parsed = runCatching { WatchProgressJson.fromJson(JSONObject(raw)) }.getOrNull() ?: continue
             result[stripped] = parsed
@@ -300,7 +307,7 @@ class WatchProgressStore(
         for ((k, v) in map) {
             obj.put(k, v)
         }
-        prefs.edit().putString(WP_TOMBSTONES_KEY, obj.toString()).apply()
+        store.putString(WP_TOMBSTONES_KEY, obj.toString())
     }
 
     private fun writeContinueWatchingRemoved(map: Map<String, Long>) {
@@ -308,7 +315,7 @@ class WatchProgressStore(
         for ((k, v) in map) {
             obj.put(k, v)
         }
-        prefs.edit().putString(CONTINUE_WATCHING_REMOVED_KEY, obj.toString()).apply()
+        store.putString(CONTINUE_WATCHING_REMOVED_KEY, obj.toString())
     }
 
     private fun invalidateCache() {
@@ -319,7 +326,7 @@ class WatchProgressStore(
     private fun debouncedNotify() {
         notificationJob?.cancel()
 
-        val nowElapsedMs = SystemClock.elapsedRealtime()
+        val nowElapsedMs = monotonicClock.elapsedMs()
         val since = nowElapsedMs - lastNotificationAtElapsedMs
         if (since < MIN_NOTIFICATION_INTERVAL_MS) {
             notificationJob =
@@ -335,7 +342,7 @@ class WatchProgressStore(
 
     private fun notifyNow() {
         notificationJob?.cancel()
-        lastNotificationAtElapsedMs = SystemClock.elapsedRealtime()
+        lastNotificationAtElapsedMs = monotonicClock.elapsedMs()
         updatesFlow.tryEmit(Unit)
     }
 
@@ -363,7 +370,7 @@ class WatchProgressStore(
     }
 
     private fun normalizedImdbIdOrNull(raw: String?): String? {
-        val value = raw?.trim()?.lowercase(Locale.US).orEmpty()
+        val value = raw?.trim()?.lowercase().orEmpty()
         if (value.isBlank()) return null
 
         val candidate =
@@ -381,6 +388,9 @@ class WatchProgressStore(
     }
 
     private companion object {
+        /** A constant now, rather than the old per-instance `logTag` parameter. */
+        private const val LOG_TAG = "WatchProgressStore"
+
         private const val WATCH_PROGRESS_KEY_PREFIX = "@watch_progress:"
         private const val CONTENT_DURATION_KEY_PREFIX = "@content_duration:"
         private const val WP_TOMBSTONES_KEY = "@wp_tombstones"

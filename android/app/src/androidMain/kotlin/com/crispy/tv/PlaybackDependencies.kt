@@ -8,6 +8,10 @@ import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.platform.AppConfig
+import com.crispy.tv.platform.android.AndroidAppLogger
+import com.crispy.tv.platform.android.AndroidMonotonicClock
+import com.crispy.tv.platform.android.AndroidTimeSource
+import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
@@ -47,7 +51,10 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
         backendClient = BackendServicesProvider.backendClient(appContext),
     )
     return BackendWatchHistoryService(
-        context = appContext,
+        progressStore = SharedPreferencesKeyValueStore(appContext, "watch_progress"),
+        timeSource = AndroidTimeSource(),
+        monotonicClock = AndroidMonotonicClock(),
+        logger = AndroidAppLogger(appContext),
         backend = BackendServicesProvider.backendClient(appContext),
         backendContextResolver = BackendContextResolverProvider.get(appContext),
         episodeListProvider = episodeListProvider,

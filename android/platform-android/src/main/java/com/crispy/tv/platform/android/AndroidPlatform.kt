@@ -6,6 +6,7 @@ import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import android.util.Log
 import com.crispy.tv.platform.AppLogger
+import com.crispy.tv.platform.MonotonicClock
 import com.crispy.tv.platform.TimeSource
 
 /**
@@ -32,17 +33,10 @@ class AndroidTimeSource : TimeSource {
     override fun nowMs(): Long = System.currentTimeMillis()
 }
 
-/**
- * A monotonic clock, for intervals and throttling.
- *
- * Separate from [TimeSource] on purpose. `SystemClock.elapsedRealtime()` has no
- * portable equivalent and no [TimeSource] equivalent, because it is not a wall
- * clock at all: it is "milliseconds since boot, unaffected by clock changes".
- */
-fun interface MonotonicClock {
-    /** Milliseconds since boot: monotonically non-decreasing, unaffected by clock changes. */
-    fun elapsedMs(): Long
-}
+// `MonotonicClock` is a *contract*, so it is declared in :android:platform-core
+// next to `TimeSource` and only implemented here. Declaring it in this module
+// would have inverted the dependency: the portable side that needs to inject a
+// clock would have to depend on the Android library to name the type.
 
 /** The Android [MonotonicClock]. */
 class AndroidMonotonicClock : MonotonicClock {
