@@ -25,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 import com.crispy.tv.accounts.AppBootstrapViewModel
+import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.AuthRoute
 import com.crispy.tv.accounts.BootstrapState
 import com.crispy.tv.accounts.ProfileSelectorRoute
@@ -44,7 +45,7 @@ fun AppRoot() {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val bootstrapViewModel: AppBootstrapViewModel =
-        viewModel(factory = remember(appContext) { AppBootstrapViewModel.factory(appContext) })
+        viewModel(factory = remember(appContext) { appBootstrapViewModelFactory(appContext) })
     val state by bootstrapViewModel.state.collectAsStateWithLifecycle()
     var introDone by rememberSaveable { mutableStateOf(false) }
 

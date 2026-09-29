@@ -24,7 +24,7 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 65 of the 182 files are there.
+ * `commonMain` one vertical slice at a time, and 66 of the 183 files are there.
  *
  * The remaining 100 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
@@ -264,6 +264,13 @@ kotlin {
             // (`org.jetbrains.androidx.navigation`), which is a dependency
             // decision, not a code one.
             implementation(libs.androidx.paging.common)
+    // androidx.lifecycle:lifecycle-viewmodel is a genuine KMP artifact at 2.11.0 - this was
+    // measured by declaring it here and compiling the `desktop` target, not read from a
+    // doc. ViewModel, ViewModelProvider and viewModelScope are therefore all reachable
+    // from commonMain, which is what lets a viewmodel move there whole instead of being
+    // split factory-from-viewmodel. `lifecycle-viewmodel-ktx` and `-compose` stay in
+    // androidMain; they are the Android-flavoured halves of the same family.
+    implementation(libs.androidx.lifecycle.viewmodel)
 
             // NOT `:android:native-engine`. It is a plain `com.android.library`,
             // so it publishes no JVM variant and cannot be consumed from a KMP

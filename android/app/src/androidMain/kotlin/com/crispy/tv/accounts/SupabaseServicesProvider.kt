@@ -87,7 +87,7 @@ object SupabaseServicesProvider {
     }
 
     fun bootstrapRepository(context: Context): AccountBootstrapRepository {
-        return AccountBootstrapRepository(
+        return AndroidAccountBootstrapRepository(
             appContext = context.applicationContext,
             supabase = accountClient(context.applicationContext),
             backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),

@@ -8,28 +8,27 @@ import com.crispy.tv.images.clearImageCache
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-data class BootstrapResult(
-    val signedIn: Boolean,
-    val anonymous: Boolean,
-    val onboardingComplete: Boolean,
-    val session: Session?,
-)
-
 /**
- * The one account repository that stays in `androidMain`, for two reasons that
- * cannot be engineered around: [SecureTokenStore] reaches `AndroidKeyStore`,
- * and [clearImageCache] reaches Coil. Its siblings are in `commonMain` in
- * `AccountRepositories.kt`.
+ * The keystore-backed implementation of [AccountBootstrapRepository], and the reason
+ * that interface exists.
+ *
+ * Two things here cannot travel: [SecureTokenStore] reaches `AndroidKeyStore`, and
+ * [clearImageCache] reaches Coil. Neither is a reason the *interface* could not live
+ * in `commonMain` — the previous KDoc on this class said both reasons "cannot be
+ * engineered around", which was true of the class and false of its callers. The
+ * previous version of this class is the fifth time this repo's shared-package trap has
+ * cost a batch: `AppBootstrapViewModel` names this type, it is declared in the same
+ * package, so it is referenced with no import, and no import audit can see it.
  */
-class AccountBootstrapRepository(
+class AndroidAccountBootstrapRepository(
     private val appContext: Context,
     private val supabase: AccountApi,
     private val backendContextResolver: BackendContextResolver,
     private val backendClient: BackendApi,
     private val activeProfileStore: ActiveProfileStore,
     private val tokenStore: SecureTokenStore,
-) {
-    suspend fun bootstrap(): BootstrapResult {
+) : AccountBootstrapRepository {
+    override suspend fun bootstrap(): BootstrapResult {
         val session = supabase.ensureValidSession()
         if (session == null) {
             return BootstrapResult(signedIn = false, anonymous = false, onboardingComplete = false, session = null)
@@ -52,11 +51,11 @@ class AccountBootstrapRepository(
      * wizard (right after Supabase sign-up) and by the "Finish setting up" gate (sign-in of an
      * account that has no profile yet).
      */
-    suspend fun bootstrapPrimaryProfile(
+    override suspend fun bootstrapPrimaryProfile(
         name: String,
         interfaceLanguage: String,
         avatarUrl: String,
-        region: String? = null,
+        region: String?,
     ): Profile {
         val session = supabase.ensureValidSession() ?: throw IllegalStateException("Not signed in.")
         val profile = backendClient.bootstrapAccount(session.accessToken, name, interfaceLanguage, avatarUrl, region)
@@ -68,7 +67,7 @@ class AccountBootstrapRepository(
 
     private val signOutMutex = Mutex()
 
-    suspend fun signOut() {
+    override suspend fun signOut() {
         // One locked sequence: revoke server-side first, then always wipe local state.
         // Running un-awaited (e.g. fire-and-forget) before re-bootstrapping is what previously
         // let a stale session survive and kept the old home mounted.

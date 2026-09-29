@@ -40,7 +40,6 @@ FORBIDDEN_PREFIXES = (
     "androidx.appcompat",
     "androidx.core",
     "androidx.fragment",
-    "androidx.lifecycle",
     "androidx.media3",
     "androidx.navigation",
     "androidx.room",
@@ -66,6 +65,24 @@ FORBIDDEN_PREFIXES = (
 # desktop and both iOS targets, so an Android-only paging type in its
 # commonMain fails `compileKotlinDesktop` in check-local.sh, and `apple.yml`
 # covers the iOS half. Re-add the prefix if `paging-common` ever stops
+# publishing the non-Android targets.
+
+# `androidx.lifecycle` is forbidden in the list above and now is not, for exactly
+# the same reason, and the evidence is stronger than paging's because it came out
+# of the resolved graph rather than out of a `.module` file. Declaring
+# `androidx.lifecycle:lifecycle-viewmodel:2.11.0` in :app's commonMain and running
+# `./gradlew :android:app:dependencyInsight --configuration desktopCompileClasspath
+# --dependency androidx.lifecycle:lifecycle-viewmodel` names
+# `androidx.lifecycle:lifecycle-viewmodel-desktop:2.11.0` -- a real per-target KMP
+# artifact, which is what makes ViewModel, ViewModelProvider and viewModelScope
+# usable from commonMain. The Android-flavoured halves of the same family
+# (`lifecycle-viewmodel-ktx`, `lifecycle-runtime-ktx`, `lifecycle-runtime-compose`,
+# `lifecycle-viewmodel-compose`) are still Android-only and are why the
+# `factory(context)` for each viewmodel stays in androidMain. So the package name
+# stopped being a signal in either direction, and the compiler is the real check:
+# :app declares desktop and both iOS targets, so an Android-only lifecycle type in
+# its commonMain fails `compileKotlinDesktop` in check-local.sh, and `apple.yml`
+# covers the iOS half. Re-add the prefix if `lifecycle-viewmodel` ever stops
 # publishing the non-Android targets.
 
 # `java.*` was previously allowlisted in six :core-domain files while every
