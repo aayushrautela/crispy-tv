@@ -1,7 +1,7 @@
 package com.crispy.tv.details
 
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
@@ -10,7 +10,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 
 internal class EpisodeWatchStateResolver(
-    private val crispyBackendClient: CrispyBackendClient,
+    private val crispyBackendClient: BackendApi,
     private val backendContextResolver: BackendContextResolver,
     private val userMediaRepository: UserMediaRepository,
     private val completionPercent: Double = 85.0,

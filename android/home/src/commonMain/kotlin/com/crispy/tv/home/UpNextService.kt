@@ -1,17 +1,18 @@
 package com.crispy.tv.home
 
-import android.util.Log
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.backend.UpNextItem
 
 class UpNextService constructor(
-    private val backendClient: CrispyBackendClient,
+    private val backendClient: BackendApi,
     private val backendContextResolver: BackendContextResolver,
     private val timeSource: TimeSource,
+    private val logger: AppLogger,
 ) {
     suspend fun loadUpNext(nowMs: Long): HomeWideRailSectionUi? {
         val backendContext = backendContextResolver.resolve()
@@ -24,7 +25,7 @@ class UpNextService constructor(
                 limit = UP_NEXT_LIMIT,
             )
         } catch (error: Exception) {
-            Log.w(TAG, "Failed to load up next", error)
+            logger.warn(TAG, "Failed to load up next", error)
             throw IllegalStateException("Unable to load Up Next right now.", error)
         }
 

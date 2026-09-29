@@ -10,6 +10,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.domain.watch.WatchSyncEffect
@@ -62,12 +63,14 @@ class HomeViewModel internal constructor(
                                     CalendarService(
                                         backendClient = BackendServicesProvider.backendClient(appContext),
                                         backendContextResolver = BackendContextResolverProvider.get(appContext),
+                                        logger = AndroidAppLogger(appContext),
                                     ),
                                 upNextService =
                                     UpNextService(
                                         backendClient = BackendServicesProvider.backendClient(appContext),
                                         backendContextResolver = BackendContextResolverProvider.get(appContext),
                                         timeSource = AndroidTimeSource(),
+                                        logger = AndroidAppLogger(appContext),
                                     ),
                                 suppressionStore = suppressionStore,
                                 timeSource = AndroidTimeSource(),

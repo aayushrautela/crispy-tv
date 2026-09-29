@@ -1,12 +1,8 @@
 package com.crispy.tv.home
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import org.json.JSONObject
-import java.util.Locale
 import com.crispy.tv.domain.watch.iso8601MonthLabel
 
 @Immutable
@@ -136,55 +132,29 @@ private fun CalendarEpisodeItem.buildCalendarSecondaryText(): String {
     }
 }
 
-class ContinueWatchingSuppressionStore(context: Context) {
-    private val preferences: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    fun read(): MutableMap<String, Long> {
-        val raw = preferences.getString(KEY_ITEM_SUPPRESSIONS, null) ?: return mutableMapOf()
-        val payload = runCatching { JSONObject(raw) }.getOrNull() ?: return mutableMapOf()
-        val map = mutableMapOf<String, Long>()
-        payload.keys().forEach { key ->
-            val timestamp = payload.optLong(key)
-            if (timestamp > 0L) {
-                map[key] = timestamp
-            }
-        }
-        return map
-    }
-
-    fun write(value: Map<String, Long>) {
-        if (value.isEmpty()) {
-            preferences.edit().remove(KEY_ITEM_SUPPRESSIONS).apply()
-            return
-        }
-
-        val payload = JSONObject()
-        value.forEach { (key, timestamp) ->
-            payload.put(key, timestamp)
-        }
-        preferences.edit().putString(KEY_ITEM_SUPPRESSIONS, payload.toString()).apply()
-    }
-
-    companion object {
-        private const val PREFS_NAME = "home_continue_watching"
-        private const val KEY_ITEM_SUPPRESSIONS = "suppressed_items"
-    }
-}
 
 fun CanonicalContinueWatchingItem.sectionKey(): String {
     return CONTINUE_WATCHING_SECTION_KEY
 }
 
 fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-    return entry.titleItemId.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
+    // Was `lowercase(Locale.US)`, which pinned this file to the JVM. Kotlin's
+    // `lowercase()` is locale-invariant by definition, so for the ASCII ids an add-on
+    // publishes the two are identical, and where they could differ the invariant form
+    // is the predictable one. `CatalogModels.key` already made this exact change for
+    // the same reason.
+    return entry.titleItemId.trim().ifBlank { entry.id.trim().lowercase() }
 }
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(): String {
     val isShow = type.equals("show", ignoreCase = true) || type.equals("anime", ignoreCase = true)
     return if (isShow) {
         val seasonEpisode = if (season != null && episode != null) {
-            String.format(Locale.US, "S%02dE%02d", season, episode)
+            // `String.format(Locale.US, "S%02dE%02d", ...)` is JVM-only. `%02d` on a
+            // non-negative Int is zero-padding to width 2 and nothing else, so
+            // `padStart` is the whole of it; a season or episode past 99 is wider
+            // than 2 either way and is not truncated by either form.
+            "S" + season.toString().padStart(2, '0') + "E" + episode.toString().padStart(2, '0')
         } else {
             null
         }

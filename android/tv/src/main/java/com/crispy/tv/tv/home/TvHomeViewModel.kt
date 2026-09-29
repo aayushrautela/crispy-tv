@@ -24,6 +24,7 @@ import com.crispy.tv.home.UpNextService
 import com.crispy.tv.home.buildHomeLayoutState
 import com.crispy.tv.home.continueWatchingContentKey
 import com.crispy.tv.home.sectionKey
+import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.tv.di.TvServices
@@ -79,11 +80,13 @@ class TvHomeViewModel internal constructor(
                             calendarService = CalendarService(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
+                                logger = AndroidAppLogger(appContext),
                             ),
                             upNextService = UpNextService(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
                                 timeSource = AndroidTimeSource(),
+                                logger = AndroidAppLogger(appContext),
                             ),
                             suppressionStore = suppressionStore,
                             timeSource = AndroidTimeSource(),

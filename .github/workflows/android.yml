@@ -109,6 +109,13 @@ jobs:
         # desktop-and-Apple-only -- without it AGP warns and runs neither.
         run: ./gradlew :android:backend:desktopTest :android:backend:testAndroidHostTest
 
+      - name: Run home common tests
+        # Same two-target split as :backend. :home's commonTest is where the
+        # moved home services are pinned, and desktop is the target that would
+        # catch one of them reaching for a JVM API -- the exact failure the
+        # commonMain move could not have compiled past on Apple.
+        run: ./gradlew :android:home:desktopTest :android:home:testAndroidHostTest
+
       - name: Run plugins module unit tests
         run: ./gradlew :android:plugins:testDebugUnitTest
 

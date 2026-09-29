@@ -58,6 +58,15 @@
 # `withHostTest {}` gets an AGP warning instead of an error, and its common tests
 # then run on no Android target at all -- :android:backend had exactly that.
 #
+# :android:home:desktopTest and :android:home:testAndroidHostTest cover the two
+# home services that moved to commonMain -- CalendarService's bucketing and key
+# building, and UpNextService's drop rules and clock fallback. Desktop on
+# purpose, for the same reason as :android:backend: a test that only ran on
+# Android would not notice either file reaching for a JVM API again, and both
+# were moved specifically to stop them doing so. :home also has to run
+# :android:home:compileKotlinLinuxX64 because it declares iosArm64 and
+# iosSimulatorArm64, and the native compile is the only check of those on Linux.
+#
 # :android:androidApp:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
 #   ./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true
@@ -104,6 +113,9 @@ fi
     :android:app:testAndroidHostTest \
     :android:backend:desktopTest \
     :android:backend:testAndroidHostTest \
+    :android:home:compileKotlinLinuxX64 \
+    :android:home:desktopTest \
+    :android:home:testAndroidHostTest \
     :android:desktopApp:compileKotlin \
     :android:desktopApp:test \
     :android:androidApp:verifyDistributionExclusions \

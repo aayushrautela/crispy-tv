@@ -1,12 +1,12 @@
 package com.crispy.tv.home
 
-import android.util.Log
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.watch.parseIso8601DateToEpochMillis
 import com.crispy.tv.domain.watch.parseIso8601InstantToEpochMillis
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.backend.CalendarItem
 
 @Immutable
@@ -80,10 +80,11 @@ data class ThisWeekResult(
 )
 
 class CalendarService constructor(
-    private val backendClient: CrispyBackendClient,
+    private val backendClient: BackendApi,
     private val backendContextResolver: BackendContextResolver,
+    private val logger: AppLogger,
 ) {
-    @Volatile
+    @kotlin.concurrent.Volatile
     private var cachedCalendarSnapshot: CachedCalendarSnapshot? = null
 
     suspend fun loadCalendar(nowMs: Long): CalendarSnapshot {
@@ -93,6 +94,12 @@ class CalendarService constructor(
                 ?.let { context -> cachedCalendarSnapshot?.takeIf { it.profileId == context.profileId }?.snapshot }
         return try {
             val freshSnapshot = fetchCalendarSnapshot(nowMs, backendContext)
+            // Deliberately redundant today, and kept anyway. Every path that
+            // yields isError == true is the no-context case, and there the
+            // ?.let below is already a no-op, so no test can observe this
+            // guard. It states the invariant -- an error snapshot is never
+            // cached -- and any future error path that *is* reachable with a
+            // context makes it load-bearing.
             if (!freshSnapshot.isError) {
                 backendContext?.let { context ->
                     cachedCalendarSnapshot = CachedCalendarSnapshot(profileId = context.profileId, snapshot = freshSnapshot)
@@ -100,7 +107,7 @@ class CalendarService constructor(
             }
             freshSnapshot
         } catch (error: Exception) {
-            Log.w(TAG, "Failed to load calendar", error)
+            logger.warn(TAG, "Failed to load calendar", error)
             cachedSnapshot
                 ?: CalendarSnapshot(
                     sections = emptyList(),
@@ -114,7 +121,7 @@ class CalendarService constructor(
         return try {
             fetchThisWeekResult(nowMs)
         } catch (error: Exception) {
-            Log.w(TAG, "Failed to load this week", error)
+            logger.warn(TAG, "Failed to load this week", error)
             ThisWeekResult(
                 items = emptyList(),
                 statusMessage = "Unable to load this week right now.",

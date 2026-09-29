@@ -35,6 +35,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -107,6 +108,7 @@ private class CalendarViewModel(
                         calendarService = CalendarService(
                             backendClient = BackendServicesProvider.backendClient(appContext),
                             backendContextResolver = BackendContextResolverProvider.get(appContext),
+                            logger = AndroidAppLogger(appContext),
                         )
                     ) as T
                 }

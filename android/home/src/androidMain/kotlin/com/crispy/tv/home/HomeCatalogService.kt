@@ -42,20 +42,6 @@ private const val PREVIEW_ITEM_LIMIT = 12
 // timer, so the cache is intentionally not time-bounded here.
 private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
 
-@Immutable
-data class HomeHeroItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val tagline: String? = null,
-    val rating: String?,
-    val year: String? = null,
-    val genres: List<String> = emptyList(),
-    val artworkUrl: String?,
-    val artwork: ResponsiveImageSet = ResponsiveImageSet.fromSingle(artworkUrl),
-    val addonId: String,
-    val type: String,
-)
 
 @Immutable
 data class HomeHeroLoadResult(
