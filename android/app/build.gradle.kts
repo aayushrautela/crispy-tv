@@ -24,9 +24,9 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 58 of the 162 files are there.
+ * `commonMain` one vertical slice at a time, and 60 of the 176 files are there.
  *
- * The remaining 104 are held by three things, and only three: a type that
+ * The remaining 101 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
  * `androidx.paging`, media3), a composition root that by definition needs a
  * platform to resolve against, and screen code that is not yet split
@@ -244,6 +244,27 @@ kotlin {
             // configuration question, not a compile one.
             implementation(libs.coil.compose)
             implementation(libs.coil.core)
+
+            // `paging-common` is the multiplatform half of paging, and it is a
+            // real KMP artifact: 3.5.1 publishes android, desktop, iosArm64,
+            // iosSimulatorArm64, macosArm64, linuxX64, js and wasmJs. That is
+            // every target this module declares, so `PagingSource`,
+            // `PagingState`, `LoadParams` and `LoadResult` all resolve in
+            // `commonMain`. `paging-runtime` and `paging-compose` stay in
+            // `androidMain` below -- `Pager`, `PagingConfig`, `cachedIn` and
+            // the Compose `LazyPagingItems` are the Android-only half, and the
+            // three PagingSource files that moved need none of them.
+            //
+            // This is NOT the situation with `androidx.navigation`, which
+            // looks symmetric and is not: `navigation-compose:2.9.8` publishes
+            // only `android`, plus `jvmStubs` and `linuxx64Stubs`. Those stubs
+            // are javadoc/dokka artifacts, not compilable KMP ones, so the
+            // six `ui/navigation` files stay blocked. The multiplatform
+            // navigation is the JetBrains fork
+            // (`org.jetbrains.androidx.navigation`), which is a dependency
+            // decision, not a code one.
+            implementation(libs.androidx.paging.common)
+
             // NOT `:android:native-engine`. It is a plain `com.android.library`,
             // so it publishes no JVM variant and cannot be consumed from a KMP
             // `commonMain` at all -- the same constraint `:ui-assets` hit. The one

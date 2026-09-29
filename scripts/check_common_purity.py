@@ -43,7 +43,6 @@ FORBIDDEN_PREFIXES = (
     "androidx.lifecycle",
     "androidx.media3",
     "androidx.navigation",
-    "androidx.paging",
     "androidx.room",
     "androidx.work",
     "dalvik.",
@@ -53,6 +52,21 @@ FORBIDDEN_PREFIXES = (
     "com.android.",
     "com.google.android.",
 )
+
+# `androidx.paging` was forbidden as a whole and is now not, because the
+# package name spans two artifacts with opposite reachability and this gate
+# matches on the name. `paging-common:3.5.1` publishes android, desktop,
+# iosArm64, iosSimulatorArm64, macosArm64, linuxX64, linuxArm64, js, wasmJs,
+# mingwX64, tvOS and watchOS -- read from its `.module` on Google Maven, since
+# Maven Central 404s every AndroidX coordinate. `paging-runtime` and
+# `paging-compose` remain Android-only and are why `Pager`, `PagingConfig`,
+# `cachedIn` and `LazyPagingItems` still live in androidMain. So the name is
+# no longer a signal in either direction, and the real check is the compiler:
+# the same argument the androidx.compose note above makes. :app declares
+# desktop and both iOS targets, so an Android-only paging type in its
+# commonMain fails `compileKotlinDesktop` in check-local.sh, and `apple.yml`
+# covers the iOS half. Re-add the prefix if `paging-common` ever stops
+# publishing the non-Android targets.
 
 # `java.*` was previously allowlisted in six :core-domain files while every
 # declared target was JVM. Those files are clear, so the exemption is gone: a

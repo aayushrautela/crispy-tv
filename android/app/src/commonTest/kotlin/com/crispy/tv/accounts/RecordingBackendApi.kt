@@ -1,6 +1,7 @@
 package com.crispy.tv.accounts
 
 import com.crispy.tv.backend.BackendApi
+import com.crispy.tv.backend.BrowseTitlesResponse
 import com.crispy.tv.backend.ImportJob
 import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ImportJobsResponse
@@ -19,10 +20,12 @@ import com.crispy.tv.backend.UpdateProfileInput
  * [BackendApi] fails to compile here until a decision is made about what that
  * member means. A partial double would let a new member arrive unexamined.
  *
- * The three members below are the ones `SyncProviderRepository` calls, and they
- * answer. The other 49 throw `AssertionError` naming the member, which is
- * louder than a silent default and says immediately which call a test forgot
- * to stub.
+ * The members below are the ones `SyncProviderRepository` and
+ * `BackendBrowseRepository` call, and they answer. The rest throw
+ * `AssertionError` naming the member, which is louder than a silent default and
+ * says immediately which call a test forgot to stub. Widening this file is the
+ * intended cost of adding a consumer: the alternative is a narrow double in
+ * the same module, which silently rots the moment a member changes.
  */
 internal class RecordingBackendApi : BackendApi {
     val listImportConnectionsCalls = mutableListOf<Pair<String, String>>()
@@ -182,13 +185,33 @@ internal class RecordingBackendApi : BackendApi {
         personId: String,
         language: String?
     ): Nothing = unused("getMetadataPersonDetail")
+    var browseTitlesResponses: List<BrowseTitlesResponse> = emptyList()
+    val browseTitlesCalls = mutableListOf<BrowseTitlesCall>()
+
+    data class BrowseTitlesCall(
+        val accessToken: String,
+        val type: String,
+        val genre: String?,
+        val sort: String,
+        val page: Int,
+    )
+
+    /** Answers [browseTitles] from a queue, one response per call, in order. */
+    fun answerBrowseTitles(vararg responses: BrowseTitlesResponse) = apply {
+        browseTitlesResponses = responses.toList()
+    }
+
     override suspend fun browseTitles(
         accessToken: String,
         type: String,
         genre: String?,
         sort: String,
         page: Int
-    ): Nothing = unused("browseTitles")
+    ): BrowseTitlesResponse {
+        browseTitlesCalls += BrowseTitlesCall(accessToken, type, genre, sort, page)
+        return browseTitlesResponses.getOrNull(browseTitlesCalls.size - 1)
+            ?: error("browseTitles was not stubbed for call ${browseTitlesCalls.size}")
+    }
     override suspend fun getHome(accessToken: String, profileId: String): Nothing = unused("getHome")
     override suspend fun getCalendar(accessToken: String, profileId: String): Nothing = unused("getCalendar")
     override suspend fun getCalendarThisWeek(

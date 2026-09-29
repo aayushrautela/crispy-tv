@@ -1,10 +1,7 @@
 package com.crispy.tv.discover
 
-import android.content.Context
 import com.crispy.tv.accounts.AccountApi
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.domain.browse.BrowseCombo
@@ -17,9 +14,19 @@ data class BrowsePagePayload(
     val hasMore: Boolean = false,
 )
 
+/**
+ * Merges the backend's per-type browse responses into one page of catalog items.
+ *
+ * Portable: it holds only the two ports (`AccountApi`, `BackendApi`) and the
+ * planning/merging rules from `:core-domain`. The `Context`-taking factory
+ * that used to live in this file's companion object is now
+ * `backendBrowseRepository(context)` in androidMain, because building the two
+ * ports needs the composition root and `Context` is Android-only. That split
+ * is the same one the settings repositories use.
+ */
 class BackendBrowseRepository(
     private val supabase: AccountApi,
-    private val backend: CrispyBackendClient,
+    private val backend: BackendApi,
 ) {
     suspend fun browsePage(
         type: String,
@@ -72,16 +79,6 @@ class BackendBrowseRepository(
             items = items,
             hasMore = merged.hasMore,
         )
-    }
-
-    companion object {
-        fun create(context: Context): BackendBrowseRepository {
-            val appContext = context.applicationContext
-            return BackendBrowseRepository(
-                supabase = SupabaseServicesProvider.accountClient(appContext),
-                backend = BackendServicesProvider.backendClient(appContext),
-            )
-        }
     }
 }
 

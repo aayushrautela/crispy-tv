@@ -178,7 +178,7 @@ class DiscoverViewModel(
                     if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
-                            repository = BackendBrowseRepository.create(appContext)
+                            repository = backendBrowseRepository(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
