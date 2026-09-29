@@ -151,11 +151,6 @@ internal fun formatGestureBrightness(level: Float): String =
 internal fun formatGestureVolume(level: PlayerGestureController.AudioLevel): String =
     if (level.isMuted) "Muted" else "${(level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()}%"
 
-internal fun playbackSeekDeltaLabel(deltaMs: Long): String {
-    val seconds = abs(deltaMs) / 1000L
-    return if (deltaMs >= 0) "+${seconds}s" else "-${seconds}s"
-}
-
 private enum class GestureRegion {
     BRIGHTNESS,
     VOLUME,

@@ -108,6 +108,18 @@ kotlin {
             implementation(project(":android:core-domain"))
             implementation(project(":android:platform-core"))
             implementation(project(":android:sharedUI"))
+            // Its `MediaModels.kt` (MediaDetails, MediaVideo) is in commonMain
+            // and is referenced by the player UI in `commonMain`. Declared here
+            // rather than in `androidMain` because the consumer is a common
+            // source set; `androidMain` still gets it transitively.
+            implementation(project(":android:addons"))
+            // The player UI in commonMain also reads `PlaybackIdentity` and
+            // `TorrentResolver`, both in `:android:player`'s commonMain.
+            implementation(project(":android:player"))
+            // NOT `:android:native-engine`. It is a plain `com.android.library`,
+            // so it publishes no JVM variant and cannot be consumed from a KMP
+            // `commonMain` at all -- the same constraint `:ui-assets` hit. The one
+            // file that needs it, `PlayerSessionSupport`, stays in `androidMain`.
         }
 
         // Everything the current code actually needs. Listed as `androidMain`

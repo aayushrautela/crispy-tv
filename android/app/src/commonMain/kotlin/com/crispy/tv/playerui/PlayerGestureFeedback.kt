@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.abs
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.domain.player.TapZone
 import com.crispy.tv.ui.components.CrispyIcon
@@ -202,5 +203,17 @@ internal object GestureIcons {
     val VolumeUp: DrawableResource = Res.drawable.ic_volume_up_filled
     val VolumeMuted: DrawableResource = Res.drawable.ic_volume_off_filled
     val Resize: DrawableResource = Res.drawable.ic_crop_filled
+}
+
+/**
+ * Formats a seek delta for the gesture ripple. Lives here rather than in
+ * `PlayerGestures` because that file is `androidMain`: it reaches
+ * `PlayerGestureController.AudioLevel`, and that class is Android-locked
+ * (`Activity`, `AudioManager`, `WindowManager`, `Settings`). This formatter is
+ * pure and its only consumer is the ripple in this file.
+ */
+internal fun playbackSeekDeltaLabel(deltaMs: Long): String {
+    val seconds = abs(deltaMs) / 1000L
+    return if (deltaMs >= 0) "+${seconds}s" else "-${seconds}s"
 }
 
