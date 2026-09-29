@@ -27,7 +27,8 @@ plugins {
  * | `LookupIds`, `StreamLookupSupport`, `StreamSelectorState` | `commonMain` | used `Locale.US` in `lowercase`, which is exactly what Kotlin's locale-independent `lowercase()` already does |
  * | `RatingFormats` | `commonMain` | `String.format` is JVM-only; now uses `core-domain`'s `formatOneDecimal`, pinned against real `%.1f` output |
  * | `AddonStreamsService` | `androidMain` | `Context`, OkHttp, `org.json` |
- * | `StreamResolver` | `androidMain` | OkHttp |
+ * | `StreamResolver` | `commonMain` | a type-level port over `CachingStreamResolver`, whose caching is the only thing the class adds and only `cachedStreams` can observe. It is **not** a transport abstraction: `AddonStreamsService` wraps `CrispyHttpClient`, which leaks `okhttp3` |
+ * | `CachingStreamResolver` | `androidMain` | OkHttp, and `AddonStreamsService` is a final class built from a `Context` and an `okhttp3` client. It is also the class the port's KDoc points at — the port is the half that could travel, the cache is the half that cannot. Its `System.currentTimeMillis()` calls are a second, independent reason it could not move on its own merits |
  * | `BackendEpisodeListProvider` | `commonMain` | moved once both of its parameters became `BackendApi` / `AccountApi` ports. It had no Android type of its own |
  * | `MetadataAddonRegistry`, `RemoteMetadataLabDataSource`, `RemoteSupabaseSyncLabService` | `androidMain` | `Context` and `org.json` |
  */

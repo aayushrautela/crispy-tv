@@ -1,6 +1,5 @@
 package com.crispy.tv.addons.streams
 
-import android.content.Context
 import android.util.Log
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.addons.lookup.StreamLookupTarget
@@ -14,10 +13,15 @@ import kotlinx.coroutines.sync.withLock
  * Wraps a single [AddonStreamsService] instance and caches completed results keyed by
  * [StreamLookupTarget] so that Details and the Player never hit the addons twice for the
  * same title. Both surfaces obtain the same process-wide instance via [StreamResolverProvider].
+ *
+ * The caching is the whole reason this is a class rather than the [StreamResolver]
+ * interface: it is the only behaviour it adds, and only [cachedStreams] can observe it.
+ * It stays in `androidMain` because [AddonStreamsService] is there — it is built from a
+ * `Context` and an `okhttp3` client — so the port is the half that could travel.
  */
-class StreamResolver(
+class CachingStreamResolver(
     private val addonStreamsService: AddonStreamsService,
-) {
+) : StreamResolver {
     private data class CacheEntry(
         val results: List<ProviderStreamsResult>,
         val expiresAtEpochMs: Long,
@@ -29,10 +33,10 @@ class StreamResolver(
     private fun cacheKey(target: StreamLookupTarget): String =
         "${target.mediaType.name.lowercase(Locale.US)}:${target.lookupId.trim()}"
 
-    suspend fun resolve(
+    override suspend fun resolve(
         target: StreamLookupTarget,
-        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)? = null,
-        onProviderResult: ((ProviderStreamsResult) -> Unit)? = null,
+        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)?,
+        onProviderResult: ((ProviderStreamsResult) -> Unit)?,
     ): List<ProviderStreamsResult> {
         Log.d(TAG, "resolve() start mediaType=${target.mediaType} lookupId='${target.lookupId}'")
         val results =
@@ -55,7 +59,7 @@ class StreamResolver(
         return results
     }
 
-    suspend fun cachedStreams(target: StreamLookupTarget): List<ProviderStreamsResult>? {
+    override suspend fun cachedStreams(target: StreamLookupTarget): List<ProviderStreamsResult>? {
         cacheLock.withLock {
             val entry = cache[cacheKey(target)] ?: return null
             if (System.currentTimeMillis() > entry.expiresAtEpochMs) {
@@ -66,7 +70,7 @@ class StreamResolver(
         }
     }
 
-    suspend fun loadProviderStreams(
+    override suspend fun loadProviderStreams(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         providerId: String,
@@ -87,7 +91,7 @@ class StreamResolver(
         }
     }
 
-    suspend fun fetchAddonSubtitles(
+    override suspend fun fetchAddonSubtitles(
         mediaType: MetadataLabMediaType,
         lookupId: String,
     ): List<AddonSubtitle> = addonStreamsService.fetchAddonSubtitles(mediaType, lookupId)

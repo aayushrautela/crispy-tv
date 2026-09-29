@@ -1,6 +1,6 @@
 package com.crispy.tv.playerui
 
-import android.util.Log
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamResolver
@@ -16,8 +16,14 @@ private const val TAG = "CrispySubtitles"
 
 class SubtitleRepository(
     private val streamResolver: StreamResolver,
+    private val logger: AppLogger,
+    /**
+     * The scope fetches run in. Injected rather than created so a test can drive them
+     * deterministically; the default is the behaviour this class always had, and the
+     * call sites in the composition root keep reading `fetchAddonSubtitles` the same way.
+     */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val cacheLock = Any()
     private var cachedKey: Pair<MetadataLabMediaType, String>? = null
@@ -40,21 +46,21 @@ class SubtitleRepository(
         if (!force && serveFromCache(mediaType, lookupId)) {
             return
         }
-        Log.d(TAG, "fetch mediaType=$mediaType id=$lookupId force=$force")
+        logger.debug(TAG, "fetch mediaType=$mediaType id=$lookupId force=$force")
         scope.launch {
             _isLoading.value = true
             _error.value = null
             runCatching {
                 streamResolver.fetchAddonSubtitles(mediaType, lookupId)
             }.onSuccess { subtitles ->
-                Log.d(TAG, "success count=${subtitles.size}")
+                logger.debug(TAG, "success count=${subtitles.size}")
                 storeInCache(mediaType, lookupId, subtitles)
                 _addonSubtitles.value = subtitles
                 if (subtitles.isEmpty()) {
                     _error.value = "No subtitles found"
                 }
             }.onFailure { throwable ->
-                Log.d(TAG, "failure ${throwable.message}")
+                logger.debug(TAG, "failure ${throwable.message}")
                 _error.value = throwable.message ?: "Failed to fetch subtitles"
             }
             _isLoading.value = false
@@ -68,7 +74,14 @@ class SubtitleRepository(
             if (cachedKey != mediaType to lookupId) {
                 return false
             }
-            Log.d(TAG, "cache hit mediaType=$mediaType id=$lookupId count=${cachedSubtitles.size}")
+            logger.debug(TAG, "cache hit mediaType=$mediaType id=$lookupId count=${cachedSubtitles.size}")
+            // Redundant today, and kept for that reason. The cache is a single slot
+            // and only `onSuccess` ever writes it, on the line before this value is
+            // published, with the same list - so a hit's cached list is by construction
+            // the list already on screen. No test can see this assignment removed. It
+            // becomes load-bearing the moment the cache holds more than one title, or a
+            // failure can publish something without storing, so it states the invariant
+            // rather than being quietly deleted. See the redundant-guard note in AGENTS.md.
             _addonSubtitles.value = cachedSubtitles
             _isLoading.value = false
             _error.value = null

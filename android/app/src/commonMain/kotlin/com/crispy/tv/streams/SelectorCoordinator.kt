@@ -5,6 +5,7 @@ import com.crispy.tv.addons.streams.StreamProviderUiState
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.addons.streams.seedProviders
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.mapping.toMediaDetails
@@ -33,6 +34,7 @@ import com.crispy.tv.backend.MetadataTitleDetailResponse
 class SelectorCoordinator(
     private val scope: CoroutineScope,
     private val streamResolver: StreamResolver,
+    private val logger: AppLogger,
     private val getMetadataItemDetail: suspend (accessToken: String, itemId: String) -> MetadataTitleDetailResponse,
     private val sessionTokenProvider: suspend () -> String?,
     private val pluginStreamLoader: PluginStreamLoader? = null,
@@ -114,7 +116,7 @@ class SelectorCoordinator(
                     val request = buildPluginRequest(resolvedTarget) ?: return@launch
                     loader.stream(request)
                         .catch { error ->
-                            android.util.Log.w("CrispyPlugins", "plugin stream flow failed: ${error.message}")
+                            logger.warn("CrispyPlugins", "plugin stream flow failed: ${error.message}")
                         }
                         .collect { result ->
                             if (session == sessionId && currentTarget == target) {

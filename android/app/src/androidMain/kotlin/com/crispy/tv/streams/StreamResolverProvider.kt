@@ -2,6 +2,7 @@ package com.crispy.tv.streams
 
 import android.content.Context
 import com.crispy.tv.addons.streams.AddonStreamsService
+import com.crispy.tv.addons.streams.CachingStreamResolver
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.network.AppHttp
 
@@ -34,6 +35,6 @@ object StreamResolverProvider {
                 context = appContext,
                 httpClient = AppHttp.client(appContext),
             )
-        return StreamResolver(addonStreamsService)
+        return CachingStreamResolver(addonStreamsService)
     }
 }

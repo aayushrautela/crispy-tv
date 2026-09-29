@@ -5,6 +5,7 @@ import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.addons.streams.AddonStreamsService
+import com.crispy.tv.addons.streams.CachingStreamResolver
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.backend.BackendContextResolver
@@ -113,7 +114,7 @@ object TvServices {
         synchronized(this) {
             streamResolver?.let { return it }
             val appContext = context.applicationContext
-            val created = StreamResolver(
+            val created = CachingStreamResolver(
                 addonStreamsService = AddonStreamsService(
                     context = appContext,
                     httpClient = AppHttp.client(appContext),

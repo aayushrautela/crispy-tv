@@ -26,6 +26,7 @@ import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.streams.StreamResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
@@ -60,6 +61,7 @@ class DetailsViewModel internal constructor(
         SelectorCoordinator(
             scope = viewModelScope,
             streamResolver = StreamResolverProvider.get(appContext),
+            logger = AndroidAppLogger(appContext),
             getMetadataItemDetail = { token, metadataItemId ->
                 BackendServicesProvider.backendClient(appContext)
                     .getMetadataItemDetail(accessToken = token, itemId = metadataItemId)

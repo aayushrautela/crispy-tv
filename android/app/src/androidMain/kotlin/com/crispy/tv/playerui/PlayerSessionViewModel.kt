@@ -24,6 +24,7 @@ import com.crispy.tv.addons.lookup.findEpisodeForLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.lookup.resolveStreamLookupTargetFromIdentity
 import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
@@ -142,11 +143,12 @@ class PlayerSessionViewModel(
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         PlaybackSettingsRepositoryProvider.get(this.appContext)
-    private val subtitleRepository: SubtitleRepository = SubtitleRepository(streamResolver)
+    private val subtitleRepository: SubtitleRepository = SubtitleRepository(streamResolver, logger = AndroidAppLogger(this.appContext))
     private val selectorCoordinator =
         SelectorCoordinator(
             scope = viewModelScope,
             streamResolver = streamResolver,
+            logger = AndroidAppLogger(this.appContext),
             getMetadataItemDetail = { token, itemId ->
                 backendClient.getMetadataItemDetail(accessToken = token, itemId = itemId)
             },
