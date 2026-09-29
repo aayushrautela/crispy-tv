@@ -47,6 +47,9 @@ Single test (important):
 ./gradlew :android:app:testAndroidHostTest --tests 'com.crispy.tv.distribution.AppDistributionTest'
 ./gradlew :android:app:testAndroidHostTest --tests 'com.crispy.tv.PlaybackDependenciesTest'
 
+# :backend's common-domain tests (BackendContextResolver)
+./gradlew :android:backend:desktopTest --tests 'com.crispy.tv.backend.BackendContextResolverTest'
+
 # SwiftPM
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests.testSomeCaseName
@@ -106,8 +109,23 @@ Composition-root tests (`:android:app:testAndroidHostTest`):
 - JUnit's `@FixMethodOrder(MethodSorters.NAME_ASCENDING)` is what makes an ordered singleton lifecycle readable; the alternative is a reset hook on production code that exists only for tests.
 - **`SecureTokenStore` is untestable on a JVM**, so everything that reaches it is untestable: `SupabaseServicesProvider.secureTokenStore` and `accountClient` directly, and `homeCatalogService` indirectly through `BackendContextResolverProvider.get`. The failure is `KeyStoreException: AndroidKeyStore not found` raised in a constructor, before any assertion. A fake keystore would prove nothing about the real one, so leave them out rather than mocking around it.
 
+Common-domain tests (`:android:backend:desktopTest`, `android/backend/src/commonTest`):
+- A `commonTest` in a module that had **no test source set at all** is the cheapest possible guard for a file that just moved to `commonMain`, and it is deliberately *not* an `androidHostTest`: a test that only ran on Android would not notice the file reaching for a JVM API again. Same reasoning as the `linuxX64` gate, applied to tests.
+- `BackendContextResolverTest` drives the resolver through `AccountApi` / `BackendApi` fakes rather than through its provider, precisely because the provider reaches the keystore.
+- `UnusedBackendApi` implements all 52 members and throws. **It exists to be broken by the compiler**: adding a `BackendApi` member fails to compile here until a fake decides what that member means. Prefer this to a mock framework that would silently absorb a new member as a no-op.
+- **Prove a new suite is not vacuous before trusting it, and treat "no test failed" as a finding rather than a pass.** Six deliberate breakages caught five. The sixth is the interesting one: deleting **only the fast-path cache read outside the `Mutex`** changed nothing observable, because the in-mutex check re-reads the same cache and the store is untouched either way. Both checks have to go before the caching assertions fail. A single-check test cannot see a redundant check being removed.
+- **A test failure and a compilation failure look identical if you only read the exit code** — and the test results on disk are the *previous* run's, so the wrong evidence gets reported. Always run `compileTestKotlinDesktop` first and read the XML only if that succeeded. This bit me once mid-session and produced a confidently wrong mutation result.
+
 Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
+- **A type-level port is the lever that moves files, and the count to report is *files*, not call sites retyped.** `BackendApi` and `AccountApi` (`android/backend/src/commonMain`) are plain interfaces the two OkHttp clients implement. The discipline that makes one trustworthy:
+  - **A port is not a transport abstraction, and must not be documented as one.** `CrispyHttpClient` leaks `okhttp3.HttpUrl`, `Headers` and `Request` in its own signature, so a client is a wrapper *around* OkHttp and cannot be typed by an interface that abstracts OkHttp. Both KDocs say this outright, because the alternative claim is the thing a reader will assume.
+  - **All OkHttp and `org.json` use in both clients is `private`**, which is what makes the ports possible at all. Every `CrispyBackend*` file is an `internal` *extension function* behind the member facade, so none of them reaches a public signature.
+  - **A nested type is as pinned as the file declaring it.** `SignUpResult` had to be lifted to its own `commonMain` file before `AccountApi` could name it — exactly as `BackendPayloads.kt` was for the four backend inputs. Look for this *before* writing the interface, not after the compiler reports it.
+  - **An override may not restate a default parameter value.** The default lives on the interface; the implementation drops it. A stripper that leaves one compiles as a *declaration conflict*, so let the compiler find the leftovers.
+  - **An override must reproduce the signature verbatim, `suspend` included.** The fake that exhaustively implements `BackendApi` lost `suspend` in generation and produced ~30 × `Non-suspend function cannot override suspend function`.
+  - **`kotlin.jvm.Volatile` does not exist in `commonMain`.** A field annotated `@Volatile` must switch to `kotlin.concurrent.Volatile` when its file moves, and the compiler says only `Unresolved reference 'Volatile'`.
+  - **A port only frees a file whose own body is already clean.** Retyping seventeen call sites moved one file. Re-typing a parameter is necessary and frequently not sufficient; audit the file's other imports before counting the win.
 - `:android:core-domain`: KMP (Android + `desktop` JVM + `linuxX64` + `iosArm64` + `iosSimulatorArm64`). Its `commonMain` is free of `java.*`/`android.*`; `scripts/check_common_purity.py` enforces that with no allowlist. The `java.time` and `URLEncoder` call sites were replaced with portable equivalents pinned by unit tests against real JVM output, which is what unblocked declaring the Apple targets.
 - `linuxX64` on the pure-Kotlin KMP modules is a **compile-only verification target**, never shipped and never run. It is the one Kotlin/Native target that builds on a Linux host, so `compileKotlinLinuxX64` in `check-local.sh` enforces the same "no JVM API" rule as the Apple targets in seconds instead of waiting for macOS CI. The import-based purity gate cannot see this class of bug: `"".format(y)` is `kotlin.*`, so it passes the import scan and then fails only when an Apple target compiles. Prefer the native compile gate for anything touching `commonMain`.
 - `:android:desktopApp`: the desktop entry point and the **seam proof** (plan §3) — one JVM module for Windows, macOS and Linux. Renders `:android:sharedUI`'s design system over `:android:core-domain`'s real `planContinueWatching`, seeded from a real contract fixture. It is a semantic-assertion test, not a golden: a Skia raster varies by Skia version and font availability, and the Android Roborazzi gate is already the rendering gate. **Host prerequisites:** Skia needs `libGL.so.1`, `libX11.so.6` and `libfontconfig.so.1`, and needs at least one font. The font is bundled in `test-fonts/` (repository root, shared with `:android:androidApp`) and reached through a generated `fonts.conf`. Without those the test reports a Skiko native-load error or `IllegalStateException: Could not load font` — neither says anything about the seam. CI's `ubuntu-latest` has all of them.
@@ -253,6 +271,7 @@ Python (tooling):
 - `python3 scripts/validate_workflows.py`
 - `./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest`
 - `./gradlew :android:app:testAndroidHostTest` (the composition root; this is the gate before touching `PlaybackDependencies`, `AppDistribution` or the two service providers)
+- `./gradlew :android:backend:desktopTest` (the port tests; the gate before changing `BackendApi` or `AccountApi`, since `UnusedBackendApi` fails to compile on a new member)
 - `python3 scripts/verify_kmp_outputs.py` (after any compile; catches a stale class a green build cannot)
 - `swift test --package-path ios/ContractRunner` (if Swift logic touched)
 - Ensure `:android:tv` and tvOS placeholder builds still compile

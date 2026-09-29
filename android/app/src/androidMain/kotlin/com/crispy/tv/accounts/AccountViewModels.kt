@@ -29,7 +29,7 @@ data class AuthUiState(
 }
 
 class AuthViewModel internal constructor(
-    private val supabase: SupabaseAccountClient,
+    private val supabase: AccountApi,
     private val bootstrapRepository: AccountBootstrapRepository,
 ) : ViewModel() {
     companion object {

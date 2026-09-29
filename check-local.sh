@@ -45,6 +45,11 @@
 # `@Config(manifest = Config.NONE)` is enough and these tests do not need the
 # merged manifest or the real app theme the golden screenshots require.
 #
+# :android:backend:desktopTest covers BackendContextResolver, which moved to
+# commonMain when AccountApi replaced SupabaseAccountClient. It runs on desktop
+# rather than the Android host test on purpose: a test that only ran on Android
+# would not notice that file reaching for a JVM API again.
+#
 # :android:androidApp:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
 #   ./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true
@@ -88,6 +93,7 @@ fi
     :android:app:compileAndroidMain \
     :android:app:compileKotlinDesktop \
     :android:app:testAndroidHostTest \
+    :android:backend:desktopTest \
     :android:desktopApp:compileKotlin \
     :android:desktopApp:test \
     :android:androidApp:verifyDistributionExclusions \

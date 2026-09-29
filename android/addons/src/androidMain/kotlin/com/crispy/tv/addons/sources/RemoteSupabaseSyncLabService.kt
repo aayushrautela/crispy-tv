@@ -1,7 +1,7 @@
 package com.crispy.tv.addons.sources
 
 import android.content.Context
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.player.SupabaseSyncAuthState
 import com.crispy.tv.player.SupabaseSyncLabResult
 import com.crispy.tv.player.SupabaseSyncLabService
@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 @Suppress("UNUSED_PARAMETER")
 class RemoteSupabaseSyncLabService(
     context: Context,
-    private val supabase: SupabaseAccountClient,
+    private val supabase: AccountApi,
 ) : SupabaseSyncLabService {
     override suspend fun initialize(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
         result("Sync Lab is temporarily disabled until addon sync moves to backend APIs.")

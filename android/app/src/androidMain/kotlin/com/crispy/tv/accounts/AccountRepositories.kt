@@ -17,7 +17,7 @@ data class BootstrapResult(
 
 class AccountBootstrapRepository(
     private val appContext: Context,
-    private val supabase: SupabaseAccountClient,
+    private val supabase: AccountApi,
     private val backendContextResolver: BackendContextResolver,
     private val backendClient: CrispyBackendClient,
     private val activeProfileStore: ActiveProfileStore,

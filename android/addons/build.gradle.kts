@@ -28,7 +28,8 @@ plugins {
  * | `RatingFormats` | `commonMain` | `String.format` is JVM-only; now uses `core-domain`'s `formatOneDecimal`, pinned against real `%.1f` output |
  * | `AddonStreamsService` | `androidMain` | `Context`, OkHttp, `org.json` |
  * | `StreamResolver` | `androidMain` | OkHttp |
- * | `MetadataAddonRegistry`, `RemoteMetadataLabDataSource`, `RemoteSupabaseSyncLabService`, `BackendEpisodeListProvider` | `androidMain` | `Context` and `org.json` |
+ * | `BackendEpisodeListProvider` | `commonMain` | moved once both of its parameters became `BackendApi` / `AccountApi` ports. It had no Android type of its own |
+ * | `MetadataAddonRegistry`, `RemoteMetadataLabDataSource`, `RemoteSupabaseSyncLabService` | `androidMain` | `Context` and `org.json` |
  */
 kotlin {
     jvmToolchain(21)

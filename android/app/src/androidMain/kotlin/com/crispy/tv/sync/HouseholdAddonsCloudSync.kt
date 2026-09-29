@@ -2,7 +2,7 @@ package com.crispy.tv.sync
 
 import android.util.Log
 import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
@@ -10,7 +10,7 @@ import java.util.Locale
 import com.crispy.tv.backend.AddonDto
 
 class HouseholdAddonsCloudSync(
-    private val supabase: SupabaseAccountClient,
+    private val supabase: AccountApi,
     private val backend: CrispyBackendClient,
     private val addonRegistry: MetadataAddonRegistry,
     private val activeProfileStore: ActiveProfileStore,

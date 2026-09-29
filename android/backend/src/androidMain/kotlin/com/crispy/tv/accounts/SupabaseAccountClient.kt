@@ -16,24 +16,19 @@ class SupabaseAccountClient(
     supabaseUrl: String,
     private val supabasePublishableKey: String,
     private val tokenStore: SecureTokenStore,
-) {
+) : AccountApi {
     private val baseUrl: String = supabaseUrl.trim().trimEnd('/')
     private val sessionMutex = Mutex()
 
-    data class SignUpResult(
-        val session: Session?,
-        val message: String,
-    )
-
-    fun isConfigured(): Boolean {
+    override fun isConfigured(): Boolean {
         return baseUrl.isNotBlank() && supabasePublishableKey.isNotBlank()
     }
 
-    fun currentSession(): Session? {
+    override fun currentSession(): Session? {
         return tokenStore.current()
     }
 
-    suspend fun ensureValidSession(): Session? {
+    override suspend fun ensureValidSession(): Session? {
         val existing = loadSession() ?: return null
         if (!shouldRefresh(existing)) {
             return existing
@@ -70,7 +65,7 @@ class SupabaseAccountClient(
         }
     }
 
-    suspend fun signInWithEmail(email: String, password: String): Session {
+    override suspend fun signInWithEmail(email: String, password: String): Session {
         checkConfigured()
         val url = "$baseUrl/auth/v1/token?grant_type=password".toHttpUrl()
         val payload = JSONObject().put("email", email.trim()).put("password", password).toString()
@@ -82,10 +77,10 @@ class SupabaseAccountClient(
         return session
     }
 
-    suspend fun signUpWithEmail(
+    override suspend fun signUpWithEmail(
         email: String,
         password: String,
-        metadata: Map<String, String?> = emptyMap(),
+        metadata: Map<String, String?>,
     ): SignUpResult {
         checkConfigured()
         val url = "$baseUrl/auth/v1/signup".toHttpUrl()
@@ -117,7 +112,7 @@ class SupabaseAccountClient(
         }
     }
 
-    suspend fun signOut() {
+    override suspend fun signOut() {
         if (!isConfigured()) return
         val session = tokenStore.current()
         if (session != null && !session.accessToken.startsWith("cp_pat_")) {

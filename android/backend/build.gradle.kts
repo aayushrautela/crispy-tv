@@ -21,13 +21,16 @@ plugins {
  * | `ActiveProfileStore` | `commonMain` | `KeyValueStore` only; the `Context` is gone |
  * | `BackendTypes` | `commonMain` | the 52 response and request types that used to be nested in `CrispyBackendClient`. Pure data; lifted out because 38 files across 8 modules referenced them, and the client is `androidMain`, so a data class's nesting was pinning all of them to `androidMain` |
  * | `AiInsightsModels` | `commonMain` | moved once `BackendTypes` was. It was blocked by naming `CrispyBackendClient.ResponsiveImageSet` and by nothing else, so it became portable the moment that type did |
+ * | `BackendApi`, `AccountApi` | `commonMain` | the type-level ports the two Android clients implement. Neither abstracts the transport: `CrispyHttpClient` leaks `okhttp3.HttpUrl` and `Headers` in its own signature, so a client is a wrapper *around* OkHttp and cannot be typed by it |
+ * | `BackendPayloads`, `SignUpResult` | `commonMain` | input and result types that were nested inside `androidMain` clients. A nested type is as pinned as the file that declares it |
+ * | `BackendContextResolver` | `commonMain` | moved once both parameters became ports. It had no OkHttp of its own; it followed `SupabaseAccountClient` only because it named it |
  * | `SecureTokenStore` | `androidMain` | Android keystore crypto and `javax.crypto`. It is the `SecretStore` implementation |
- * | `BackendContextResolver`, the six `CrispyBackend*` files, `SupabaseAccountClient` | `androidMain` | OkHttp and `org.json` |
+ * | the six `CrispyBackend*` files, `SupabaseAccountClient` | `androidMain` | OkHttp and `org.json` |
  *
- * The dependency direction matters for the migration: `BackendContextResolver` is a
- * *consumer* of `SupabaseAccountClient`, which is OkHttp, so it follows that adapter
- * rather than leading it. It is listed with its blocker rather than moved
- * optimistically and left failing to compile.
+ * A port retype frees a *file* only when that file's own body is already clean,
+ * so these moves are measured in files rather than in the count of call sites
+ * retyped. `BackendContextResolver` needed one parameter changed; a repository
+ * named in seventeen places may still be pinned by its own `Context`.
  */
 kotlin {
     jvmToolchain(21)
@@ -69,6 +72,22 @@ kotlin {
             implementation(project(":android:network"))
 
             implementation(libs.coroutines.android)
+        }
+
+        // `commonTest`, not `androidHostTest`. `BackendContextResolver` reached
+        // `commonMain` in the same commit that declared `AccountApi`, and it is the
+        // one piece of this module with real logic that has no Android type left in
+        // its signature -- it takes two interfaces and a `KeyValueStore`-backed
+        // `ActiveProfileStore`. Putting the test in `commonTest` means it also runs on
+        // the Apple targets, which is the whole point of having made the class
+        // portable: a test that only runs on Android would not notice if the class
+        // reached for a JVM API again.
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+
+            // `runTest`, so the `Mutex` in `BackendContextResolver` is exercised the
+            // way production runs it rather than on `runBlocking`.
+            implementation(libs.coroutines.test)
         }
     }
 }

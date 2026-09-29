@@ -93,6 +93,12 @@ jobs:
       - name: Run domain unit tests
         run: ./gradlew :android:core-domain:desktopTest
 
+      - name: Run backend common tests
+        # Runs on desktop, not the Android host test, on purpose: these cover a
+        # file that moved into commonMain, and a test that only ran on Android
+        # would not notice it reaching for a JVM API again.
+        run: ./gradlew :android:backend:desktopTest
+
       - name: Run plugins module unit tests
         run: ./gradlew :android:plugins:testDebugUnitTest
 

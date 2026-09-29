@@ -2,14 +2,14 @@ package com.crispy.tv.search
 
 import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import java.util.Locale
 
 class AiSearchRepository(
-    private val supabase: SupabaseAccountClient,
+    private val supabase: AccountApi,
     private val activeProfileStore: ActiveProfileStore,
     private val backend: CrispyBackendClient,
 ) {

@@ -2,7 +2,7 @@ package com.crispy.tv.sync
 
 import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED
@@ -12,7 +12,7 @@ import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 
 class ProfileDataCloudSync(
     private val context: Context,
-    private val supabase: SupabaseAccountClient,
+    private val supabase: AccountApi,
     private val backend: CrispyBackendClient,
     private val activeProfileStore: ActiveProfileStore =
         ActiveProfileStore(SharedPreferencesKeyValueStore(context, "supabase_sync_lab")),

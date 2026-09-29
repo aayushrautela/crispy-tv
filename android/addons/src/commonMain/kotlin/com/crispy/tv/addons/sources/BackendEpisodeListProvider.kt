@@ -1,13 +1,13 @@
 package com.crispy.tv.addons.sources
 
-import com.crispy.tv.accounts.SupabaseAccountClient
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.accounts.AccountApi
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.domain.watch.EpisodeInfo
 import com.crispy.tv.player.EpisodeListProvider
 
 class BackendEpisodeListProvider(
-    private val supabaseAccountClient: SupabaseAccountClient,
-    private val backendClient: CrispyBackendClient,
+    private val supabaseAccountClient: AccountApi,
+    private val backendClient: BackendApi,
 ) : EpisodeListProvider {
     override suspend fun fetchEpisodeList(
         mediaType: String,

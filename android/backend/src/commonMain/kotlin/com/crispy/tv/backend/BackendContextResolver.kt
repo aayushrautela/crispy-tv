@@ -1,7 +1,8 @@
 package com.crispy.tv.backend
 
+import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -11,9 +12,9 @@ data class BackendContext(
 )
 
 class BackendContextResolver(
-    private val supabaseAccountClient: SupabaseAccountClient,
+    private val supabaseAccountClient: AccountApi,
     private val activeProfileStore: ActiveProfileStore,
-    private val backendClient: CrispyBackendClient,
+    private val backendClient: BackendApi,
 ) {
     @Volatile
     private var cachedContext: CachedBackendContext? = null
