@@ -8,6 +8,7 @@ import com.crispy.tv.addons.streams.AddonStreamsService
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.backend.BackendContextResolver
+import com.crispy.tv.backend.CachingBackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.platform.android.AndroidAppLogger
@@ -97,7 +98,7 @@ object TvServices {
         synchronized(this) {
             contextResolver?.let { return it }
             val appContext = context.applicationContext
-            val created = BackendContextResolver(
+            val created = CachingBackendContextResolver(
                 supabaseAccountClient = accountClient(appContext),
                 activeProfileStore = activeProfileStore(appContext),
                 backendClient = backendClient(appContext),

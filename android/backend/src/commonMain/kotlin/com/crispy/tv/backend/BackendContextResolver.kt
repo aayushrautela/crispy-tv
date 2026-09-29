@@ -11,16 +11,36 @@ data class BackendContext(
     val profileId: String,
 )
 
-class BackendContextResolver(
+/**
+ * Resolves the access token and profile the backend should be addressed with.
+ *
+ * An interface rather than a class, for the same reason [BackendApi] is: the
+ * repositories that depend on it are ordinary logic with nothing Android about
+ * them, and they cannot be exercised against a final class.
+ * [CachingBackendContextResolver] is the only implementation.
+ */
+interface BackendContextResolver {
+    suspend fun resolve(): BackendContext?
+
+    /** Drops the cached context. Called on sign-out. */
+    fun clear()
+}
+
+/**
+ * [BackendContextResolver] with a per-session cache in front of the three
+ * lookups it would otherwise repeat. The lock-free read before the mutex is a
+ * fast path; the check inside the mutex is what makes concurrent resolves agree.
+ */
+class CachingBackendContextResolver(
     private val supabaseAccountClient: AccountApi,
     private val activeProfileStore: ActiveProfileStore,
     private val backendClient: BackendApi,
-) {
+) : BackendContextResolver {
     @Volatile
     private var cachedContext: CachedBackendContext? = null
     private val resolveMutex = Mutex()
 
-    suspend fun resolve(): BackendContext? {
+    override suspend fun resolve(): BackendContext? {
         if (!supabaseAccountClient.isConfigured() || !backendClient.isConfigured()) {
             return null
         }
@@ -59,7 +79,7 @@ class BackendContextResolver(
         }
     }
 
-    fun clear() {
+    override fun clear() {
         cachedContext = null
     }
 

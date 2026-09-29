@@ -24,7 +24,7 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 41 of the 159 files are there.
+ * `commonMain` one vertical slice at a time, and 42 of the 160 files are there.
  *
  * The remaining 118 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
@@ -241,10 +241,14 @@ kotlin {
         // The `commonMain` half of this module's tests, and it is what
         // `desktopTest` runs. The two halves are complementary and neither
         // substitutes for the other: `commonTest` cannot see androidMain, so it
-        // covers the settings repositories and nothing in the composition root,
-        // while `androidHostTest` below covers exactly the reverse.
+        // covers the settings repositories, the account repositories and nothing
+        // in the composition root, while `androidHostTest` below covers exactly
+        // the reverse.
         commonTest.dependencies {
             implementation(kotlin("test"))
+            // `runTest`, for the suspend-shaped ports. The settings tests are all
+            // synchronous and did not need it; the account repositories are not.
+            implementation(libs.coroutines.test)
         }
 
         // The composition root's own tests. `withHostTest {}` above is what creates

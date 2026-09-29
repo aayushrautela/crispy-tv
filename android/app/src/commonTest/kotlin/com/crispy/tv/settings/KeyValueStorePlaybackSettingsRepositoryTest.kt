@@ -2,6 +2,7 @@ package com.crispy.tv.settings
 
 import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
+import com.crispy.tv.testing.FakeKeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

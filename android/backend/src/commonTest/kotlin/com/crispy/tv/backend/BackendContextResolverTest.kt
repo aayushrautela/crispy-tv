@@ -25,6 +25,12 @@ import kotlin.test.assertNull
  * the user's behalf -- that decision is what `ProfileSelectorRoute` exists for,
  * and a resolver that guessed would silently log a new account into the first
  * profile.
+ *
+ * The subject is [CachingBackendContextResolver], the only implementation of the
+ * [BackendContextResolver] interface. The interface exists so the account
+ * repositories in `:android:app` can be handed one; this suite drives the real
+ * implementation against fakes rather than a substitute, because the caching is
+ * the behaviour being pinned.
  */
 class BackendContextResolverTest {
 
@@ -83,7 +89,7 @@ class BackendContextResolverTest {
         val profiles = ActiveProfileStore(store)
         profiles.setActiveProfileId(USER_ID, PROFILE_ID)
         val account = FakeAccountApi().withSession(session(USER_ID))
-        val resolver = BackendContextResolver(account, profiles, UnusedBackendApi())
+        val resolver = CachingBackendContextResolver(account, profiles, UnusedBackendApi())
 
         assertEquals(PROFILE_ID, resolver.resolve()?.profileId)
 
@@ -122,7 +128,7 @@ class BackendContextResolverTest {
         val store = FakeKeyValueStore()
         ActiveProfileStore(store).setActiveProfileId(USER_ID, PROFILE_ID)
         val account = FakeAccountApi(configured = false).withSession(session(USER_ID))
-        val resolver = BackendContextResolver(account, ActiveProfileStore(store), UnusedBackendApi(configured = true))
+        val resolver = CachingBackendContextResolver(account, ActiveProfileStore(store), UnusedBackendApi(configured = true))
 
         assertNull(resolver.resolve())
         assertEquals(0, account.ensureValidSessionCalls, "an unconfigured client must not be used")
@@ -133,7 +139,7 @@ class BackendContextResolverTest {
         val store = FakeKeyValueStore()
         ActiveProfileStore(store).setActiveProfileId(USER_ID, PROFILE_ID)
         val account = FakeAccountApi().withSession(session(USER_ID))
-        val resolver = BackendContextResolver(account, ActiveProfileStore(store), UnusedBackendApi(configured = false))
+        val resolver = CachingBackendContextResolver(account, ActiveProfileStore(store), UnusedBackendApi(configured = false))
 
         assertNull(resolver.resolve())
         assertEquals(0, account.ensureValidSessionCalls, "an unconfigured backend must not be used")
@@ -191,7 +197,7 @@ class BackendContextResolverTest {
         store: FakeKeyValueStore,
         session: Session?,
         configured: Boolean,
-    ): BackendContextResolver = BackendContextResolver(
+    ): BackendContextResolver = CachingBackendContextResolver(
         supabaseAccountClient = FakeAccountApi(configured = configured).withSession(session),
         activeProfileStore = ActiveProfileStore(store),
         backendClient = UnusedBackendApi(configured = true),

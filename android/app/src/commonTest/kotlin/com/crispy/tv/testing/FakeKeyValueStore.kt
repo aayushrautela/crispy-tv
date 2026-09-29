@@ -1,9 +1,9 @@
-package com.crispy.tv.settings
+package com.crispy.tv.testing
 
 import com.crispy.tv.platform.KeyValueStore
 
 /**
- * In-memory [KeyValueStore] for the settings tests.
+ * In-memory [KeyValueStore] for every `commonMain` store test in this module.
  *
  * Counts every write so a test can assert that a setter which decides nothing
  * changed left the store alone -- the repositories all short-circuit in that

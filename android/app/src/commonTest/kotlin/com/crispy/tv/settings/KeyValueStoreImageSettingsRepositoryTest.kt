@@ -1,5 +1,6 @@
 package com.crispy.tv.settings
 
+import com.crispy.tv.testing.FakeKeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

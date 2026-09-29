@@ -9,11 +9,20 @@ plugins {
  *
  * The largest Phase 2 module at 3,422 lines, and the one where the honest split is
  * narrow. Nine of its thirteen files are HTTP or JSON adapters over
- * `CrispyBackendClient`, and they stay in `androidMain` for the same two reasons
- * documented on `:android:network` and `:android:watchhistory`: OkHttp and
- * `org.json` have no Kotlin/Native artifact, and replacing `org.json` with
- * `kotlinx.serialization` is a behaviour change on the parsing boundary, not
- * plumbing.
+ * `CrispyBackendClient`, and they stay in `androidMain` for the two reasons
+ * documented on `:android:network` and `:android:watchhistory`.
+ *
+ * Those reasons, stated so they are not re-derived wrongly. OkHttp is a declared
+ * JVM/Android dependency with no Kotlin/Native artifact, so a `commonMain` file
+ * cannot name it at all. `org.json` is worse, and in a way that is easy to get
+ * backwards: it is **not a dependency of this project**. It is a class of the
+ * Android platform, supplied by `android.jar`, and it appears in exactly one
+ * build file here — `testImplementation` in `:android:plugins`. So there is no
+ * version to bump and no artifact to swap; it is simply absent from
+ * `commonMainCompileClasspath` (verified for `:android:app`). Replacing it means
+ * adding `kotlinx.serialization`, and that is a behaviour change on the parsing
+ * boundary, not plumbing. It is not to be done as a side effect of moving a
+ * file.
  *
  * | file | where | why |
  * |---|---|---|
@@ -23,7 +32,7 @@ plugins {
  * | `AiInsightsModels` | `commonMain` | moved once `BackendTypes` was. It was blocked by naming `CrispyBackendClient.ResponsiveImageSet` and by nothing else, so it became portable the moment that type did |
  * | `BackendApi`, `AccountApi` | `commonMain` | the type-level ports the two Android clients implement. Neither abstracts the transport: `CrispyHttpClient` leaks `okhttp3.HttpUrl` and `Headers` in its own signature, so a client is a wrapper *around* OkHttp and cannot be typed by it |
  * | `BackendPayloads`, `SignUpResult` | `commonMain` | input and result types that were nested inside `androidMain` clients. A nested type is as pinned as the file that declares it |
- * | `BackendContextResolver` | `commonMain` | moved once both parameters became ports. It had no OkHttp of its own; it followed `SupabaseAccountClient` only because it named it |
+ * | `BackendContextResolver`, `CachingBackendContextResolver` | `commonMain` | moved once both parameters became ports. It had no OkHttp of its own; it followed `SupabaseAccountClient` only because it named it. Later split into the interface and the caching implementation, because the three account repositories that depend on it cannot be tested against a final class |
  * | `SecureTokenStore` | `androidMain` | Android keystore crypto and `javax.crypto`. It is the `SecretStore` implementation |
  * | the six `CrispyBackend*` files, `SupabaseAccountClient` | `androidMain` | OkHttp and `org.json` |
  *

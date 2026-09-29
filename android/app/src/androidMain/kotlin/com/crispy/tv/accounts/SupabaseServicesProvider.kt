@@ -98,7 +98,12 @@ object SupabaseServicesProvider {
     }
 
     fun pendingProviderAuthStore(context: Context): PendingProviderAuthStore {
-        return PendingProviderAuthStore(context.applicationContext)
+        // The prefs file name is here rather than in commonMain because the file is an
+        // Android concern; the key names are in `PendingProviderAuthStore` itself. Renaming
+        // it would strand the in-flight OAuth state of every install that has one.
+        return PendingProviderAuthStore(
+            SharedPreferencesKeyValueStore(context.applicationContext, "pending_provider_auth"),
+        )
     }
 
     fun homeCatalogService(context: Context): HomeCatalogService {

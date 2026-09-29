@@ -12,7 +12,7 @@ object BackendContextResolverProvider {
         synchronized(this) {
             resolver?.let { return it }
             val appContext = context.applicationContext
-            val created = BackendContextResolver(
+            val created = CachingBackendContextResolver(
                 supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                 backendClient = BackendServicesProvider.backendClient(appContext),
