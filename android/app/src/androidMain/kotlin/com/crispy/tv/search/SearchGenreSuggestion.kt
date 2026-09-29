@@ -1,70 +1,83 @@
 package com.crispy.tv.search
 
-import com.crispy.tv.app.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.genre_action
+import com.crispy.tv.ui.resources.genre_animated
+import com.crispy.tv.ui.resources.genre_comedy
+import com.crispy.tv.ui.resources.genre_documentary
+import com.crispy.tv.ui.resources.genre_drama
+import com.crispy.tv.ui.resources.genre_family
+import com.crispy.tv.ui.resources.genre_fantasy
+import com.crispy.tv.ui.resources.genre_horror
+import com.crispy.tv.ui.resources.genre_mystery
+import com.crispy.tv.ui.resources.genre_romance
+import com.crispy.tv.ui.resources.genre_scifi
+import com.crispy.tv.ui.resources.genre_thriller
+import org.jetbrains.compose.resources.DrawableResource
 
 enum class SearchGenreSuggestion(
     val key: String,
     val label: String,
-    val imageResId: Int,
+    val imageResId: DrawableResource,
 ) {
     ACTION(
         key = "action",
         label = "Action",
-        imageResId = R.drawable.genre_action,
+        imageResId = Res.drawable.genre_action,
     ),
     ANIMATED(
         key = "animated",
         label = "Animated",
-        imageResId = R.drawable.genre_animated,
+        imageResId = Res.drawable.genre_animated,
     ),
     COMEDY(
         key = "comedy",
         label = "Comedy",
-        imageResId = R.drawable.genre_comedy,
+        imageResId = Res.drawable.genre_comedy,
     ),
     DOCUMENTARY(
         key = "documentary",
         label = "Documentary",
-        imageResId = R.drawable.genre_documentary,
+        imageResId = Res.drawable.genre_documentary,
     ),
     DRAMA(
         key = "drama",
         label = "Drama",
-        imageResId = R.drawable.genre_drama,
+        imageResId = Res.drawable.genre_drama,
     ),
     FAMILY(
         key = "family",
         label = "Family",
-        imageResId = R.drawable.genre_family,
+        imageResId = Res.drawable.genre_family,
     ),
     FANTASY(
         key = "fantasy",
         label = "Fantasy",
-        imageResId = R.drawable.genre_fantasy,
+        imageResId = Res.drawable.genre_fantasy,
     ),
     HORROR(
         key = "horror",
         label = "Horror",
-        imageResId = R.drawable.genre_horror,
+        imageResId = Res.drawable.genre_horror,
     ),
     MYSTERY(
         key = "mystery",
         label = "Mystery",
-        imageResId = R.drawable.genre_mystery,
+        imageResId = Res.drawable.genre_mystery,
     ),
     ROMANCE(
         key = "romance",
         label = "Romance",
-        imageResId = R.drawable.genre_romance,
+        imageResId = Res.drawable.genre_romance,
     ),
     SCI_FI(
         key = "scifi",
         label = "Sci-Fi",
-        imageResId = R.drawable.genre_scifi,
+        imageResId = Res.drawable.genre_scifi,
     ),
     THRILLER(
         key = "thriller",
         label = "Thriller",
-        imageResId = R.drawable.genre_thriller,
+        imageResId = Res.drawable.genre_thriller,
     ),
 }

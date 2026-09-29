@@ -30,24 +30,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.painterResource
-import androidx.annotation.DrawableRes
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.distribution.AppDistribution
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.resources.ic_build
+import com.crispy.tv.ui.resources.ic_closed_caption
+import com.crispy.tv.ui.resources.ic_extension
+import com.crispy.tv.ui.resources.ic_image
+import com.crispy.tv.ui.resources.ic_info
+import com.crispy.tv.ui.resources.ic_keyboard_arrow_right
+import com.crispy.tv.ui.resources.ic_language
+import com.crispy.tv.ui.resources.ic_person
+import com.crispy.tv.ui.resources.ic_video_settings
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 data class SettingsItem(
     val label: String,
     val description: String? = null,
-    @DrawableRes val icon: Int,
+    val icon: DrawableResource,
     val iconTint: androidx.compose.ui.graphics.Color,
     val onClick: () -> Unit = {}
 )
@@ -79,7 +89,7 @@ fun SettingsScreen(
                         SettingsItem(
                             label = "Account and subscription",
                             description = "Manage your account, subscription, profiles, and billing",
-                            icon = R.drawable.ic_person,
+                            icon = Res.drawable.ic_person,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToAccountsProfiles
                         )
@@ -92,21 +102,21 @@ fun SettingsScreen(
                         SettingsItem(
                             label = "Playback",
                             description = "Player defaults and intro controls",
-                            icon = R.drawable.ic_video_settings,
+                            icon = Res.drawable.ic_video_settings,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToPlaybackSettings
                         ),
                         SettingsItem(
                             label = "Image Quality",
                             description = "Choose artwork detail and cache size",
-                            icon = R.drawable.ic_image,
+                            icon = Res.drawable.ic_image,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToImageSettings
                         ),
                         SettingsItem(
                             label = "Subtitles",
                             description = "Caption styling and defaults",
-                            icon = R.drawable.ic_closed_caption,
+                            icon = Res.drawable.ic_closed_caption,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
@@ -120,7 +130,7 @@ fun SettingsScreen(
                                 SettingsItem(
                                     label = "Plugins",
                                     description = "JavaScript plugin repositories",
-                                    icon = R.drawable.ic_build,
+                                    icon = Res.drawable.ic_build,
                                     iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     onClick = onNavigateToPluginsSettings,
                                 ),
@@ -130,7 +140,7 @@ fun SettingsScreen(
                             SettingsItem(
                                 label = "Addons",
                                 description = "Install and remove addon manifests",
-                                icon = R.drawable.ic_extension,
+                                icon = Res.drawable.ic_extension,
                                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 onClick = onNavigateToAddonsSettings,
                             ),
@@ -139,7 +149,7 @@ fun SettingsScreen(
                             SettingsItem(
                                 label = "Language & Region",
                                 description = "Preferred content language",
-                                icon = R.drawable.ic_language,
+                                icon = Res.drawable.ic_language,
                                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
                         )
@@ -152,7 +162,7 @@ fun SettingsScreen(
                         SettingsItem(
                             label = "About",
                             description = "Version, licenses, and credits",
-                            icon = R.drawable.ic_info,
+                            icon = Res.drawable.ic_info,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
@@ -172,7 +182,7 @@ fun SettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )
@@ -284,7 +294,7 @@ private fun SettingsItemRow(
         },
         trailingContent = {
             CrispyIcon(
-                painter = painterResource(R.drawable.ic_keyboard_arrow_right),
+                painter = painterResource(Res.drawable.ic_keyboard_arrow_right),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 autoMirror = true,

@@ -1,15 +1,15 @@
 package com.crispy.tv.details
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.annotation.DrawableRes
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -55,7 +54,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,8 +62,17 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_auto_awesome
+import com.crispy.tv.ui.resources.ic_check_filled
+import com.crispy.tv.ui.resources.ic_close_filled
+import com.crispy.tv.ui.resources.ic_playlist_add_filled
+import com.crispy.tv.ui.resources.ic_sentiment_very_dissatisfied
+import com.crispy.tv.ui.resources.ic_share
+import com.crispy.tv.ui.resources.ic_thumb_up
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 /** Story presentation order: standout hook first, then good/bad, fun fact last. */
 private val SlideDisplayOrder =
@@ -233,14 +240,14 @@ private fun AiInsightsStorySlide(
             AiInsightsMoodSlide(
                 labelText = slide.label,
                 bodyText = slide.body ?: slide.context,
-                moodIcon = R.drawable.ic_thumb_up,
+                moodIcon = Res.drawable.ic_thumb_up,
                 palette = palette,
             )
         AiInsightSlideKey.THE_CATCH ->
             AiInsightsMoodSlide(
                 labelText = slide.label,
                 bodyText = slide.body ?: slide.context,
-                moodIcon = R.drawable.ic_sentiment_very_dissatisfied,
+                moodIcon = Res.drawable.ic_sentiment_very_dissatisfied,
                 palette = palette,
             )
         AiInsightSlideKey.TRIVIA ->
@@ -253,7 +260,7 @@ private fun AiInsightsStorySlide(
             AiInsightsMoodSlide(
                 labelText = slide.label,
                 bodyText = slide.body ?: slide.context,
-                moodIcon = R.drawable.ic_auto_awesome,
+                moodIcon = Res.drawable.ic_auto_awesome,
                 palette = palette,
             )
     }
@@ -381,7 +388,7 @@ private fun AiInsightsRotatingBackdrop(
             )
         } else {
             CrispyIcon(
-                painter = painterResource(R.drawable.ic_auto_awesome),
+                painter = painterResource(Res.drawable.ic_auto_awesome),
                 contentDescription = null,
                 tint = palette.onPillBackground.copy(alpha = 0.70f),
                 modifier =
@@ -414,7 +421,7 @@ private fun rememberSlowRotationDegrees(): Float {
 private fun AiInsightsMoodSlide(
     labelText: String,
     bodyText: String?,
-    @DrawableRes moodIcon: Int,
+    moodIcon: DrawableResource,
     palette: DetailsPaletteColors,
 ) {
     Column(
@@ -482,7 +489,7 @@ private fun AiInsightsHeroArtwork(
             )
         } else {
             CrispyIcon(
-                painter = painterResource(R.drawable.ic_auto_awesome),
+                painter = painterResource(Res.drawable.ic_auto_awesome),
                 contentDescription = null,
                 tint = palette.onPillBackground.copy(alpha = 0.72f),
                 modifier = Modifier.size(52.dp),
@@ -627,7 +634,7 @@ private fun AiInsightsProgressHeader(
         }
         IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
             Icon(
-                painter = painterResource(R.drawable.ic_close_filled),
+                painter = painterResource(Res.drawable.ic_close_filled),
                 contentDescription = "Close",
                 tint = palette.onPageBackground,
             )
@@ -653,14 +660,14 @@ private fun AiInsightsFooterActions(
         ) {
             AiInsightsPillButton(
                 text = if (isInWatchlist) "In watchlist" else "Add to watchlist",
-                icon = if (isInWatchlist) R.drawable.ic_check_filled else R.drawable.ic_playlist_add_filled,
+                icon = if (isInWatchlist) Res.drawable.ic_check_filled else Res.drawable.ic_playlist_add_filled,
                 palette = palette,
                 onClick = onToggleWatchlist,
                 modifier = Modifier.weight(1f),
             )
             AiInsightsPillButton(
                 text = "Share",
-                icon = R.drawable.ic_share,
+                icon = Res.drawable.ic_share,
                 palette = palette,
                 onClick = onShare,
                 modifier = Modifier.weight(1f),
@@ -677,7 +684,7 @@ private fun AiInsightsFooterActions(
 @Composable
 private fun AiInsightsPillButton(
     text: String,
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     palette: DetailsPaletteColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

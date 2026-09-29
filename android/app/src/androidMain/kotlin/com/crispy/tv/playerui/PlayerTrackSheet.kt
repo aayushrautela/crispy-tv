@@ -1,5 +1,6 @@
 package com.crispy.tv.playerui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,17 +18,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
-import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -41,15 +41,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.painterResource
+import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.nativeengine.playback.NativeTrack
-import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
 import com.crispy.tv.streams.SHEET_HEIGHT_FRACTION
 import com.crispy.tv.streams.SHEET_MAX_WIDTH
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import org.jetbrains.compose.resources.DrawableResource
+import com.crispy.tv.ui.resources.ic_check_filled
+import com.crispy.tv.ui.resources.ic_graphic_eq_filled
+import com.crispy.tv.ui.resources.ic_music_note_filled
+import com.crispy.tv.ui.resources.ic_subtitles_filled
 import java.util.Locale
+import org.jetbrains.compose.resources.painterResource
 
 private val ISO639_2_TO_1 =
     mapOf(
@@ -206,7 +211,7 @@ internal fun PlayerAudioSheet(
                             subtitle = title?.let { languageLabelForCode(track.language) },
                             isSelected = track.id == selectedAudioTrackId,
                             palette = palette,
-                            leadingIcon = if (track.language == null) R.drawable.ic_music_note_filled else R.drawable.ic_graphic_eq_filled,
+                            leadingIcon = if (track.language == null) Res.drawable.ic_music_note_filled else Res.drawable.ic_graphic_eq_filled,
                             onClick = { onSelectAudioTrack(track.id) },
                         )
                     }
@@ -313,7 +318,7 @@ internal fun PlayerSubtitleSheet(
                         subtitle = null,
                         isSelected = offSelected,
                         palette = palette,
-                        leadingIcon = R.drawable.ic_subtitles_filled,
+                        leadingIcon = Res.drawable.ic_subtitles_filled,
                         onClick = { onSelectSubtitleTrack(null) },
                     )
                 }
@@ -328,7 +333,7 @@ internal fun PlayerSubtitleSheet(
                         subtitle = option.subtitle,
                         isSelected = option.isSelected,
                         palette = palette,
-                        leadingIcon = R.drawable.ic_subtitles_filled,
+                        leadingIcon = Res.drawable.ic_subtitles_filled,
                         onClick = { onSelectSubtitleTrack(option.trackId) },
                     )
                 }
@@ -443,7 +448,7 @@ private fun TrackRow(
     subtitle: String?,
     isSelected: Boolean,
     palette: DetailsPaletteColors,
-     leadingIcon: Int,
+    leadingIcon: DrawableResource,
     onClick: () -> Unit,
 ) {
     val containerColor = if (isSelected) palette.accent else Color.Transparent
@@ -489,7 +494,7 @@ private fun TrackRow(
         }
         if (isSelected) {
             Icon(
-                painter = painterResource(R.drawable.ic_check_filled),
+                painter = painterResource(Res.drawable.ic_check_filled),
                 contentDescription = null,
                 tint = palette.onAccent,
                 modifier = Modifier.size(20.dp),

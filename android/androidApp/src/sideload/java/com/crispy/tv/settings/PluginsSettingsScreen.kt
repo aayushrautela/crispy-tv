@@ -24,7 +24,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -33,9 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -48,10 +47,13 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.plugins.repo.PluginRepoClient
 import com.crispy.tv.plugins.repo.PluginRepoInfo
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
-import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.resources.ic_delete
+import com.crispy.tv.ui.resources.ic_refresh
 import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -60,6 +62,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 @Immutable
 internal data class PluginsSettingsUiState(
@@ -220,7 +223,7 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )
@@ -316,10 +319,10 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                                 )
                             }
                             IconButton(onClick = { viewModel.refreshRepo(repo.url) }) {
-                                Icon(painter = painterResource(R.drawable.ic_refresh), contentDescription = "Refresh repository")
+                                Icon(painter = painterResource(Res.drawable.ic_refresh), contentDescription = "Refresh repository")
                             }
                             IconButton(onClick = { viewModel.removeRepo(repo.url) }) {
-                                Icon(painter = painterResource(R.drawable.ic_delete), contentDescription = "Remove repository")
+                                Icon(painter = painterResource(Res.drawable.ic_delete), contentDescription = "Remove repository")
                             }
                         }
                         repo.scrapers.forEach { scraper ->

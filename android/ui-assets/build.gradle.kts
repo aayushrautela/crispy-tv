@@ -1,32 +1,18 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.compose)
 }
 
+// Android-only assets that cannot be composeResources: the launcher mipmaps
+// (referenced from AndroidManifest.xml), the splash colour and the two splash
+// drawables (referenced from `windowSplashScreenAnimatedIcon` in a theme), and
+// the nine provider-logo SVGs, which Compose Multiplatform documents as
+// unsupported on Android. The design drawables and the brand composables moved
+// to `:android:sharedUI`.
 android {
     namespace = "com.crispy.tv.ui.assets"
     compileSdk = 37
 
     defaultConfig {
-        missingDimensionStrategy("distribution", "sideload")
         minSdk = 26
     }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    buildFeatures {
-        compose = true
-    }
-}
-
-dependencies {
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.runtime)
-    implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.compose.animation)
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.compose.material3)
 }

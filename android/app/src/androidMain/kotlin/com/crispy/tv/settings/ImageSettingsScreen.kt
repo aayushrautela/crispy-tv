@@ -19,13 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.painterResource
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
-import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
-import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.utils.appBarScrollBehavior
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +44,7 @@ fun ImageSettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )

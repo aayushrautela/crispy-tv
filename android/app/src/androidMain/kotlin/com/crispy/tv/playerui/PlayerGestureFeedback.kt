@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.annotation.DrawableRes
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,15 +30,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.domain.player.TapZone
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_brightness_6_filled
+import com.crispy.tv.ui.resources.ic_chevron_left_filled
+import com.crispy.tv.ui.resources.ic_chevron_right_filled
+import com.crispy.tv.ui.resources.ic_crop_filled
+import com.crispy.tv.ui.resources.ic_volume_off_filled
+import com.crispy.tv.ui.resources.ic_volume_up_filled
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun rememberGestureFeedback(): GestureFeedbackState {
@@ -116,7 +122,7 @@ internal fun GestureFeedbackOverlay(
 
 internal data class GestureFeedbackMessage(
     val text: String,
-    @DrawableRes val icon: Int,
+    val icon: DrawableResource,
     val autoMirror: Boolean = false,
 )
 
@@ -170,9 +176,9 @@ internal fun SeekRippleOverlay(
                             painter =
                                 painterResource(
                                     if (ripple.isForward) {
-                                        R.drawable.ic_chevron_right_filled
+                                        Res.drawable.ic_chevron_right_filled
                                     } else {
-                                        R.drawable.ic_chevron_left_filled
+                                        Res.drawable.ic_chevron_left_filled
                                     }
                                 ),
                             contentDescription = null,
@@ -192,9 +198,9 @@ internal fun SeekRippleOverlay(
 }
 
 internal object GestureIcons {
-    @DrawableRes val Brightness: Int = R.drawable.ic_brightness_6_filled
-    @DrawableRes val VolumeUp: Int = R.drawable.ic_volume_up_filled
-    @DrawableRes val VolumeMuted: Int = R.drawable.ic_volume_off_filled
-    @DrawableRes val Resize: Int = R.drawable.ic_crop_filled
+    val Brightness: DrawableResource = Res.drawable.ic_brightness_6_filled
+    val VolumeUp: DrawableResource = Res.drawable.ic_volume_up_filled
+    val VolumeMuted: DrawableResource = Res.drawable.ic_volume_off_filled
+    val Resize: DrawableResource = Res.drawable.ic_crop_filled
 }
 

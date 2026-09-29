@@ -144,6 +144,10 @@ dependencies {
     implementation(project(":android:platform-android"))
     implementation(project(":android:backend"))
     implementation(project(":android:addons"))
+    // Owns the design drawables and the brand composables. `:ui-assets` still
+    // supplies the launcher mipmaps, the splash colour and the provider-logo
+    // SVGs, none of which can be composeResources.
+    implementation(project(":android:sharedUI"))
     implementation(project(":android:ui-assets"))
 
     coreLibraryDesugaring(libs.desugar.jdk.libs.nio)

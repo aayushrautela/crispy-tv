@@ -28,12 +28,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.HomeCatalogPosterCard
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_close_filled
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun PlayerMoreSheet(
@@ -66,7 +67,7 @@ internal fun PlayerMoreSheet(
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_close_filled),
+                        painter = painterResource(Res.drawable.ic_close_filled),
                         contentDescription = "Close",
                         tint = Color.White,
                     )

@@ -28,9 +28,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.annotation.DrawableRes
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.components.rememberCrispyImageModel
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Shared long-press / item-actions sheet shell used across the app (library,
@@ -41,7 +42,7 @@ import com.crispy.tv.ui.components.rememberCrispyImageModel
 data class ItemActionSheetItem(
     val label: String,
     val supporting: String? = null,
-    @DrawableRes val icon: Int? = null,
+    val icon: DrawableResource? = null,
     val autoMirror: Boolean = false,
     val filled: Boolean = false,
     val destructive: Boolean = false,
@@ -126,7 +127,7 @@ fun ItemActionSheet(
 fun WatchActionRow(
     label: String,
     supporting: String,
-    @DrawableRes icon: Int?,
+    icon: DrawableResource?,
     filled: Boolean,
     destructive: Boolean = false,
     onClick: () -> Unit,

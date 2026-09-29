@@ -23,22 +23,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.util.formatRatingOutOfTen
+import com.crispy.tv.backend.MetadataCompanyView
+import com.crispy.tv.backend.MetadataPersonRefView
+import com.crispy.tv.backend.MetadataReviewView
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.PersonCircleCard
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.initials
 import com.crispy.tv.ui.components.rememberCrispyImageModel
-import com.crispy.tv.backend.MetadataCompanyView
-import com.crispy.tv.backend.MetadataPersonRefView
-import com.crispy.tv.backend.MetadataReviewView
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_star_filled
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun SimpleCastItem(
@@ -169,7 +171,7 @@ internal fun MetadataReviewCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_star_filled),
+                            painter = painterResource(Res.drawable.ic_star_filled),
                             contentDescription = null,
                             tint = Color(0xFFFFD54F),
                             modifier = Modifier.size(16.dp),

@@ -3,16 +3,6 @@ package com.crispy.tv.details
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.annotation.OptIn
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.source.MergingMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -56,29 +46,41 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
-import com.crispy.tv.ui.components.SharedImageMemoryKeys
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.details.trailer.TrailerPlaybackSource
-import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.details.trailer.TrailerPlaybackSource
+import com.crispy.tv.details.trailer.TrailerSource
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateHeroCornerRadius
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_pause_filled
+import com.crispy.tv.ui.resources.ic_play_arrow_filled
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.details.trailer.TrailerSource
-import com.crispy.tv.PlaybackDependencies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.painterResource
 
 internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
     return details?.artworkUrl
@@ -271,7 +273,7 @@ internal fun HeroSection(
         }
 
         if (hasTrailer) {
-            val icon = if (isActuallyPlaying) R.drawable.ic_pause_filled else R.drawable.ic_play_arrow_filled
+            val icon = if (isActuallyPlaying) Res.drawable.ic_pause_filled else Res.drawable.ic_play_arrow_filled
             val label = if (isActuallyPlaying) "Pause" else "Trailer"
             Surface(
                 modifier = Modifier

@@ -1,5 +1,7 @@
 package com.crispy.tv.details
 
+
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -14,9 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.res.painterResource
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.ui.components.CrispyIcon
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,15 +38,18 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.LocalLifecycleOwner
-
+import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.backend.MetadataVideoView
+import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_close_filled
+import com.crispy.tv.ui.resources.ic_open_in_new_filled
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
-
-import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.backend.MetadataVideoView
+import org.jetbrains.compose.resources.painterResource
 
 private const val YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v="
 
@@ -107,7 +109,7 @@ internal fun YouTubeExtraVideoDialog(
                     )
                     IconButton(onClick = onDismiss) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_close_filled),
+                            painter = painterResource(Res.drawable.ic_close_filled),
                             contentDescription = "Close",
                         )
                     }
@@ -201,7 +203,7 @@ internal fun YouTubeExtraVideoDialog(
                         },
                     ) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_open_in_new_filled),
+                            painter = painterResource(Res.drawable.ic_open_in_new_filled),
                             contentDescription = null,
                             modifier = Modifier.padding(end = 4.dp),
                             autoMirror = true,

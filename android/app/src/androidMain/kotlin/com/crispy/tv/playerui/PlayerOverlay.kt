@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -25,25 +24,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
-import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.domain.player.TapSeekChain
 import com.crispy.tv.domain.player.TapSeekEvent
 import com.crispy.tv.streams.StreamSelectorSheet
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_pause_filled
+import com.crispy.tv.ui.resources.ic_play_arrow_filled
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun PlayerOverlay(
@@ -227,7 +229,7 @@ internal fun PlayerOverlay(
                                 .size(84.dp),
                     ) {
                         Icon(
-                            painter = painterResource(if (uiState.isPlaying) R.drawable.ic_pause_filled else R.drawable.ic_play_arrow_filled),
+                            painter = painterResource(if (uiState.isPlaying) Res.drawable.ic_pause_filled else Res.drawable.ic_play_arrow_filled),
                             contentDescription = if (uiState.isPlaying) "Pause" else "Play",
                             modifier = Modifier.size(44.dp),
                         )

@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,7 +48,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -57,7 +56,6 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.home.HomeCatalogPosterCard
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
@@ -68,10 +66,13 @@ import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import org.jetbrains.compose.resources.painterResource
 
 private val PersonAvatarSize = 120.dp
 private val TopAppBarClearanceHeight = 64.dp
@@ -188,7 +189,7 @@ private fun PersonDetailsScreen(
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     CrispyIcon(
-                        painter = painterResource(R.drawable.ic_arrow_back),
+                        painter = painterResource(Res.drawable.ic_arrow_back),
                         contentDescription = "Back",
                         autoMirror = true,
                     )

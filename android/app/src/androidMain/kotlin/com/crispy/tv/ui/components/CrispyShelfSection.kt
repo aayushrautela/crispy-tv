@@ -27,11 +27,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_keyboard_arrow_right_rounded
+import org.jetbrains.compose.resources.painterResource
 
 enum class CrispyViewAllPillSize {
     Default,
@@ -149,7 +150,7 @@ private fun CrispyViewAllPill(
         contentAlignment = Alignment.Center,
     ) {
         CrispyIcon(
-            painter = painterResource(R.drawable.ic_keyboard_arrow_right_rounded),
+            painter = painterResource(Res.drawable.ic_keyboard_arrow_right_rounded),
             contentDescription = "View all",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(iconSize),

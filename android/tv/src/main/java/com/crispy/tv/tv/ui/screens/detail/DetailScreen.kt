@@ -1,6 +1,7 @@
 package com.crispy.tv.tv.ui.screens.detail
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -38,26 +39,39 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.net.Uri
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
 import com.crispy.tv.tv.ui.components.CrispyIcon
+import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
 import com.crispy.tv.tv.ui.components.RailSection
-import com.crispy.tv.tv.ui.components.tvHeroScrim
 import com.crispy.tv.tv.ui.components.skeletonElement
+import com.crispy.tv.tv.ui.components.tvHeroScrim
 import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
 import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
-import androidx.annotation.DrawableRes
+import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_add_filled
+import com.crispy.tv.ui.resources.ic_check_circle_filled
+import com.crispy.tv.ui.resources.ic_check_filled
+import com.crispy.tv.ui.resources.ic_pause_filled
+import com.crispy.tv.ui.resources.ic_play_arrow_filled
+import com.crispy.tv.ui.resources.ic_share_filled
+import com.crispy.tv.ui.resources.ic_star_filled
+import com.crispy.tv.ui.resources.ic_thumb_down
+import com.crispy.tv.ui.resources.ic_thumb_down_filled
+import com.crispy.tv.ui.resources.ic_thumb_up
+import com.crispy.tv.ui.resources.ic_thumb_up_filled
+import com.crispy.tv.ui.resources.ic_volume_off_filled
+import com.crispy.tv.ui.resources.ic_volume_up_filled
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 internal val ScreenPadding = 48.dp
 
@@ -263,31 +277,31 @@ private fun DetailContent(
                     )
                     HeaderActionButton(
                         label = if (state.isInWatchlist) "In watchlist" else "Watchlist",
-                        icon = R.drawable.ic_add_filled,
+                        icon = Res.drawable.ic_add_filled,
                         active = state.isInWatchlist,
                         onClick = onToggleWatchlist,
                     )
                     HeaderActionButton(
                         label = if (state.isWatched) "Watched" else "Mark watched",
-                        icon = R.drawable.ic_check_filled,
+                        icon = Res.drawable.ic_check_filled,
                         active = state.isWatched,
                         onClick = onToggleWatched,
                     )
                     HeaderActionButton(
                         label = if (state.liked == true) "Liked" else "Like",
-                        icon = if (state.liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+                        icon = if (state.liked == true) Res.drawable.ic_thumb_up_filled else Res.drawable.ic_thumb_up,
                         active = state.liked == true,
                         onClick = { onSetLiked(if (state.liked == true) null else true) },
                     )
                     HeaderActionButton(
                         label = if (state.liked == false) "Disliked" else "Dislike",
-                        icon = if (state.liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+                        icon = if (state.liked == false) Res.drawable.ic_thumb_down_filled else Res.drawable.ic_thumb_down,
                         active = state.liked == false,
                         onClick = { onSetLiked(if (state.liked == false) null else false) },
                     )
                     HeaderActionButton(
                         label = "Share",
-                        icon = R.drawable.ic_share_filled,
+                        icon = Res.drawable.ic_share_filled,
                         active = false,
                         onClick = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
@@ -302,13 +316,13 @@ private fun DetailContent(
                     if (state.trailers.isNotEmpty()) {
                         HeaderActionButton(
                             label = if (trailerPlaying) "Pause" else "Trailer",
-                            icon = if (trailerPlaying) R.drawable.ic_pause_filled else R.drawable.ic_play_arrow_filled,
+                            icon = if (trailerPlaying) Res.drawable.ic_pause_filled else Res.drawable.ic_play_arrow_filled,
                             active = trailerPlaying,
                             onClick = { trailerPlaying = !trailerPlaying },
                         )
                         HeaderActionButton(
                             label = if (trailerMuted) "Muted" else "Sound on",
-                            icon = if (trailerMuted) R.drawable.ic_volume_off_filled else R.drawable.ic_volume_up_filled,
+                            icon = if (trailerMuted) Res.drawable.ic_volume_off_filled else Res.drawable.ic_volume_up_filled,
                             autoMirror = true,
                             active = !trailerMuted,
                             onClick = { trailerMuted = !trailerMuted },
@@ -686,7 +700,7 @@ private fun EpisodeRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (watchState?.isWatched == true) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_check_circle_filled),
+                        painter = painterResource(Res.drawable.ic_check_circle_filled),
                         contentDescription = "Watched",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),
@@ -745,7 +759,7 @@ private fun EpisodeRow(
                 .clickable(onClick = onToggleWatched),
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_check_filled),
+                painter = painterResource(Res.drawable.ic_check_filled),
                 contentDescription = "Toggle watched",
                 tint = if (watchState?.isWatched == true) {
                     MaterialTheme.colorScheme.onPrimary
@@ -761,7 +775,7 @@ private fun EpisodeRow(
 @Composable
 private fun HeaderActionButton(
     label: String,
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     active: Boolean,
     onClick: () -> Unit,
     autoMirror: Boolean = false,
@@ -924,7 +938,7 @@ private fun ReviewOverlay(review: ReviewUi, onDismiss: () -> Unit) {
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_star_filled),
+                                painter = painterResource(Res.drawable.ic_star_filled),
                                 contentDescription = null,
                                 tint = Color(0xFFFFD54F),
                                 modifier = Modifier.size(14.dp),

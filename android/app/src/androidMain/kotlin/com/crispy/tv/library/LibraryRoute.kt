@@ -5,45 +5,49 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.Button
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import com.crispy.tv.ui.assets.R
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.components.ItemActionSheet
-import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
+import com.crispy.tv.ui.components.ItemActionSheet
+import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_check
+import com.crispy.tv.ui.resources.ic_check_filled
+import com.crispy.tv.ui.resources.ic_event
+import com.crispy.tv.ui.resources.ic_open_in_new_filled
 import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -97,7 +101,7 @@ fun LibraryRoute(
                 title = { CrispySectionAppBarTitle(label = "Library") },
                 actions = {
                     IconButton(onClick = onOpenCalendar) {
-                        Icon(painter = painterResource(R.drawable.ic_event), contentDescription = "Calendar")
+                        Icon(painter = painterResource(Res.drawable.ic_event), contentDescription = "Calendar")
                     }
                     ProfileIconButton(onClick = onOpenAccountsProfiles)
                 },
@@ -173,7 +177,7 @@ fun LibraryRoute(
                 add(
                     ItemActionSheetItem(
                         label = "Open details",
-                        icon = R.drawable.ic_open_in_new_filled,
+                        icon = Res.drawable.ic_open_in_new_filled,
                         autoMirror = true,
                         onClick = {
                             selectedLibraryItem = null
@@ -184,7 +188,7 @@ fun LibraryRoute(
                 add(
                     ItemActionSheetItem(
                         label = if (watched) "Mark as unwatched" else "Mark as watched",
-                        icon = if (watched) R.drawable.ic_check_filled else R.drawable.ic_check,
+                        icon = if (watched) Res.drawable.ic_check_filled else Res.drawable.ic_check,
                         filled = watched,
                         dividerBefore = true,
                         onClick = {

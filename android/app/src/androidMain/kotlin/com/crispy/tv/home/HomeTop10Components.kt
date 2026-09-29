@@ -29,7 +29,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -40,18 +39,25 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.crispy.tv.app.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.sharedCardBackdropModifier
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.archivo_top10
+import org.jetbrains.compose.resources.Font
 
 private const val TOP10_LIMIT = 10
 private val Top10PosterWidth: Dp = 150.dp
 private val Top10Overlap: Dp = 14.dp
 private val Top10LineWidth: Dp = 2.dp
-private val Top10FontFamily = FontFamily(Font(R.font.archivo_top10))
+// `Font(FontResource)` is a @Composable function -- it reads the resource bytes
+// during composition -- so this cannot be a plain top-level `val` the way the
+// Android `Font(Int)` overload was. A composable property getter keeps the one
+// declaration and leaves every use site unchanged.
+private val Top10FontFamily: FontFamily
+    @Composable get() = FontFamily(Font(Res.font.archivo_top10))
 
 @Composable
 internal fun HomeTop10SectionRow(

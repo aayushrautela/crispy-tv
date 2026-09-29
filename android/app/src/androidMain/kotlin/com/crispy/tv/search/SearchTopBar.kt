@@ -39,15 +39,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.res.painterResource
-import com.crispy.tv.ui.assets.R
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_close
+import com.crispy.tv.ui.resources.ic_search
+import com.crispy.tv.ui.resources.ic_wand_stars
 import com.crispy.tv.ui.theme.Dimensions
+import org.jetbrains.compose.resources.painterResource
 
 private val SearchAiLoadingColors =
     listOf(
@@ -100,7 +103,7 @@ fun SearchBar(
         },
         leadingIcon = {
             Icon(
-                painter = painterResource(R.drawable.ic_search),
+                painter = painterResource(Res.drawable.ic_search),
                 contentDescription = null,
                 modifier = Modifier.padding(start = 6.dp),
             )
@@ -115,7 +118,7 @@ fun SearchBar(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_close),
+                        painter = painterResource(Res.drawable.ic_close),
                         contentDescription = "Clear search",
                     )
                 }
@@ -160,7 +163,7 @@ fun AiSearchButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_wand_stars),
+            painter = painterResource(Res.drawable.ic_wand_stars),
             contentDescription = "AI search",
             modifier = Modifier.rotate(rotation),
             tint = if (isHighlighted) {

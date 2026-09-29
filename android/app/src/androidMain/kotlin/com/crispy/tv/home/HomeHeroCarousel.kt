@@ -5,14 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,13 +26,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.genreIcon
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
@@ -41,6 +38,11 @@ import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
 import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_calendar_month
+import com.crispy.tv.ui.resources.ic_star_filled
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -201,8 +203,8 @@ internal fun HomeHeroCarousel(
 
                 val heroMeta = buildList {
                     item.genres.firstOrNull()?.let { genre -> add(genreIcon(genre) to genre) }
-                    item.year?.let { add(R.drawable.ic_calendar_month to it) }
-                    item.rating?.let { add(R.drawable.ic_star_filled to it) }
+                    item.year?.let { add(Res.drawable.ic_calendar_month to it) }
+                    item.rating?.let { add(Res.drawable.ic_star_filled to it) }
                 }
 
                 if (heroMeta.isNotEmpty()) {
@@ -232,7 +234,7 @@ internal fun HomeHeroCarousel(
 }
 
 @Composable
-private fun HeroMetaItem(@DrawableRes icon: Int, label: String) {
+private fun HeroMetaItem(icon: DrawableResource, label: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)

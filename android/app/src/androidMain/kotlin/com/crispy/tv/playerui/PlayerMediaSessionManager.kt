@@ -22,7 +22,6 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
-import com.crispy.tv.app.R
 import com.crispy.tv.ui.assets.R as AssetsR
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import java.io.ByteArrayOutputStream

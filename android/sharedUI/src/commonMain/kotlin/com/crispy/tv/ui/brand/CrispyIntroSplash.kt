@@ -23,10 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.brand_mark
+import com.crispy.tv.ui.resources.brand_wordmark_crispy
+import com.crispy.tv.ui.resources.brand_wordmark_tv
+import org.jetbrains.compose.resources.painterResource
 
 private const val IntroDurationMs = 1200
 private const val RevealVisibilityThreshold = 0.01f
@@ -132,7 +135,7 @@ fun CrispyIntroSplash(
             },
         ) {
             Image(
-                painter = painterResource(R.drawable.brand_mark),
+                painter = painterResource(Res.drawable.brand_mark),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
@@ -159,7 +162,7 @@ fun CrispyIntroSplash(
                             },
                     ) {
                         Image(
-                            painter = painterResource(R.drawable.brand_wordmark_crispy),
+                            painter = painterResource(Res.drawable.brand_wordmark_crispy),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
@@ -182,7 +185,7 @@ fun CrispyIntroSplash(
                             },
                     ) {
                         Image(
-                            painter = painterResource(R.drawable.brand_wordmark_tv),
+                            painter = painterResource(Res.drawable.brand_wordmark_tv),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier

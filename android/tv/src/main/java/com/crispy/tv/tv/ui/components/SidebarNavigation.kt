@@ -34,21 +34,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.annotation.DrawableRes
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.tv.ui.navigation.TvDestination
-import com.crispy.tv.ui.assets.R
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 private val SidebarExpandedWidth = 200.dp
 private val SidebarCollapsedWidth = 76.dp
@@ -278,7 +277,7 @@ private fun SidebarPanel(
 
 @Composable
 private fun SidebarItem(
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     label: String,
     selected: Boolean,
     showLabel: Boolean,

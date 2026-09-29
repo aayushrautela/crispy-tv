@@ -52,10 +52,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -66,11 +65,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.ui.brand.CrispyWordmark
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_account_circle
+import com.crispy.tv.ui.resources.ic_add
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.resources.ic_arrow_drop_down
+import com.crispy.tv.ui.resources.ic_lock
+import com.crispy.tv.ui.resources.ic_mail
+import com.crispy.tv.ui.resources.ic_visibility
+import com.crispy.tv.ui.resources.ic_visibility_off
 import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import org.jetbrains.compose.resources.painterResource
 
 private const val ProfileBackground = 0xFF141414
 private const val ProfileTileFallback = 0xFF333333
@@ -174,7 +182,7 @@ private fun AuthScreen(
                         ) {
                             IconButton(onClick = { signUpStep = 1 }) {
                                 CrispyIcon(
-                                    painter = painterResource(R.drawable.ic_arrow_back),
+                                    painter = painterResource(Res.drawable.ic_arrow_back),
                                     contentDescription = "Back",
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     autoMirror = true,
@@ -267,7 +275,7 @@ private fun AuthScreen(
                             ),
                             leadingIcon = {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_mail),
+                                    painter = painterResource(Res.drawable.ic_mail),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -287,7 +295,7 @@ private fun AuthScreen(
                             ),
                             leadingIcon = {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_lock),
+                                    painter = painterResource(Res.drawable.ic_lock),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -295,7 +303,7 @@ private fun AuthScreen(
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
-                                        painter = painterResource(if (passwordVisible) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
+                                        painter = painterResource(if (passwordVisible) Res.drawable.ic_visibility_off else Res.drawable.ic_visibility),
                                         contentDescription = if (passwordVisible) "Hide password" else "Show password",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -635,7 +643,7 @@ private fun ProfileSetupScreen(onFinishSetup: (name: String, language: String, a
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     IconButton(onClick = { languageMenuOpen = true }) {
-                        Icon(painter = painterResource(R.drawable.ic_arrow_drop_down), contentDescription = "Select language")
+                        Icon(painter = painterResource(Res.drawable.ic_arrow_drop_down), contentDescription = "Select language")
                     }
                 },
             )
@@ -717,7 +725,7 @@ private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
                 )
             } else {
                 Icon(
-                    painter = painterResource(R.drawable.ic_account_circle),
+                    painter = painterResource(Res.drawable.ic_account_circle),
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(64.dp),
@@ -752,7 +760,7 @@ private fun ProfileAddCard(onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_add),
+                painter = painterResource(Res.drawable.ic_add),
                 contentDescription = "Add profile",
                 tint = Color.White,
                 modifier = Modifier.size(48.dp),
@@ -815,7 +823,7 @@ private fun ProfileManagementScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )
@@ -823,7 +831,7 @@ private fun ProfileManagementScreen(
                 },
                 actions = {
                     IconButton(onClick = onOpenCreateDialog) {
-                        Icon(painter = painterResource(R.drawable.ic_add), contentDescription = "Add profile")
+                        Icon(painter = painterResource(Res.drawable.ic_add), contentDescription = "Add profile")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -958,7 +966,7 @@ private fun ProfileRow(name: String, isKids: Boolean, avatarUrl: String?) {
                 )
             } else {
                 Icon(
-                    painter = painterResource(R.drawable.ic_account_circle),
+                    painter = painterResource(Res.drawable.ic_account_circle),
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(32.dp),
@@ -1077,7 +1085,7 @@ private fun AccountSettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )

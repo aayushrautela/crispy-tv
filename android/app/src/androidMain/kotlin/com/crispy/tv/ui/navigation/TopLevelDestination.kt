@@ -1,30 +1,36 @@
 package com.crispy.tv.ui.navigation
 
-import androidx.annotation.DrawableRes
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_explore
+import com.crispy.tv.ui.resources.ic_explore_filled
+import com.crispy.tv.ui.resources.ic_home
+import com.crispy.tv.ui.resources.ic_home_filled
+import com.crispy.tv.ui.resources.ic_video_library
+import com.crispy.tv.ui.resources.ic_video_library_filled
+import org.jetbrains.compose.resources.DrawableResource
 
 enum class TopLevelDestination(
     val route: String,
     val label: String,
-    @DrawableRes val inactiveIcon: Int,
-    @DrawableRes val activeIcon: Int,
+    val inactiveIcon: DrawableResource,
+    val activeIcon: DrawableResource,
 ) {
     Home(
         route = AppRoutes.HomeRoute,
         label = "Home",
-        inactiveIcon = R.drawable.ic_home,
-        activeIcon = R.drawable.ic_home_filled,
+        inactiveIcon = Res.drawable.ic_home,
+        activeIcon = Res.drawable.ic_home_filled,
     ),
     Discover(
         route = AppRoutes.DiscoverRoute,
         label = "Discover",
-        inactiveIcon = R.drawable.ic_explore,
-        activeIcon = R.drawable.ic_explore_filled,
+        inactiveIcon = Res.drawable.ic_explore,
+        activeIcon = Res.drawable.ic_explore_filled,
     ),
     Library(
         route = AppRoutes.LibraryRoute,
         label = "Library",
-        inactiveIcon = R.drawable.ic_video_library,
-        activeIcon = R.drawable.ic_video_library_filled,
+        inactiveIcon = Res.drawable.ic_video_library,
+        activeIcon = Res.drawable.ic_video_library_filled,
     ),
 }

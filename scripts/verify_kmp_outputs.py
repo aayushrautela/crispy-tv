@@ -190,6 +190,13 @@ def declared_types(path: Path) -> tuple[set[str], bool]:
 
     if has_facade:
         name = facade_name or path.stem
+        # Kotlin/JVM replaces a dot in the file name with an underscore when
+        # naming the facade class. The compose-resources plugin names its
+        # generated accessors `Drawable0.commonMain.kt`, whose facade is
+        # `Drawable0_commonMainKt` -- not `Drawable0.commonMainKt`. Using the
+        # stem verbatim reported all of them as orphans, which looks exactly
+        # like the stale-output breakage this gate exists to catch.
+        name = name.replace(".", "_")
         types.add(f"{package}.{name}Kt" if package else f"{name}Kt")
 
     return types, False

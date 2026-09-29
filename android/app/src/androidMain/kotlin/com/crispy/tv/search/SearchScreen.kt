@@ -1,6 +1,7 @@
 package com.crispy.tv.search
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,19 +11,17 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -30,13 +29,14 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,14 +48,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyShelfSection
 import com.crispy.tv.ui.components.LandscapeCard
@@ -63,11 +61,15 @@ import com.crispy.tv.ui.components.PersonCircleCard
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_close
+import com.crispy.tv.ui.resources.ic_history
 import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun SearchRoute(
@@ -310,7 +312,7 @@ private fun RecentSearchChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_history),
+            painter = painterResource(Res.drawable.ic_history),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -327,7 +329,7 @@ private fun RecentSearchChip(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_close),
+                painter = painterResource(Res.drawable.ic_close),
                 contentDescription = "Remove recent search",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -495,7 +497,7 @@ private fun GenreTab(
             .clickable(onClick = onClick)
     ) {
         Image(
-            painter = painterResource(id = genre.imageResId),
+            painter = painterResource(genre.imageResId),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

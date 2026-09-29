@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -42,20 +41,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaDetails
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.details.DetailsPaletteColors
+import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.addons.model.MediaVideo
-import com.crispy.tv.nativeengine.playback.PlayerResizeMode
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back_filled
+import com.crispy.tv.ui.resources.ic_crop_filled
+import com.crispy.tv.ui.resources.ic_graphic_eq_filled
+import com.crispy.tv.ui.resources.ic_info
+import com.crispy.tv.ui.resources.ic_layers
+import com.crispy.tv.ui.resources.ic_subtitles_filled
+import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToLong
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun PlayerTopBar(
@@ -76,7 +83,7 @@ internal fun PlayerTopBar(
         Surface(shape = CircleShape, color = palette.pillBackground, contentColor = palette.onPillBackground) {
             IconButton(onClick = onBack) {
                 CrispyIcon(
-                    painter = painterResource(R.drawable.ic_arrow_back_filled),
+                    painter = painterResource(Res.drawable.ic_arrow_back_filled),
                     contentDescription = "Back",
                     autoMirror = true,
                 )
@@ -124,7 +131,7 @@ internal fun PlayerTopBar(
             enabled = isMetadataLoaded,
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_info),
+                painter = painterResource(Res.drawable.ic_info),
                 contentDescription = "Info",
                 tint = if (isMetadataLoaded) palette.onPillBackground else palette.onPillBackground.copy(alpha = 0.4f),
             )
@@ -258,7 +265,7 @@ internal fun PlayerBottomControls(
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_graphic_eq_filled),
+                                painter = painterResource(Res.drawable.ic_graphic_eq_filled),
                                 contentDescription = "Audio tracks",
                                 tint = palette.onPillBackground,
                                 modifier = Modifier.size(20.dp),
@@ -270,7 +277,7 @@ internal fun PlayerBottomControls(
                         modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_subtitles_filled),
+                            painter = painterResource(Res.drawable.ic_subtitles_filled),
                             contentDescription = "Subtitles",
                             tint = palette.onPillBackground,
                             modifier = Modifier.size(20.dp),
@@ -281,7 +288,7 @@ internal fun PlayerBottomControls(
                         modifier = Modifier.size(40.dp),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_layers),
+                            painter = painterResource(Res.drawable.ic_layers),
                             contentDescription = "Streams",
                             tint = palette.onPillBackground,
                             modifier = Modifier.size(20.dp),
@@ -300,7 +307,7 @@ internal fun PlayerBottomControls(
                             )
                         } else {
                             CrispyIcon(
-                                painter = painterResource(R.drawable.ic_crop_filled),
+                                painter = painterResource(Res.drawable.ic_crop_filled),
                                 contentDescription = "Resize: ${resizeMode.label}",
                                 tint = palette.onPillBackground,
                                 modifier = Modifier.size(20.dp),

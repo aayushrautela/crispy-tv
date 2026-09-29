@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -24,17 +24,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_keyboard_arrow_right_filled
 import com.crispy.tv.ui.theme.Dimensions
+import org.jetbrains.compose.resources.painterResource
 
 private const val HOME_POSTER_SKELETON_COUNT = 5
 
@@ -106,7 +107,7 @@ internal fun HomeCatalogSectionRow(
                 )
             ) {
                 CrispyIcon(
-                    painter = painterResource(R.drawable.ic_keyboard_arrow_right_filled),
+                    painter = painterResource(Res.drawable.ic_keyboard_arrow_right_filled),
                     contentDescription = "See all",
                     modifier = Modifier.size(20.dp),
                     autoMirror = true,

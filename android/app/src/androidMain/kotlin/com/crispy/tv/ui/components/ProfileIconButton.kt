@@ -21,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -32,8 +31,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import com.crispy.tv.accounts.ActiveProfileInfo
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.accounts.loadActiveProfile
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_person
+import org.jetbrains.compose.resources.painterResource
 
 private val ProfileIconButtonSize = 40.dp
 private val ProfileIconContainerSize = 32.dp
@@ -116,7 +117,7 @@ fun ProfileIconButton(onClick: () -> Unit) {
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_person),
+                            painter = painterResource(Res.drawable.ic_person),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,18 +36,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.details.DetailsPaletteColors
-import com.crispy.tv.details.ExpandableDescription
-import com.crispy.tv.details.formatRuntimeForHeader
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.util.normalizeRatingText
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.details.DetailsPaletteColors
+import com.crispy.tv.details.ExpandableDescription
+import com.crispy.tv.details.formatRuntimeForHeader
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_close_filled
+import com.crispy.tv.ui.resources.ic_star_filled
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun PlayerInfoSheet(
@@ -105,7 +107,7 @@ internal fun PlayerInfoSheet(
                             modifier = Modifier.align(Alignment.TopEnd),
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_close_filled),
+                                painter = painterResource(Res.drawable.ic_close_filled),
                                 contentDescription = "Close",
                                 tint = palette.onPageBackground,
                             )
@@ -219,7 +221,7 @@ private fun MetaRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_star_filled),
+                    painter = painterResource(Res.drawable.ic_star_filled),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = Color(0xFFFFD54F),

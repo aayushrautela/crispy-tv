@@ -31,19 +31,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -53,29 +52,34 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
-import com.crispy.tv.ui.theme.Dimensions
-import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
+import com.crispy.tv.network.AppHttp
+import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_add
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.resources.ic_delete
+import com.crispy.tv.ui.resources.ic_extension
+import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import com.crispy.tv.network.AppHttp
-import com.crispy.tv.network.CrispyHttpClient
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import java.util.Locale
+import org.jetbrains.compose.resources.painterResource
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Immutable
 internal data class InstalledAddonUi(
@@ -475,7 +479,7 @@ private fun AddonsSettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )
@@ -520,7 +524,7 @@ private fun AddonsSettingsScreen(
                     modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding)
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_add),
+                        painter = painterResource(Res.drawable.ic_add),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
@@ -755,7 +759,7 @@ private fun AddonListRow(
                     )
                 } else {
                     Icon(
-                        painter = painterResource(R.drawable.ic_extension),
+                        painter = painterResource(Res.drawable.ic_extension),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -783,7 +787,7 @@ private fun AddonListRow(
         trailingContent = {
             IconButton(onClick = onRemove) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_delete),
+                    painter = painterResource(Res.drawable.ic_delete),
                     contentDescription = "Remove addon",
                     tint = MaterialTheme.colorScheme.error
                 )

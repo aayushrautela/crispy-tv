@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -32,23 +32,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.input.pointer.pointerInput
-import com.crispy.tv.ui.assets.R
-
-import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.addons.model.MediaVideo
-import com.crispy.tv.catalog.toCatalogItem
-import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.backend.MetadataReviewView
 import com.crispy.tv.backend.MetadataVideoView
+import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.catalog.toCatalogItem
+import com.crispy.tv.home.HomeCatalogPosterCard
+import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_check_filled
+import com.crispy.tv.ui.theme.Dimensions
+import org.jetbrains.compose.resources.painterResource
 
 internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
@@ -239,7 +240,7 @@ internal fun LazyListScope.detailsBodyContent(
                                 leadingIcon = if (uiState.seasonWatchStates[season] == true) {
                                     {
                                         Icon(
-                                            painter = painterResource(R.drawable.ic_check_filled),
+                                            painter = painterResource(Res.drawable.ic_check_filled),
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp),
                                             tint = palette.accent,

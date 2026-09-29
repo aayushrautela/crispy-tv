@@ -33,7 +33,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -44,7 +43,9 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeWideRailItemUi
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_keyboard_arrow_right_filled
+import org.jetbrains.compose.resources.painterResource
 
 object TvHomeDimensions {
     val WideCardWidth: Dp = 248.dp
@@ -130,7 +131,7 @@ fun TvRailHeader(
                     contentAlignment = Alignment.Center,
                 ) {
                     CrispyIcon(
-                        painter = painterResource(R.drawable.ic_keyboard_arrow_right_filled),
+                        painter = painterResource(Res.drawable.ic_keyboard_arrow_right_filled),
                         contentDescription = "See all",
                         autoMirror = true,
                     )

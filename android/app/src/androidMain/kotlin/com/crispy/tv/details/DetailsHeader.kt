@@ -10,7 +10,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +21,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,23 +37,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import com.crispy.tv.domain.optimistic.FieldSync
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.annotation.DrawableRes
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextLayoutResult
@@ -64,11 +61,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.util.normalizeRatingText
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.domain.optimistic.FieldSync
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_bookmark
+import com.crispy.tv.ui.resources.ic_bookmark_filled
+import com.crispy.tv.ui.resources.ic_check_circle
+import com.crispy.tv.ui.resources.ic_check_circle_filled
+import com.crispy.tv.ui.resources.ic_keyboard_arrow_down_filled
+import com.crispy.tv.ui.resources.ic_keyboard_arrow_up_filled
+import com.crispy.tv.ui.resources.ic_play_arrow_filled
+import com.crispy.tv.ui.resources.ic_replay
+import com.crispy.tv.ui.resources.ic_share
+import com.crispy.tv.ui.resources.ic_star_filled
+import com.crispy.tv.ui.resources.ic_thumb_down
+import com.crispy.tv.ui.resources.ic_thumb_down_filled
+import com.crispy.tv.ui.resources.ic_thumb_up
+import com.crispy.tv.ui.resources.ic_thumb_up_filled
+import com.crispy.tv.ui.resources.ic_wand_stars
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Date
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 private val AiInsightsBorderColors =
     listOf(
@@ -373,7 +388,7 @@ internal fun HeaderInfoSection(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 CrispyIcon(
-                                    painter = painterResource(R.drawable.ic_wand_stars),
+                                    painter = painterResource(Res.drawable.ic_wand_stars),
                                     contentDescription = null,
                                 )
                             }
@@ -402,8 +417,8 @@ internal fun HeaderInfoSection(
                     ) {
                         val iconVector =
                             when (watchCta.icon) {
-                                WatchCtaIcon.REPLAY -> R.drawable.ic_replay
-                                WatchCtaIcon.PLAY -> R.drawable.ic_play_arrow_filled
+                                WatchCtaIcon.REPLAY -> Res.drawable.ic_replay
+                                WatchCtaIcon.PLAY -> Res.drawable.ic_play_arrow_filled
                             }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -454,7 +469,7 @@ internal fun HeaderInfoSection(
                         selected = isInWatchlist,
                         sync = optimisticSync.watchlist,
                         palette = palette,
-                        icon = if (isInWatchlist) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+                        icon = if (isInWatchlist) Res.drawable.ic_bookmark_filled else Res.drawable.ic_bookmark,
                         onClick = onToggleWatchlist
                     )
 
@@ -463,7 +478,7 @@ internal fun HeaderInfoSection(
                         selected = isWatched,
                         sync = optimisticSync.watched,
                         palette = palette,
-                        icon = if (isWatched) R.drawable.ic_check_circle_filled else R.drawable.ic_check_circle,
+                        icon = if (isWatched) Res.drawable.ic_check_circle_filled else Res.drawable.ic_check_circle,
                         onClick = onToggleWatched
                     )
 
@@ -472,7 +487,7 @@ internal fun HeaderInfoSection(
                         selected = liked == true,
                         sync = optimisticSync.rating,
                         palette = palette,
-                        icon = if (liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+                        icon = if (liked == true) Res.drawable.ic_thumb_up_filled else Res.drawable.ic_thumb_up,
                         onClick = { onSetLiked(if (liked == true) null else true) }
                     )
 
@@ -481,7 +496,7 @@ internal fun HeaderInfoSection(
                         selected = liked == false,
                         sync = optimisticSync.rating,
                         palette = palette,
-                        icon = if (liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+                        icon = if (liked == false) Res.drawable.ic_thumb_down_filled else Res.drawable.ic_thumb_down,
                         onClick = { onSetLiked(if (liked == false) null else false) }
                     )
 
@@ -490,7 +505,7 @@ internal fun HeaderInfoSection(
                         selected = false,
                         sync = OptimisticSyncBadge(),
                         palette = palette,
-                        icon = R.drawable.ic_share,
+                        icon = Res.drawable.ic_share,
                         onClick = {
                             val title = details.title
                             val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -532,7 +547,7 @@ internal fun HeaderInfoSection(
                         contentAlignment = Alignment.Center,
                     ) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_wand_stars),
+                            painter = painterResource(Res.drawable.ic_wand_stars),
                             contentDescription = null,
                         )
                     }
@@ -575,8 +590,8 @@ internal fun HeaderInfoSection(
             ) {
                 val iconVector =
                     when (watchCta.icon) {
-                        WatchCtaIcon.REPLAY -> R.drawable.ic_replay
-                        WatchCtaIcon.PLAY -> R.drawable.ic_play_arrow_filled
+                        WatchCtaIcon.REPLAY -> Res.drawable.ic_replay
+                        WatchCtaIcon.PLAY -> Res.drawable.ic_play_arrow_filled
                     }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -665,7 +680,7 @@ private fun DetailsQuickActionsRow(
             selected = isInWatchlist,
             sync = optimisticSync.watchlist,
             palette = palette,
-            icon = if (isInWatchlist) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+            icon = if (isInWatchlist) Res.drawable.ic_bookmark_filled else Res.drawable.ic_bookmark,
             onClick = onToggleWatchlist
         )
 
@@ -674,7 +689,7 @@ private fun DetailsQuickActionsRow(
             selected = isWatched,
             sync = optimisticSync.watched,
             palette = palette,
-            icon = if (isWatched) R.drawable.ic_check_circle_filled else R.drawable.ic_check_circle,
+            icon = if (isWatched) Res.drawable.ic_check_circle_filled else Res.drawable.ic_check_circle,
             onClick = onToggleWatched
         )
 
@@ -683,7 +698,7 @@ private fun DetailsQuickActionsRow(
             selected = liked == true,
             sync = optimisticSync.rating,
             palette = palette,
-            icon = if (liked == true) R.drawable.ic_thumb_up_filled else R.drawable.ic_thumb_up,
+            icon = if (liked == true) Res.drawable.ic_thumb_up_filled else Res.drawable.ic_thumb_up,
             onClick = { onSetLiked(if (liked == true) null else true) }
         )
 
@@ -692,7 +707,7 @@ private fun DetailsQuickActionsRow(
             selected = liked == false,
             sync = optimisticSync.rating,
             palette = palette,
-            icon = if (liked == false) R.drawable.ic_thumb_down_filled else R.drawable.ic_thumb_down,
+            icon = if (liked == false) Res.drawable.ic_thumb_down_filled else Res.drawable.ic_thumb_down,
             onClick = { onSetLiked(if (liked == false) null else false) }
         )
 
@@ -701,7 +716,7 @@ private fun DetailsQuickActionsRow(
             selected = false,
             sync = OptimisticSyncBadge(),
             palette = palette,
-            icon = R.drawable.ic_share,
+            icon = Res.drawable.ic_share,
             onClick = onShare
         )
     }
@@ -714,7 +729,7 @@ private fun DetailsQuickAction(
     sync: OptimisticSyncBadge,
     palette: DetailsPaletteColors,
     selectedAccent: Color? = null,
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     onClick: () -> Unit
 ) {
     val accent = selectedAccent ?: palette.accent
@@ -781,7 +796,7 @@ private fun HeaderMetaRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 CrispyIcon(
-                    painter = painterResource(R.drawable.ic_star_filled),
+                    painter = painterResource(Res.drawable.ic_star_filled),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = Color(0xFFFFD54F)
@@ -873,7 +888,7 @@ internal fun ExpandableDescription(
                         )
                     ) {
                         Icon(
-                            painter = if (expanded) painterResource(R.drawable.ic_keyboard_arrow_up_filled) else painterResource(R.drawable.ic_keyboard_arrow_down_filled),
+                            painter = if (expanded) painterResource(Res.drawable.ic_keyboard_arrow_up_filled) else painterResource(Res.drawable.ic_keyboard_arrow_down_filled),
                             contentDescription = toggleDescriptionLabel,
                             modifier = Modifier.size(18.dp),
                             tint = textColor.copy(alpha = 0.82f),

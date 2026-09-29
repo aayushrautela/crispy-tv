@@ -1,8 +1,8 @@
 package com.crispy.tv.details
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,16 +28,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
 import coil3.compose.AsyncImage
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_check_filled
 import com.crispy.tv.ui.theme.Dimensions
 import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -121,7 +122,7 @@ internal fun EpisodeCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_check_filled),
+                            painter = painterResource(Res.drawable.ic_check_filled),
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                         )

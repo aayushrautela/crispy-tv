@@ -1,8 +1,25 @@
+import org.jetbrains.compose.resources.ResourcesExtension
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.kotlin.compose)
+}
+
+compose.resources {
+    // `Res` is `internal` by default, which is correct for a module that owns and
+    // uses its own resources. These resources are owned here but consumed by
+    // `:app`, `:tv` and `:androidApp`, so the class has to be public. This is the
+    // supported switch; the alternative circulating upstream is a `doLast` block
+    // that rewrites `internal object Res` in the generated file, which patches
+    // generated output and is labelled a temporary workaround.
+    publicResClass = true
+
+    // Default would be `crispy_rewrite.android.sharedui.generated.resources`, which
+    // is derived from the Gradle coordinates and leaks the build system into every
+    // import. Callers are UI code; `com.crispy.tv.ui.resources` is what that is.
+    packageOfResClass = "com.crispy.tv.ui.resources"
 }
 
 kotlin {

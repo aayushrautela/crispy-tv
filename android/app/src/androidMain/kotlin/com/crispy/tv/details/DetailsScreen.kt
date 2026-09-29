@@ -30,12 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberBottomSheetState
-import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -53,35 +53,43 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
-import com.crispy.tv.distribution.AppDistribution
-import com.crispy.tv.ui.components.ItemActionSheet
-import com.crispy.tv.ui.components.ItemActionSheetItem
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.StreamSelectorUiState
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.ui.components.CrispyIcon
-import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.backend.MetadataReviewView
+import com.crispy.tv.backend.MetadataVideoView
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.settings.PlaybackSettings
-import com.crispy.tv.streams.StreamSelectorSheet
-import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource
 import com.crispy.tv.details.trailer.extractYouTubeVideoId
+import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.settings.PlaybackSettings
+import com.crispy.tv.streams.StreamSelectorSheet
+import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.components.ItemActionSheet
+import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back_filled
+import com.crispy.tv.ui.resources.ic_check
+import com.crispy.tv.ui.resources.ic_check_filled
+import com.crispy.tv.ui.resources.ic_done_all
+import com.crispy.tv.ui.resources.ic_done_all_filled
+import com.crispy.tv.ui.resources.ic_star_filled
+import com.crispy.tv.ui.resources.ic_volume_off_filled
+import com.crispy.tv.ui.resources.ic_volume_up_filled
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
-import com.crispy.tv.backend.MetadataReviewView
-import com.crispy.tv.backend.MetadataVideoView
+import org.jetbrains.compose.resources.painterResource
 
 private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 
@@ -343,7 +351,7 @@ internal fun DetailsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back_filled),
+                            painter = painterResource(Res.drawable.ic_arrow_back_filled),
                             contentDescription = "Back",
                             tint = contentColor,
                             autoMirror = true,
@@ -354,7 +362,7 @@ internal fun DetailsScreen(
                     if (showTrailer && !trailerKey.isNullOrBlank()) {
                         IconButton(onClick = { onTrailerMutedChanged(!userMutedTrailer) }) {
                             CrispyIcon(
-                                painter = painterResource(if (userMutedTrailer) R.drawable.ic_volume_off_filled else R.drawable.ic_volume_up_filled),
+                                painter = painterResource(if (userMutedTrailer) Res.drawable.ic_volume_off_filled else Res.drawable.ic_volume_up_filled),
                                 contentDescription = if (userMutedTrailer) "Unmute trailer" else "Mute trailer",
                                 tint = contentColor,
                                 autoMirror = true,
@@ -428,7 +436,7 @@ internal fun DetailsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.ic_star_filled),
+                                            painter = painterResource(Res.drawable.ic_star_filled),
                                             contentDescription = null,
                                             tint = Color(0xFFFFD54F),
                                         )
@@ -468,7 +476,7 @@ internal fun DetailsScreen(
                         ItemActionSheetItem(
                             label = if (watchState.isWatched) "Unmark as watched" else "Mark as watched",
                             supporting = "This episode only",
-                            icon = if (watchState.isWatched) R.drawable.ic_check_filled else R.drawable.ic_check,
+                            icon = if (watchState.isWatched) Res.drawable.ic_check_filled else Res.drawable.ic_check,
                             filled = watchState.isWatched,
                             onClick = {
                                 onToggleEpisodeWatched(selectedEpisode)
@@ -485,7 +493,7 @@ internal fun DetailsScreen(
                                         "Mark season $episodeSeason as watched"
                                     },
                                 supporting = "All episodes in this season",
-                                icon = if (seasonWatched) R.drawable.ic_done_all_filled else R.drawable.ic_done_all,
+                                icon = if (seasonWatched) Res.drawable.ic_done_all_filled else Res.drawable.ic_done_all,
                                 filled = seasonWatched,
                                 dividerBefore = true,
                                 onClick = {

@@ -26,10 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_search
+import org.jetbrains.compose.resources.painterResource
 
 // Outer capsule
 internal val FloatingBarHeight = 60.dp
@@ -98,7 +99,7 @@ internal fun FloatingBottomBar(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_search),
+                    painter = painterResource(Res.drawable.ic_search),
                     contentDescription = "Search",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),

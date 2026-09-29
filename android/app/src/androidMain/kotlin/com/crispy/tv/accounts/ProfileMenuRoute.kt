@@ -14,9 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.annotation.DrawableRes
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,19 +31,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.ui.assets.R
-import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.avatar.AvatarUrlResolver
 import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.resources.ic_exit_to_app
+import com.crispy.tv.ui.resources.ic_person
+import com.crispy.tv.ui.resources.ic_settings
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Google-style account menu shown when the profile icon is tapped. It surfaces the active
@@ -103,7 +107,7 @@ fun ProfileMenuRoute(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         CrispyIcon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
+                            painter = painterResource(Res.drawable.ic_arrow_back),
                             contentDescription = "Back",
                             autoMirror = true,
                         )
@@ -130,7 +134,7 @@ fun ProfileMenuRoute(
                 onClick = onOpenSettings,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(painter = painterResource(R.drawable.ic_settings), contentDescription = null)
+                Icon(painter = painterResource(Res.drawable.ic_settings), contentDescription = null)
                 Spacer(modifier = Modifier.size(8.dp))
                 Text("Open settings")
             }
@@ -142,7 +146,7 @@ fun ProfileMenuRoute(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 ProfileMenuRow(
-                    icon = R.drawable.ic_person,
+                    icon = Res.drawable.ic_person,
                     label = "Manage profiles",
                     onClick = onManageProfiles,
                 )
@@ -152,7 +156,7 @@ fun ProfileMenuRoute(
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 ProfileMenuRow(
-                    icon = R.drawable.ic_exit_to_app,
+                    icon = Res.drawable.ic_exit_to_app,
                     label = "Sign out",
                     onClick = onSignOut,
                     autoMirror = true,
@@ -201,7 +205,7 @@ private fun ProfileMenuHeader(profile: ActiveProfileInfo?) {
                 )
             } else {
                 Icon(
-                    painter = painterResource(R.drawable.ic_person),
+                    painter = painterResource(Res.drawable.ic_person),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(36.dp),
@@ -227,7 +231,7 @@ private fun ProfileMenuHeader(profile: ActiveProfileInfo?) {
 
 @Composable
 private fun ProfileMenuRow(
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     label: String,
     onClick: () -> Unit,
     autoMirror: Boolean = false,

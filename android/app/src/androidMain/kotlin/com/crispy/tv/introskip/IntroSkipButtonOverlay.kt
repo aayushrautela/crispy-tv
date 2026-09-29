@@ -18,10 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.assets.R
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_skip_next
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 
 private const val AUTO_HIDE_DELAY_MS = 15_000L
 
@@ -93,7 +94,7 @@ fun IntroSkipButtonOverlay(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_skip_next),
+                    painter = painterResource(Res.drawable.ic_skip_next),
                     contentDescription = null
                 )
                 Text(skipLabelFor(interval.segmentType))

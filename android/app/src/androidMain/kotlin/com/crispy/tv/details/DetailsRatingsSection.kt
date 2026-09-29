@@ -1,10 +1,11 @@
 package com.crispy.tv.details
 
-import androidx.compose.foundation.layout.Spacer
+import androidx.annotation.RawRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,25 +19,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.annotation.DrawableRes
-import androidx.annotation.RawRes
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.addons.util.normalizeRatingText
+import com.crispy.tv.backend.MetadataTitleRatings
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.backend.MetadataTitleRatings
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_star_filled
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun RatingsSection(
@@ -121,7 +123,7 @@ private fun RatingPill(rating: DetailsRatingPill, modifier: Modifier = Modifier)
                             )
                         } else {
                             CrispyIcon(
-                                painter = painterResource(rating.badgeIcon ?: R.drawable.ic_star_filled),
+                                painter = painterResource(rating.badgeIcon ?: Res.drawable.ic_star_filled),
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -164,7 +166,7 @@ private data class DetailsRatingPill(
     val badgeText: String?,
     val badgeColor: Color,
     val badgeContentColor: Color,
-    @DrawableRes val badgeIcon: Int? = null,
+    val badgeIcon: DrawableResource? = null,
     @param:RawRes val badgeLogoRes: Int? = null,
 )
 
