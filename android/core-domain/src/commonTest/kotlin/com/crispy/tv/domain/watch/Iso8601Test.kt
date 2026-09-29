@@ -183,5 +183,12 @@ class Iso8601Test {
         assertNull(iso8601MonthLabel("2024-02-31"))
         assertNull(iso8601MonthLabel("2024-13-01"))
         assertNull(iso8601MonthLabel("not-a-date"))
+
+        // Ten correct digits with no separators is not a date. The month parser
+        // reads digits at 0-4, 5-7 and 8-10 and has to check the two hyphens
+        // itself: without that check this renders a "Jan" badge for a string
+        // LocalDate rejects, which is a plausible-looking wrong answer rather
+        // than a visible failure.
+        assertNull(iso8601MonthLabel("2024010526"))
     }
 }

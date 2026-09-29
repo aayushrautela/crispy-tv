@@ -24,15 +24,25 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 54 of the 160 files are there.
+ * `commonMain` one vertical slice at a time, and 57 of the 161 files are there.
  *
- * The remaining 106 are held by three things, and only three: a type that
+ * The remaining 104 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
  * `androidx.paging`, media3), a composition root that by definition needs a
  * platform to resolve against, and screen code that is not yet split
- * factory-from-viewmodel. The measurements that decide which is which are in
- * kmp-migration-plan.md; the two rules that decide what is worth changing are
- * in AGENTS.md under *A type-level port is the lever that moves files*.
+ * factory-from-viewmodel. The two rules that decide what is worth changing are
+ * in AGENTS.md under *A type-level port is the lever that moves files*. The
+ * two counts above are a `find` away and are re-measured rather than trusted
+ * as the module moves.
+ *
+ * A fourth held a surprising number of files before this: `java.time`. It was
+ * one helper -- `formatLongDate`, a `LocalDate` + `DateTimeFormatter` call at
+ * the bottom of `DetailsMetadataSection` -- and it pinned two details screens
+ * between them, because a portable replacement has to be written before the
+ * file it lives in can move. The replacement did not go next to the caller:
+ * `:core-domain`'s `Iso8601.kt` had already replaced `java.time` for the
+ * calendar, so the formatter went there and only the fallback policy stayed
+ * here. Look for the existing replacement before writing a second one.
  *
  * Coil used to be the fourth, and was the largest of the four: 15 files reached
  * it, 4,378 lines in total, and every one of them was blocked by

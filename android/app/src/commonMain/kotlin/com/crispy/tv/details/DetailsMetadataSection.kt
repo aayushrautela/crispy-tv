@@ -18,9 +18,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.addons.model.MediaDetails
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import com.crispy.tv.backend.MetadataTitleDetailResponse
 import com.crispy.tv.backend.MetadataTitleExtrasResponse
 
@@ -69,30 +66,5 @@ internal fun buildDetailsRows(
     }
 
     return rows
-}
-
-internal fun formatLongDate(date: String?): String? {
-    val raw = date?.trim().orEmpty()
-    if (raw.isBlank()) return null
-
-    val iso = if (raw.length >= 10) raw.take(10) else raw
-    return try {
-        val parsed = LocalDate.parse(iso)
-        parsed.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
-    } catch (_: Throwable) {
-        date
-    }
-}
-
-internal fun formatRuntimeMinutes(minutes: Int?): String? {
-    if (minutes == null || minutes <= 0) return null
-    val h = minutes / 60
-    val m = minutes % 60
-
-    return when {
-        h > 0 && m > 0 -> "$h hr $m min"
-        h > 0 -> "$h hr"
-        else -> "$m min"
-    }
 }
 

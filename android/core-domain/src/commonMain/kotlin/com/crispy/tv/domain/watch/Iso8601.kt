@@ -142,6 +142,13 @@ fun iso8601MonthLabel(value: String): String? {
 private fun parseIso8601MonthNumber(value: String): Int? {
     if (value.length < 10) return null
     val year = value.readDigits(0, 4) ?: return null
+    // The separators are checked, unlike a bare "ten digits is a date" reading.
+    // Without this, "2024010526" parsed as 2024-01-05 and rendered a label for a
+    // string that LocalDate rejects. The length check stays a lower bound rather
+    // than equality because the one caller passes a release date that may carry
+    // an instant after the date, and reads the month off the first ten
+    // characters -- the same truncation its sibling performs.
+    if (value[4] != '-' || value[7] != '-') return null
     val month = value.readDigits(5, 7) ?: return null
     val day = value.readDigits(8, 10) ?: return null
     if (month !in 1..12) return null
@@ -149,6 +156,53 @@ private fun parseIso8601MonthNumber(value: String): Int? {
     // LocalDate rejects it rather than labelling it "Feb".
     if (!isValidDate(year, month, day)) return null
     return month
+}
+
+/**
+ * Renders a `YYYY-MM-DD` date the way `java.time` renders it under the
+ * `MMM d, yyyy` pattern with `Locale.US`: `Jan 5, 2026`.
+ *
+ * ## Why byte-for-byte
+ *
+ * This is the portable replacement for
+ * `LocalDate.parse(s).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))`,
+ * which is a user-visible label, so a drift here is a visible text change rather
+ * than a wrong number. It is nevertheless pinned to the JVM's output, verified on
+ * JDK 21 for `2026-01-05`, `2024-02-29`, `2026-12-31` and `9999-12-31`.
+ *
+ * Two details are not obvious and both come from the JVM:
+ *
+ * - **The year is a year-of-era, not a year.** `0000-01-01` formats as
+ *   `Jan 1, 0001`, not `Jan 1, 0000`, because year 0 belongs to the era before
+ *   the common one and its year-of-era is 1. [formatYearOfEra] reproduces that.
+ * - **A year needing more than four digits renders with a sign**: `+10000-01-01`
+ *   formats as `Jan 1, +10000`. This parser accepts exactly four digits, so that
+ *   input is rejected rather than rendered — a deliberate difference, since the
+ *   input cannot reach here through a caller that truncates to ten characters.
+ *
+ * [MONTH_LABELS] is the same table [iso8601MonthLabel] uses, and it is the
+ * `Locale.US` set: `Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec`, with no
+ * abbreviated forms carrying a period.
+ */
+fun formatIso8601LongDate(value: String): String? {
+    val epochDay = parseIso8601DateToEpochDay(value) ?: return null
+    val (year, month, dayOfMonth) = civilFromEpochDay(epochDay)
+    val label = MONTH_LABELS[month - 1]
+    return "$label $dayOfMonth, ${formatYearOfEra(year)}"
+}
+
+/**
+ * The year-of-era, zero-padded to four digits, as `MMM d, yyyy` renders it.
+ *
+ * A proleptic year at or before 0 sits in the era before the common one, where
+ * the year-of-era is one greater, so year 0 prints as 1 and never as 0. Years
+ * that need more than four digits carry an explicit sign, which is how `+10000`
+ * comes out of the same pattern.
+ */
+private fun formatYearOfEra(year: Int): String {
+    val yearOfEra = if (year > 0) year else year + 1
+    val sign = if (yearOfEra < 0) "-" else ""
+    return sign + yearOfEra.toString().padStart(4, '0')
 }
 
 /**
