@@ -60,6 +60,13 @@ kotlin {
             api(project(":android:player"))
 
             api(libs.coroutines.core)
+
+            // For `MediaDetailMappings.kt`: six wire->model extensions whose receivers
+            // are all backend response types. Those types already live in `:backend`'s
+            // `commonMain` as `BackendTypes.kt`, so the mappings are portable -- but the
+            // file could not be moved while `:backend` was reachable only from
+            // `androidMain`. `normalizedCatalogMediaType` alone blocked 8 `:app` files.
+            implementation(project(":android:backend"))
         }
 
         androidMain.dependencies {

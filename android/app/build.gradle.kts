@@ -116,6 +116,27 @@ kotlin {
             // The player UI in commonMain also reads `PlaybackIdentity` and
             // `TorrentResolver`, both in `:android:player`'s commonMain.
             implementation(project(":android:player"))
+            // The repository interfaces in `commonMain` name the backend response
+            // types, which live in `:android:backend`'s `commonMain` as
+            // `BackendTypes.kt`. The *client* is still `androidMain` -- it speaks
+            // OkHttp and `org.json` -- but its data types are portable, and they are
+            // what these interfaces refer to. Without this a domain interface cannot
+            // name the response it maps onto, which is what kept `UserMediaRepository`
+            // and `CatalogRepository` in `androidMain` long after their own bodies
+            // were already pure.
+            implementation(project(":android:backend"))
+            // For `CatalogItem` / `CatalogSectionRef` / `CatalogPageResult`, the home
+            // feed's catalog models. They sat in `:home`'s `androidMain` on the stated
+            // ground of "Compose runtime" -- which was not the blocker at all, since
+            // Compose runtime publishes for every target. The real blocker was one
+            // `java.util.Locale` on one line, and the models moved once that did. It
+            // blocked 27 `:app` files, more than any other single upstream type.
+            //
+            // `:home`'s *services* (`HomeCatalogService`, `CalendarService`,
+            // `UpNextService`) are still `androidMain` and still unreachable from here.
+            // Declaring the module does not grant that, because `commonMain` sees only
+            // `commonMain`.
+            implementation(project(":android:home"))
             // NOT `:android:native-engine`. It is a plain `com.android.library`,
             // so it publishes no JVM variant and cannot be consumed from a KMP
             // `commonMain` at all -- the same constraint `:ui-assets` hit. The one

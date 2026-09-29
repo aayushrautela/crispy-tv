@@ -4,7 +4,6 @@ import androidx.compose.runtime.Immutable
 import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.images.ResponsiveImageSet
-import java.util.Locale
 
 @Immutable
 data class CatalogSectionRef(
@@ -20,7 +19,13 @@ data class CatalogSectionRef(
     val subtitle: String = "",
     val previewItems: List<CatalogItem> = emptyList(),
 ) {
-    val key: String = catalogId.trim().lowercase(Locale.US)
+    // Was `lowercase(Locale.US)`, which pinned this file to the JVM. Kotlin's
+    // `lowercase()` is locale-invariant by definition, so for the ASCII slugs an
+    // add-on publishes the two are identical; where they could differ is a
+    // non-ASCII catalog id, and there the invariant form is the predictable one
+    // (it is also what a Turkish-locale device produced before, since a catalog
+    // id never passed through a user-facing locale).
+    val key: String = catalogId.trim().lowercase()
 
     val displayTitle: String
         get() = heading.ifBlank { title.ifBlank { name.ifBlank { catalogId } } }

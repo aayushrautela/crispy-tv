@@ -45,7 +45,7 @@ plugins {
  * | `HomeRefreshCoordinator` | `androidMain` | consumes `HomeCatalogService`, `CalendarService` and `UpNextService`, all of which are `androidMain`. The injected clock is the part that had to change, and it did |
  * | `CalendarService`, `HomeCatalogService`, `UpNextService` | `androidMain` | `org.json`, Compose, and the backend client |
  * | `HomeSnapshotModels` | `androidMain` | `org.json` and `Context` |
- * | `CatalogModels` | `androidMain` | Compose runtime |
+ * | `CatalogModels` | `commonMain` | moved in Phase 4. The row used to read "`androidMain` / Compose runtime", which was **incomplete rather than a real blocker** -- the only Compose call in the file is the `@Immutable` annotation, and Compose runtime publishes for every target `:home` builds. What actually pinned it was `java.util.Locale`, on one line: `catalogId.trim().lowercase(Locale.US)`. That is the second time this file's stated reason was a proxy rather than the cause, and the difference matters -- the real blocker was a single call that had a portable equivalent, where the stated one implied giving up the annotation |
  * | `RecommendationCatalogDiskCacheStore` | `androidMain` | `Context`, `org.json`, `java.io` |
  */
 kotlin {
@@ -87,6 +87,16 @@ kotlin {
             api(project(":android:player"))
 
             api(libs.coroutines.core)
+
+            // For `@Immutable` on the catalog models in `commonMain`. This is the
+            // only Compose dependency `:home` has, and it is the reason
+            // `CatalogModels` could not simply be moved: the annotation is a load-
+            // bearing Compose compiler hint, and `CatalogItem` is an 18-field data
+            // class. Without it the compiler treats every item as unstable and
+            // skipping stops working for each card in a catalog row. Dropping the
+            // annotation to avoid a dependency would be a silent recomposition
+            // regression, so the dependency is the honest cost.
+            implementation(libs.androidx.compose.runtime)
         }
 
         androidMain.dependencies {
@@ -100,11 +110,8 @@ kotlin {
             implementation(project(":android:backend"))
             implementation(project(":android:addons"))
 
-            // Compose runtime only — `@Immutable` on the UI model types. Note the
-            // BOM: this is a source-set dependency handler, and `KotlinDependencyHandler`
-            // has no `platform()`, so the BOM has to be pinned per artifact here.
-            // Phase 4 replaces this with the `compose.*` accessors.
-            implementation(libs.androidx.compose.runtime)
+            // Compose runtime moved to `commonMain` with `CatalogModels`; `androidMain`
+            // still sees it for `HomeUiModels`, which remains here.
 
             implementation(libs.coroutines.android)
         }
