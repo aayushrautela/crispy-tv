@@ -79,9 +79,6 @@ import java.util.Locale
 import com.crispy.tv.backend.WatchGenerationsResponse
 
 private const val LIBRARY_PAGE_SIZE = 60
-internal const val LIBRARY_SECTION_HISTORY = "history"
-internal const val LIBRARY_SECTION_WATCHLIST = "watchlist"
-internal const val LIBRARY_SECTION_RATINGS = "ratings"
 
 private const val RATING_BAND_LIKED = "liked"
 private const val RATING_BAND_DISLIKED = "disliked"

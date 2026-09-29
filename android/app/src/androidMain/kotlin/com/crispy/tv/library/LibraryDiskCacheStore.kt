@@ -17,14 +17,14 @@ import java.security.MessageDigest
  * is explicitly invalidated (server signal, generation advance, or local
  * optimistic write). Deeper pages are always served from the network.
  */
-class LibraryDiskCacheStore(appContext: Context) {
+class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
     private val cacheDirectory = appContext.filesDir.resolve(CACHE_DIRECTORY_NAME).also { directory ->
         if (!directory.exists()) {
             directory.mkdirs()
         }
     }
 
-    suspend fun read(profileId: String, sectionId: String): LibraryCachedPage? = withContext(Dispatchers.IO) {
+    override suspend fun read(profileId: String, sectionId: String): LibraryCachedPage? = withContext(Dispatchers.IO) {
         val file = cacheFile(profileId, sectionId)
         val raw = runCatching { file.readText(StandardCharsets.UTF_8) }.getOrNull() ?: return@withContext null
         val json = runCatching { JSONObject(raw) }.getOrNull() ?: return@withContext null
@@ -40,7 +40,7 @@ class LibraryDiskCacheStore(appContext: Context) {
         )
     }
 
-    suspend fun write(
+    override suspend fun write(
         profileId: String,
         sectionId: String,
         page: LibrarySectionPageUi,
@@ -71,6 +71,9 @@ class LibraryDiskCacheStore(appContext: Context) {
         }
     }
 
+    /**
+     * Not on [LibraryDiskCache]: the screen calls this, the paging source does not.
+     */
     suspend fun invalidate(profileId: String, sectionId: String) = withContext(Dispatchers.IO) {
         runCatching { cacheFile(profileId, sectionId).delete() }
     }
@@ -182,10 +185,3 @@ class LibraryDiskCacheStore(appContext: Context) {
         private const val CACHE_DIRECTORY_NAME = "library_section_cache"
     }
 }
-
-data class LibraryCachedPage(
-    val items: List<CatalogItem>,
-    val nextCursor: String?,
-    val hasMore: Boolean,
-    val appliedGenerationMs: Long?,
-)

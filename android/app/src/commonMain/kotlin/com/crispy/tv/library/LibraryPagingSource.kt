@@ -3,7 +3,7 @@ package com.crispy.tv.library
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.ClientMediaCard
 import com.crispy.tv.backend.ClientMediaCardQueryResult
 import com.crispy.tv.catalog.CatalogItem
@@ -12,10 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class LibraryPagingSource(
-    private val backend: CrispyBackendClient,
+    private val backend: BackendApi,
     private val backendContextResolver: BackendContextResolver,
     private val sectionId: String,
-    private val libraryCache: LibraryDiskCacheStore,
+    private val libraryCache: LibraryDiskCache,
     private val appliedGenerationMsProvider: () -> Long?,
 ) : PagingSource<String, CatalogItem>() {
     override fun getRefreshKey(state: PagingState<String, CatalogItem>): String? = null
@@ -79,7 +79,7 @@ class LibraryPagingSource(
 }
 
 private suspend fun loadLibrarySectionPage(
-    backend: CrispyBackendClient,
+    backend: BackendApi,
     accessToken: String,
     profileId: String,
     sectionId: String,
@@ -198,3 +198,13 @@ data class LibrarySectionPageUi(
     val nextCursor: String? = null,
     val hasMore: Boolean = false,
 )
+
+/**
+ * The section keys the library is partitioned by. They were declared in `LibraryScreen`,
+ * which is `androidMain`; `LibraryPagingSource` dispatches on all three, so a key that
+ * lives in a file the dispatcher cannot see is a key the dispatcher cannot compile
+ * against. Plain strings, so nothing else was required to move them.
+ */
+internal const val LIBRARY_SECTION_HISTORY = "history"
+internal const val LIBRARY_SECTION_WATCHLIST = "watchlist"
+internal const val LIBRARY_SECTION_RATINGS = "ratings"
