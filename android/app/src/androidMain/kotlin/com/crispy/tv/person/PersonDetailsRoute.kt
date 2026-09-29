@@ -88,7 +88,7 @@ fun PersonDetailsRoute(
     val viewModel: PersonDetailsViewModel =
         viewModel(
             key = personId,
-            factory = PersonDetailsViewModel.factory(context, personId)
+            factory = personDetailsViewModelFactory(context, personId)
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 

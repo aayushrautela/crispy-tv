@@ -1,25 +1,22 @@
 package com.crispy.tv.person
 
-import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.MetadataPersonDetail
 import com.crispy.tv.backend.PersonSocials
 import com.crispy.tv.addons.mapping.normalizedCatalogMediaType
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.domain.person.KnownForPartitioner
 import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.catalog.toCatalogItem
-import java.util.Locale
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.crispy.tv.backend.MetadataPersonDetail
 
 @Immutable
 data class PersonKnownForRail(
@@ -47,10 +44,21 @@ data class PersonDetailsUiState(
     val errorMessage: String? = null
 )
 
+/**
+ * Loads one person's details.
+ *
+ * This used to take a `java.util.Locale` and pass it down to the loader, which
+ * converted it with `toLanguageTag()` on the way to the backend. The wire always
+ * spoke a BCP-47 tag, so the conversion was happening one layer too low. The
+ * platform's answer now arrives as a tag string from [languageTagProvider], which
+ * the factory in `androidMain` supplies from the platform locale -- the same rule
+ * `SearchViewModel` follows.
+ */
 class PersonDetailsViewModel internal constructor(
     private val personId: String,
-    private val personLoader: suspend (String, Locale) -> PersonDetails?,
-    private val localeProvider: () -> Locale = { Locale.getDefault() },
+    private val personLoader: suspend (String, String) -> PersonDetails?,
+    private val languageTagProvider: () -> String,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PersonDetailsUiState())
@@ -69,12 +77,24 @@ class PersonDetailsViewModel internal constructor(
         _uiState.value =
             current.copy(
                 isLoading = true,
+                // The `null` arm is currently unreachable, and that is worth knowing
+                // rather than guessing about. The only states this class can hold are:
+                // (loading, null, null) at init, (false, person, null) after a
+                // success, (false, null, "Failed to load") after a failure, and the
+                // two in-flight variants of those. A failed load *replaces* the whole
+                // state rather than merging, so `person != null` implies
+                // `errorMessage == null` always. Deleting the null arm fails every
+                // test in PersonDetailsViewModelTest. It is kept because it is the
+                // statement of the intent -- a refresh that already has a person on
+                // screen should not leave a stale error under it -- and because a
+                // future change that merges instead of replacing would make it
+                // load-bearing again. See the redundant-guard findings in AGENTS.md.
                 errorMessage = if (current.person != null) null else current.errorMessage,
             )
         refreshJob = viewModelScope.launch {
             val person =
-                withContext(Dispatchers.IO) {
-                    personLoader(personId, localeProvider())
+                withContext(ioDispatcher) {
+                    personLoader(personId, languageTagProvider())
                 }
 
             if (person == null) {
@@ -89,43 +109,10 @@ class PersonDetailsViewModel internal constructor(
                 )
         }
     }
-
-    companion object {
-        fun factory(appContext: Context, personId: String): ViewModelProvider.Factory {
-            val context = appContext.applicationContext
-            val supabase = SupabaseServicesProvider.accountClient(context)
-            val backend = BackendServicesProvider.backendClient(context)
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (!modelClass.isAssignableFrom(PersonDetailsViewModel::class.java)) {
-                        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                    }
-
-                    val personLoader: suspend (String, Locale) -> PersonDetails? = { requestedPersonId, locale ->
-                        val session = supabase.ensureValidSession()
-                        if (session == null) {
-                            null
-                        } else {
-                            runCatching {
-                                backend.getMetadataPersonDetail(
-                                    accessToken = session.accessToken,
-                                    personId = requestedPersonId,
-                                    language = locale.toLanguageTag(),
-                                ).toUiModel()
-                            }.getOrNull()
-                        }
-                    }
-
-                    @Suppress("UNCHECKED_CAST")
-                    return PersonDetailsViewModel(personId = personId, personLoader = personLoader) as T
-                }
-            }
-        }
-    }
 }
 
-private fun MetadataPersonDetail.toUiModel(): PersonDetails {
-    val rails = com.crispy.tv.domain.person.KnownForPartitioner.partition(
+internal fun MetadataPersonDetail.toUiModel(): PersonDetails {
+    val rails = KnownForPartitioner.partition(
         items = knownFor,
         typeOf = { it.normalizedCatalogMediaType() },
         genresOf = { it.genres },
