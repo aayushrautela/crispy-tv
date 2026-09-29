@@ -24,7 +24,7 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 57 of the 161 files are there.
+ * `commonMain` one vertical slice at a time, and 58 of the 162 files are there.
  *
  * The remaining 104 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
@@ -53,6 +53,23 @@ plugins {
  * repository's rule is that a seam is worth building only when the upstream
  * library has not already shipped one, and this was the largest file in
  * `:app`'s `androidMain` sitting behind a seam that already existed.
+ *
+ * A fifth is now a *rule* rather than a count, and it is the one to reach for
+ * before building anything. An `R` class cannot be named off Android at all, so
+ * a `res/raw` reference blocks a file completely -- but it usually blocks only
+ * a few lines of it. `DetailsCastSection.kt` imported `com.crispy.tv.ui.assets.R`
+ * for one `when` mapping and was otherwise portable, so the 25 lines that need
+ * the identifiers moved into `ReviewProviderBadge.kt` and the other 216 stayed.
+ * The name matching went the other way and into `commonMain` as
+ * `ReviewProvider` + `reviewProviderOrNull`, because that half is pure and
+ * testable and leaving it beside the `R` lookups would have made it untestable:
+ * `R$raw` is not on a JVM test classpath, so a test calling the combined
+ * function failed with `NoClassDefFoundError` rather than with a wrong answer.
+ * **Push the pure part toward `commonMain` and the platform part toward
+ * `androidMain`, even when the platform part is the smaller one.** The badge
+ * receives the result as a composable-slot parameter with no default, so a
+ * call site cannot quietly forget it -- the same choice
+ * `ImageSettingsRepository(onQualityChanged:)` already made.
  *
  * ## What this module deliberately does not know
  *

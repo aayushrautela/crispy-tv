@@ -169,6 +169,7 @@ internal fun LazyListScope.detailsBodyContent(
                             review = review,
                             modifier = Modifier.width(Dimensions.WideCardWidth),
                             onClick = { onReviewClick(review) },
+                            reviewProviderBadge = ::ReviewProviderBadge,
                         )
                     }
                 } else {

@@ -33,7 +33,6 @@ import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.backend.MetadataCompanyView
 import com.crispy.tv.backend.MetadataPersonRefView
 import com.crispy.tv.backend.MetadataReviewView
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.PersonCircleCard
 import com.crispy.tv.ui.components.PersonProfileSharedKeys
 import com.crispy.tv.ui.components.initials
@@ -142,6 +141,7 @@ internal fun MetadataReviewCard(
     review: MetadataReviewView,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
+    reviewProviderBadge: @Composable (provider: String) -> Unit,
 ) {
     ElevatedCard(
         modifier = modifier.height(168.dp),
@@ -209,33 +209,53 @@ internal fun MetadataReviewCard(
                         )
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    ReviewProviderBadge(provider = review.provider)
+                    reviewProviderBadge(review.provider)
                 }
             }
         }
     }
 }
 
-@Composable
-internal fun ReviewProviderBadge(provider: String) {
-    val logoRes = reviewProviderLogoRes(provider) ?: return
-    AsyncImage(
-        model = logoRes,
-        contentDescription = provider.providerLabel(),
-        modifier = Modifier.size(width = 24.dp, height = 24.dp),
-    )
-}
-
-private fun reviewProviderLogoRes(provider: String): Int? =
-    when (provider.trim().lowercase()) {
-        "tmdb" -> R.raw.tmdb
-        "trakt" -> R.raw.trakt
-        else -> null
+/**
+ * A human-readable name for a review source.
+ *
+ * Internal rather than private because the Android-only badge in
+ * `ReviewProviderBadge.kt` uses it for the logo's content description, and
+ * that file is the one part of this card that cannot be portable.
+ */
+internal fun String.providerLabel(): String =
+    when (reviewProviderOrNull()) {
+        ReviewProvider.TMDB -> "TMDB review"
+        ReviewProvider.TRAKT -> "Trakt review"
+        null -> "Review source"
     }
 
-private fun String.providerLabel(): String =
+/**
+ * A review source this app has artwork for.
+ *
+ * The name is a backend-supplied string, so recognising it is a pure decision
+ * and belongs here. The artwork is a `res/raw` entry in `:ui-assets`, and an
+ * `R` class is not reachable from KMP `commonMain`, so the identifier that
+ * cannot be named from this source set lives in `ReviewProviderBadge.kt`. That
+ * split is not only a portability requirement: it is what makes the name
+ * matching testable, because the mapping used to sit on the same function as
+ * the `R` lookups and loading `R$raw` failed on a JVM host test.
+ */
+internal enum class ReviewProvider {
+    TMDB,
+    TRAKT,
+}
+
+/**
+ * The provider named by a review source, or null when it is not one this app
+ * has artwork for.
+ *
+ * Matching is on the trimmed, lowercased name, so `"  TMDB "` and `"tmdb"` are
+ * the same provider. A name that merely contains a known one is not a match.
+ */
+internal fun String.reviewProviderOrNull(): ReviewProvider? =
     when (trim().lowercase()) {
-        "tmdb" -> "TMDB review"
-        "trakt" -> "Trakt review"
-        else -> "Review source"
+        "tmdb" -> ReviewProvider.TMDB
+        "trakt" -> ReviewProvider.TRAKT
+        else -> null
     }
