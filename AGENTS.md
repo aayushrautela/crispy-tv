@@ -28,6 +28,7 @@ Other useful tasks:
 ```sh
 # JVM unit tests (if present)
 ./gradlew :android:core-domain:test
+./gradlew :android:app:testAndroidHostTest
 ./gradlew :android:androidApp:testStoreDebugUnitTest
 
 # Clean
@@ -41,6 +42,10 @@ Single test (important):
 ./gradlew :android:core-domain:desktopTest --tests 'com.crispy.tv.contracts.PlayerMachineContractTest'
 ./gradlew :android:core-domain:desktopTest --tests 'com.crispy.tv.contracts.PlayerMachineContractTest.playerMachineFixtures'
 ./gradlew :android:core-domain:testAndroidHostTest --tests 'com.crispy.tv.contracts.PlayerMachineContractTest'
+
+# The composition root, in :app's only test compilation:
+./gradlew :android:app:testAndroidHostTest --tests 'com.crispy.tv.distribution.AppDistributionTest'
+./gradlew :android:app:testAndroidHostTest --tests 'com.crispy.tv.PlaybackDependenciesTest'
 
 # SwiftPM
 swift test --package-path ios/ContractRunner --filter ContinueWatchingContractTests
@@ -71,7 +76,7 @@ bash .github/scripts/fetch-torrserver-binaries.sh
 
 Gradle modules (common targets):
 - `:android:androidApp`: the Android entry point (`com.android.application`) — manifest, `res/` that only the application needs, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden-screenshot tests
-- `:android:app`: the shared UI and presentation layer, a Kotlin Multiplatform library. Its `commonMain` now holds the design-agnostic UI (routes, `ui/components`, `ui/navigation`, `ui/edge_to_edge`, `ui/utils`, the seek/gesture feedback surfaces) and `androidMain` holds the rest; `commonMain` is a strict subset of the Android build, so the phone app and the desktop app compile the same files.
+- `:android:app`: the shared UI and presentation layer, a Kotlin Multiplatform library. Its `commonMain` now holds the design-agnostic UI (routes, `ui/components`, `ui/navigation`, `ui/edge_to_edge`, `ui/utils`, the seek/gesture feedback surfaces) and `androidMain` holds the rest; `commonMain` is a strict subset of the Android build, so the phone app and the desktop app compile the same files. Its `androidHostTest` source set (see *Composition-root tests* below) is where the composition root is pinned.
 - `:android:sharedUI`: the design system **and the design assets** (Phase 4 Step 1) — `composeResources`, the theme tokens, the brand composables
 - `:android:ui-assets`: Android-only assets that cannot be `composeResources` — launcher mipmaps, the splash colour and its two drawables, the nine provider-logo SVGs
 - `:android:youtube-extractor`: sideload-only YouTube stream extraction (NewPipeExtractor)
@@ -91,6 +96,15 @@ Golden screenshots (`:android:androidApp:testStoreDebugUnitTest`):
   - `dnf download` fetches **both** `i686` and `x86_64` packages, and merging them puts a 32-bit `libfontconfig.so.1` on the path. Skiko then dies with `UnsatisfiedLinkError: libfontconfig.so.1: wrong ELF class: ELFCLASS32`, surfacing as `ExceptionInInitializerError` from `SkiaGraphicsContext` and then as four `NoClassDefFoundError: RenderNodeContext` — which reads as "the desktop seam proof is broken" and is not. Extract only `*x86_64*.rpm` and check the ELF class before trusting the result.
   - `cpio -idm` applies the payload's directory modes, so a single shared target directory makes the *second* rpm fail on a read-only directory — stage each one separately and merge. A `cp -a` that fails this way is silent under `2>/dev/null`, so verify the three critical libraries are actually present afterwards rather than assuming the loop worked.
   - `rm -rf` on the previous merge fails on the same read-only directories, leaving stale libraries behind. Build a fresh directory and check the merged output for 32-bit artefacts.
+
+Composition-root tests (`:android:app:testAndroidHostTest`):
+- `:app` is a KMP library, so this is its **only** test compilation. It exists because of `withHostTest {}` in `android { }`; without that block `:app` has no way to be tested at all. `desktopTest` sees only `commonMain` + `appUi`, and everything this covers — `AppDistribution`, `PlaybackDependencies`, `BackendServicesProvider`, `SupabaseServicesProvider` — is in `androidMain`. Do not reach for the aggregate `check` task to find the name; `testAndroidHostTest` is it.
+- **The source set is not on the `sourceSets` container.** `androidHostTest.dependencies { }` does not resolve; only `getByName("androidHostTest").dependencies { }` does. The task names (`testAndroidHostTest`, `compileAndroidHostTest`, `assembleAndroidHostTest`) exist regardless.
+- Robolectric is here **for a `Context` and nothing else**. No view is inflated and no resource is read, so `@Config(manifest = Config.NONE)` is enough and `isIncludeAndroidResources` is unnecessary — which is exactly why these can live in `:app` while the goldens must stay in `:androidApp`. Robolectric is the repo's existing dependency, not a new one.
+- **Pin `sdk = [35]` on every one of these classes.** With `Config.NONE` there is no manifest, so Robolectric cannot read `targetSdk` and silently falls back to **SDK 21**. That is below the app's `minSdk` of 26, so a class added after API 21 (`AudioFocusRequest`, API 26) is absent from `android-all`, the classloader falls through to AGP's mockable `android.jar`, and the failure reads `Method setAudioAttributes in android.media.AudioFocusRequest$Builder not mocked` — a message that names a real app class and blames nothing about Robolectric.
+- **The Robolectric sandbox classloader is shared across every test class with the same `@Config` in one worker JVM.** It is not per class, and this is the opposite of what the isolation argument usually claims. Any test about a process-wide singleton therefore sees every other class's mutations: a test instance is rebuilt per method, so an object a test installs has to live in a `companion object` or a second method is comparing against a different object than the one installed; and a lazily cached instance populated by another class makes an assertion pass without the code under test having run. `:app`'s `AppDistributionTest` reads `torrentResolverFactory` rather than `getTorrentResolver` for that reason, and the comment says so.
+- JUnit's `@FixMethodOrder(MethodSorters.NAME_ASCENDING)` is what makes an ordered singleton lifecycle readable; the alternative is a reset hook on production code that exists only for tests.
+- **`SecureTokenStore` is untestable on a JVM**, so everything that reaches it is untestable: `SupabaseServicesProvider.secureTokenStore` and `accountClient` directly, and `homeCatalogService` indirectly through `BackendContextResolverProvider.get`. The failure is `KeyStoreException: AndroidKeyStore not found` raised in a constructor, before any assertion. A fake keystore would prove nothing about the real one, so leave them out rather than mocking around it.
 
 Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`). `commonMain` must stay platform-free.
@@ -238,6 +252,7 @@ Python (tooling):
 - `python3 scripts/validate_contracts.py`
 - `python3 scripts/validate_workflows.py`
 - `./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest`
+- `./gradlew :android:app:testAndroidHostTest` (the composition root; this is the gate before touching `PlaybackDependencies`, `AppDistribution` or the two service providers)
 - `python3 scripts/verify_kmp_outputs.py` (after any compile; catches a stale class a green build cannot)
 - `swift test --package-path ios/ContractRunner` (if Swift logic touched)
 - Ensure `:android:tv` and tvOS placeholder builds still compile

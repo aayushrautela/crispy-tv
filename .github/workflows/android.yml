@@ -83,6 +83,13 @@ jobs:
             :android:core-domain:testAndroidHostTest \
             :android:desktopApp:test
 
+      - name: Run app composition-root tests
+        # :app is a KMP library, so this is its only test compilation. The tests
+        # need a Context and nothing else -- no view, no resource -- so they run
+        # without the merged manifest the golden screenshots require, which is
+        # why they can live in :app at all.
+        run: ./gradlew :android:app:testAndroidHostTest
+
       - name: Run domain unit tests
         run: ./gradlew :android:core-domain:desktopTest
 

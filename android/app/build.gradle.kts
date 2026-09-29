@@ -70,6 +70,12 @@ kotlin {
         androidResources {
             enable = true
         }
+        // Gives this KMP library a host unit test compilation, and with it the
+        // `testAndroidHostTest` task. Without it `:app` has no way to be tested at
+        // all: `desktopTest` sees only `commonMain` + `appUi`, and the composition
+        // root -- the thing every future migration step unwinds -- lives in
+        // `androidMain`. `:core-domain` declares the same block.
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -226,6 +232,26 @@ kotlin {
 
         commonTest.dependencies {
             implementation(kotlin("test"))
+        }
+
+        // The composition root's own tests. `withHostTest {}` above is what creates
+        // this source set and the `testAndroidHostTest` task; it is not named on
+        // the `sourceSets` container, so `getByName` is the only way to reach it.
+        //
+        // Robolectric, and only for a `Context`. Nothing here inflates a view or
+        // reads a resource, so `@Config(manifest = Config.NONE)` is enough and the
+        // merged manifest and the real app theme are not needed -- which is why
+        // these can live in `:app` while the golden screenshots must stay in
+        // `:androidApp`. Robolectric is already a dependency of this repository.
+        //
+        // Note what this does NOT give the tests: Robolectric reuses one sandbox
+        // classloader per `@Config` across every test class in the worker JVM, so
+        // the singletons these tests assert on are shared with each other. A test
+        // of a process-lifetime object has to account for that rather than assume
+        // a fresh process -- see the comments in the test sources.
+        getByName("androidHostTest").dependencies {
+            implementation(libs.robolectric)
+            implementation(libs.androidx.test.core.ktx)
         }
     }
 }

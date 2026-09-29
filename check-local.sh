@@ -38,6 +38,13 @@
 # mistakes. The measure of what is left, and why the rest of it is a refactor
 # rather than a file move, is in kmp-migration-plan.md under "Phase 4, Step 6".
 #
+# :android:app:testAndroidHostTest is the composition root's gate. `:app` has no
+# other way to be tested: `desktopTest` sees only commonMain + appUi, and the
+# composition root is in androidMain. Robolectric is there for a `Context` and
+# nothing else -- no view is inflated and no resource is read, so
+# `@Config(manifest = Config.NONE)` is enough and these tests do not need the
+# merged manifest or the real app theme the golden screenshots require.
+#
 # :android:androidApp:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
 #   ./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true
@@ -80,6 +87,7 @@ fi
     :android:sharedUI:compileAndroidMain \
     :android:app:compileAndroidMain \
     :android:app:compileKotlinDesktop \
+    :android:app:testAndroidHostTest \
     :android:desktopApp:compileKotlin \
     :android:desktopApp:test \
     :android:androidApp:verifyDistributionExclusions \
