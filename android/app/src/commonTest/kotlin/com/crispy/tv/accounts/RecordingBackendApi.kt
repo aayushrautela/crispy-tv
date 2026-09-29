@@ -2,6 +2,7 @@ package com.crispy.tv.accounts
 
 import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BrowseTitlesResponse
+import com.crispy.tv.backend.ClientMediaCardQueryResult
 import com.crispy.tv.backend.ImportJob
 import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ImportJobsResponse
@@ -48,7 +49,13 @@ internal class RecordingBackendApi : BackendApi {
         val returnTo: String,
     )
 
-    override fun isConfigured(): Boolean = true
+    /**
+     * `LibraryPagingSource` branches on this before it resolves a profile, so a double
+     * that always answers true can never reach the unconfigured path.
+     */
+    var configured: Boolean = true
+
+    override fun isConfigured(): Boolean = configured
 
     override val baseUrl: String get() = "https://api.test"
 
@@ -239,24 +246,72 @@ internal class RecordingBackendApi : BackendApi {
         profileId: String,
         itemId: String
     ): Nothing = unused("dismissContinueWatching")
+    val listWatchHistoryCalls = mutableListOf<LibrarySectionCall>()
+    val listWatchlistCalls = mutableListOf<LibrarySectionCall>()
+    val listRatingsCalls = mutableListOf<LibrarySectionCall>()
+
+    data class LibrarySectionCall(
+        val accessToken: String,
+        val profileId: String,
+        val limit: Int,
+        val cursor: String?,
+    )
+
+    private var historyResponses: List<ClientMediaCardQueryResult> = emptyList()
+    private var watchlistResponses: List<ClientMediaCardQueryResult> = emptyList()
+    private var ratingsResponses: List<ClientMediaCardQueryResult> = emptyList()
+
+    /** Stubs the three section listings. The next call on each takes the next answer. */
+    fun answerSections(
+        history: List<ClientMediaCardQueryResult> = emptyList(),
+        watchlist: List<ClientMediaCardQueryResult> = emptyList(),
+        ratings: List<ClientMediaCardQueryResult> = emptyList(),
+    ) {
+        historyResponses = history.toList()
+        watchlistResponses = watchlist.toList()
+        ratingsResponses = ratings.toList()
+    }
+
     override suspend fun listWatchHistory(
         accessToken: String,
         profileId: String,
         limit: Int,
         cursor: String?
-    ): Nothing = unused("listWatchHistory")
+    ): ClientMediaCardQueryResult {
+        listWatchHistoryCalls += LibrarySectionCall(accessToken, profileId, limit, cursor)
+        return nextOrFail(historyResponses, listWatchHistoryCalls.size, "listWatchHistory")
+    }
+
     override suspend fun listWatchlist(
         accessToken: String,
         profileId: String,
         limit: Int,
         cursor: String?
-    ): Nothing = unused("listWatchlist")
+    ): ClientMediaCardQueryResult {
+        listWatchlistCalls += LibrarySectionCall(accessToken, profileId, limit, cursor)
+        return nextOrFail(watchlistResponses, listWatchlistCalls.size, "listWatchlist")
+    }
+
     override suspend fun listRatings(
         accessToken: String,
         profileId: String,
         limit: Int,
         cursor: String?
-    ): Nothing = unused("listRatings")
+    ): ClientMediaCardQueryResult {
+        listRatingsCalls += LibrarySectionCall(accessToken, profileId, limit, cursor)
+        return nextOrFail(ratingsResponses, listRatingsCalls.size, "listRatings")
+    }
+
+    /**
+     * A queue shorter than the call count fails loudly rather than repeating the last
+     * answer, so a test that expects two network reads cannot pass on one.
+     */
+    private fun nextOrFail(
+        answers: List<ClientMediaCardQueryResult>,
+        callNumber: Int,
+        name: String,
+    ): ClientMediaCardQueryResult = answers.getOrNull(callNumber - 1)
+        ?: error("$name was not stubbed for call $callNumber")
     override suspend fun getWatchGenerations(
         accessToken: String,
         profileId: String
