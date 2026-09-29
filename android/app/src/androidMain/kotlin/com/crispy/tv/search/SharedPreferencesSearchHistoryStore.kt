@@ -5,13 +5,30 @@ import android.content.SharedPreferences
 import java.util.Locale
 import org.json.JSONArray
 
-class SearchHistoryStore(context: Context) {
+/**
+ * The [SearchHistoryStore] implementation, persisted as a JSON array in
+ * `SharedPreferences`.
+ *
+ * It is in `androidMain` for two independent reasons, and the port exists so
+ * neither of them reaches a caller. `org.json` is a class of the Android
+ * platform supplied by `android.jar` rather than a dependency of this project,
+ * so a KMP `commonMain` does not have it; and `SharedPreferences` is Android
+ * only. `java.util.Locale` is a third, used solely by [normalize] for a
+ * case-insensitive comparison — the same JVM-only reason, and one that would
+ * remain if the JSON went away tomorrow.
+ *
+ * The class is named for its persistence rather than reusing the port's name
+ * because a class and an interface cannot share a fully-qualified name, which
+ * is why [CachingStreamResolver] and [AndroidAccountBootstrapRepository] were
+ * renamed the same way.
+ */
+class SharedPreferencesSearchHistoryStore(context: Context) : SearchHistoryStore {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun load(): List<String> = readHistory()
+    override fun load(): List<String> = readHistory()
 
-    fun record(query: String): List<String> {
+    override fun record(query: String): List<String> {
         val normalizedQuery = normalize(query) ?: return readHistory()
         val updatedHistory =
             buildList {
@@ -27,7 +44,7 @@ class SearchHistoryStore(context: Context) {
         return updatedHistory
     }
 
-    fun remove(query: String): List<String> {
+    override fun remove(query: String): List<String> {
         val normalizedQuery = normalize(query) ?: return readHistory()
         val updatedHistory =
             readHistory().filterNot {
@@ -38,7 +55,7 @@ class SearchHistoryStore(context: Context) {
         return updatedHistory
     }
 
-    fun clear(): List<String> {
+    override fun clear(): List<String> {
         prefs.edit().remove(KEY_RECENT_SEARCHES).commit()
         return emptyList()
     }

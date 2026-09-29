@@ -1,21 +1,26 @@
 package com.crispy.tv.search
 
-import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.AccountApi
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
-import java.util.Locale
+import com.crispy.tv.backend.BackendApi
 
 class AiSearchRepository(
     private val supabase: AccountApi,
     private val activeProfileStore: ActiveProfileStore,
-    private val backend: CrispyBackendClient,
+    private val backend: BackendApi,
 ) {
+    /**
+     * [languageTag] is a BCP-47 tag such as `en-GB` and is sent to the backend
+     * verbatim. It is a `String` rather than a `java.util.Locale` because a tag
+     * is what crosses the wire — the conversion used to happen here, and doing
+     * it at the edge means the repository holds no JVM type and the platform
+     * locale stays in the composition root where it belongs. There is
+     * deliberately no default: a repository that guesses a language would hide
+     * a missing locale decision behind a plausible-looking request.
+     */
     suspend fun search(
         query: String,
-        locale: Locale = Locale.getDefault(),
+        languageTag: String,
     ): SearchResultsPayload {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
@@ -33,19 +38,8 @@ class AiSearchRepository(
             accessToken = session.accessToken,
             profileId = profileId,
             query = normalizedQuery,
-            locale = locale.toLanguageTag(),
+            locale = languageTag,
         )
         return payload.toSearchResultsPayload()
-    }
-
-    companion object {
-        fun create(context: Context): AiSearchRepository {
-            val appContext = context.applicationContext
-            return AiSearchRepository(
-                supabase = SupabaseServicesProvider.accountClient(appContext),
-                activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
-                backend = BackendServicesProvider.backendClient(appContext),
-            )
-        }
     }
 }

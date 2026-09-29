@@ -16,7 +16,7 @@ fun rememberSearchViewModel(
     return viewModel(
         viewModelStoreOwner = viewModelStoreOwner,
         factory = remember(appContext) {
-            SearchViewModel.factory(appContext)
+            searchViewModelFactory(appContext)
         },
     )
 }

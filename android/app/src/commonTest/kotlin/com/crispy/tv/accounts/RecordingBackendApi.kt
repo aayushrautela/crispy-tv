@@ -1,5 +1,6 @@
 package com.crispy.tv.accounts
 
+import kotlinx.coroutines.CompletableDeferred
 import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BrowseTitlesResponse
 import com.crispy.tv.backend.ClientMediaCardQueryResult
@@ -11,6 +12,8 @@ import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.WatchMutationInput
 import com.crispy.tv.backend.ProviderAccountsResponse
 import com.crispy.tv.backend.ProviderState
+import com.crispy.tv.backend.SearchResultsResponse
+import com.crispy.tv.backend.SearchSuggestionsResponse
 import com.crispy.tv.backend.StartImportResult
 import com.crispy.tv.backend.UpdateProfileInput
 
@@ -146,23 +149,62 @@ internal class RecordingBackendApi : BackendApi {
         addonId: String
     ): Nothing = unused("uninstallAddon")
     override suspend fun getAvatars(): Nothing = unused("getAvatars")
-    override suspend fun searchTitles(accessToken: String, query: String, limit: Int): Nothing = unused("searchTitles")
+    override suspend fun searchTitles(
+        accessToken: String,
+        query: String,
+        limit: Int
+    ): SearchResultsResponse {
+        searchTitlesCalls += SearchCall(accessToken, query, limit)
+        // A viewmodel's `getOrElse` turns a throwing call into an error payload, so
+        // without an explicit failure a test can only ever see the generic
+        // fallback and cannot tell it apart from one that ignored the message.
+        searchTitlesFailure?.let { throw it }
+        // A gate is what makes a *stale response* testable at all. Every other
+        // answer here returns without suspending, so on an unconfined test
+        // dispatcher each request completes inside its own call and the view
+        // model's token guard can never mismatch. Holding the response open
+        // until a test releases it is what puts a second search in between.
+        val gate = searchTitlesGate
+        if (gate != null) {
+            // Only the FIRST call is held. Holding every call is useless: release
+            // resumes them all and the fresh response then wins by ordering, so
+            // a dropped stale-response guard is invisible. Holding exactly one
+            // puts the stale response back on screen *after* the fresh one, which
+            // is the only ordering in which the guard has anything to prevent.
+            searchTitlesGate = null
+            gate.await()
+        }
+        return searchTitlesAnswers.getOrNull(searchTitlesCalls.size - 1)
+            ?: error("searchTitles was not stubbed for call ${searchTitlesCalls.size}; use answerSearchTitles")
+    }
     override suspend fun searchSuggestions(
         accessToken: String,
         query: String,
         limit: Int
-    ): Nothing = unused("searchSuggestions")
+    ): SearchSuggestionsResponse {
+        searchSuggestionsCalls += SearchCall(accessToken, query, limit)
+        return searchSuggestionsAnswers.getOrNull(searchSuggestionsCalls.size - 1)
+            ?: error("searchSuggestions was not stubbed for call ${searchSuggestionsCalls.size}")
+    }
     override suspend fun searchTitlesByGenre(
         accessToken: String,
         genre: String,
         limit: Int
-    ): Nothing = unused("searchTitlesByGenre")
+    ): SearchResultsResponse {
+        searchTitlesByGenreCalls += GenreSearchCall(accessToken, genre, limit)
+        return searchTitlesByGenreAnswers.getOrNull(searchTitlesByGenreCalls.size - 1)
+            ?: error("searchTitlesByGenre was not stubbed for call ${searchTitlesByGenreCalls.size}")
+    }
     override suspend fun searchAiTitles(
         accessToken: String,
         profileId: String,
         query: String,
         locale: String?
-    ): Nothing = unused("searchAiTitles")
+    ): SearchResultsResponse {
+        searchAiTitlesCalls += AiSearchCall(accessToken, profileId, query, locale)
+        return searchAiTitlesAnswers.getOrNull(searchAiTitlesCalls.size - 1)
+            ?: error("searchAiTitles was not stubbed for call ${searchAiTitlesCalls.size}")
+    }
     override suspend fun getAiInsights(
         accessToken: String,
         profileId: String,
@@ -192,6 +234,74 @@ internal class RecordingBackendApi : BackendApi {
         personId: String,
         language: String?
     ): Nothing = unused("getMetadataPersonDetail")
+    // --- search -------------------------------------------------------------------------
+    // Widened for `SearchViewModelTest`. The four search members each answer from
+    // their own queue rather than one shared list, because the viewmodel reaches
+    // three of them in a single test and a shared queue would make the call counts
+    // ambiguous. Each still fails loudly when the queue is short, so a test that
+    // expects two calls cannot pass on one.
+    var searchTitlesAnswers: List<SearchResultsResponse> = emptyList()
+    var searchTitlesFailure: Throwable? = null
+    /** Held open by [holdSearchTitles] until [releaseSearchTitles] is called. */
+    var searchTitlesGate: CompletableDeferred<Unit>? = null
+    val searchTitlesCalls = mutableListOf<SearchCall>()
+    var searchSuggestionsAnswers: List<SearchSuggestionsResponse> = emptyList()
+    val searchSuggestionsCalls = mutableListOf<SearchCall>()
+    var searchTitlesByGenreAnswers: List<SearchResultsResponse> = emptyList()
+    val searchTitlesByGenreCalls = mutableListOf<GenreSearchCall>()
+    var searchAiTitlesAnswers: List<SearchResultsResponse> = emptyList()
+    val searchAiTitlesCalls = mutableListOf<AiSearchCall>()
+
+    data class SearchCall(val accessToken: String, val query: String, val limit: Int)
+
+    data class GenreSearchCall(val accessToken: String, val genre: String, val limit: Int)
+
+    /** [locale] is recorded, not ignored: it is the whole point of the boundary change. */
+    data class AiSearchCall(
+        val accessToken: String,
+        val profileId: String,
+        val query: String,
+        val locale: String?,
+    )
+
+    fun answerSearchTitles(vararg responses: SearchResultsResponse) = apply {
+        searchTitlesAnswers = responses.toList()
+    }
+
+    /**
+     * Makes [searchTitles] throw instead of answering. The call is still recorded
+     * first, so a test can assert that the request was attempted and failed
+     * rather than never made.
+     */
+    fun failSearchTitlesWith(error: Throwable) = apply {
+        searchTitlesFailure = error
+    }
+
+    /**
+     * Makes the NEXT `searchTitles` call suspend before it answers. Release with
+     * [releaseSearchTitles]. Needed to observe a stale-response guard: without a
+     * suspension point the response lands inside the call that issued it and the
+     * guard can never mismatch.
+     */
+    fun holdSearchTitles(): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { searchTitlesGate = it }
+
+    fun releaseSearchTitles() {
+        searchTitlesGate?.complete(Unit)
+    }
+
+    fun answerSearchSuggestions(vararg responses: SearchSuggestionsResponse) = apply {
+        searchSuggestionsAnswers = responses.toList()
+    }
+
+    fun answerSearchTitlesByGenre(vararg responses: SearchResultsResponse) = apply {
+        searchTitlesByGenreAnswers = responses.toList()
+    }
+
+    fun answerSearchAiTitles(vararg responses: SearchResultsResponse) = apply {
+        searchAiTitlesAnswers = responses.toList()
+    }
+
     var browseTitlesResponses: List<BrowseTitlesResponse> = emptyList()
     val browseTitlesCalls = mutableListOf<BrowseTitlesCall>()
 

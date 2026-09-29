@@ -1,20 +1,13 @@
 package com.crispy.tv.search
 
-import android.content.Context
 import com.crispy.tv.accounts.AccountApi
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
-import java.util.Locale
+import com.crispy.tv.backend.BackendApi
 
 class BackendSearchRepository(
     private val supabase: AccountApi,
-    private val backend: CrispyBackendClient,
+    private val backend: BackendApi,
 ) {
-    suspend fun search(
-        query: String,
-        @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),
-    ): SearchResultsPayload {
+    suspend fun search(query: String): SearchResultsPayload {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
             return SearchResultsPayload()
@@ -50,10 +43,7 @@ class BackendSearchRepository(
         ).suggestions
     }
 
-    suspend fun discoverByGenre(
-        genreSuggestion: SearchGenreSuggestion,
-        @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),
-    ): SearchResultsPayload {
+    suspend fun discoverByGenre(genreSuggestion: SearchGenreSuggestion): SearchResultsPayload {
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             ?: return SearchResultsPayload(message = "Sign in to browse genres.")
 
@@ -62,15 +52,5 @@ class BackendSearchRepository(
             genre = genreSuggestion.label,
         )
         return payload.toSearchResultsPayload(defaultGenre = genreSuggestion.label)
-    }
-
-    companion object {
-        fun create(context: Context): BackendSearchRepository {
-            val appContext = context.applicationContext
-            return BackendSearchRepository(
-                supabase = SupabaseServicesProvider.accountClient(appContext),
-                backend = BackendServicesProvider.backendClient(appContext),
-            )
-        }
     }
 }
