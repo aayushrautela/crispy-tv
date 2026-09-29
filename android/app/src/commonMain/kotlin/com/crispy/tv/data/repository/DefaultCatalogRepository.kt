@@ -1,6 +1,6 @@
 package com.crispy.tv.data.repository
 
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.backend.MetadataSeriesEpisodesResponse
 import com.crispy.tv.backend.MetadataTitleDetailResponse
@@ -8,7 +8,7 @@ import com.crispy.tv.backend.MetadataTitleExtrasResponse
 import com.crispy.tv.backend.MetadataTitleRatingsResponse
 
 class DefaultCatalogRepository(
-    private val backendClient: CrispyBackendClient,
+    private val backendClient: BackendApi,
 ) : CatalogRepository {
     override suspend fun getTitleDetail(
         accessToken: String,

@@ -25,24 +25,24 @@ class CrispyBackendClient(
     internal val httpClient: CrispyHttpClient,
     backendUrl: String,
     internal val aiHttpClient: CrispyHttpClient = httpClient,
-) {
-    val baseUrl: String = backendUrl.trim().trimEnd('/')
+) : BackendApi {
+    override val baseUrl: String = backendUrl.trim().trimEnd('/')
 
-    fun isConfigured(): Boolean {
+    override fun isConfigured(): Boolean {
         return baseUrl.isNotBlank()
     }
 
-    suspend fun getMe(accessToken: String): MeResponse {
+    override suspend fun getMe(accessToken: String): MeResponse {
         return getMeApi(accessToken)
     }
 
-    suspend fun createProfile(
+    override suspend fun createProfile(
         accessToken: String,
         name: String,
-        sortOrder: Int? = null,
-        isKids: Boolean = false,
-        avatarKey: String? = null,
-        interfaceLanguage: String? = null,
+        sortOrder: Int?,
+        isKids: Boolean,
+        avatarKey: String?,
+        interfaceLanguage: String?,
     ): Profile {
         return createProfileApi(
             accessToken = accessToken,
@@ -54,12 +54,12 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun bootstrapAccount(
+    override suspend fun bootstrapAccount(
         accessToken: String,
         name: String,
         interfaceLanguage: String,
         avatarUrl: String,
-        region: String? = null,
+        region: String?,
     ): Profile {
         return bootstrapAccountApi(
             accessToken = accessToken,
@@ -70,15 +70,15 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun listImportConnections(accessToken: String, profileId: String): ProviderAccountsResponse {
+    override suspend fun listImportConnections(accessToken: String, profileId: String): ProviderAccountsResponse {
         return listImportConnectionsApi(accessToken, profileId)
     }
 
-    suspend fun listImportJobs(accessToken: String, profileId: String): ImportJobsResponse {
+    override suspend fun listImportJobs(accessToken: String, profileId: String): ImportJobsResponse {
         return listImportJobsApi(accessToken, profileId)
     }
 
-    suspend fun startImport(
+    override suspend fun startImport(
         accessToken: String,
         profileId: String,
         provider: ImportProvider,
@@ -89,19 +89,20 @@ class CrispyBackendClient(
         return startImportApi(accessToken, profileId, provider, action, clientId, returnTo)
     }
 
-    suspend fun getProfileSettings(accessToken: String, profileId: String): ProfileSettings {
+    override suspend fun getProfileSettings(accessToken: String, profileId: String): ProfileSettings {
         return getProfileSettingsApi(accessToken, profileId)
     }
 
-    suspend fun patchProfileSettings(accessToken: String, profileId: String, settings: Map<String, String>): ProfileSettings {
+    override suspend fun patchProfileSettings(
+        accessToken: String,
+        profileId: String,
+        settings: Map<String,
+        String>,
+    ): ProfileSettings {
         return patchProfileSettingsApi(accessToken, profileId, settings)
     }
 
-    suspend fun searchTitles(
-        accessToken: String,
-        query: String,
-        limit: Int = 20,
-    ): SearchResultsResponse {
+    override suspend fun searchTitles(accessToken: String, query: String, limit: Int): SearchResultsResponse {
         return searchTitlesApi(
             accessToken = accessToken,
             query = query,
@@ -109,11 +110,7 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun searchSuggestions(
-        accessToken: String,
-        query: String,
-        limit: Int = 8,
-    ): SearchSuggestionsResponse {
+    override suspend fun searchSuggestions(accessToken: String, query: String, limit: Int): SearchSuggestionsResponse {
         return searchSuggestionsApi(
             accessToken = accessToken,
             query = query,
@@ -121,11 +118,7 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun searchTitlesByGenre(
-        accessToken: String,
-        genre: String,
-        limit: Int = 20,
-    ): SearchResultsResponse {
+    override suspend fun searchTitlesByGenre(accessToken: String, genre: String, limit: Int): SearchResultsResponse {
         return searchTitlesByGenreApi(
             accessToken = accessToken,
             genre = genre,
@@ -133,11 +126,11 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun searchAiTitles(
+    override suspend fun searchAiTitles(
         accessToken: String,
         profileId: String,
         query: String,
-        locale: String? = null,
+        locale: String?,
     ): SearchResultsResponse {
         return searchAiTitlesApi(
             accessToken = accessToken,
@@ -147,11 +140,11 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun getAiInsights(
+    override suspend fun getAiInsights(
         accessToken: String,
         profileId: String,
         itemId: String,
-        locale: String? = null,
+        locale: String?,
     ): AiInsightsResult {
         return getAiInsightsApi(
             accessToken = accessToken,
@@ -161,79 +154,76 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderState {
+    override suspend fun disconnectImportConnection(
+        accessToken: String,
+        profileId: String,
+        provider: ImportProvider,
+    ): ProviderState {
         return disconnectImportConnectionApi(accessToken, profileId, provider)
     }
 
-    suspend fun listProfiles(accessToken: String): List<Profile> {
+    override suspend fun listProfiles(accessToken: String): List<Profile> {
         return listProfilesApi(accessToken)
     }
 
-    suspend fun updateProfile(
-        accessToken: String,
-        profileId: String,
-        input: UpdateProfileInput,
-    ): Profile {
+    override suspend fun updateProfile(accessToken: String, profileId: String, input: UpdateProfileInput): Profile {
         return updateProfileApi(accessToken, profileId, input)
     }
 
-    suspend fun getAccountSettings(accessToken: String): AccountSettings {
+    override suspend fun getAccountSettings(accessToken: String): AccountSettings {
         return getAccountSettingsApi(accessToken)
     }
 
-    suspend fun patchAccountSettings(
-        accessToken: String,
-        settings: Map<String, String>,
-    ): AccountSettings {
+    override suspend fun patchAccountSettings(accessToken: String, settings: Map<String, String>): AccountSettings {
         return patchAccountSettingsApi(
             accessToken = accessToken,
             settings = settings,
         )
     }
 
-    suspend fun deleteAccount(accessToken: String): Boolean {
+    override suspend fun deleteAccount(accessToken: String): Boolean {
         return deleteAccountApi(accessToken)
     }
 
-    suspend fun listAddons(accessToken: String): List<AddonDto> {
+    override suspend fun listAddons(accessToken: String): List<AddonDto> {
         return listAddonsApi(accessToken)
     }
 
-    suspend fun installAddon(
+    override suspend fun installAddon(
         accessToken: String,
         profileId: String,
         manifestUrl: String,
-        type: String = "stremio",
-        payload: Map<String, String> = emptyMap(),
+        type: String,
+        payload: Map<String, String>,
     ): AddonDto {
         return installAddonApi(accessToken, profileId, manifestUrl, type, payload)
     }
 
-    suspend fun uninstallAddon(accessToken: String, profileId: String, addonId: String): Boolean {
+    override suspend fun uninstallAddon(accessToken: String, profileId: String, addonId: String): Boolean {
         return uninstallAddonApi(accessToken, profileId, addonId)
     }
 
-    suspend fun getAvatars(): List<Avatar> {
+    override suspend fun getAvatars(): List<Avatar> {
         return getAvatarsApi()
     }
 
-    suspend fun getMetadataItemDetail(accessToken: String, itemId: String): MetadataTitleDetailResponse {
+    override suspend fun getMetadataItemDetail(accessToken: String, itemId: String): MetadataTitleDetailResponse {
         return getMetadataItemDetailApi(accessToken, itemId)
     }
 
-    suspend fun getMetadataItemExtras(accessToken: String, itemId: String): MetadataTitleExtrasResponse {
+    override suspend fun getMetadataItemExtras(accessToken: String, itemId: String): MetadataTitleExtrasResponse {
         return getMetadataItemExtrasApi(accessToken, itemId)
     }
 
-    suspend fun getSeriesEpisodes(
+    override suspend fun getSeriesEpisodes(
         accessToken: String,
         seriesItemId: String,
-        season: Int? = null,
+        season: Int?,
     ): MetadataSeriesEpisodesResponse {
         return getSeriesEpisodesApi(accessToken, seriesItemId, season)
     }
 
-    suspend fun getMetadataItemRatings(
+    override suspend fun getMetadataItemRatings(
         accessToken: String,
         profileId: String,
         itemId: String,
@@ -245,28 +235,29 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun getMetadataPersonDetail(accessToken: String, personId: String, language: String? = null): MetadataPersonDetail {
+    override suspend fun getMetadataPersonDetail(
+        accessToken: String,
+        personId: String,
+        language: String?,
+    ): MetadataPersonDetail {
         return getMetadataPersonDetailApi(accessToken, personId, language)
     }
 
 
-    suspend fun resolvePlayback(accessToken: String, input: ItemLookupInput): PlaybackResolveResponse {
+    override suspend fun resolvePlayback(accessToken: String, input: ItemLookupInput): PlaybackResolveResponse {
         return resolvePlaybackApi(accessToken, input)
     }
 
-    suspend fun getHome(
-        accessToken: String,
-        profileId: String,
-    ): ProfileHomeResponse? {
+    override suspend fun getHome(accessToken: String, profileId: String): ProfileHomeResponse? {
         return getHomeApi(accessToken, profileId)
     }
 
-    suspend fun browseTitles(
+    override suspend fun browseTitles(
         accessToken: String,
         type: String,
-        genre: String? = null,
-        sort: String = "popularity",
-        page: Int = 0,
+        genre: String?,
+        sort: String,
+        page: Int,
     ): BrowseTitlesResponse {
         return browseTitlesApi(
             accessToken = accessToken,
@@ -277,74 +268,79 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {
+    override suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {
         return getCalendarApi(accessToken, profileId)
     }
 
-    suspend fun getCalendarThisWeek(accessToken: String, profileId: String): CalendarResponse {
+    override suspend fun getCalendarThisWeek(accessToken: String, profileId: String): CalendarResponse {
         return getCalendarThisWeekApi(accessToken, profileId)
     }
 
-    suspend fun getUpNext(accessToken: String, profileId: String, limit: Int = 20): UpNextResponse {
+    override suspend fun getUpNext(accessToken: String, profileId: String, limit: Int): UpNextResponse {
         return getUpNextApi(accessToken, profileId, limit)
     }
 
-    suspend fun sendWatchEvent(accessToken: String, profileId: String, input: PlaybackEventInput): WatchActionResponse {
+    override suspend fun sendWatchEvent(
+        accessToken: String,
+        profileId: String,
+        input: PlaybackEventInput,
+    ): WatchActionResponse {
         return sendWatchEventApi(accessToken, profileId, input)
     }
 
-    suspend fun listContinueWatching(
+    override suspend fun listContinueWatching(
         accessToken: String,
         profileId: String,
-        limit: Int = 20,
-        cursor: String? = null,
+        limit: Int,
+        cursor: String?,
     ): ClientMediaCardQueryResult {
         return listContinueWatchingApi(accessToken, profileId, limit, cursor)
     }
 
-    suspend fun dismissContinueWatching(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
+    override suspend fun dismissContinueWatching(
+        accessToken: String,
+        profileId: String,
+        itemId: String,
+    ): WatchActionResponse {
         return dismissContinueWatchingApi(accessToken, profileId, itemId)
     }
 
-    suspend fun listWatchHistory(
+    override suspend fun listWatchHistory(
         accessToken: String,
         profileId: String,
-        limit: Int = 50,
-        cursor: String? = null,
+        limit: Int,
+        cursor: String?,
     ): ClientMediaCardQueryResult {
         return listWatchHistoryApi(accessToken, profileId, limit, cursor)
     }
 
-    suspend fun listWatchlist(
+    override suspend fun listWatchlist(
         accessToken: String,
         profileId: String,
-        limit: Int = 50,
-        cursor: String? = null,
+        limit: Int,
+        cursor: String?,
     ): ClientMediaCardQueryResult {
         return listWatchlistApi(accessToken, profileId, limit, cursor)
     }
 
-    suspend fun listRatings(
+    override suspend fun listRatings(
         accessToken: String,
         profileId: String,
-        limit: Int = 50,
-        cursor: String? = null,
+        limit: Int,
+        cursor: String?,
     ): ClientMediaCardQueryResult {
         return listRatingsApi(accessToken, profileId, limit, cursor)
     }
 
-    suspend fun getWatchGenerations(
-        accessToken: String,
-        profileId: String,
-    ): WatchGenerationsResponse {
+    override suspend fun getWatchGenerations(accessToken: String, profileId: String): WatchGenerationsResponse {
         return getWatchGenerationsApi(accessToken, profileId)
     }
 
-    suspend fun getWatchState(accessToken: String, profileId: String, itemId: String): WatchStateEnvelope {
+    override suspend fun getWatchState(accessToken: String, profileId: String, itemId: String): WatchStateEnvelope {
         return getWatchStateApi(accessToken, profileId, itemId)
     }
 
-    suspend fun getWatchStates(
+    override suspend fun getWatchStates(
         accessToken: String,
         profileId: String,
         itemIds: List<String>,
@@ -352,7 +348,7 @@ class CrispyBackendClient(
         return getWatchStatesApi(accessToken, profileId, itemIds)
     }
 
-    suspend fun getWatchStateMap(
+    override suspend fun getWatchStateMap(
         accessToken: String,
         profileId: String,
         itemIds: List<String>,
@@ -363,20 +359,28 @@ class CrispyBackendClient(
             .associateBy { it.itemId }
     }
 
-    suspend fun markWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {
+    override suspend fun markWatched(
+        accessToken: String,
+        profileId: String,
+        input: WatchMutationInput,
+    ): WatchActionResponse {
         return markWatchedApi(accessToken, profileId, input)
     }
 
-    suspend fun unmarkWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {
+    override suspend fun unmarkWatched(
+        accessToken: String,
+        profileId: String,
+        input: WatchMutationInput,
+    ): WatchActionResponse {
         return unmarkWatchedApi(accessToken, profileId, input)
     }
 
-    suspend fun putWatchlist(
+    override suspend fun putWatchlist(
         accessToken: String,
         profileId: String,
         itemId: String,
-        occurredAt: String? = null,
-        payload: Map<String, Any?> = emptyMap(),
+        occurredAt: String?,
+        payload: Map<String, Any?>,
     ): WatchActionResponse {
         return putWatchlistApi(
             accessToken = accessToken,
@@ -387,17 +391,17 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun deleteWatchlist(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
+    override suspend fun deleteWatchlist(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
         return deleteWatchlistApi(accessToken, profileId, itemId)
     }
 
-    suspend fun setLiked(
+    override suspend fun setLiked(
         accessToken: String,
         profileId: String,
         itemId: String,
         liked: Boolean,
-        occurredAt: String? = null,
-        payload: Map<String, Any?> = emptyMap(),
+        occurredAt: String?,
+        payload: Map<String, Any?>,
     ): WatchActionResponse {
         return setLikedApi(
             accessToken = accessToken,
@@ -409,7 +413,7 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun deleteRating(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
+    override suspend fun deleteRating(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
         return deleteRatingApi(accessToken, profileId, itemId)
     }
 
@@ -491,32 +495,3 @@ class CrispyBackendClient(
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
-
-data class ItemLookupInput(
-    val itemId: String? = null,
-)
-
-data class WatchMutationInput(
-    val itemId: String,
-    val occurredAt: String? = null,
-    val rating: Int? = null,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val payload: Map<String, Any?> = emptyMap(),
-)
-
-data class PlaybackEventInput(
-    val clientEventId: String,
-    val eventType: String,
-    val itemId: String,
-    val positionSeconds: Double? = null,
-    val durationSeconds: Double? = null,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val occurredAt: String? = null,
-    val payload: Map<String, Any?> = emptyMap(),
-)
-
-data class ImportJobsResponse(
-    val jobs: List<ImportJob>,
-)
