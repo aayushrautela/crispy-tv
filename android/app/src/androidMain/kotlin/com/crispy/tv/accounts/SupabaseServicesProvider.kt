@@ -11,6 +11,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.PluginSyncBridgeProvider
 import com.crispy.tv.sync.ProfileDataCloudSync
+import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.platform.android.AndroidTimeSource
 
@@ -124,6 +125,7 @@ object SupabaseServicesProvider {
             context = appContext,
             supabase = accountClient(appContext),
             backend = BackendServicesProvider.backendClient(appContext),
+            playbackSettings = PlaybackSettingsRepositoryProvider.get(appContext),
             activeProfileStore = activeProfileStore(appContext),
         )
     }

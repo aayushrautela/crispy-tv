@@ -50,6 +50,14 @@
 # rather than the Android host test on purpose: a test that only ran on Android
 # would not notice that file reaching for a JVM API again.
 #
+# :android:app:desktopTest and :android:app:testAndroidHostTest are two halves of
+# one module and neither replaces the other. `commonTest` reaches only commonMain,
+# so it covers the settings repositories that moved onto `KeyValueStore` and
+# nothing in the composition root; `androidHostTest` reaches androidMain and
+# covers the opposite. A module that declares `commonTest` without
+# `withHostTest {}` gets an AGP warning instead of an error, and its common tests
+# then run on no Android target at all -- :android:backend had exactly that.
+#
 # :android:androidApp:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
 #   ./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true
@@ -92,8 +100,10 @@ fi
     :android:sharedUI:compileAndroidMain \
     :android:app:compileAndroidMain \
     :android:app:compileKotlinDesktop \
+    :android:app:desktopTest \
     :android:app:testAndroidHostTest \
     :android:backend:desktopTest \
+    :android:backend:testAndroidHostTest \
     :android:desktopApp:compileKotlin \
     :android:desktopApp:test \
     :android:androidApp:verifyDistributionExclusions \

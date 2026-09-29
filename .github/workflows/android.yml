@@ -84,20 +84,30 @@ jobs:
             :android:desktopApp:test
 
       - name: Run app composition-root tests
-        # :app is a KMP library, so this is its only test compilation. The tests
-        # need a Context and nothing else -- no view, no resource -- so they run
-        # without the merged manifest the golden screenshots require, which is
-        # why they can live in :app at all.
+        # The androidMain half of :app. The tests need a Context and nothing
+        # else -- no view, no resource -- so they run without the merged manifest
+        # the golden screenshots require, which is why they can live in :app at
+        # all. Robolectric is here for the Context, not for rendering.
         run: ./gradlew :android:app:testAndroidHostTest
+
+      - name: Run app common-domain tests
+        # The commonMain half of :app, and the reason these two steps exist
+        # separately rather than as one `check`: commonTest cannot see androidMain
+        # and androidHostTest cannot see what commonMain alone would compile.
+        # desktop is the target that would catch a JVM API leaking into a file
+        # that has just moved.
+        run: ./gradlew :android:app:desktopTest
 
       - name: Run domain unit tests
         run: ./gradlew :android:core-domain:desktopTest
 
       - name: Run backend common tests
-        # Runs on desktop, not the Android host test, on purpose: these cover a
-        # file that moved into commonMain, and a test that only ran on Android
-        # would not notice it reaching for a JVM API again.
-        run: ./gradlew :android:backend:desktopTest
+        # Both targets, deliberately. desktop is what would notice a file that
+        # moved into commonMain reaching for a JVM API; the host test is what
+        # notices it not compiling on the platform the module actually ships to.
+        # :backend declares withHostTest{} precisely so that commonTest is not
+        # desktop-and-Apple-only -- without it AGP warns and runs neither.
+        run: ./gradlew :android:backend:desktopTest :android:backend:testAndroidHostTest
 
       - name: Run plugins module unit tests
         run: ./gradlew :android:plugins:testDebugUnitTest

@@ -24,6 +24,12 @@ android {
 }
 
 dependencies {
+    // `api`, not `implementation`: `NativePlaybackEnginePreference` and
+    // `PlayerResizeMode` moved to :core-domain so that a KMP `commonMain` can
+    // name them, and they appear in this module's own public signatures. With
+    // `implementation` a consumer that only depends on :native-engine would see
+    // an unresolvable type in those signatures.
+    api(project(":android:core-domain"))
     implementation(project(":android:network"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

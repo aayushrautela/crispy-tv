@@ -4,16 +4,18 @@ import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED
-import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED
-import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_MUTED
-import com.crispy.tv.settings.PLAYBACK_SETTINGS_PREFS_NAME
+import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 
 class ProfileDataCloudSync(
-    private val context: Context,
+    // Not a property: only the default values below need a `Context`, and
+    // leaving it out of the field set says so. The two collaborators that
+    // actually persist something take a [com.crispy.tv.platform.KeyValueStore]
+    // or a repository now, so this class opens no preferences of its own.
+    context: Context,
     private val supabase: AccountApi,
     private val backend: CrispyBackendClient,
+    private val playbackSettings: PlaybackSettingsRepository,
     private val activeProfileStore: ActiveProfileStore =
         ActiveProfileStore(SharedPreferencesKeyValueStore(context, "supabase_sync_lab")),
     private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
@@ -106,39 +108,38 @@ class ProfileDataCloudSync(
         applyPlaybackSettings(settings)
     }
 
+    /**
+     * Writes the pulled values through the repository rather than through a
+     * second `SharedPreferences` handle on the same file.
+     *
+     * It used to open its own handle and `putBoolean` the three keys directly,
+     * which meant the settings repository had to register an
+     * `OnSharedPreferenceChangeListener` to notice -- the listener existed only
+     * to reconcile two writers of the same three values. Now that the sync is
+     * the only other caller, one writer is enough, and the repository can keep
+     * its in-memory snapshot authoritative. Every setter is a no-op when the
+     * value is unchanged, so an absent setting in the payload leaves the local
+     * value alone.
+     */
     private fun applyPlaybackSettings(settings: Map<String, String>) {
-        val prefs = context.getSharedPreferences(PLAYBACK_SETTINGS_PREFS_NAME, Context.MODE_PRIVATE)
-        val editor = prefs.edit()
-        var hasChanges = false
-
-        parseBooleanSetting(settings[KEY_PLAYBACK_SKIP_INTRO_ENABLED])?.let { enabled ->
-            editor.putBoolean(PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED, enabled)
-            hasChanges = true
+        parseBooleanSetting(settings[KEY_PLAYBACK_SKIP_INTRO_ENABLED])?.let {
+            playbackSettings.setSkipIntroEnabled(it)
         }
-        parseBooleanSetting(settings[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED])?.let { enabled ->
-            editor.putBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED, enabled)
-            hasChanges = true
+        parseBooleanSetting(settings[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED])?.let {
+            playbackSettings.setTrailerAutoplayEnabled(it)
         }
-        parseBooleanSetting(settings[KEY_PLAYBACK_TRAILER_MUTED])?.let { muted ->
-            editor.putBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_MUTED, muted)
-            hasChanges = true
-        }
-
-        if (hasChanges) {
-            editor.apply()
+        parseBooleanSetting(settings[KEY_PLAYBACK_TRAILER_MUTED])?.let {
+            playbackSettings.setTrailerMuted(it)
         }
     }
 
     private fun buildSettingsForCloud(base: Map<String, String>): Map<String, String> {
         val result = base.toMutableMap()
 
-        val playbackPrefs = context.getSharedPreferences(PLAYBACK_SETTINGS_PREFS_NAME, Context.MODE_PRIVATE)
-        val skipIntroEnabled = playbackPrefs.getBoolean(PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED, true)
-        val trailerAutoplayEnabled = playbackPrefs.getBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED, true)
-        val trailerMuted = playbackPrefs.getBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_MUTED, false)
-        result[KEY_PLAYBACK_SKIP_INTRO_ENABLED] = skipIntroEnabled.toString()
-        result[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED] = trailerAutoplayEnabled.toString()
-        result[KEY_PLAYBACK_TRAILER_MUTED] = trailerMuted.toString()
+        val current = playbackSettings.settings.value
+        result[KEY_PLAYBACK_SKIP_INTRO_ENABLED] = current.skipIntroEnabled.toString()
+        result[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED] = current.trailerAutoplayEnabled.toString()
+        result[KEY_PLAYBACK_TRAILER_MUTED] = current.trailerMuted.toString()
 
         return result
     }

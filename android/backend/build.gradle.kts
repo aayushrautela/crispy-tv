@@ -39,6 +39,7 @@ kotlin {
         namespace = "com.crispy.tv.backend"
         compileSdk = 37
         minSdk = 26
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -82,6 +83,12 @@ kotlin {
         // the Apple targets, which is the whole point of having made the class
         // portable: a test that only runs on Android would not notice if the class
         // reached for a JVM API again.
+        //
+        // `withHostTest {}` above is what keeps that choice honest rather than
+        // accidental. Without it, a `commonTest` source set on a KMP module makes
+        // AGP print "android host tests are not enabled" -- i.e. the tests would run
+        // on desktop and Apple but not on Android, which is the platform the module
+        // actually ships to. :android:core-domain declares the same block.
         commonTest.dependencies {
             implementation(kotlin("test"))
 

@@ -10,14 +10,6 @@ enum class NativePlaybackEngine {
     MPV
 }
 
-enum class NativePlaybackEnginePreference(
-    val label: String,
-) {
-    Auto("Auto"),
-    ExoPlayer("ExoPlayer"),
-    Libmpv("libmpv"),
-}
-
 enum class NativePlaybackState {
     IDLE,
     PREPARING,

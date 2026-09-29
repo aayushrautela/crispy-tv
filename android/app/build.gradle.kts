@@ -18,13 +18,21 @@ plugins {
  * owned the manifest, `res/`, signing, flavours and 159 source files; all of
  * that is now in `:androidApp`, which is a thin entry point on top of this.
  *
- * ## Nothing here is in `commonMain` yet
+ * ## What is in `commonMain`, and what still is not
  *
- * Every file still lives in `androidMain`. That is deliberate: the split
- * proves the module graph compiles before any code is moved across a source-set
- * boundary, and moving 31k lines of Compose at the same time as restructuring
- * the modules would make a failure impossible to attribute. Phase 4 moves the
- * screens into `commonMain` one vertical slice at a time.
+ * The split itself was the deliberate part: it proved the module graph compiles
+ * before any code crossed a source-set boundary, because moving 31k lines of
+ * Compose at the same time as restructuring the modules would have made a
+ * failure impossible to attribute. Phase 4 then moves the screens into
+ * `commonMain` one vertical slice at a time, and 41 of the 159 files are there.
+ *
+ * The remaining 118 are held by three things, and only three: a type that
+ * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
+ * `androidx.paging`, media3, Coil), a composition root that by definition needs
+ * a platform to resolve against, and screen code that is not yet split
+ * factory-from-viewmodel. The measurements that decide which is which are in
+ * kmp-migration-plan.md; the two rules that decide what is worth changing are
+ * in AGENTS.md under *A type-level port is the lever that moves files*.
  *
  * ## What this module deliberately does not know
  *
@@ -106,10 +114,10 @@ kotlin {
         jvmMain.get().dependsOn(appUi)
         iosMain.get().dependsOn(appUi)
 
-        // What every target needs. Nothing is declared here yet: all 158 files
-        // are still in `androidMain`, and moving code into `commonMain` is
-        // Phase 4's work. Declaring more would advertise a portability that the
-        // source layout does not have yet.
+        // What every target needs. These are the dependencies a `commonMain`
+        // file is *allowed* to reach for, so the set is deliberately small: it
+        // grows when a file moves, not before, because a dependency declared
+        // here with no consumer yet is a portability claim nothing backs.
         commonMain.dependencies {
             implementation(project(":android:core-domain"))
             implementation(project(":android:platform-core"))
@@ -230,6 +238,11 @@ kotlin {
             implementation(libs.coroutines.android)
         }
 
+        // The `commonMain` half of this module's tests, and it is what
+        // `desktopTest` runs. The two halves are complementary and neither
+        // substitutes for the other: `commonTest` cannot see androidMain, so it
+        // covers the settings repositories and nothing in the composition root,
+        // while `androidHostTest` below covers exactly the reverse.
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
