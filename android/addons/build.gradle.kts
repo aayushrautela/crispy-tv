@@ -23,7 +23,7 @@ plugins {
  * | `StreamModels` | `commonMain` | the 12 data classes plus magnet/torrent parsing; `MetadataLabMediaType` comes from `:android:player`'s `commonMain` |
  * | `MediaModels` | `commonMain` | data classes |
  * | `StreamStableKey` | `commonMain` | pure string rules |
- * | `MediaDetailMappings` | `androidMain` | every function is an extension *on* a `CrispyBackendClient` nested type, so it belongs with its receiver, not above it. The bodies are pure mapping code; the receiver is what pins it |
+ * | `MediaDetailMappings` | `commonMain` | was `androidMain` for the reason in this row's own earlier wording: every function is an extension *on* a nested backend type, and the nested types were pinned. The nested types were then lifted into `:android:backend` as `BackendTypes`, which is what freed the file — the extension receiver became a portable type. The bodies were always pure mapping code |
  * | `LookupIds`, `StreamLookupSupport`, `StreamSelectorState` | `commonMain` | used `Locale.US` in `lowercase`, which is exactly what Kotlin's locale-independent `lowercase()` already does |
  * | `RatingFormats` | `commonMain` | `String.format` is JVM-only; now uses `core-domain`'s `formatOneDecimal`, pinned against real `%.1f` output |
  * | `AddonStreamsService` | `androidMain` | `Context`, OkHttp, `org.json` |

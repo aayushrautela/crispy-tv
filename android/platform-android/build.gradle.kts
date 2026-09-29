@@ -15,12 +15,16 @@ plugins {
  * Every module that converts to multiplatform in Phase 2 needs some of these, and
  * none of them should own them:
  *
- * - `:android:watchhistory` needs `KeyValueStore` and `AppLogger`
- * - `:android:backend` needs all four
+ * - `:android:watchhistory` needs `KeyValueStore`, `AppLogger` and `TimeSource`
+ * - `:android:backend` needs `KeyValueStore` and `SecretStore`
  * - `:android:home` needs `AppLogger` and `TimeSource`
- * - `:android:addons` needs `KeyValueStore` and `AppLogger`
+ * - `:android:app` needs `KeyValueStore` and `AppLogger`
  *
- * 26 files across the repository import `android.util.Log` today. Putting the
+ * That list is measured, not asserted: `grep -rl --include=*.kt 'com.crispy.tv.platform.<Name>' android`
+ * per interface. It changes as modules convert, so re-run it rather than trusting a copy —
+ * an earlier version of this comment listed `:android:addons`, which uses none of the four.
+ *
+ * 22 files across the repository import `android.util.Log` today. Putting the
  * adapter in `:app` would mean every library module depends on the application,
  * which is the dependency direction the whole migration is trying to undo.
  *

@@ -30,11 +30,20 @@ plugins {
  * caller exists, so its shape -- whether it needs multipart bodies, how headers
  * are represented without OkHttp's `Headers`, whether a URL is a `String` or
  * something structured -- would be guesswork, and the first module that actually
- * uses it would redesign it. The measured call-site shape today is `code` (28),
- * `body` (26), `headers` (5), `isSuccessful` (4), `url` (2), spread over 25 files
- * in six modules, none of which is portable yet. The port lands with the first
- * consumer in the `:android:watchhistory` step, with a real implementation and real
- * call sites behind it.
+ * uses it would redesign it. The call sites today are 14 files across six modules
+ * -- `:android:addons`, `:android:app`, `:android:backend`, `:android:network`,
+ * `:android:tv`, `:android:watchhistory` -- and every one of them is in a
+ * non-`commonMain` source set. They read `code`, `body`, `headers`, `isSuccessful`
+ * and `url` off the response and pass `CrispyHttpClient` itself into constructors,
+ * which is the shape a port would have to answer to. (The two `commonMain` files
+ * that mention `CrispyHttpClient` are the port KDocs saying why `BackendApi` and
+ * `AccountApi` are not transport abstractions, so they are not call sites and are
+ * not counted. An earlier version of this comment published per-member counts; they
+ * were removed rather than re-derived, because no reader could reproduce the command
+ * that produced them. Count with
+ * `grep -rl --include=*.kt 'CrispyHttpClient\|httpClient\.' android | grep -v src/commonMain`.)
+ * The port lands with the first consumer in the `:android:watchhistory` step, with a
+ * real implementation and real call sites behind it.
  */
 kotlin {
     jvmToolchain(21)
