@@ -35,6 +35,42 @@ plugins {
  * two counts above are a `find` away and are re-measured rather than trusted
  * as the module moves.
  *
+ * ### The three are not three things, they are seven named hubs
+ *
+ * The paragraph above groups the remainder, but "a type that cannot be named
+ * off Android" is not a blocker you can go and look at -- and an import audit
+ * cannot find it, because `:app` and `:home` and `:addons` **share package
+ * names**, so a declaration in another module's `androidMain` is reachable from
+ * here with no import at all. This was measured, not reasoned: of the 104, an
+ * audit found **35 files / 7,514 lines (48% of the remaining lines) with no
+ * `android.*`, `java.*`, `org.json` or `nativeengine` import whatsoever**,
+ * `git mv`-ed all 34 of them to `commonMain` in one batch, and **all 34
+ * failed**. Not one. So the 35 are worth naming individually, by the hub that
+ * actually holds each, because that is the thing to go and change:
+ *
+ * | hub | declared in | holds | what freeing it costs |
+ * |---|---|---|---|
+ * | the viewmodels | `AccountViewModels`, `CatalogViewModel`, `HomeViewModel`, `HomeSelectorViewModel`, `LibraryScreen`, `SearchViewModel`, `AppBootstrapViewModel` | the `Route`/`Screen` files, ~4,000 lines | the factory/viewmodel split: `ViewModelProvider.Factory` is Android-only, so the factory stays in `androidMain` forever and only the viewmodel moves |
+ * | `DetailsPalette.kt` | `androidMain/.../details` | 6 files (`AiInsightsStoryOverlay`, `DetailsBody`, `PlayerInfoSheet`, `PlayerEpisodeRow`, `PlayerEpisodesSheet`, `PlayerMoreSheet`) | a real design change, not a move: it reads `android.graphics.Bitmap`, `LocalContext` and `materialkolor`'s `rememberDynamicColorScheme` to derive a scheme from artwork |
+ * | the composition root | `SupabaseServicesProvider`, `BackendServicesProvider`, `PlaybackDependencies`, `DistributionComponents`, the two settings `…RepositoryProvider`s | `ProfileMenuRoute`, `CalendarScreen`, `SettingsScreen`, `SettingsNavGraph`, `AppDistribution` | these *are* the root; a screen resolves them in `androidMain` and needs a seam for the values, not for the providers |
+ * | `androidx.navigation` | not on the `commonMain` classpath at all | all 6 files in `ui/navigation` | a dependency decision: JetBrains publishes a Multiplatform navigation-compose, and it is not the artifact this module currently resolves |
+ * | `androidx.paging` | not on the `commonMain` classpath at all | `CatalogPagingSource`, `LibraryPagingSource`, `BrowsePagingSource` | same shape: paging 3.3+ has KMP artifacts, and this is a version/artifact question rather than a code question |
+ * | `StreamResolver` | `androidMain/.../addons` | `SelectorCoordinator`, `HomeStreamSelector` | the same port treatment as `BackendApi`, applied to a type the project owns |
+ * | `R.raw` | `:ui-assets` | `DetailsRatingsSection` (7 logos) | see the rule below: split the file, and push the name matching to `commonMain` the way `ReviewProviderOrNull` did |
+ *
+ * `DetailsHeader` and `StreamSelectorContent` form an eighth, smaller hub
+ * (`PlayerInfoSheet`, `PlayerEpisodeRow`), and `IntroSkipService` a ninth
+ * (`IntroSkipButtonOverlay`). `PlayerSessionViewModel` is pinned by a tenth and
+ * is not a hub at all: ten of its types are declared only in
+ * `:android:native-engine`, which is a plain `com.android.library` and
+ * therefore cannot be named from a KMP `commonMain` whatever we write here.
+ * That one is a Phase 5/6 decision about the media engine.
+ *
+ * The method that produced this table is the one to repeat: move the batch,
+ * let the compiler name the hubs, revert what fails. It has now been run four
+ * times -- 8 files (1 moved), 12 (10 moved), 2 (2 moved) and 35 (0 moved) --
+ * and the yield falls as the easy wins are taken, which is the expected shape.
+ *
  * A fourth held a surprising number of files before this: `java.time`. It was
  * one helper -- `formatLongDate`, a `LocalDate` + `DateTimeFormatter` call at
  * the bottom of `DetailsMetadataSection` -- and it pinned two details screens
