@@ -24,15 +24,25 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 42 of the 160 files are there.
+ * `commonMain` one vertical slice at a time, and 54 of the 160 files are there.
  *
- * The remaining 118 are held by three things, and only three: a type that
+ * The remaining 106 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
- * `androidx.paging`, media3, Coil), a composition root that by definition needs
- * a platform to resolve against, and screen code that is not yet split
+ * `androidx.paging`, media3), a composition root that by definition needs a
+ * platform to resolve against, and screen code that is not yet split
  * factory-from-viewmodel. The measurements that decide which is which are in
  * kmp-migration-plan.md; the two rules that decide what is worth changing are
  * in AGENTS.md under *A type-level port is the lever that moves files*.
+ *
+ * Coil used to be the fourth, and was the largest of the four: 15 files reached
+ * it, 4,378 lines in total, and every one of them was blocked by
+ * `CrispyImage.kt` reading `LocalContext`. The fix was not ours to design --
+ * Coil's own `commonMain` already declares `expect val LocalPlatformContext`,
+ * which *is* `LocalContext` on Android, and `expect abstract class
+ * PlatformContext`, which on Android is a typealias for `Context`. The
+ * repository's rule is that a seam is worth building only when the upstream
+ * library has not already shipped one, and this was the largest file in
+ * `:app`'s `androidMain` sitting behind a seam that already existed.
  *
  * ## What this module deliberately does not know
  *
@@ -151,6 +161,26 @@ kotlin {
             // Declaring the module does not grant that, because `commonMain` sees only
             // `commonMain`.
             implementation(project(":android:home"))
+            // Coil, for `CrispyImage.kt` and the card composables that render
+            // through it. `coil-compose` and `coil-core` both publish
+            // android, jvm, iosArm64, iosSimulatorArm64, macosArm64, js and
+            // wasmJs, which covers every target this module declares, and
+            // neither is Compose Multiplatform -- so they are named directly
+            // rather than through a `compose.*` accessor.
+            //
+            // What makes the image layer portable is `coil3.PlatformContext`
+            // (an `expect abstract class` in Coil's commonMain, an `actual`
+            // typealias for `Context` on Android) together with
+            // `coil3.compose.LocalPlatformContext`, Coil's own portable
+            // replacement for the Android-only `LocalContext`. Coil's own
+            // `AsyncImage` reads that local for the same reason, so this is
+            // upstream's supported path and not a workaround.
+            //
+            // `coil-network-okhttp` and `coil-svg` stay in `androidMain` below:
+            // they are Android/JVM artifacts and a Phase 5/6 runtime
+            // configuration question, not a compile one.
+            implementation(libs.coil.compose)
+            implementation(libs.coil.core)
             // NOT `:android:native-engine`. It is a plain `com.android.library`,
             // so it publishes no JVM variant and cannot be consumed from a KMP
             // `commonMain` at all -- the same constraint `:ui-assets` hit. The one
@@ -222,10 +252,12 @@ kotlin {
             // `compose.uiToolingPreview` accessor to replace it with. Add it back
             // with an explicit version if a @Preview is ever actually used.
             implementation(libs.google.material)
-            implementation(libs.coil.compose)
+            // `coil-compose` and `coil-core` are declared in `commonMain` above,
+            // because the image layer moved there. These two stay here: they are
+            // Android/JVM artifacts, and which fetcher and which decoder the
+            // desktop and iOS builds configure is a Phase 5/6 runtime question.
             implementation(libs.coil.network.okhttp)
             implementation(libs.coil.svg)
-            implementation(libs.coil.core)
             implementation(libs.material.kolor)
             implementation(libs.metrics.performance)
 
@@ -241,9 +273,9 @@ kotlin {
         // The `commonMain` half of this module's tests, and it is what
         // `desktopTest` runs. The two halves are complementary and neither
         // substitutes for the other: `commonTest` cannot see androidMain, so it
-        // covers the settings repositories, the account repositories and nothing
-        // in the composition root, while `androidHostTest` below covers exactly
-        // the reverse.
+        // covers the settings repositories, the account repositories, the
+        // `EpisodeWatchStateResolver` and nothing in the composition root, while
+        // `androidHostTest` below covers exactly the reverse.
         commonTest.dependencies {
             implementation(kotlin("test"))
             // `runTest`, for the suspend-shaped ports. The settings tests are all
