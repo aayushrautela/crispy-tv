@@ -30,10 +30,13 @@
 # container with none of those reports `Could not load font` or a Skiko native-load
 # error, neither of which says anything about the seam -- see AGENTS.md.
 #
-# :android:app is a KMP library whose sources are all still in androidMain (Phase
-# 1 of kmp-migration-plan.md proves the module graph; Phase 4 moves them). Its
-# commonMain is empty, so the purity gate has nothing to scan there yet -- but
-# androidMain and desktopMain both have to compile.
+# :android:app is a KMP library. Phase 1 proved the module graph; Phase 4 has
+# since moved the design-agnostic half of it into commonMain (37 files at the
+# time of writing, against 120 still in androidMain), so the purity gate now has
+# real work to do there. commonMain is a strict subset of the Android build, so
+# androidMain and desktopMain both have to compile and the two catch different
+# mistakes. The measure of what is left, and why the rest of it is a refactor
+# rather than a file move, is in kmp-migration-plan.md under "Phase 4, Step 6".
 #
 # :android:androidApp:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
 # by default; re-record with
