@@ -342,6 +342,15 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
+    // Coil is `implementation` in :app's commonMain, so it is on the runtime
+    // classpath of these tests but not on their compile classpath. Only the two
+    // tests that drive Coil's API directly need it here: LandscapeCardScreenshotTest
+    // reaches the image layer through the composable, and CoilDataUriScreenshotTest
+    // has to build an ImageLoader and read SuccessResult/ErrorResult. Declared
+    // rather than reached through a test fixture, because a test that cannot see
+    // the type it is asserting about is a test that cannot be written.
+    testImplementation(libs.coil.core)
+    testImplementation(libs.coil.compose)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
