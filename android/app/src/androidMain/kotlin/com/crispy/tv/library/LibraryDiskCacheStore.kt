@@ -74,7 +74,7 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
     /**
      * Not on [LibraryDiskCache]: the screen calls this, the paging source does not.
      */
-    suspend fun invalidate(profileId: String, sectionId: String) = withContext(Dispatchers.IO) {
+    override suspend fun invalidate(profileId: String, sectionId: String) = withContext(Dispatchers.IO) {
         runCatching { cacheFile(profileId, sectionId).delete() }
     }
 

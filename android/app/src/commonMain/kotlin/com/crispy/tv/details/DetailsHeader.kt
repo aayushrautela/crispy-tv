@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import android.text.format.DateFormat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -48,8 +47,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -81,7 +78,6 @@ import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.resources.ic_thumb_up_filled
 import com.crispy.tv.ui.resources.ic_wand_stars
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import java.util.Date
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -165,6 +161,45 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
     )
 }
 
+/**
+ * The second line under the watch CTA, or `null` when the CTA has nothing to add.
+ *
+ * This lived inside [HeaderInfoSection]'s body and appeared **twice**, byte for
+ * byte, once per layout branch -- a wide screen and a narrow one. A `when` inside a
+ * `@Composable` is not callable from a test, so both copies were unreachable: a
+ * suite would have had to render the whole header to check which arm was chosen,
+ * and deleting an arm would have failed nothing. Extracting it makes one decision
+ * with one implementation, which is also the only reason the duplication can go --
+ * the two branches legitimately differ in layout and must not be merged.
+ *
+ * The arms are **not** the same order as they look. A rewatch that also has a
+ * running time resolves to the rewatch line, so `remainingMinutes` only decides
+ * anything when the title has not been watched before. That ordering is the copy's
+ * decision and it is pinned by `DetailsHeaderSubtextTest`.
+ *
+ * Both formatters and the clock are slots rather than calls to `java.text` and
+ * `System.currentTimeMillis()`; the strings they build are unchanged, which is what
+ * lets this function be pure enough to test.
+ */
+internal fun watchCtaSubtext(
+    watchCta: WatchCta,
+    dateFormat: (Long) -> String,
+    timeFormat: (Long) -> String,
+    clock: () -> Long,
+): String? =
+    when {
+        watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
+            val date = dateFormat(watchCta.lastWatchedAtEpochMs)
+            "Last watched on $date"
+        }
+        watchCta.remainingMinutes != null -> {
+            val endsAtMs = clock() + (watchCta.remainingMinutes * 60_000L)
+            val time = timeFormat(endsAtMs)
+            "Ends at $time"
+        }
+        else -> null
+    }
+
 @Composable
 internal fun HeaderInfoSection(
     details: MediaDetails?,
@@ -180,6 +215,35 @@ internal fun HeaderInfoSection(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetLiked: (Boolean?) -> Unit,
+    // These four are capabilities the platform owns, not wiring, so they arrive as
+    // slots with no default: a call site cannot forget one.
+    //
+    // `shareText` is the 5th instance of this shape in the repository (after
+    // `openUrl` and `launchUrl`): `android.content.Intent` and `android.net.Uri`
+    // cannot appear in a commonMain signature at all, so the slot carries the text
+    // and the whole Intent/chooser construction lives in the androidMain side.
+    //
+    // `dateFormat` / `timeFormat` are locale-aware renderings, which is precisely
+    // why this file could not be moved earlier. `formatIso8601LongDate` in
+    // :core-domain is the *locale-invariant* formatter and would print a different
+    // string than the user is used to, so the rendering stays a slot and only the
+    // decision moves to commonMain.
+    //
+    // `clock` is injected rather than read from the system, so the countdown below
+    // is a value the tests can pin.
+    shareText: (String) -> Unit,
+    dateFormat: (Long) -> String,
+    timeFormat: (Long) -> String,
+    clock: () -> Long,
+    // The wide/narrow decision. It used to be read twice in this file from
+    // `LocalConfiguration`, which is Android-only even under Compose Multiplatform
+    // (it lives in `AndroidCompositionLocals_androidKt`) -- and this file's two
+    // copies had drifted apart in indentation, one of them by four spaces.
+    // `LocalWindowInfo.current.containerDpSize` is not the answer: that symbol does
+    // not exist in the resolved Compose artifacts, so a "portable replacement" here
+    // would have been a guess. The caller already reads `LocalConfiguration`, so the
+    // value crosses as a slot and the duplicate reads go away with it.
+    isWideScreen: Boolean,
     softFade: Modifier = Modifier,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -221,9 +285,6 @@ internal fun HeaderInfoSection(
                 Box(modifier = Modifier.fillMaxWidth(0.84f).height(14.dp).skeletonElement(color = DetailsSkeletonColors.Base))
                 Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).skeletonElement(color = DetailsSkeletonColors.Base))
             }
-
-            val configuration = LocalConfiguration.current
-        val isWideScreen = configuration.screenWidthDp >= 768 && configuration.screenHeightDp < configuration.screenWidthDp
 
             if (isWideScreen) {
                 // Buttons skeleton (wide)
@@ -330,24 +391,8 @@ internal fun HeaderInfoSection(
         var showAiInsightsBorder by remember { mutableStateOf(false) }
         if (aiInsightsIsLoading) showAiInsightsBorder = true
 
-        val context = LocalContext.current
-            val configuration = LocalConfiguration.current
-            val isWideScreen = configuration.screenWidthDp >= 768 && configuration.screenHeightDp < configuration.screenWidthDp
-
-            if (isWideScreen) {
-            val watchCtaSubtext =
-                when {
-                    watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
-                        val date = DateFormat.getDateFormat(context).format(Date(watchCta.lastWatchedAtEpochMs))
-                        "Last watched on $date"
-                    }
-                    watchCta.remainingMinutes != null -> {
-                        val endsAtMs = System.currentTimeMillis() + (watchCta.remainingMinutes * 60_000L)
-                        val time = DateFormat.getTimeFormat(context).format(Date(endsAtMs))
-                        "Ends at $time"
-                    }
-                    else -> null
-                }
+        if (isWideScreen) {
+            val watchCtaSubtext = watchCtaSubtext(watchCta, dateFormat, timeFormat, clock)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -508,11 +553,7 @@ internal fun HeaderInfoSection(
                         icon = Res.drawable.ic_share,
                         onClick = {
                             val title = details.title
-                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy")
-                            }
-                            context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
+                            shareText("Check out $title on Crispy")
                         }
                     )
                 }
@@ -561,19 +602,7 @@ internal fun HeaderInfoSection(
                 }
             }
 
-            val watchCtaSubtext =
-                when {
-                    watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
-                        val date = DateFormat.getDateFormat(context).format(Date(watchCta.lastWatchedAtEpochMs))
-                        "Last watched on $date"
-                    }
-                    watchCta.remainingMinutes != null -> {
-                        val endsAtMs = System.currentTimeMillis() + (watchCta.remainingMinutes * 60_000L)
-                        val time = DateFormat.getTimeFormat(context).format(Date(endsAtMs))
-                        "Ends at $time"
-                    }
-                    else -> null
-                }
+            val watchCtaSubtext = watchCtaSubtext(watchCta, dateFormat, timeFormat, clock)
 
             Button(
                 onClick = onWatchNow,
@@ -642,11 +671,7 @@ internal fun HeaderInfoSection(
                 onSetLiked = onSetLiked,
                 onShare = {
                     val title = details.title
-                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy")
-                    }
-                    context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
+                    shareText("Check out $title on Crispy")
                 }
             )
         }

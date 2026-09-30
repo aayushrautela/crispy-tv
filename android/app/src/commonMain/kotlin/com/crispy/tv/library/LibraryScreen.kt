@@ -1,6 +1,5 @@
 package com.crispy.tv.library
 
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,24 +28,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.BackendContextResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
-import com.crispy.tv.network.AppHttp
-import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
-import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
 import kotlinx.coroutines.flow.combine
-import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
-import com.crispy.tv.app.appGraph
 import com.crispy.tv.domain.optimistic.MutationStatus
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.repository.UserMediaRepository
@@ -73,23 +64,26 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import java.time.Instant
-import java.time.YearMonth
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.crispy.tv.domain.watch.civilMonthKey
+import com.crispy.tv.domain.watch.civilMonthKeyFromEpochMillis
+import com.crispy.tv.domain.watch.previousMonthKey
 import com.crispy.tv.backend.WatchGenerationsResponse
 
 private const val LIBRARY_PAGE_SIZE = 60
 
-private const val RATING_BAND_LIKED = "liked"
-private const val RATING_BAND_DISLIKED = "disliked"
+// `internal` rather than `private` because these are the *identity* of each band:
+// they are what a section's `groupKey`/`bandKey` carries and what its row `key`
+// is built from, so a suite asserting against a hand-typed `"this_month"` would be
+// asserting its own string rather than this constant. `LibraryMonthKeyTest` names
+// all seven.
+internal const val RATING_BAND_LIKED = "liked"
+internal const val RATING_BAND_DISLIKED = "disliked"
 
-private const val WATCHLIST_GROUP_THIS_MONTH = "this_month"
-private const val WATCHLIST_GROUP_LAST_MONTH = "last_month"
-private const val WATCHLIST_GROUP_EARLIER_THIS_YEAR = "earlier_this_year"
-private const val WATCHLIST_GROUP_LAST_YEAR = "last_year"
-private const val WATCHLIST_GROUP_OLDER = "older"
+internal const val WATCHLIST_GROUP_THIS_MONTH = "this_month"
+internal const val WATCHLIST_GROUP_LAST_MONTH = "last_month"
+internal const val WATCHLIST_GROUP_EARLIER_THIS_YEAR = "earlier_this_year"
+internal const val WATCHLIST_GROUP_LAST_YEAR = "last_year"
+internal const val WATCHLIST_GROUP_OLDER = "older"
 
 private val LIBRARY_SECTIONS =
     listOf(
@@ -111,12 +105,25 @@ data class LibraryUiState(
 )
 
 class LibraryViewModel internal constructor(
-    private val appContext: Context,
-    private val backend: CrispyBackendClient,
+    private val backend: BackendApi,
     private val backendContextResolver: BackendContextResolver,
     private val userMediaRepository: UserMediaRepository,
     private val outbox: UserMutationOutbox,
-    private val libraryCache: LibraryDiskCacheStore,
+    private val libraryCache: LibraryDiskCache,
+    // The sync channel is an `okhttp` socket, so the socket itself cannot cross.
+    // What crosses is the *decision* to open one for a resolved session -- the same
+    // slot HomeViewModel takes, deliberately given the same name and the same three
+    // parameters, so the two readers of the codebase find one shape rather than two.
+    private val watchSyncFactory: (
+        accessToken: String,
+        profileId: String,
+        onEffect: (WatchSyncEffect) -> Unit,
+    ) -> WatchSyncSource,
+    private val clock: () -> Long,
+    // `java.util.UUID` has no Kotlin/Native equivalent, so the mint lives in
+    // androidMain. DetailsViewModel takes this same slot under this same name for
+    // the same reason, and both supply it from the same function.
+    private val newMutationId: () -> String,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
@@ -135,12 +142,10 @@ class LibraryViewModel internal constructor(
         viewModelScope.launch {
             val context = backendContextResolver.resolve() ?: return@launch
             syncSource =
-                OkHttpWatchSyncSource(
-                    httpClient = AppHttp.okHttp(appContext),
-                    baseUrl = backend.baseUrl,
-                    accessToken = context.accessToken,
-                    profileId = context.profileId,
-                    onEffect = { effect -> onSyncEffect(effect) },
+                watchSyncFactory(
+                    context.accessToken,
+                    context.profileId,
+                    { effect -> onSyncEffect(effect) },
                 )
             syncSource?.onSurfaceVisible()
         }
@@ -263,10 +268,10 @@ class LibraryViewModel internal constructor(
     fun setWatched(item: CatalogItem, desired: Boolean) {
         val contentType =
             (if (item.type == "movie") MetadataLabMediaType.MOVIE else MetadataLabMediaType.SERIES).toContentType()
-        val now = System.currentTimeMillis()
+        val now = clock()
         outbox.enqueue(
             TitleWatchedMutation(
-                id = newUserMutationId(),
+                id = newMutationId(),
                 titleItemId = item.itemId,
                 entityId = item.itemId,
                 createdAtMs = now,
@@ -279,27 +284,6 @@ class LibraryViewModel internal constructor(
         )
     }
 
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return LibraryViewModel(
-                            appContext = appContext,
-                            backend = BackendServicesProvider.backendClient(appContext),
-                            backendContextResolver = BackendContextResolverProvider.get(appContext),
-                            userMediaRepository = DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext)),
-                            outbox = appContext.appGraph().userMutationOutbox,
-                            libraryCache = LibraryDiskCacheStore(appContext),
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
 }
 
 internal fun WatchGenerationsResponse.generationMsFor(sectionId: String): Long? {
@@ -335,55 +319,73 @@ internal fun collapseEpisodesByShow(items: List<CatalogItem>): List<CatalogItem>
 // region History month grouping
 
 @Immutable
-private data class HistoryMonthSectionUi(
+internal data class HistoryMonthSectionUi(
     val monthKey: String,
     val label: String,
     val items: List<CatalogItem>,
 )
 
-private fun buildHistoryMonthSections(items: List<CatalogItem>): List<HistoryMonthSectionUi> {
+// `java.time` supplied two impure answers to these questions -- which month an
+// instant falls in, and which month "now" is -- and both are now parameters. The
+// caller decides the zone, because `ZoneId.systemDefault()` is a reading of the
+// device rather than a property of the timestamp, and it decides the clock for the
+// same reason. Everything below is arithmetic on two `"yyyy-MM"` strings.
+internal fun buildHistoryMonthSections(
+    items: List<CatalogItem>,
+    currentMonthKey: String,
+    utcOffsetMillis: Long,
+    monthName: (String) -> String,
+): List<HistoryMonthSectionUi> {
     if (items.isEmpty()) return emptyList()
     val result = mutableListOf<HistoryMonthSectionUi>()
     var currentKey: String? = null
     var currentItems = mutableListOf<CatalogItem>()
     for (item in items) {
-        val key = historyMonthKey(item.lastActivityAt ?: item.watchedAt)
+        val key = historyMonthKey(item.lastActivityAt ?: item.watchedAt, utcOffsetMillis)
         if (key != currentKey && currentKey != null && currentItems.isNotEmpty()) {
-            result.add(HistoryMonthSectionUi(currentKey, historyMonthLabel(currentKey), currentItems.toList()))
+            result.add(HistoryMonthSectionUi(currentKey, historyMonthLabel(currentKey, currentMonthKey, monthName), currentItems.toList()))
             currentItems = mutableListOf()
         }
         currentKey = key
         currentItems.add(item)
     }
     if (currentKey != null && currentItems.isNotEmpty()) {
-        result.add(HistoryMonthSectionUi(currentKey, historyMonthLabel(currentKey), currentItems.toList()))
+        result.add(HistoryMonthSectionUi(currentKey, historyMonthLabel(currentKey, currentMonthKey, monthName), currentItems.toList()))
     }
     return result.map { section -> section.copy(items = collapseEpisodesByShow(section.items)) }
 }
 
-private fun historyMonthKey(timestamp: String?): String {
-    if (timestamp.isNullOrBlank()) return "unknown"
-    return try {
-        val instant = Instant.parse(timestamp)
-        YearMonth.from(instant.atZone(ZoneId.systemDefault())).toString()
-    } catch (_: Exception) {
-        "unknown"
-    }
-}
+internal fun historyMonthKey(timestamp: String?, utcOffsetMillis: Long): String =
+    // `isNullOrBlank` is redundant with the `?:` on the other side, and that was
+    // measured: a mutation to `isNullOrEmpty` compiles and every test still passes,
+    // because `civilMonthKey("   ", offset)` is null -- the ISO parser rejects a blank
+    // string -- so both spellings reach `"unknown"`. It is kept because it states the
+    // rule the repository's own style asks for ("treat blank as missing") rather than
+    // leaving it as a side effect of the parser's strictness, and because it is the
+    // cheap half of the pair: `previousMonthKey` and `historyMonthLabel` both treat
+    // the literal `"unknown"` as the sentinel, so the branch that produces it should
+    // say why. Do not read the surviving mutation as a missing test.
+    if (timestamp.isNullOrBlank()) "unknown" else civilMonthKey(timestamp, utcOffsetMillis) ?: "unknown"
 
-private fun historyMonthLabel(monthKey: String): String {
-    if (monthKey == "unknown") return "Unknown date"
-    return try {
-        val ym = YearMonth.parse(monthKey)
-        val now = YearMonth.now()
-        when (ym) {
-            now -> "This Month"
-            now.minusMonths(1) -> "Last Month"
-            else -> ym.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
-        }
-    } catch (_: Exception) {
-        "Unknown date"
-    }
+/**
+ * The copy here is the app's, not a format: only the *name* of an older month is
+ * locale-aware, and that half is the [monthName] slot. The two words this decides on
+ * its own are English in the original too, so they did not follow the slot.
+ *
+ * The `try`/`catch` this replaced guarded a `YearMonth.parse` throw that a key
+ * [historyMonthKey] produced cannot make, so the guard is gone rather than
+ * reproduced: a `when` over two strings has nothing to throw on. A key from
+ * somewhere else is a different question, and the answer is at [yearOf].
+ */
+internal fun historyMonthLabel(
+    monthKey: String,
+    currentMonthKey: String,
+    monthName: (String) -> String,
+): String = when {
+    monthKey == "unknown" -> "Unknown date"
+    monthKey == currentMonthKey -> "This Month"
+    monthKey == previousMonthKey(currentMonthKey) -> "Last Month"
+    else -> monthName(monthKey)
 }
 
 private sealed interface HistoryDisplayRow {
@@ -404,13 +406,16 @@ private sealed interface HistoryDisplayRow {
 // region Rating band grouping
 
 @Immutable
-private data class RatingBandUi(
+internal data class RatingBandUi(
     val bandKey: String,
     val label: String,
     val items: List<CatalogItem>,
 )
 
-private fun buildRatingBandSections(items: List<CatalogItem>): List<RatingBandUi> {
+// `internal` rather than `private`: this picks the band's order and its `liked ==
+// null` fate, and both are decisions a test can otherwise only reach through the
+// whole screen. `LibraryMonthKeyTest` calls it and pins all three.
+internal fun buildRatingBandSections(items: List<CatalogItem>): List<RatingBandUi> {
     val bands =
         listOf(
             RATING_BAND_LIKED to "Liked",
@@ -444,29 +449,50 @@ private sealed interface RatingDisplayRow {
 
 // region Watchlist date grouping
 
-private fun watchlistGroupKey(addedAt: String?): String {
+/**
+ * The four bands, oldest last. The original read `addedYear` off the resolved
+ * `ZonedDateTime` and `nowYear` off `Instant.now()`, which meant it held a year *as
+ * well as* a month; holding only the month key and reading the year out of it is the
+ * same answer, because a `"yyyy-MM"` key's year is its first four characters.
+ *
+ * [yearOf] returns `0` for a key it cannot read, and that is deliberate rather than
+ * defensive: the only keys that reach here come from [civilMonthKey], so the
+ * fallback is for a caller that has not been written yet, and it lands in
+ * [WATCHLIST_GROUP_OLDER] the same way a parse failure did before.
+ */
+internal fun watchlistGroupKey(
+    addedAt: String?,
+    currentMonthKey: String,
+    utcOffsetMillis: Long,
+): String {
+    // Redundant with the `?:` two lines down, and measured: mutating this to
+    // `isNullOrEmpty` compiles and every test still passes, because a blank string
+    // fails the ISO parser and lands in `WATCHLIST_GROUP_OLDER` anyway. Kept for the
+    // same reason as the `isNullOrBlank` in `historyMonthKey` -- it names the rule
+    // instead of inheriting it from the parser's strictness. This is the *second*
+    // instance of that shape in this file and the ninth in the repository; both are
+    // written down here so the next person does not read the surviving mutation as a
+    // gap in the suite.
     if (addedAt.isNullOrBlank()) return WATCHLIST_GROUP_OLDER
-    return try {
-        val instant = Instant.parse(addedAt)
-        val zdt = instant.atZone(ZoneId.systemDefault())
-        val now = Instant.now().atZone(ZoneId.systemDefault())
-        val addedMonth = YearMonth.from(zdt)
-        val nowMonth = YearMonth.from(now)
-        val addedYear = zdt.year
-        val nowYear = now.year
-        when {
-            addedMonth == nowMonth -> WATCHLIST_GROUP_THIS_MONTH
-            addedMonth == nowMonth.minusMonths(1) -> WATCHLIST_GROUP_LAST_MONTH
-            addedYear == nowYear -> WATCHLIST_GROUP_EARLIER_THIS_YEAR
-            addedYear == nowYear - 1 -> WATCHLIST_GROUP_LAST_YEAR
-            else -> WATCHLIST_GROUP_OLDER
-        }
-    } catch (_: Exception) {
-        WATCHLIST_GROUP_OLDER
+    val addedMonthKey = civilMonthKey(addedAt, utcOffsetMillis) ?: return WATCHLIST_GROUP_OLDER
+    val addedYear = yearOf(addedMonthKey)
+    val currentYear = yearOf(currentMonthKey)
+    return when {
+        addedMonthKey == currentMonthKey -> WATCHLIST_GROUP_THIS_MONTH
+        addedMonthKey == previousMonthKey(currentMonthKey) -> WATCHLIST_GROUP_LAST_MONTH
+        addedYear == currentYear -> WATCHLIST_GROUP_EARLIER_THIS_YEAR
+        addedYear == currentYear - 1 -> WATCHLIST_GROUP_LAST_YEAR
+        else -> WATCHLIST_GROUP_OLDER
     }
 }
 
-private fun watchlistGroupLabel(groupKey: String): String =
+private fun yearOf(monthKey: String): Int = monthKey.take(4).toIntOrNull() ?: 0
+
+// `internal` rather than `private` for the same reason `buildHistoryMonthSections`
+// is: a decision no test can call is a decision no test can cover, and this one has
+// five arms plus a fallback. `LibraryMonthKeyTest` calls it directly rather than
+// re-deriving the answer, which is what makes a deleted arm a failure.
+internal fun watchlistGroupLabel(groupKey: String): String =
     when (groupKey) {
         WATCHLIST_GROUP_THIS_MONTH -> "This Month"
         WATCHLIST_GROUP_LAST_MONTH -> "Last Month"
@@ -477,19 +503,26 @@ private fun watchlistGroupLabel(groupKey: String): String =
     }
 
 @Immutable
-private data class WatchlistDateSectionUi(
+internal data class WatchlistDateSectionUi(
     val groupKey: String,
     val label: String,
     val items: List<CatalogItem>,
 )
 
-private fun buildWatchlistDateSections(items: List<CatalogItem>): List<WatchlistDateSectionUi> {
+// Same two decisions as the history grouping above, one more question: the two
+// year-only bands ("earlier this year", "last year") need the year, which the
+// four leading characters of a `"yyyy-MM"` key already are.
+internal fun buildWatchlistDateSections(
+    items: List<CatalogItem>,
+    currentMonthKey: String,
+    utcOffsetMillis: Long,
+): List<WatchlistDateSectionUi> {
     if (items.isEmpty()) return emptyList()
     val result = mutableListOf<WatchlistDateSectionUi>()
     var currentKey: String? = null
     var currentItems = mutableListOf<CatalogItem>()
     for (item in items) {
-        val key = watchlistGroupKey(item.addedAt)
+        val key = watchlistGroupKey(item.addedAt, currentMonthKey, utcOffsetMillis)
         if (key != currentKey && currentKey != null && currentItems.isNotEmpty()) {
             result.add(WatchlistDateSectionUi(currentKey, watchlistGroupLabel(currentKey), currentItems.toList()))
             currentItems = mutableListOf()
@@ -523,8 +556,17 @@ internal fun LazyListScope.historyItems(
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
     onItemLongPress: (CatalogItem) -> Unit,
+    currentMonthKey: String,
+    utcOffsetMillis: Long,
+    monthName: (String) -> String,
 ) {
-    val monthSections = buildHistoryMonthSections(loadedItems)
+    val monthSections =
+        buildHistoryMonthSections(
+            items = loadedItems,
+            currentMonthKey = currentMonthKey,
+            utcOffsetMillis = utcOffsetMillis,
+            monthName = monthName,
+        )
     val displayRows = monthSections.flatMap { section ->
         listOf(
             HistoryDisplayRow.Header(section.monthKey, section.label),
@@ -628,8 +670,15 @@ internal fun LazyListScope.watchlistItems(
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
     onItemLongPress: (CatalogItem) -> Unit,
+    currentMonthKey: String,
+    utcOffsetMillis: Long,
 ) {
-    val dateSections = buildWatchlistDateSections(loadedItems)
+    val dateSections =
+        buildWatchlistDateSections(
+            items = loadedItems,
+            currentMonthKey = currentMonthKey,
+            utcOffsetMillis = utcOffsetMillis,
+        )
     val displayRows = dateSections.flatMap { section ->
         listOf(
             WatchlistDisplayRow.Header(section.groupKey, section.label),
@@ -790,3 +839,13 @@ internal fun LibraryAppendState(
 
 // endregion
 
+/**
+ * The month the device is currently in, as the same `"yyyy-MM"` key
+ * [civilMonthKey] produces for a history entry.
+ *
+ * This is the answer `YearMonth.now()` used to give inline, and it is separated for
+ * one reason: it is the only value in either grouping that changes without any input
+ * changing, so it is the one a test has to be able to set.
+ */
+internal fun currentMonthKeyOf(clock: () -> Long, utcOffsetMillis: Long): String =
+    civilMonthKeyFromEpochMillis(clock(), utcOffsetMillis)

@@ -132,6 +132,10 @@ internal fun DetailsScreen(
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
     val density = LocalDensity.current
+    val localeFormatters = remember(context) { localeDateFormatters(context) }
+    // The same expression `DetailsHeader` used to run twice, once per layout branch.
+    val isWideScreen = configuration.screenWidthDp >= 768 &&
+        configuration.screenHeightDp < configuration.screenWidthDp
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageUrl = remember(details, initialArtworkUrl) {
         detailsHeroImageUrl(details = details) ?: initialArtworkUrl
@@ -318,6 +322,11 @@ internal fun DetailsScreen(
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
                         onSetLiked = onSetLiked,
+                        shareText = { text -> shareOnCrispy(context = context, text = text) },
+                        dateFormat = localeFormatters.date,
+                        timeFormat = localeFormatters.time,
+                        clock = { System.currentTimeMillis() },
+                        isWideScreen = isWideScreen,
                         softFade = softFade,
                     )
                 }

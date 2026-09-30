@@ -248,6 +248,72 @@ fun formatIso8601Instant(epochMillis: Long): String {
 }
 
 /**
+ * The `"yyyy-MM"` civil month [epochMillis] falls in, at a fixed UTC offset.
+ *
+ * Replaces `YearMonth.from(Instant.ofEpochMilli(ms).atZone(zone)).toString()`.
+ * The zone arrives as its offset in milliseconds rather than as a `ZoneId`,
+ * because the device's zone is the one part of that expression which cannot be
+ * pure: two devices reading the same instant on either side of a month boundary
+ * must produce different keys, and a caller which cannot state its offset cannot
+ * say which month it meant. So the caller decides, at the composition root, where
+ * the platform's answer is available -- and the decision is then testable.
+ */
+fun civilMonthKeyFromEpochMillis(epochMillis: Long, utcOffsetMillis: Long): String {
+    val (year, month, _) = civilFromEpochDay(utcEpochDayOf(epochMillis + utcOffsetMillis))
+    return monthKeyOf(year, month)
+}
+
+/**
+ * The `"yyyy-MM"` civil month an ISO-8601 instant falls in, at a fixed UTC offset.
+ *
+ * Replaces `YearMonth.from(Instant.parse(value).atZone(zone)).toString()`. A value
+ * this file's parser rejects returns null, which the caller treats exactly as it
+ * treated the old `Instant.parse` failure -- the convention
+ * [parseIso8601InstantToEpochMillis] already documents.
+ */
+fun civilMonthKey(value: String, utcOffsetMillis: Long): String? =
+    civilMonthKeyFromEpochMillis(
+        parseIso8601InstantToEpochMillis(value) ?: return null,
+        utcOffsetMillis,
+    )
+
+/**
+ * The month before [monthKey], with the year decremented across January.
+ *
+ * Replaces `YearMonth.parse(key).minusMonths(1).toString()`. A key which is not
+ * `"yyyy-MM"` with a month in `1..12` returns null rather than throwing, because
+ * the caller only ever holds a key this file produced or a literal it recognises,
+ * and a library function that throws on a value it might itself have been handed
+ * is worse than one that says "not a month". January of year `0000` has no
+ * predecessor for the same reason and also returns null.
+ */
+fun previousMonthKey(monthKey: String): String? {
+    if (monthKey.length != 7 || monthKey[4] != '-') return null
+    val year = monthKey.readDigits(0, 4) ?: return null
+    val month = monthKey.readDigits(5, 7) ?: return null
+    if (month !in 1..12) return null
+    // The one case the padding cannot express: December of year -1, which would need
+    // a sign and a five-digit field, and so could not be read back by this function.
+    // Returning null says "there is no previous month" rather than minting a key
+    // nothing can parse.
+    if (month == 1 && year == 0) return null
+    return if (month == 1) monthKeyOf(year - 1, 12) else monthKeyOf(year, month - 1)
+}
+
+/**
+ * A `"yyyy-MM"` key.
+ *
+ * The year handling is deliberately not shared with [formatYearOfEra]: a month key
+ * is a grouping token which is compared for equality and parsed back again, so it
+ * has to round-trip through [previousMonthKey], and an era-shifted or signed year
+ * would not. [parseIso8601InstantToEpochMillis] reads exactly four digits, so every
+ * key it can produce is `0000`-`9999` and plain padding is the whole job; the one
+ * value outside that range is refused by [previousMonthKey] rather than minted.
+ */
+private fun monthKeyOf(year: Int, month: Int): String =
+    year.toString().padStart(4, '0') + "-" + month.toString().padStart(2, '0')
+
+/**
  * The proleptic Gregorian date for a day count from 1970-01-01.
  *
  * Howard Hinnant's `civil_from_days`, the inverse of [epochDayOf]. Exact for the

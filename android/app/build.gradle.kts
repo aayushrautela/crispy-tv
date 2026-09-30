@@ -24,7 +24,7 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 92 of the 180 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 94 of the 182 main-source files are there.
  *
  * The remaining 88 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
@@ -58,12 +58,26 @@ plugins {
  * | `StreamResolver` | `androidMain/.../addons` | `SelectorCoordinator`, `HomeStreamSelector` | the same port treatment as `BackendApi`, applied to a type the project owns |
  * | `R.raw` | `:ui-assets` | `DetailsRatingsSection` (7 logos) | see the rule below: split the file, and push the name matching to `commonMain` the way `ReviewProviderOrNull` did |
  *
- * `DetailsHeader` and `StreamSelectorContent` form an eighth, smaller hub
- * (`PlayerInfoSheet`, `PlayerEpisodeRow`), and `IntroSkipService` a ninth
- * (`IntroSkipButtonOverlay`). `PlayerSessionViewModel` is pinned by a tenth and
- * is not a hub at all: ten of its types are declared only in
- * `:android:native-engine`, which is a plain `com.android.library` and
- * therefore cannot be named from a KMP `commonMain` whatever we write here.
+ * | ~~`DetailsHeader`~~ | **freed** | `PlayerInfoSheet`, `PlayerEpisodeRow` | **none left on this row.** `DetailsHeader` was held by five separate things at once -- `java.time`'s `Instant`/`YearMonth`, `Locale`, a `Context` for the share `Intent`, `LocalConfiguration` for the wide-screen branch, and an Android-only `DateFormat` -- and five no-default slots plus three portable month-key helpers in `:core-domain` cleared all five. The two `playerui` files it used to hold are still `androidMain`, but for a different and much smaller reason, now written down |
+ *
+ * `StreamSelectorContent` is the whole of what that smaller hub became, and it
+ * is held by **one function at the bottom of its own file**:
+ * `formatEpisodeReleaseDate`, a `LocalDate.parse` +
+ * `DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)` pair. That single
+ * helper is what `PlayerInfoSheet` and `PlayerEpisodeRow` reach for, which is
+ * why freeing `DetailsHeader` did not free them -- and it is the fourth time
+ * one unremarkable formatter at the bottom of a screen has held more than its
+ * own file (`formatLongDate` held two details screens, this holds three files).
+ * The replacement is *easier* than `formatLongDate`'s was, because the pattern
+ * is pinned to `Locale.US`: the output is the same English string on every
+ * device, so a portable month-abbreviation helper in the same `Iso8601.kt` is
+ * byte-identical and needs no locale slot at all.
+ *
+ * `IntroSkipService` is a tenth, smaller one (`IntroSkipButtonOverlay`).
+ * `PlayerSessionViewModel` is pinned by an eleventh and is not a hub at all:
+ * ten of its types are declared only in `:android:native-engine`, which is a
+ * plain `com.android.library` and therefore cannot be named from a KMP
+ * `commonMain` whatever we write here.
  * That one is a Phase 5/6 decision about the media engine.
  *
  * The method that produced this table is the one to repeat: move the batch,

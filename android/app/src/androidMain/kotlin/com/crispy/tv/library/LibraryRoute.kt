@@ -20,6 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import com.crispy.tv.library.currentMonthKeyOf
+import com.crispy.tv.library.deviceUtcOffsetMillis
+import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,17 +56,23 @@ import org.jetbrains.compose.resources.painterResource
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LibraryRoute(
+    // A `Context` cannot be named in a `commonMain` signature, and this route is
+    // androidMain anyway because it reads `collectAsLazyPagingItems`, which needs
+    // `paging-compose`. So the viewmodel factory crosses as the value the nav graph
+    // already holds a `Context` for, and the two renderings this screen needs cross
+    // as arguments. Same shape as the auth and search routes.
+    viewModelFactory: ViewModelProvider.Factory,
+    monthName: (String) -> String,
     onItemClick: (CatalogItem, String?) -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
-    val appContext = LocalContext.current.applicationContext
-    val viewModel: LibraryViewModel =
-        viewModel(
-            factory = remember(appContext) { LibraryViewModel.factory(appContext) },
-        )
+    val viewModel: LibraryViewModel = viewModel(factory = viewModelFactory)
+    val clock: () -> Long = { System.currentTimeMillis() }
+    val utcOffsetMillis: () -> Long = { deviceUtcOffsetMillis() }
+    val currentMonthKey = currentMonthKeyOf(clock, utcOffsetMillis())
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -172,9 +181,9 @@ ProfileIconButton(
             }
         } else {
             when (selectedSectionKey) {
-                HistoryKey -> historyItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it })
+                HistoryKey -> historyItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it }, currentMonthKey = currentMonthKey, utcOffsetMillis = utcOffsetMillis(), monthName = monthName)
                 RatingsKey -> ratingsItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it })
-                WatchlistKey -> watchlistItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it })
+                WatchlistKey -> watchlistItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it }, currentMonthKey = currentMonthKey, utcOffsetMillis = utcOffsetMillis())
             }
 
             item(key = "load-more") {
