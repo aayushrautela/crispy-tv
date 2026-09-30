@@ -37,13 +37,20 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RECHECK: set[str] = set()
 
 TASK = ":android:app:desktopTest"
+
+# `:app`'s `desktopTest` builds the **desktop** target only, so a mutation in an
+# `androidMain` file cannot fail under it however it is written. `testAndroidHostTest`
+# is the module's only test compilation that compiles `androidMain` as well, so an
+# entry whose file lives there must name this task instead. An entry that picks the
+# wrong task reports SURVIVED and the verdict is a fact about the driver, not the code.
+HOST_TASK = ":android:app:testAndroidHostTest"
 GESTURES = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerGestures.kt"
 SHEET = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerEpisodesSheet.kt"
 CTRL = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerGestureController.kt"
 SETTINGS = "android/app/src/commonMain/kotlin/com/crispy/tv/settings/SettingsScreen.kt"
 ANDROID_CTRL = "android/app/src/androidMain/kotlin/com/crispy/tv/playerui/PlayerGestureController.kt"
 
-# (label, path, old, new, tests)
+# (label, path, old, new, tests[, task])
 MUTATIONS = [
     # ---- formatGestureBrightness / formatGestureVolume -----------------------
     (
@@ -172,42 +179,95 @@ MUTATIONS = [
         'if (level.isMuted) "muted" else',
         "PlayerGesturesTest",
     ),
-    # ---- the port's name ----------------------------------------------------
-    # NOTE: there is deliberately NO entry for the androidMain implementation.
-    # An earlier entry tried `abstract class` there and SURVIVED, and the reason is
-    # structural rather than about the code: `:android:app:desktopTest` compiles
-    # the desktop target, which does not include `androidMain` at all, so **a
-    # `commonTest` run cannot observe a mutation in that source set whatever the
-    # mutation is**. The entry was dropped rather than retargeted, because the only
-    # task that would see it (`compileAndroidMain`) asserts nothing.
-    #
-    # The same reason applies to the two `SettingsScreen` entries below: their
-    # branch sits inside a `@Composable` body, and `commonTest` is not a rendering
-    # test -- the golden screenshots in `:android:androidApp` are. The decision a
-    # caller can make is *which value to pass*, and that lives in androidMain's
-    # `SettingsNavGraph`. Recording that here is why these are absent from the
-    # list rather than reported as survivors.
-    # ---- SettingsScreen's one slot ------------------------------------------
+    # NOTE: `SettingsScreen`'s `if (pluginsUiSupported)` has no entry, and so does
+    # nothing else in this file's `commonMain` -- the reason is written below, where
+    # the `androidMain` entries that *were* unobservable now live, because they are
+    # now observed.
+]
+
+# ---- entries that CANNOT be observed by any compilation task -----------------
+#
+# `SettingsScreen`'s `if (pluginsUiSupported)` was dropped from this list, and the
+# reason is now measured rather than assumed. Unlike the `androidMain` entries
+# below, this branch is not a source-set problem: it sits inside a `@Composable`
+# body, so **no** compilation task observes it -- only a rendering harness does,
+# and the golden screenshots in `:android:androidApp` do not render `SettingsScreen`.
+# Reaching for a Compose test rule would add a dependency to pin one boolean, and
+# extracting an `internal fun shouldShowPluginsEntry(p: Boolean) = p` would be a
+# decision no test can tell from the call site -- the "a test's own re-implementation
+# of a decision" trap in reverse. The decision that is worth testing is the *caller's*,
+# and `SettingsNavGraph` is where `pluginsUiSupported` is read.
+
+# ---- AndroidPlayerGestureController (androidMain) ----------------------------
+#
+# Every entry below names `HOST_TASK`. These are the implementation behind a port
+# the same landing created, and before this suite they had **no** verification at
+# all: the original entry turned the class `abstract` -- which cannot compile at
+# its one construction site -- and `desktopTest` reported SURVIVED, because the
+# desktop target never sees `androidMain`. That verdict was a fact about the task.
+MUTATIONS += [
     (
-        "settings-hides-the-plugins-row-regardless-of-the-slot",
-        SETTINGS,
-        "if (pluginsUiSupported) {",
-        "if (true) {",
-        "PlayerGesturesTest",
+        "the-android-implementation-stops-implementing-the-port",
+        ANDROID_CTRL,
+        "internal class AndroidPlayerGestureController(",
+        "internal abstract class AndroidPlayerGestureController(",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
     ),
     (
-        "settings-always-shows-the-plugins-row",
-        SETTINGS,
-        "if (pluginsUiSupported) {",
-        "if (false) {",
-        "PlayerGesturesTest",
+        "brightness-is-not-clamped-when-applied",
+        ANDROID_CTRL,
+        "        val target = level.coerceIn(0.02f, 1f)",
+        "        val target = level",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
+    ),
+    (
+        "restore-brightness-is-not-a-latch",
+        ANDROID_CTRL,
+        "        if (brightnessRestored) return\n        brightnessRestored = true",
+        "        brightnessRestored = true",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
+    ),
+    (
+        "current-brightness-ignores-the-system-setting",
+        ANDROID_CTRL,
+        "            readSystemBrightness()",
+        "            1f",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
+    ),
+    (
+        "set-volume-reports-the-request-not-what-it-applied",
+        ANDROID_CTRL,
+        "        return AudioLevel(\n            fraction = targetVolume.toFloat() / maxVolume.toFloat(),\n            isMuted = targetVolume == 0,\n        )",
+        "        return AudioLevel(\n            fraction = level,\n            isMuted = targetVolume == 0,\n        )",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
+    ),
+    (
+        "set-volume-is-not-clamped-below-zero",
+        ANDROID_CTRL,
+        "        val targetVolume = (level.coerceIn(0f, 1f) * maxVolume.toFloat())",
+        "        val targetVolume = (level * maxVolume.toFloat())",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
+    ),
+    (
+        "the-factory-accepts-a-null-activity",
+        ANDROID_CTRL,
+        "    if (activity == null) return null\n    val audioManager",
+        "    val audioManager",
+        "AndroidPlayerGestureControllerTest",
+        HOST_TASK,
     ),
 ]
 
 
-def run(tests: str):
+def run(tests: str, task: str = TASK):
     return subprocess.run(
-        ["./gradlew", TASK, "--tests", tests],
+        ["./gradlew", task, "--tests", tests],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -216,12 +276,18 @@ def run(tests: str):
 
 
 def failed_tests(out: str):
-    return sorted({m[1] for m in re.findall(r"^(\w+)\[.*?\] > (\S+?)\[.*?\] FAILED", out, re.M)})
+    # The `[desktop]` suffix is NOT always there: `testAndroidHostTest` prints
+    # `Class > method FAILED` with no bracket at all, so a regex that requires one
+    # silently extracts no evidence and reports every catch as a bare "build
+    # failed". Six entries were caught correctly and credited to nothing until a
+    # single hand-run showed the format. The suffix is therefore optional.
+    return sorted({m[2] for m in re.findall(
+        r"^(\w+)(?:\[.*?\])? > (\S+?)(?:\[.*?\])? FAILED", out, re.M)})
 
 
 def check_anchors():
     bad = []
-    for label, rel, old, _new, _t in MUTATIONS:
+    for label, rel, old, _new, _t, *_rest in MUTATIONS:
         n = io.open(os.path.join(ROOT, rel), encoding="utf-8").read().count(old)
         if n != 1:
             bad.append((label, n))
@@ -246,7 +312,8 @@ def main():
           f"{' (RECHECK mode)' if RECHECK else ''}", flush=True)
 
     counts = {"CAUGHT": 0, "SKIP": 0, "SURVIVED": 0}
-    for label, rel, old, new, tests in selected:
+    for label, rel, old, new, tests, *_rest in selected:
+        task = _rest[0] if _rest else TASK
         path = os.path.join(ROOT, rel)
         original = io.open(path, encoding="utf-8").read()
         if original.count(old) != 1:
@@ -255,7 +322,7 @@ def main():
             continue
         try:
             io.open(path, "w", encoding="utf-8").write(original.replace(old, new, 1))
-            proc = run(tests)
+            proc = run(tests, task)
             out = proc.stdout + proc.stderr
             if proc.returncode == 0:
                 print(f"SURVIVED {label}: compiled and every test still passed", flush=True)

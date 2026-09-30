@@ -63,6 +63,23 @@ internal class AndroidPlayerGestureController(
 
     override fun setVolume(level: Float): AudioLevel {
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        // The `coerceIn(0f, 1f)` here is the FIFTEENTH redundant guard in this
+        // repository, and the mutation that proved it is `set-volume-is-not-clamped-below-zero`.
+        // Removing it compiles, and no test changes, because the `coerceIn(0, maxVolume)` two
+        // lines below already clamps the rounded *Int* into the same range: -4f gives
+        // (-4f * 15).roundToInt() = -60, clamped to 0; 1.4f gives 21, clamped to 15; and a
+        // value like -0.01f rounds to 0 before the clamp ever sees it. So the Float clamp can
+        // never be the thing that decides the answer.
+        //
+        // It is kept rather than deleted, and the reason is not a test: it states the
+        // contract at the point where the fraction enters. The downstream Int clamp is a
+        // consequence of rounding to a step count, and it is the one that would be removed by
+        // someone tidying the arithmetic; with the Float clamp gone, `setVolume(-4f)` would
+        // then be `-4f * max` and the *returned* `fraction` would be computed from an
+        // unclamped step. It is the statement of intent, and it becomes load-bearing the day
+        // the rounding changes. Written down here so the surviving mutation is not read as a
+        // gap in the suite -- `setVolumeClampsTheRequestedFractionAtBothEnds` does pin the
+        // behaviour, it simply cannot see which of the two clamps produced it.
         val targetVolume = (level.coerceIn(0f, 1f) * maxVolume.toFloat())
             .roundToInt()
             .coerceIn(0, maxVolume)
