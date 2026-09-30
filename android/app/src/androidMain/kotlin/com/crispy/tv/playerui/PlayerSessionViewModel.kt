@@ -1124,13 +1124,6 @@ class PlayerSessionViewModel(
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
-    private fun resolveInitialEngine(preference: NativePlaybackEnginePreference): NativePlaybackEngine =
-        if (preference == NativePlaybackEnginePreference.Libmpv) {
-            NativePlaybackEngine.MPV
-        } else {
-            NativePlaybackEngine.EXO
-        }
-
     private fun applyPersistedPlaybackSettings() {
         val settings = playbackSettingsRepository.settings.value
         Log.d(
@@ -1198,21 +1191,22 @@ class PlayerSessionViewModel(
     }
 
     private fun applyPendingInitialSeekIfNeeded(snapshot: NativePlaybackSnapshot) {
-        val targetPositionMs = pendingInitialSeekMs ?: return
-        if (targetPositionMs <= 0L) {
-            pendingInitialSeekMs = null
-            return
+        // The decision is `InitialSeekDecision`, not a Boolean, because the three
+        // outcomes do different amounts of work and a flag would have to be re-derived
+        // here. It is a sealed interface, so this `when` is checked to be exhaustive by
+        // the compiler -- adding a fourth outcome later is a compile error at the one
+        // place that acts on it, not a silently ignored branch.
+        when (val decision = initialSeekDecision(pendingInitialSeekMs, snapshot.state, snapshot.positionMs)) {
+            is InitialSeekDecision.Wait -> return
+            is InitialSeekDecision.Clear -> {
+                pendingInitialSeekMs = null
+            }
+            is InitialSeekDecision.Seek -> {
+                playbackController.seekTo(decision.positionMs)
+                pendingInitialSeekMs = null
+                scheduleProgressSyncAfterSeek()
+            }
         }
-        if (snapshot.state == NativePlaybackState.IDLE || snapshot.state == NativePlaybackState.PREPARING) {
-            return
-        }
-        if (snapshot.positionMs >= targetPositionMs - 1_000L) {
-            pendingInitialSeekMs = null
-            return
-        }
-        playbackController.seekTo(targetPositionMs)
-        pendingInitialSeekMs = null
-        scheduleProgressSyncAfterSeek()
     }
 
     private fun maybeHandlePlaybackError(
@@ -1225,10 +1219,7 @@ class PlayerSessionViewModel(
 
         lastHandledErrorToken = error.token
         val playbackEnginePreference = playbackSettingsRepository.settings.value.playbackEnginePreference
-        val shouldFallback =
-            error.codecLikely &&
-                engine == NativePlaybackEngine.EXO &&
-                playbackEnginePreference != NativePlaybackEnginePreference.ExoPlayer
+        val shouldFallback = shouldFallBackToMpv(error, engine, playbackEnginePreference)
         if (!shouldFallback) {
             return false
         }
@@ -1266,18 +1257,6 @@ class PlayerSessionViewModel(
         }
         onPlaybackMetrics(snapshot)
         publishMediaSessionFromUiState()
-    }
-
-    private fun statusMessage(snapshot: NativePlaybackSnapshot): String {
-        return when (snapshot.state) {
-            NativePlaybackState.IDLE,
-            NativePlaybackState.PREPARING -> "Preparing playback..."
-            NativePlaybackState.BUFFERING -> "Buffering..."
-            NativePlaybackState.PLAYING -> "Playing"
-            NativePlaybackState.PAUSED -> "Paused"
-            NativePlaybackState.ENDED -> "Playback ended."
-            NativePlaybackState.ERROR -> snapshot.error?.message ?: "Playback error"
-        }
     }
 
     private fun syncWatchHistory(

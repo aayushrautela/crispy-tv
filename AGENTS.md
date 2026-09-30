@@ -450,6 +450,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   clothes.** Grep the property initialisers, not the parameter list; move the wiring to the
   factory and leave the class behind it.
 
+- **Deleting a private member whose name a same-package `internal` top-level function now carries
+  needs no call-site edit.** Extracting a private member to a top-level `internal` declaration of
+  the same name in the same package leaves every existing call site resolving to the top-level
+  function the moment the member is deleted — the member was shadowing it, so "delete the member"
+  *is* the whole change. This is the §1.1 same-package trap taken the other way, and it is worth
+  looking for: it means a literal body move can be two files with no call-site churn at all. The
+  corollary is that you get no compiler signal for it, so check it with
+  `diff <(git show HEAD:<file>) <current>` rather than by the number of call sites you expected
+  to edit.
 ### 3. Tests
 
 - **A decision no test can call is a decision no test can cover — name it in production.**
@@ -505,6 +514,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   (`0xFFB03040`) are pink-red with blue above green, so a blanket "is it warm?" assertion
   fails on exactly the two roles it most needed to check. Measure each direction, then pin it.
 
+- **A class too large to construct has to have its decisions extracted *before* the split, not
+  after.** "Characterise before refactoring" is unfalsifiable when the class is 1,411 lines and
+  needs a real player to exist: there is nothing to characterise. `PlayerSessionViewModel` had
+  four pure decisions buried in it — engine selection, the status line, the pending-initial-seek
+  rule, and the codec-fallback condition — and they were only nameable *after* being lifted into
+  `PlayerSessionDecisions.kt`. So the extraction is not a preliminary to the split, it is the
+  precondition for pinning it. Ask what a class cannot do to a test, and extract that first.
+- **`org.junit.Assert.assertEquals` has no four-argument overload, and swapping expected for actual
+  still compiles.** Three separate slips in one test file, in two shapes: a four-argument call
+  (`message, expected, actual, "extra"`) and a three-argument call whose first argument was the
+  *expected value* and second the message. The second one compiled, ran, and reported
+  `expected:<[Preparing playback...]> but was:<[wrong message for IDLE]>` — a failure that reads
+  as a production bug and is entirely the assertion's argument order. `:androidApp` tests use the
+  JUnit order (message first), `commonTest` suites use `kotlin.test` (message last), both correct.
+  When a failure message quotes your own label text as the *actual*, the assertion is misordered.
 ### 4. Coroutines in tests
 
 - A class that builds its own `CoroutineScope` on a real dispatcher is untestable until the scope is
@@ -530,6 +554,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 Every rule in this section is stated in each driver's docstring, because a driver is run unattended.
 
+- **`Pattern.finditer(s, re.M)` does not set a flag, and it does not raise.** On a *compiled*
+  pattern the second argument is `pos`, so the integer `8` is read as a start offset; `^` can then
+  never match again and the scan returns an empty list. A mutation driver that reads failure names
+  this way reports **"no test failed" for a suite that failed by name** — the verdict looks
+  trustworthy and the evidence is silently empty, which is the worst of the two failure modes.
+  Compile with the flag (`re.compile(pattern, re.M)`) and scan with one argument. The tell is a
+  driver that returns *no* evidence for mutations a hand-run catches immediately: run one by hand
+  and print the task's own output before believing any regex over it.
+- **Take the capture-group index from the pattern in front of you, not from another driver.**
+  `AGENTS.md` records the correct index as 3 for a `FAILED`-line pattern; this driver's pattern has
+  two groups (both bracket groups are non-capturing), so index 3 raised `IndexError: no such
+  group` on the first run. A rule quoted from a sibling file is a claim about that file.
 - **Never pass `-q`.** It suppresses Gradle's per-test `FAILED` lines, so every entry reports "build
   failed" instead of a name: the *verdict* survives and the *evidence* does not, and a run reporting
   no test names is indistinguishable from one whose mutations did not compile.

@@ -84,8 +84,8 @@ is not waiting on Phase 4.
 | `home` | 13 | 4 |
 | `network` | 2 | 4 |
 | `watchhistory` | 2 | 3 |
-| **`:app`** | **107** | **80** |
-| **total** | **189** | **104** |
+| **`:app`** | **107** | **81** |
+| **total** | **189** | **105** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
@@ -128,7 +128,15 @@ What moved `:app` was mostly **not** UI work. It was removing the things that we
 
 **What the plan above still gets wrong, corrected against the tree:**
 
-- *"Split `PlayerSessionViewModel` (1,410 lines)"* — still 1,409 and untouched. Unchanged
+- *"Split `PlayerSessionViewModel` (1,410 lines)"* — **step 1 done, the split itself not started.**
+  Four pure decisions were extracted into `PlayerSessionDecisions.kt` and pinned by 16
+  `androidHostTest` cases *before* any use case moved, because the class cannot be
+  constructed without a real player and "characterise before refactoring" is therefore
+  impossible until the decisions are separately nameable. Re-measured 2026-09-30: 1,411
+  lines and **54 functions**, of which 15 of 45 `com.crispy.tv` imports are
+  `:android:nativeengine.playback.*` — so the split moves **zero** files into `commonMain`
+  and is an `androidMain`-to-`androidMain` restructure that creates the seam Phase 5/6
+  needs. It is filed in the wrong phase and is Phase 5's item wearing a Phase 4 label.
   and still the highest-likelihood regression in the migration.
 - *"Verify the 28 shared-transition call sites"* — re-measured 2026-09-30: **27 files**, not
   28 and not 10, and the split that matters is **14 in `:app` `commonMain` against 13 in
@@ -573,7 +581,20 @@ left to be discovered.
   - **Corrected 2026-09-29:** the first destination is **`:app`'s own `commonMain`**, not `:sharedUI`'s. `:sharedUI` owns the design system and its assets; phone/tablet UI that `:tv` does not use goes to `:app/commonMain`, and `:app`'s empty `commonMain` is the thing that needed proving. Anything genuinely shared by both surfaces goes to `:sharedUI`.
 - The import rule in §4.1 applies to every file moved: coordinates change, imports do not.
 - `R.font.archivo_top10` → `composeResources`. Superseded by **Step 1: resources** below, which is the real prerequisite for moving any composable and splits it into two parts that must not be bundled.
-- Split `PlayerSessionViewModel` along use-case lines. **Highest-likelihood behavioural regression in the migration** — state, coroutine scoping and recomposition are all in play. Diff behaviour, not just pixels. **Still 1,409 lines and entirely untouched as of 2026-09-29.** Do it while the golden gate is fresh rather than at the end.
+- Split `PlayerSessionViewModel` along use-case lines. **Highest-likelihood behavioural regression in the migration** — state, coroutine scoping and recomposition are all in play. Diff behaviour, not just pixels. **Step 1 done 2026-09-30: the four pure decisions are extracted and pinned; the use-case split itself is not started, and the file is 1,411 lines with 54 functions.** Extract-then-pin came first and was not optional — see §1. **The split moves no files into `commonMain`**: 15 of its 45 `com.crispy.tv` imports are `:android:nativeengine.playback.*`, and `:android:native-engine` is a plain `com.android.library`, so what this buys Phase 5/6 is the seam, not a count.
+  - `PlayerSessionDecisions.kt` holds `resolveInitialEngine`, `statusMessage`,
+    `initialSeekDecision` (a `sealed interface` of `Wait`/`Clear`/`Seek`) and
+    `shouldFallBackToMpv`, all `internal` in the same package. Two of the two literal
+    body moves needed **no call-site edit at all** — the private members were shadowing
+    same-named top-level functions, so deleting the member *was* the change.
+  - **Three decisions a reader would get backwards, now pinned:** `Auto` starting on
+    ExoPlayer is a product decision (it means *try Exo, switch on a codec error*), not
+    "pick the best engine"; the readiness check is evaluated *before* the already-at-target
+    check, so a `PREPARING` snapshot that has reached the target waits rather than clears;
+    and the fallback's third conjunct is `preference != ExoPlayer`, **not** `== Libmpv` —
+    reversing it compiles, reads sensibly, and quietly reduces `Auto` to `ExoPlayer`.
+  - All three of those mutations are **caught by name** (`scripts/mutate_player_session_decisions.py`,
+    3 entries, 0 survived).
 - Verify the shared-transition call sites against CMP's documented limitations (no `AndroidView` interop, `ContentScale` snapping, no shape-clip animation). **The host is DONE and the count is corrected. 2026-09-30.**
   - **The count was wrong twice, and the second error was the informative one.** The plan said 28, then 10 across 6 files; measured over tracked sources it is **27 files — 14 in `:app` `commonMain`, 13 in `androidMain`**. The per-file list is in `AGENTS.md`.
   - **"Bound to navigation" is a statement about the file, not about the mechanism.** Across the whole repository there are exactly three distinct imports of shared-transition machinery: six sites of `com.crispy.tv.ui.navigation.LocalSharedTransitionScope`, **one** of `androidx.compose.animation.SharedTransitionScope` and **one** of `androidx.compose.animation.SharedTransitionLayout`. **Zero** of the 27 participants import `androidx.navigation` for the transition itself — `androidx.compose.animation` is Compose Multiplatform and present on every target. Navigation is what *navigates*; the thing that *transitions* is Compose.
