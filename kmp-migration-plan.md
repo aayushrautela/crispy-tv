@@ -76,7 +76,7 @@ is not waiting on Phase 4.
 | Module | `commonMain` | `androidMain` |
 |---|---|---|
 | `core-domain` | 29 | 0 |
-| `platform-core` | 6 | 0 |
+| `platform-core` | 7 | 0 |
 | `sharedUI` | 4 | 0 |
 | `player` | 6 | 0 |
 | `addons` | 10 | 5 |
@@ -150,17 +150,30 @@ compose-resources API, not a thin alias. The rule this gate is actually reaching
 written it would be switched off the first time it fired on correct code, which is the
 same failure mode as the stale-class gate had.
 
-**Phase 7 has a larger hole than that, and it blocks Phase 5 too.** All six
-`platform-core` interfaces — `SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`,
-`DistributionCapabilities`, `MonotonicClock` — have **no desktop implementation at all**.
-Phase 7's own text calls this out ("an impl that only works on Android is invisible until
-this runs"), and it is still unstarted. The part worth correcting is the phase it is filed
-under: `desktopApp` now reaches into `:app`'s `commonMain` for real, so the missing
-implementations are the **next** blocker on becoming a desktop app, not a hardening task
-that can wait until the end. `:platform-android` holds the Android side of all six and is
-a plain `com.android.library`, so it cannot itself be a `commonMain` dependency; whether
-it converts to `com.android.kotlin.multiplatform.library` is unverified and is the first
-question for the next landing.
+**The six-interface hole that blocked Phase 5 is closed** (2026-09-30). All six
+`platform-core` ports — `SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`,
+`DistributionCapabilities`, `MonotonicClock` — now have desktop implementations in
+`:android:platform-desktop`, a new plain `kotlin.jvm` module, constructed by
+`desktopApp`'s `DesktopEnvironment` and covered by 40 tests.
+
+**`:platform-android` was measured and deliberately left as a plain
+`com.android.library`**, which answers the question this note used to call the next
+landing's first question. Five modules already depend on it — `:android:app`,
+`:android:tv`, and `:android:watchhistory`, `:android:backend`, `:android:home` by
+`api` — and all four KMP consumers already take it from an `androidMain` source set.
+Converting it would have churned four modules to move code with no reason to move, so
+the desktop implementations went into a **symmetric sibling** instead. `:platform-android`'s
+own KDoc had already specified that shape: *"The desktop equivalents arrive with the
+desktop app in Phase 5 and the Apple equivalents in Phase 6, each against the same
+`platform-core` interfaces. That is the whole point of the interfaces existing."*
+
+**One thing that had to move for the two implementations to agree, and is worth
+remembering:** `SecureTokenStore`'s `PREFIX`/`IV_SEPARATOR`/`GCM_TAG_LENGTH_BITS` were
+`private` constants, so a second implementation had to reproduce the format by reading
+that file's body — a coupling with no compiler in it, where a change on one side produces
+values the other silently cannot read (`decrypt` returns `null`, which looks like a
+corrupt read rather than a format mismatch). They are now `SecretFormat` in
+`:platform-core`'s `commonMain`, beside the interface, and both sides reference it.
 
 **One measurement that is easy to get backwards, recorded because it was nearly got
 wrong:** `:desktopApp` being a plain `kotlin.jvm` module consuming a KMP library's `jvm`
@@ -740,7 +753,7 @@ Grow the Phase 1 skeleton into the shipping app.
 ### Phase 7 — Harden *(1 wk)*
 
 - Run the full contract suite on **all four** targets: Android, desktop JVM, `iosArm64`, `iosSimulatorArm64`.
-- Force every `platform-core` interface implementation onto the desktop target — an impl that only works on Android is invisible until this runs. **Re-measured 2026-09-30: all six interfaces (`SecretStore`, `KeyValueStore`, `AppLogger`, `TimeSource`, `DistributionCapabilities`, `MonotonicClock`) still have no desktop implementation whatsoever** — all six files are pure (`grep -cE "^import (android\.|java\.)"` is 0 for each), so nothing blocks writing them, and `platform-core` already declares `jvm("desktop")`. `desktopApp` still reaches none of them, though it now reaches `:app`'s `commonMain` for real. This is the single largest untouched item in the plan, and it gates **Phase 5** as much as Phase 7.
+- ~~Force every `platform-core` interface implementation onto the desktop target.~~ **Done 2026-09-30 in `:android:platform-desktop`** — a new plain `kotlin.jvm` module holding all six: `DesktopTimeSource`, `DesktopMonotonicClock`, `DesktopAppLogger`, `FileKeyValueStore`, `DesktopSecretStore`, `DesktopDistributionCapabilities`, with 40 tests. `desktopApp`'s `DesktopEnvironment` constructs all six and the window's size is persisted through the injected `KeyValueStore`, so the seam is exercised rather than declared. What the *rest* of this phase still holds: an impl that only works on Android is invisible until the full suite runs on all four targets, which is the first bullet.
 - CI gates: zero platform imports in `commonMain`; zero Compose in `sharedLogic`; no KMP library declares a flavour.
   - **This list previously read "zero `org.jetbrains.compose` imports anywhere", and that is wrong.** There are 93, all `org.jetbrains.compose.resources`, which is a real package — 124 classes in the desktop jar, zero `androidx/compose` classes in the same jar. The rule being reached for is §4.1's: no `org.jetbrains.compose.{runtime,ui,foundation,material3}` alias imports. A gate that fires on correct code gets switched off.
 - Publish the platform-support matrix: per module, shared vs platform-specific, with file paths.

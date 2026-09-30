@@ -21,16 +21,36 @@ import com.crispy.tv.watchhistory.ContinueWatchingRail
  * it deliberately does *not* render yet, and why.
  *
  * The rail is `:app` code reached through `:app`'s `desktop` JVM variant -- this
- * module holds no presentation of its own, only the window and the fixture seed.
+ * module holds no presentation of its own, only the window, the fixture seed and
+ * the [DesktopEnvironment] that supplies the platform ports.
  */
 fun main() {
+    val environment = DesktopEnvironment()
     val seed = SeedData.load()
 
+    // The window's size is read back out of the settings store and written on the
+    // way out, which is the smallest honest use of the seam: it drives an injected
+    // `KeyValueStore` through a real round trip, so a store that cannot persist
+    // shows up as a window that forgets its size rather than as a test nobody
+    // wrote. A first run has no stored value and takes the defaults.
+    val storedWidth = environment.settings.getFloat(WINDOW_WIDTH_KEY, DEFAULT_WINDOW_WIDTH_DP)
+    val storedHeight = environment.settings.getFloat(WINDOW_HEIGHT_KEY, DEFAULT_WINDOW_HEIGHT_DP)
+    environment.logger.info("Main", "Seeded ${seed.items.size} continue-watching item(s)")
+
     application {
+        val windowState = rememberWindowState(width = storedWidth.dp, height = storedHeight.dp)
+
         Window(
-            onCloseRequest = ::exitApplication,
+            // Written here rather than from a `SideEffect` on the size, which
+            // would rewrite the file on every frame of a drag -- hundreds of full
+            // read-modify-writes -- to record a value that only matters at launch.
+            onCloseRequest = {
+                environment.settings.putFloat(WINDOW_WIDTH_KEY, windowState.size.width.value.toFloat())
+                environment.settings.putFloat(WINDOW_HEIGHT_KEY, windowState.size.height.value.toFloat())
+                exitApplication()
+            },
             title = "Crispy",
-            state = rememberWindowState(width = 1100.dp, height = 800.dp),
+            state = windowState,
         ) {
             ContinueWatchingRail(
                 items = seed.items,

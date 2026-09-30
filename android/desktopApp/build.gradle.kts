@@ -87,6 +87,12 @@ dependencies {
 
     implementation(compose.desktop.currentOs)
 
+    // The desktop implementations of the `:android:platform-core` interfaces.
+    // Before this edge the module reached `:app` but had no way to construct a
+    // clock, a logger, a settings store or a secret store, so nothing portable
+    // that injects one could be called from here.
+    implementation(project(":android:platform-desktop"))
+
     // SeedData reads a real contract fixture off disk to seed the window.
     implementation(libs.serialization.json)
 

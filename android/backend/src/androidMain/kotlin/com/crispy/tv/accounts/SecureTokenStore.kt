@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.crispy.tv.platform.SecretFormat
 import com.crispy.tv.platform.SecretStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +48,7 @@ class SecureTokenStore(private val context: Context) : SecretStore {
     }
 
     /**
-     * The stored form is `$PREFIX<base64 iv>:<base64 ciphertext>`.
+     * The stored form is `${SecretFormat.PREFIX}<base64 iv>${SecretFormat.IV_SEPARATOR}<base64 ciphertext>`.
      *
      * The prefix is what makes [isEncrypted] answerable. Before it, the value was
      * a bare `iv:ciphertext` pair, and a two-part colon-separated string is not
@@ -67,21 +68,21 @@ class SecureTokenStore(private val context: Context) : SecretStore {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val iv = cipher.iv
         val ciphertext = cipher.doFinal(plaintext.toByteArray(StandardCharsets.UTF_8))
-        return PREFIX +
-            Base64.encodeToString(iv, Base64.NO_WRAP) + IV_SEPARATOR +
+        return SecretFormat.PREFIX +
+            Base64.encodeToString(iv, Base64.NO_WRAP) + SecretFormat.IV_SEPARATOR +
             Base64.encodeToString(ciphertext, Base64.NO_WRAP)
     }
 
-    override fun isEncrypted(value: String): Boolean = value.startsWith(PREFIX)
+    override fun isEncrypted(value: String): Boolean = SecretFormat.isEncrypted(value)
 
     override fun decrypt(stored: String): String? = runCatching {
-        val payload = if (stored.startsWith(PREFIX)) stored.removePrefix(PREFIX) else stored
-        val parts = payload.split(IV_SEPARATOR)
+        val payload = if (isEncrypted(stored)) stored.removePrefix(SecretFormat.PREFIX) else stored
+        val parts = payload.split(SecretFormat.IV_SEPARATOR)
         if (parts.size != 2) return@runCatching null
         val iv = Base64.decode(parts[0], Base64.NO_WRAP)
         val ciphertext = Base64.decode(parts[1], Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+        cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(SecretFormat.GCM_TAG_LENGTH_BITS, iv))
         String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
     }.getOrNull()
 
@@ -132,8 +133,5 @@ class SecureTokenStore(private val context: Context) : SecretStore {
         private const val KEY_SESSION = "session"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "crispy_secure_token_key"
-        private const val IV_SEPARATOR = ":"
-        private const val PREFIX = "enc_v1:"
-        private const val GCM_TAG_LENGTH_BITS = 128
     }
 }
