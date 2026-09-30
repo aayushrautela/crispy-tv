@@ -1,22 +1,16 @@
 package com.crispy.tv.home
 
-import android.content.Context
-import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendContextResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.backend.BackendContextResolver
+import com.crispy.tv.platform.AppLogger
+import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
-import com.crispy.tv.network.AppHttp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -31,60 +25,41 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.crispy.tv.platform.android.AndroidTimeSource
 
 private const val RAIL_LOAD_ATTEMPTS = 3
 private const val RAIL_RETRY_BACKOFF_MS = 400L
+private const val TAG = "HomeViewModel"
 
+/**
+ * The home screen's viewmodel. It took a single `appContext: Context` and built
+ * every collaborator in the factory below -- the same composition-root shape as
+ * the other ported viewmodels. What crosses the source-set line:
+ *
+ * - `refreshCoordinator`, `watchHistoryService` and `suppressionStore` are all
+ *   `commonMain` now (the coordinator moved outright; the service was already
+ *   an interface; the store was replanted on `KeyValueStore`).
+ * - `backendResolver` answers the context the sync channel needs; the
+ *   `CrispyBackendClient` lazy is gone, because its only use was the channel's
+ *   base URL, which the factory closes over instead.
+ * - `watchSyncFactory` builds the channel from a resolved context. A shared
+ *   interface would have had exactly one implementation used from one side of
+ *   the line, so `stashHandoff`'s rule applies: a function slot, not a port.
+ * - `timeSource`, `logger` and `ioDispatcher` are the established seams.
+ */
 class HomeViewModel internal constructor(
-    private val appContext: Context,
     private val refreshCoordinator: HomeRefreshCoordinator,
     private val watchHistoryService: WatchHistoryService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
+    private val backendResolver: BackendContextResolver,
+    private val watchSyncFactory: (
+        accessToken: String,
+        profileId: String,
+        onEffect: (WatchSyncEffect) -> Unit,
+    ) -> WatchSyncSource,
+    private val timeSource: TimeSource,
+    private val logger: AppLogger,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
-    companion object {
-        private const val TAG = "HomeViewModel"
-
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-                        val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
-                        val suppressionStore = ContinueWatchingSuppressionStore(appContext)
-                        @Suppress("UNCHECKED_CAST")
-                        return HomeViewModel(
-                            appContext = appContext,
-                            refreshCoordinator = HomeRefreshCoordinator(
-                                homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
-                                homeWatchActivityService = HomeWatchActivityService(),
-                                watchHistoryService = watchHistoryService,
-                                calendarService =
-                                    CalendarService(
-                                        backendClient = BackendServicesProvider.backendClient(appContext),
-                                        backendContextResolver = BackendContextResolverProvider.get(appContext),
-                                        logger = AndroidAppLogger(appContext),
-                                    ),
-                                upNextService =
-                                    UpNextService(
-                                        backendClient = BackendServicesProvider.backendClient(appContext),
-                                        backendContextResolver = BackendContextResolverProvider.get(appContext),
-                                        timeSource = AndroidTimeSource(),
-                                        logger = AndroidAppLogger(appContext),
-                                    ),
-                                suppressionStore = suppressionStore,
-                                timeSource = AndroidTimeSource(),
-                            ),
-                            watchHistoryService = watchHistoryService,
-                            suppressionStore = suppressionStore,
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
-
     private val _state = MutableStateFlow(HomeUiState())
 
     val uiState: StateFlow<HomeUiState> = _state.asStateFlow()
@@ -101,8 +76,6 @@ class HomeViewModel internal constructor(
     private var hasAttemptedInitialLoad = false
 
     private var watchSyncSource: WatchSyncSource? = null
-    private val backendResolver by lazy { BackendContextResolverProvider.get(appContext) }
-    private val backendClient by lazy { BackendServicesProvider.backendClient(appContext) }
 
     init {
         viewModelScope.launch {
@@ -140,16 +113,14 @@ coroutineScope {
     }
 
     fun onHomeVisible() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val context = backendResolver.resolve() ?: return@launch
             watchSyncSource?.close()
             watchSyncSource =
-                WatchSyncSource(
-                    httpClient = AppHttp.okHttp(appContext),
-                    baseUrl = backendClient.baseUrl,
-                    accessToken = context.accessToken,
-                    profileId = context.profileId,
-                    onEffect = { effect ->
+                watchSyncFactory(
+                    context.accessToken,
+                    context.profileId,
+                    { effect ->
                         when (effect) {
                             WatchSyncEffect.RefetchContinueWatching,
                             WatchSyncEffect.RefetchHistory,
@@ -180,7 +151,7 @@ coroutineScope {
 
     private suspend fun refreshPrimaryHomeIfStale() {
         val expiresAtMs = runCatching { refreshCoordinator.cachedHomeExpiresAtMs() }.getOrNull()
-        val nowMs = System.currentTimeMillis()
+        val nowMs = timeSource.nowMs()
         if (expiresAtMs == null || nowMs >= expiresAtMs) {
             loadPrimary()
         }
@@ -212,7 +183,7 @@ coroutineScope {
 
         viewModelScope.launch {
             val removalResult =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     if (item.id.isNotBlank()) {
                         watchHistoryService.removeFromPlayback(playbackId = item.id.trim())
                     } else {
@@ -229,7 +200,7 @@ coroutineScope {
     private suspend fun loadPrimary() {
         val snapshot = runCatching { refreshCoordinator.loadPrimarySnapshot() }.getOrElse { error ->
             if (error is CancellationException) throw error
-            Log.w(TAG, "Primary home feed load failed", error)
+            logger.warn(TAG, "Primary home feed load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load home feed.")
             HomePrimarySnapshot(hero = HeroState(isLoading = false))
         }
@@ -312,7 +283,7 @@ coroutineScope {
 
     private fun suppressKeys(vararg keys: String) {
         val suppressionMap = suppressedItemsByKey ?: mutableMapOf<String, Long>().also { suppressedItemsByKey = it }
-        val now = System.currentTimeMillis()
+        val now = timeSource.nowMs()
         keys.asSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }

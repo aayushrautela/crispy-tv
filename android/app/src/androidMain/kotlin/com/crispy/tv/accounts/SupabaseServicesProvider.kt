@@ -6,6 +6,7 @@ import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.HomeCatalogService
+import com.crispy.tv.home.CachingHomeCatalogService
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
@@ -111,8 +112,10 @@ object SupabaseServicesProvider {
         synchronized(this) {
             homeCatalogService?.let { return it }
             val appContext = context.applicationContext
+            // The cached type above is the `HomeCatalogService` interface; only the
+            // construction names the `org.json`-pinned implementation.
             val created =
-                HomeCatalogService(
+                CachingHomeCatalogService(
                     backendClient = BackendServicesProvider.backendClient(appContext),
                     backendContextResolver = BackendContextResolverProvider.get(appContext),
                     diskCacheStore = RecommendationCatalogDiskCacheStore(appContext, AndroidTimeSource()),

@@ -42,6 +42,7 @@ import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
+import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
 import kotlinx.coroutines.flow.combine
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
@@ -134,7 +135,7 @@ class LibraryViewModel internal constructor(
         viewModelScope.launch {
             val context = backendContextResolver.resolve() ?: return@launch
             syncSource =
-                WatchSyncSource(
+                OkHttpWatchSyncSource(
                     httpClient = AppHttp.okHttp(appContext),
                     baseUrl = backend.baseUrl,
                     accessToken = context.accessToken,

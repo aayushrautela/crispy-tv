@@ -10,7 +10,9 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.home.CatalogSectionLayoutMeta
 import com.crispy.tv.home.CalendarService
 import com.crispy.tv.home.ContinueWatchingSuppressionStore
+import com.crispy.tv.home.continueWatchingSuppressionStore
 import com.crispy.tv.home.HomeCatalogService
+import com.crispy.tv.home.CachingHomeCatalogService
 import com.crispy.tv.home.HomePrimarySnapshot
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshCoordinator
@@ -29,6 +31,7 @@ import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.tv.di.TvServices
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
+import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -66,11 +69,11 @@ class TvHomeViewModel internal constructor(
                         "Unknown ViewModel class: ${modelClass.name}"
                     }
                     val watchHistoryService = TvServices.watchHistoryService(appContext)
-                    val suppressionStore = ContinueWatchingSuppressionStore(appContext)
+                    val suppressionStore = continueWatchingSuppressionStore(appContext)
                     return TvHomeViewModel(
                         appContext = appContext,
                         refreshCoordinator = HomeRefreshCoordinator(
-                            homeCatalogService = HomeCatalogService(
+                            homeCatalogService = CachingHomeCatalogService(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
                                 diskCacheStore = RecommendationCatalogDiskCacheStore(appContext, AndroidTimeSource()),
@@ -177,7 +180,7 @@ class TvHomeViewModel internal constructor(
             val context = backendResolver.resolve() ?: return@launch
             watchSyncSource?.close()
             watchSyncSource =
-            WatchSyncSource(
+            OkHttpWatchSyncSource(
                 httpClient = com.crispy.tv.network.AppHttp.okHttp(appContext),
                 baseUrl = backendClient.baseUrl,
                 accessToken = context.accessToken,

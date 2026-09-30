@@ -24,7 +24,7 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 79 of the 175 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 80 of the 176 main-source files are there.
  *
  * The remaining 96 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
@@ -219,11 +219,16 @@ kotlin {
             // `java.util.Locale` on one line, and the models moved once that did. It
             // blocked 27 `:app` files, more than any other single upstream type.
             //
-            // `:home`'s *services* (`HomeCatalogService`, `CalendarService`,
-            // `UpNextService`) are still `androidMain` and still unreachable from here.
-            // Declaring the module does not grant that, because `commonMain` sees only
-            // `commonMain`.
+            // `:home`'s services travel through interfaces now (`HomeCatalogService`)
+            // or moved outright (`HomeRefreshCoordinator`,
+            // `ContinueWatchingSuppressionStore`, `CalendarService`,
+            // `UpNextService`); `commonMain` sees only `commonMain`, so only the
+            // portable half is visible here, which is the whole point.
             implementation(project(":android:home"))
+            // For the `WatchSyncSource` interface `HomeViewModel` drives. The
+            // OkHttp implementation stays in `:watchhistory`'s `androidMain`;
+            // this dependency is the interface, not the socket.
+            implementation(project(":android:watchhistory"))
             // Coil, for `CrispyImage.kt` and the card composables that render
             // through it. `coil-compose` and `coil-core` both publish
             // android, jvm, iosArm64, iosSimulatorArm64, macosArm64, js and

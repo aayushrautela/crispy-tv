@@ -31,26 +31,29 @@ import java.io.IOException
  *
  * The [httpClient] is injected so this module never depends on the app's
  * [com.crispy.tv.network.AppHttp] singleton.
+ *
+ * This is the `androidMain` implementation of [WatchSyncSource]. It stays here
+ * permanently: OkHttp, okio and `org.json` exist on no KMP target.
  */
-class WatchSyncSource(
+class OkHttpWatchSyncSource(
     private val httpClient: OkHttpClient,
     private val baseUrl: String,
     private val accessToken: String,
     private val profileId: String,
     private val onEffect: (WatchSyncEffect) -> Unit,
     private val maxDurationMs: Long = 30L * 60L * 1000L,
-) {
+) : WatchSyncSource {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var call: Call? = null
     private var opened = false
     private var maxDurationJob: Job? = null
     private var state: WatchSyncState = createWatchSyncState(profileId)
 
-    fun onSurfaceVisible() = handle(WatchSyncEvent.SurfaceBecameVisible)
+    override fun onSurfaceVisible() = handle(WatchSyncEvent.SurfaceBecameVisible)
 
-    fun onSurfaceHidden() = handle(WatchSyncEvent.SurfaceHidden)
+    override fun onSurfaceHidden() = handle(WatchSyncEvent.SurfaceHidden)
 
-    fun close() {
+    override fun close() {
         opened = false
         maxDurationJob?.cancel()
         call?.cancel()

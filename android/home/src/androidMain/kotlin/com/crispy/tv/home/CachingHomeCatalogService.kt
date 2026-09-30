@@ -1,9 +1,8 @@
 package com.crispy.tv.home
 
-import androidx.compose.runtime.Immutable
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.toStringMap
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
@@ -43,36 +42,30 @@ private const val PREVIEW_ITEM_LIMIT = 12
 private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
 
 
-@Immutable
-data class HomeHeroLoadResult(
-    val items: List<HomeHeroItem> = emptyList(),
-    val statusMessage: String = "",
-)
-
-@Immutable
-data class HomePrimaryFeedLoadResult(
-    val heroResult: HomeHeroLoadResult = HomeHeroLoadResult(),
-    val sections: List<CatalogSectionRef> = emptyList(),
-    val sectionsStatusMessage: String = "",
-)
-
-class HomeCatalogService constructor(
-    private val backendClient: CrispyBackendClient,
+/**
+ * The `androidMain` implementation of [HomeCatalogService]. It stays here
+ * permanently: the snapshot mapping below is written against `org.json`,
+ * which is a class of the Android platform rather than a dependency of this
+ * project. The two result types it returns already live in `commonMain`, so
+ * the only thing pinning a caller was the service type itself.
+ */
+class CachingHomeCatalogService constructor(
+    private val backendClient: BackendApi,
     private val backendContextResolver: BackendContextResolver,
     private val diskCacheStore: RecommendationCatalogDiskCacheStore,
-) {
+) : HomeCatalogService {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val inFlightMutex = Mutex()
     private val inFlightSnapshots = mutableMapOf<String, Deferred<HomeCatalogSnapshot>>()
-    suspend fun loadPrimaryHomeFeed(
-        sectionLimit: Int = Int.MAX_VALUE,
+    override suspend fun loadPrimaryHomeFeed(
+        sectionLimit: Int,
     ): HomePrimaryFeedLoadResult {
         val snapshot = loadSnapshot()
         return snapshot.toPrimaryHomeFeedLoadResult(sectionLimit = sectionLimit)
     }
 
-    suspend fun loadCachedPrimaryHomeFeed(
-        sectionLimit: Int = Int.MAX_VALUE,
+    override suspend fun loadCachedPrimaryHomeFeed(
+        sectionLimit: Int,
     ): HomePrimaryFeedLoadResult? {
         val backendContext = getBackendContext()
         // Stale-while-revalidate: reuse the last snapshot regardless of age so a
@@ -82,7 +75,7 @@ class HomeCatalogService constructor(
         return snapshot.toPrimaryHomeFeedLoadResult(sectionLimit = sectionLimit)
     }
 
-    suspend fun fetchCatalogPage(
+    override suspend fun fetchCatalogPage(
         section: CatalogSectionRef,
         page: Int,
         pageSize: Int,
@@ -170,7 +163,7 @@ class HomeCatalogService constructor(
         return null
     }
 
-    suspend fun cachedHomeExpiresAtMs(): Long? {
+    override suspend fun cachedHomeExpiresAtMs(): Long? {
         val backendContext = getBackendContext()
         return readCachedHomeExpiresAtMs(profileId = backendContext?.profileId)
     }
