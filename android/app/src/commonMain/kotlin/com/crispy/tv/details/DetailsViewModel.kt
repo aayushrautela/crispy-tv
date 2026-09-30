@@ -4,9 +4,6 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import android.content.Context
-import android.util.Log
-import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.domain.optimistic.EpisodeWatchedMutation
 import com.crispy.tv.domain.optimistic.FieldSync
 import com.crispy.tv.domain.optimistic.MutationStatus
@@ -20,22 +17,21 @@ import com.crispy.tv.domain.optimistic.deriveUserState
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.optimistic.UserMutationOutbox
-import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.addons.streams.AddonStream
-import com.crispy.tv.distribution.AppDistribution
-import com.crispy.tv.platform.android.AndroidAppLogger
+import com.crispy.tv.addons.streams.StreamResolver
+import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.platform.AppLogger
+import com.crispy.tv.streams.PluginStreamLoader
 import com.crispy.tv.streams.SelectorCoordinator
-import com.crispy.tv.streams.StreamResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.lookup.findEpisodeForLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.lookup.parseLookupId
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,7 +43,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 class DetailsViewModel internal constructor(
     private val itemId: String,
@@ -55,22 +50,30 @@ class DetailsViewModel internal constructor(
     private val runtimeEntry: RuntimeDetailsEntry?,
     private val detailsUseCases: DetailsUseCases,
     private val outbox: UserMutationOutbox,
-    appContext: Context,
+    streamResolver: StreamResolver,
+    private val logger: AppLogger,
+    getMetadataItemDetail: suspend (accessToken: String, itemId: String) -> MetadataTitleDetailResponse,
+    sessionTokenProvider: suspend () -> String?,
+    pluginStreamLoader: PluginStreamLoader?,
+    private val stashHandoff: (AddonStream, String) -> String?,
+    private val newMutationId: () -> String,
+    private val languageTagProvider: () -> String,
+    private val clock: () -> Long,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
+    // The coordinator is built here rather than in the factory: `scope` is
+    // `viewModelScope`, an extension property that only exists on a ViewModel.
+    // The factory therefore passes the coordinator's *dependencies* — all ports
+    // or function slots — and keeps the composition-root wiring itself.
     val coordinator =
         SelectorCoordinator(
             scope = viewModelScope,
-            streamResolver = StreamResolverProvider.get(appContext),
-            logger = AndroidAppLogger(appContext),
-            getMetadataItemDetail = { token, metadataItemId ->
-                BackendServicesProvider.backendClient(appContext)
-                    .getMetadataItemDetail(accessToken = token, itemId = metadataItemId)
-            },
-            sessionTokenProvider = {
-                SupabaseServicesProvider.accountClient(appContext).ensureValidSession()?.accessToken
-            },
-            pluginStreamLoader = AppDistribution.current.pluginStreamLoader(appContext),
+            streamResolver = streamResolver,
+            logger = logger,
+            getMetadataItemDetail = getMetadataItemDetail,
+            sessionTokenProvider = sessionTokenProvider,
+            pluginStreamLoader = pluginStreamLoader,
         )
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
@@ -89,7 +92,7 @@ class DetailsViewModel internal constructor(
     private var allSeasonsWatchJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
-    @Volatile
+    @kotlin.concurrent.Volatile
     private var reloadGeneration: Long = 0L
 
     /** Last known server truth for this title; optimistic pending mutations are merged on top. */
@@ -201,7 +204,7 @@ class DetailsViewModel internal constructor(
         reloadJob?.cancel()
         val generation = ++reloadGeneration
         reloadJob = viewModelScope.launch {
-            val nowMs = System.currentTimeMillis()
+            val nowMs = clock()
 
             aiJob?.cancel()
             coordinator.dismiss()
@@ -239,7 +242,7 @@ class DetailsViewModel internal constructor(
             }
 
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     detailsUseCases.loadScreen(
                         itemId = itemId,
                         requestedMediaType = requestedMediaType,
@@ -250,7 +253,7 @@ class DetailsViewModel internal constructor(
             if (!isCurrentGeneration(generation)) return@launch
 
             val enrichedDetails = result.details
-            Log.d(
+            logger.debug(
                 "DetailsViewModel",
                 "rendered details itemId=${enrichedDetails?.itemId} title=${enrichedDetails?.title}",
             )
@@ -297,13 +300,13 @@ class DetailsViewModel internal constructor(
             }
 
             val detailsForAi = enrichedDetails
-            val aiLocale = Locale.getDefault()
+            val languageTag = languageTagProvider()
             val aiItemId = detailsForAi?.itemId?.trim()
 
             if (!aiItemId.isNullOrBlank()) {
                 val cached =
-                    withContext(Dispatchers.IO) {
-                        detailsUseCases.loadCachedAiInsights(aiItemId, aiLocale.toLanguageTag())
+                    withContext(ioDispatcher) {
+                        detailsUseCases.loadCachedAiInsights(aiItemId, languageTag)
                     }
                 if (cached != null && isCurrentGeneration(generation)) {
                     _uiState.update { it.copy(aiInsights = cached) }
@@ -319,7 +322,7 @@ class DetailsViewModel internal constructor(
         extrasJob =
             viewModelScope.launch {
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.loadExtras(itemId = itemId)
                     }
                 if (!isCurrentGeneration(generation)) return@launch
@@ -328,7 +331,7 @@ class DetailsViewModel internal constructor(
                 val isEpisodicTitle = _uiState.value.details
                     ?.itemType?.let { !it.equals("movie", ignoreCase = true) } == true
                 val allEpisodes = if (titleExtras != null && isEpisodicTitle) {
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.loadAllEpisodes(itemId = itemId)
                     }
                 } else {
@@ -409,7 +412,7 @@ class DetailsViewModel internal constructor(
         ratingsJob =
             viewModelScope.launch {
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.loadRatings(itemId = itemId)
                     }
                 if (!isCurrentGeneration(generation)) return@launch
@@ -447,7 +450,7 @@ class DetailsViewModel internal constructor(
 
         startAiGeneration(
             itemId = aiItemId,
-            locale = Locale.getDefault(),
+            languageTag = languageTagProvider(),
             showStory = true,
             announce = true,
         )
@@ -459,7 +462,7 @@ class DetailsViewModel internal constructor(
 
     private fun startAiGeneration(
         itemId: String,
-        locale: Locale,
+        languageTag: String,
         showStory: Boolean,
         announce: Boolean,
     ) {
@@ -473,10 +476,10 @@ class DetailsViewModel internal constructor(
                 }
 
                 runCatching {
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.generateAiInsights(
                             itemId = itemId,
-                            languageTag = locale.toLanguageTag(),
+                            languageTag = languageTag,
                         )
                     }
                 }.onSuccess { result ->
@@ -579,7 +582,7 @@ class DetailsViewModel internal constructor(
 
         val headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes)
 
-        Log.d(
+        logger.debug(
             "DetailsViewModel",
             "stream selector target mediaType=${target.mediaType} lookupId=${target.lookupId} " +
                 "tmdbId=${target.tmdbId} source=${if (state.continueVideoId.isNullOrBlank()) "resolved" else "continueVideoId"}",
@@ -680,7 +683,7 @@ class DetailsViewModel internal constructor(
         episodesJob =
             viewModelScope.launch {
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.loadSeasonEpisodes(
                             season = season,
                             details = details,
@@ -731,7 +734,7 @@ class DetailsViewModel internal constructor(
             viewModelScope.launch {
                 val details = _uiState.value.details ?: return@launch
                 val episodeWatchStates =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.resolveEpisodeWatchStates(details, videos)
                     }
                 _uiState.update { current ->
@@ -763,7 +766,7 @@ class DetailsViewModel internal constructor(
         allSeasonsWatchJob =
             viewModelScope.launch {
                 val watchStates =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         detailsUseCases.resolveEpisodeWatchStates(details, allEpisodes)
                     }
                 if (!isCurrentGeneration(generation)) return@launch
@@ -841,7 +844,7 @@ class DetailsViewModel internal constructor(
             return
         }
 
-        Log.d(
+        logger.debug(
             "DetailsViewModel",
             "stream selector open mediaType=${target.mediaType} lookupId=${target.lookupId} tmdbId=${target.tmdbId}",
         )
@@ -868,7 +871,7 @@ class DetailsViewModel internal constructor(
 
     fun onStreamSelected(stream: AddonStream) {
         if (!stream.hasPlayableSource) {
-            Log.w("DetailsViewModel", "stream selected without playable source provider=${stream.providerId} stableKey=${stream.stableKey}")
+            logger.warn("DetailsViewModel", "stream selected without playable source provider=${stream.providerId} stableKey=${stream.stableKey}")
             _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
@@ -891,12 +894,12 @@ class DetailsViewModel internal constructor(
         viewModelScope.launch {
             val details = initialDetails
                 ?: run {
-                    Log.w("DetailsViewModel", "stream selected but details are missing; aborting playback")
+                    logger.warn("DetailsViewModel", "stream selected but details are missing; aborting playback")
                     return@launch
                 }
 
             val enriched =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     detailsUseCases.ensureImdbId(details, requestedMediaType)
                 }
             if (enriched.imdbId != details.imdbId) {
@@ -957,7 +960,7 @@ class DetailsViewModel internal constructor(
                 parentMediaType = enriched.parentMediaType ?: parentMediaType,
                 absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
             )
-            val resumePositionMs = withContext(Dispatchers.IO) {
+            val resumePositionMs = withContext(ioDispatcher) {
                 detailsUseCases.userMediaRepository
                     .getLocalWatchProgress(identity)
                     ?.takeIf { it.progressPercent in 1.0..95.0 }
@@ -965,8 +968,8 @@ class DetailsViewModel internal constructor(
                     ?: 0L
             }
 
-            val chosenStreamHandoffKey = PlayerStreamHandoff.stash(stream, resolvedLookupId)
-            Log.d(
+            val chosenStreamHandoffKey = stashHandoff(stream, resolvedLookupId)
+            logger.debug(
                 "DetailsViewModel",
                 "stream selected provider=${stream.providerId} name=${stream.name} stableKey=${stream.stableKey} " +
                     "url=${stream.url?.take(96)} lookupId=$resolvedLookupId handoffKey=$chosenStreamHandoffKey " +
@@ -989,10 +992,10 @@ class DetailsViewModel internal constructor(
         val details = uiState.value.details ?: return
         val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
         val desired = !uiState.value.isInWatchlist
-        val now = System.currentTimeMillis()
+        val now = clock()
         outbox.enqueue(
             WatchlistMutation(
-                id = newUserMutationId(),
+                id = newMutationId(),
                 titleItemId = targetId,
                 entityId = targetId,
                 createdAtMs = now,
@@ -1009,10 +1012,10 @@ class DetailsViewModel internal constructor(
         val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
         val contentType = (details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE).toContentType()
         val desired = !uiState.value.isWatched
-        val now = System.currentTimeMillis()
+        val now = clock()
         outbox.enqueue(
             TitleWatchedMutation(
-                id = newUserMutationId(),
+                id = newMutationId(),
                 titleItemId = targetId,
                 entityId = targetId,
                 createdAtMs = now,
@@ -1035,10 +1038,10 @@ class DetailsViewModel internal constructor(
             return
         }
         val desired = !(uiState.value.episodeWatchStates[video.id]?.isWatched ?: false)
-        val now = System.currentTimeMillis()
+        val now = clock()
         outbox.enqueue(
             EpisodeWatchedMutation(
-                id = newUserMutationId(),
+                id = newMutationId(),
                 titleItemId = targetId,
                 entityId = "$targetId#S$season:E$episode",
                 createdAtMs = now,
@@ -1056,10 +1059,10 @@ class DetailsViewModel internal constructor(
 
     fun toggleSeasonWatched(seasonItemId: String, seasonNumber: Int) {
         val desired = !(uiState.value.seasonWatchStates[seasonNumber] ?: false)
-        val now = System.currentTimeMillis()
+        val now = clock()
         outbox.enqueue(
             SeasonWatchedMutation(
-                id = newUserMutationId(),
+                id = newMutationId(),
                 titleItemId = itemId,
                 entityId = seasonItemId,
                 createdAtMs = now,
@@ -1076,10 +1079,10 @@ class DetailsViewModel internal constructor(
     fun setLiked(liked: Boolean?) {
         val details = uiState.value.details ?: return
         val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
-        val now = System.currentTimeMillis()
+        val now = clock()
         outbox.enqueue(
             RatingMutation(
-                id = newUserMutationId(),
+                id = newMutationId(),
                 titleItemId = targetId,
                 entityId = targetId,
                 createdAtMs = now,
@@ -1104,30 +1107,6 @@ class DetailsViewModel internal constructor(
         onOpenStreamSelectorForEpisode(target.id)
     }
 
-    companion object {
-        internal fun factory(
-            itemId: String,
-            itemType: String,
-            runtimeEntry: RuntimeDetailsEntry?,
-            detailsUseCases: DetailsUseCases,
-            outbox: UserMutationOutbox,
-            appContext: Context,
-        ): ViewModelProvider.Factory {
-            return object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return DetailsViewModel(
-                        itemId = itemId,
-                        itemType = itemType,
-                        runtimeEntry = runtimeEntry,
-                        detailsUseCases = detailsUseCases,
-                        outbox = outbox,
-                        appContext = appContext.applicationContext,
-                    ) as T
-                }
-            }
-        }
-    }
 }
 
 private data class PendingEpisodeNavigation(

@@ -74,7 +74,9 @@ class AppGraph(
         itemType: String,
         runtimeEntry: RuntimeDetailsEntry? = null,
     ): ViewModelProvider.Factory {
-        return DetailsViewModel.factory(
+        // The member name shadows the top-level factory, so this is qualified:
+        // AppGraph only forwards its own wiring, it makes no decisions here.
+        return com.crispy.tv.details.detailsViewModelFactory(
             itemId = itemId,
             itemType = itemType,
             runtimeEntry = runtimeEntry,
