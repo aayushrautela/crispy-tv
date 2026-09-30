@@ -1,5 +1,6 @@
 package com.crispy.tv.optimistic
 
+
 import com.crispy.tv.domain.optimistic.EpisodeWatchedMutation
 import com.crispy.tv.domain.optimistic.MediaContentType
 import com.crispy.tv.domain.optimistic.MutationKind
@@ -16,16 +17,13 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Durable, process-death-safe store for pending mutations. Backed by a single
- * JSON file; loading coerces any transient [MutationStatus.Inflight] entry back
- * to [MutationStatus.Pending] so a write interrupted by a crash is retried.
+ * The [PendingMutationStore] implementation that persists to a single JSON file.
+ *
+ * It is `androidMain` permanently, and not because anything here is Android-specific:
+ * it reaches for `org.json`, which is a class of the Android platform supplied by
+ * `android.jar` rather than a dependency of this project, so a KMP source set does not
+ * have it at all. The interface travels; this file does not.
  */
-interface PendingMutationStore {
-    suspend fun loadAll(): List<UserMutation>
-
-    suspend fun saveAll(mutations: List<UserMutation>)
-}
-
 internal class FileBackedPendingMutationStore(
     private val file: File,
 ) : PendingMutationStore {

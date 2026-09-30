@@ -20,6 +20,7 @@ import com.crispy.tv.domain.optimistic.deriveUserState
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.optimistic.UserMutationOutbox
+import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
@@ -991,7 +992,7 @@ class DetailsViewModel internal constructor(
         val now = System.currentTimeMillis()
         outbox.enqueue(
             WatchlistMutation(
-                id = UserMutationOutbox.newId(),
+                id = newUserMutationId(),
                 titleItemId = targetId,
                 entityId = targetId,
                 createdAtMs = now,
@@ -1011,7 +1012,7 @@ class DetailsViewModel internal constructor(
         val now = System.currentTimeMillis()
         outbox.enqueue(
             TitleWatchedMutation(
-                id = UserMutationOutbox.newId(),
+                id = newUserMutationId(),
                 titleItemId = targetId,
                 entityId = targetId,
                 createdAtMs = now,
@@ -1037,7 +1038,7 @@ class DetailsViewModel internal constructor(
         val now = System.currentTimeMillis()
         outbox.enqueue(
             EpisodeWatchedMutation(
-                id = UserMutationOutbox.newId(),
+                id = newUserMutationId(),
                 titleItemId = targetId,
                 entityId = "$targetId#S$season:E$episode",
                 createdAtMs = now,
@@ -1058,7 +1059,7 @@ class DetailsViewModel internal constructor(
         val now = System.currentTimeMillis()
         outbox.enqueue(
             SeasonWatchedMutation(
-                id = UserMutationOutbox.newId(),
+                id = newUserMutationId(),
                 titleItemId = itemId,
                 entityId = seasonItemId,
                 createdAtMs = now,
@@ -1078,7 +1079,7 @@ class DetailsViewModel internal constructor(
         val now = System.currentTimeMillis()
         outbox.enqueue(
             RatingMutation(
-                id = UserMutationOutbox.newId(),
+                id = newUserMutationId(),
                 titleItemId = targetId,
                 entityId = targetId,
                 createdAtMs = now,

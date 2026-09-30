@@ -40,6 +40,7 @@ import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.network.AppHttp
+import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import kotlinx.coroutines.flow.combine
 import com.crispy.tv.PlaybackDependencies
@@ -264,7 +265,7 @@ class LibraryViewModel internal constructor(
         val now = System.currentTimeMillis()
         outbox.enqueue(
             TitleWatchedMutation(
-                id = UserMutationOutbox.newId(),
+                id = newUserMutationId(),
                 titleItemId = item.itemId,
                 entityId = item.itemId,
                 createdAtMs = now,

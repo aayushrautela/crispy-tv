@@ -23,8 +23,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Process-wide coordinator for optimistic user mutations.
@@ -44,34 +42,50 @@ class UserMutationOutbox(
     private val executor: MutationExecutor,
     private val scope: CoroutineScope,
     private val policy: RetryPolicy = RetryPolicy(),
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val clock: () -> Long,
     private val pollMs: Long = 250,
 ) {
     private val mutex = Mutex()
-    private val started = AtomicBoolean(false)
+    private var started = false
     private val _byItem = MutableStateFlow<Map<String, List<UserMutation>>>(emptyMap())
     private var processorJob: Job? = null
 
     fun start() {
-        if (!started.compareAndSet(false, true)) return
-        processorJob =
-            scope.launch {
-                val loaded =
-                    store.loadAll().map { mutation ->
-                        if (mutation.status == MutationStatus.Inflight) {
-                            mutation.copyStatus(MutationStatus.Pending)
-                        } else {
-                            mutation
-                        }
+        scope.launch {
+            // `java.util.concurrent.atomic.AtomicBoolean` has no commonMain equivalent, and
+            // this class already owns a Mutex, so the once-only latch is that Mutex. The
+            // latch is taken and released before the long poll loop below, so a second
+            // start() cannot end up queued behind it rather than returning immediately.
+            val alreadyStarted = mutex.withLock { started.also { started = true } }
+            if (alreadyStarted) return@launch
+            // Only the latch winner may own `processorJob`. A rejected second start
+            // must not overwrite it: `stop()` cancels this field, and cancelling the
+            // rejected no-op job instead would leave the live processor running with
+            // nobody holding a handle to it. That is exactly what the latch test
+            // (`start(); start(); stop()`) pins.
+            // `coroutineContext` here is the launched child's context (the lambda's
+            // receiver is the child's scope, not the outer one), so this is the live
+            // processor's own handle — not the jobless outer scope's.
+            processorJob = coroutineContext[Job]
+            val loaded =
+                store.loadAll().map { mutation ->
+                    if (mutation.status == MutationStatus.Inflight) {
+                        mutation.copyStatus(MutationStatus.Pending)
+                    } else {
+                        mutation
                     }
-                commit(loaded, persist = true)
-                processLoop()
-            }
+                }
+            commit(loaded, persist = true)
+            processLoop()
+        }
     }
 
     fun stop() {
         processorJob?.cancel()
-        started.set(false)
+        // Deliberately not taking the latch: start() and stop() are both called from the
+        // composition root on one thread, and holding the Mutex here would mean either
+        // making stop() suspend or reading the flag twice.
+        started = false
     }
 
     fun observeItem(itemId: String): StateFlow<List<UserMutation>> =
@@ -86,21 +100,33 @@ class UserMutationOutbox(
     /** Register a new intent. Rapid same-target toggles coalesce to the latest. */
     fun enqueue(mutation: UserMutation) {
         val now = clock()
-        val pending =
-            mutation.copyStatus(MutationStatus.Pending).copyNextAttempt(now)
-        val next =
-            coalesce(_byItem.value.values.flatten().filter { it.id != pending.id }, pending)
-        scope.launch { commit(next, persist = true) }
+        val pending = mutation.copyStatus(MutationStatus.Pending).copyNextAttempt(now)
+        scope.launch {
+            // The snapshot MUST be taken inside the launch, under the same lock as
+            // the commit. An earlier revision snapshotted `_byItem` eagerly here and
+            // committed later: two rapid enqueues then computed from the same stale
+            // state and the last commit silently dropped the first mutation. The
+            // `toggles of different targets both survive` case pins it.
+            mutex.withLock {
+                val next = coalesce(_byItem.value.values.flatten().filter { it.id != pending.id }, pending)
+                commitLocked(next, persist = true)
+            }
+        }
     }
 
     /** Re-attempt a mutation that previously failed. */
     fun retry(id: String) {
         val now = clock()
-        val next =
-            _byItem.value.values.flatten().map {
-                if (it.id == id) it.copyStatus(MutationStatus.Pending).copyNextAttempt(now) else it
+        scope.launch {
+            // Same lost-update shape as [enqueue]: snapshot under the commit lock.
+            mutex.withLock {
+                val next =
+                    _byItem.value.values.flatten().map {
+                        if (it.id == id) it.copyStatus(MutationStatus.Pending).copyNextAttempt(now) else it
+                    }
+                commitLocked(next, persist = true)
             }
-        scope.launch { commit(next, persist = true) }
+        }
     }
 
     private suspend fun processLoop() {
@@ -187,11 +213,14 @@ class UserMutationOutbox(
     }
 
     private suspend fun commit(mutations: List<UserMutation>, persist: Boolean) {
-        mutex.withLock {
-            _byItem.value = mutations.groupBy { it.titleItemId }
-            if (persist) {
-                store.saveAll(mutations)
-            }
+        mutex.withLock { commitLocked(mutations, persist) }
+    }
+
+    /** The commit itself, for call sites that already hold [mutex] ([enqueue], [retry]). */
+    private suspend fun commitLocked(mutations: List<UserMutation>, persist: Boolean) {
+        _byItem.value = mutations.groupBy { it.titleItemId }
+        if (persist) {
+            store.saveAll(mutations)
         }
     }
 
@@ -202,10 +231,6 @@ class UserMutationOutbox(
             if (idx >= 0) all[idx] = mutation else all.add(mutation)
             _byItem.value = all.groupBy { it.titleItemId }
         }
-    }
-
-    companion object {
-        fun newId(): String = UUID.randomUUID().toString()
     }
 }
 

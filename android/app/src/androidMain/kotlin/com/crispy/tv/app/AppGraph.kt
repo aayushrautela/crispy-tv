@@ -77,7 +77,15 @@ class AppGraph(
         )
         val executor = UserMediaMutationExecutor(userMediaRepository)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        UserMutationOutbox(store = store, executor = executor, scope = scope)
+        UserMutationOutbox(
+            store = store,
+            executor = executor,
+            scope = scope,
+            // The clock was a defaulted lambda whose body was a JVM call; a default that
+            // cannot compile in commonMain is not a default, it is a decision the
+            // composition root has to make, so it makes it here.
+            clock = { System.currentTimeMillis() },
+        )
     }
 
     internal fun detailsUseCases(): DetailsUseCases = detailsUseCases
