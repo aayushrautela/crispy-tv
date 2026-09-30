@@ -329,6 +329,12 @@ internal fun DetailsScreen(
                     onRetry = onRetry,
                     onSeasonSelected = onSeasonSelected,
                     onItemClick = onItemClick,
+                    reviewProviderBadge = { provider ->
+                        ReviewProviderBadge(provider = provider)
+                    },
+                    ratingBadgeLogo = { logo ->
+                        DetailsRatingBadgeLogo(logo = logo)
+                    },
                     onPersonClick = onPersonClick,
                     onEpisodeClick = onEpisodeClick,
                     onToggleEpisodeWatched = onToggleEpisodeWatched,

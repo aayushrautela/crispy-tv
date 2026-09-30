@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import androidx.annotation.RawRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,18 +26,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.addons.util.normalizeRatingText
 import com.crispy.tv.backend.MetadataTitleRatings
-import com.crispy.tv.ui.assets.R
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_star_filled
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+
+/**
+ * Which provider's logo a rating badge wears.
+ *
+ * `com.crispy.tv.ui.assets.R` is an Android resource class, so the badge used to carry a
+ * raw resource id and that was the only thing keeping this file in `androidMain`. The
+ * *identity* of a badge is not a resource -- it is a value -- so the identity lives here and
+ * `DetailsRatingBadgeLogo` (androidMain) is the only thing that turns it into a drawable,
+ * exactly as `ReviewProvider`/`reviewProviderOrNull` already do for the cast and reviews
+ * rows.
+ */
+enum class RatingBadgeLogo {
+    TMDB,
+    IMDB,
+    TRAKT,
+    ROTTEN_TOMATOES,
+    METACRITIC,
+    LETTERBOXD,
+    MYANIMELIST,
+}
 
 @Composable
 internal fun RatingsSection(
@@ -47,6 +64,7 @@ internal fun RatingsSection(
     isLoading: Boolean,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
+    ratingBadgeLogo: @Composable (RatingBadgeLogo) -> Unit,
 ) {
     val ratings = remember(tmdbRating, titleRatings) {
         buildRatings(
@@ -75,14 +93,18 @@ internal fun RatingsSection(
             }
         } else {
             items(items = ratings, key = { it.key }) { rating ->
-                RatingPill(rating = rating)
+                RatingPill(rating = rating, ratingBadgeLogo = ratingBadgeLogo)
             }
         }
     }
 }
 
 @Composable
-private fun RatingPill(rating: DetailsRatingPill, modifier: Modifier = Modifier) {
+private fun RatingPill(
+    rating: DetailsRatingPill,
+    ratingBadgeLogo: @Composable (RatingBadgeLogo) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier.widthIn(min = 160.dp),
         shape = RoundedCornerShape(999.dp),
@@ -93,17 +115,13 @@ private fun RatingPill(rating: DetailsRatingPill, modifier: Modifier = Modifier)
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val badgeLogoRes = rating.badgeLogoRes
-            if (badgeLogoRes != null) {
+            val badgeLogo = rating.badgeLogo
+            if (badgeLogo != null) {
                 Box(
                     modifier = Modifier.size(36.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    AsyncImage(
-                        model = badgeLogoRes,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    ratingBadgeLogo(badgeLogo)
                 }
             } else {
                 Surface(
@@ -159,7 +177,10 @@ private fun RatingPillPlaceholder(modifier: Modifier = Modifier) {
     )
 }
 
-private data class DetailsRatingPill(
+// `internal` rather than `private` because the badge decision is the part of this
+// file the R-split made portable, and a decision nobody can call is a decision
+// nobody can test. See DetailsRatingsSectionTest.
+internal data class DetailsRatingPill(
     val key: String,
     val source: String,
     val score: String,
@@ -167,10 +188,10 @@ private data class DetailsRatingPill(
     val badgeColor: Color,
     val badgeContentColor: Color,
     val badgeIcon: DrawableResource? = null,
-    @param:RawRes val badgeLogoRes: Int? = null,
+    val badgeLogo: RatingBadgeLogo? = null,
 )
 
-private fun buildRatings(
+internal fun buildRatings(
     tmdbRating: String?,
     titleRatings: MetadataTitleRatings?,
 ): List<DetailsRatingPill> {
@@ -180,9 +201,18 @@ private fun buildRatings(
         buildRatingPill(
             key = "tmdb",
             source = "TMDB",
+            // The `takeIf` is deliberately redundant, and was kept deliberately. A mutation
+            // that removed it fails nothing, and the reason is worth writing down rather
+            // than rediscovering: `formatRatingOutOfTen` returns null for a blank string, so
+            // `formatTmdbRating("")` is "" and `buildRatingPill`'s own `resolvedScore` check
+            // drops the blank score a moment later. The guard restates a rule the formatter
+            // already enforces and the pill builder re-enforces, which is why it is a cheap
+            // local statement of "a blank fallback string is not a rating" rather than the
+            // thing that makes it true. Removing it would also silently make this call site
+            // depend on a behaviour of a function in another module.
             score = resolvedTitleRatings?.tmdb?.asOutOfTen() ?: tmdbRating?.trim()?.takeIf { it.isNotBlank() }?.let(::formatTmdbRating),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.tmdb,
+                logo = RatingBadgeLogo.TMDB,
                 text = "TMDB",
                 backgroundColor = Color(0xFF01B4E4),
                 contentColor = Color.White,
@@ -193,7 +223,7 @@ private fun buildRatings(
             source = "IMDb",
             score = resolvedTitleRatings?.imdb?.asOutOfTen(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.imdb,
+                logo = RatingBadgeLogo.IMDB,
                 text = "IMDb",
                 backgroundColor = Color(0xFFF5C518),
                 contentColor = Color(0xFF121212),
@@ -204,7 +234,7 @@ private fun buildRatings(
             source = "Trakt",
             score = resolvedTitleRatings?.trakt?.asOutOfTen(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.trakt,
+                logo = RatingBadgeLogo.TRAKT,
                 text = "Trakt",
                 backgroundColor = Color(0xFFED1C24),
                 contentColor = Color.White,
@@ -215,7 +245,7 @@ private fun buildRatings(
             source = "Rotten Tomatoes",
             score = resolvedTitleRatings?.rottenTomatoes?.asPercent(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rotten_tomatoes,
+                logo = RatingBadgeLogo.ROTTEN_TOMATOES,
                 text = "RT",
                 backgroundColor = Color.Transparent,
                 contentColor = Color.Unspecified,
@@ -236,7 +266,7 @@ private fun buildRatings(
             source = "Metacritic",
             score = resolvedTitleRatings?.metacritic?.asOutOfHundred(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.metacritic,
+                logo = RatingBadgeLogo.METACRITIC,
                 text = "MC",
                 backgroundColor = Color.Transparent,
                 contentColor = Color.Unspecified,
@@ -247,7 +277,7 @@ private fun buildRatings(
             source = "Letterboxd",
             score = resolvedTitleRatings?.letterboxd?.asOutOfFive(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.letterboxd,
+                logo = RatingBadgeLogo.LETTERBOXD,
                 text = "LB",
                 backgroundColor = Color(0xFF202830),
                 contentColor = Color.White,
@@ -268,7 +298,7 @@ private fun buildRatings(
             source = "MyAnimeList",
             score = resolvedTitleRatings?.myAnimeList?.asOutOfTen(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.myanimelist,
+                logo = RatingBadgeLogo.MYANIMELIST,
                 text = "MAL",
                 backgroundColor = Color(0xFF2E51A2),
                 contentColor = Color.White,
@@ -282,14 +312,14 @@ private fun formatTmdbRating(value: String): String {
 }
 
 @Stable
-private data class RatingBadgeSpec(
-    @param:RawRes val logoRes: Int? = null,
+internal data class RatingBadgeSpec(
+    val logo: RatingBadgeLogo? = null,
     val text: String,
     val backgroundColor: Color,
     val contentColor: Color,
 )
 
-private fun buildRatingPill(
+internal fun buildRatingPill(
     key: String,
     source: String,
     score: String?,
@@ -300,10 +330,10 @@ private fun buildRatingPill(
         key = key,
         source = source,
         score = resolvedScore,
-        badgeText = if (badge.logoRes == null) badge.text else null,
+        badgeText = if (badge.logo == null) badge.text else null,
         badgeColor = badge.backgroundColor,
         badgeContentColor = badge.contentColor,
-        badgeLogoRes = badge.logoRes,
+        badgeLogo = badge.logo,
     )
 }
 

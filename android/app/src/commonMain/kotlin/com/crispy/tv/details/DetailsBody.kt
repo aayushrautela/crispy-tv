@@ -58,6 +58,8 @@ internal fun LazyListScope.detailsBodyContent(
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
+    reviewProviderBadge: @Composable (String) -> Unit,
+    ratingBadgeLogo: @Composable (RatingBadgeLogo) -> Unit,
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
@@ -114,6 +116,7 @@ internal fun LazyListScope.detailsBodyContent(
             isLoading = uiState.ratingsIsLoading,
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,
+            ratingBadgeLogo = ratingBadgeLogo,
         )
     }
 
@@ -169,7 +172,7 @@ internal fun LazyListScope.detailsBodyContent(
                             review = review,
                             modifier = Modifier.width(Dimensions.WideCardWidth),
                             onClick = { onReviewClick(review) },
-                            reviewProviderBadge = ::ReviewProviderBadge,
+                            reviewProviderBadge = reviewProviderBadge,
                         )
                     }
                 } else {

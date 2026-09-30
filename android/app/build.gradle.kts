@@ -24,9 +24,9 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 80 of the 176 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 85 of the 178 main-source files are there.
  *
- * The remaining 96 are held by three things, and only three: a type that
+ * The remaining 93 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
  * `androidx.paging`, media3), a composition root that by definition needs a
  * platform to resolve against, and screen code that is not yet split
@@ -51,7 +51,7 @@ plugins {
  * | hub | declared in | holds | what freeing it costs |
  * |---|---|---|---|
  * | the viewmodels | `AccountViewModels`, `CatalogViewModel`, `HomeViewModel`, `HomeSelectorViewModel`, `LibraryScreen`, `SearchViewModel`, `AppBootstrapViewModel` | the `Route`/`Screen` files, ~4,000 lines | the factory/viewmodel split: `ViewModelProvider.Factory` is Android-only, so the factory stays in `androidMain` forever and only the viewmodel moves |
- * | `DetailsPalette.kt` | `androidMain/.../details` | 6 files (`AiInsightsStoryOverlay`, `DetailsBody`, `PlayerInfoSheet`, `PlayerEpisodeRow`, `PlayerEpisodesSheet`, `PlayerMoreSheet`) | a real design change, not a move: it reads `android.graphics.Bitmap`, `LocalContext` and `materialkolor`'s `rememberDynamicColorScheme` to derive a scheme from artwork |
+ * | ~~`DetailsPalette.kt`~~ | **freed** | `AiInsightsStoryOverlay`, `DetailsBody`, `DetailsRatingsSection` | **none left -- all three moved.** The three reasons this row claimed were all wrong, and each is worth recording because two of them were premises rather than measurements. `com.materialkolor` 5.0.0 is a genuine KMP artifact (it publishes `android`, `iosArm64`, `iosSimulatorArm64`, `jvm`, `macosArm64`, `js`, `wasmJs`), so `rememberDynamicColorScheme` and `themeColor` were never blockers. `LocalContext` is Coil's own `coil3.compose.LocalPlatformContext` in `commonMain`. And the bitmap is not a blocker either, it is the *return type* of an `expect`: `coil3.toBitmap` yields `android.graphics.Bitmap` on Android and `org.jetbrains.skia.Bitmap` elsewhere, so no `commonMain` signature can name it -- the extraction takes Compose's `ImageBitmap`, which every target shares, and only the two loader composables stayed behind for `Context`. That is the fourth time a blocker in this table turned out to be an untested premise |
  * | the composition root | `SupabaseServicesProvider`, `BackendServicesProvider`, `PlaybackDependencies`, `DistributionComponents`, the two settings `…RepositoryProvider`s | `ProfileMenuRoute`, `CalendarScreen`, `SettingsScreen`, `SettingsNavGraph`, `AppDistribution` | these *are* the root; a screen resolves them in `androidMain` and needs a seam for the values, not for the providers |
  * | `androidx.navigation` | not on the `commonMain` classpath at all | all 6 files in `ui/navigation` | a dependency decision: JetBrains publishes a Multiplatform navigation-compose, and it is not the artifact this module currently resolves |
  * | `androidx.paging` | not on the `commonMain` classpath at all | `CatalogPagingSource`, `LibraryPagingSource`, `BrowsePagingSource` | same shape: paging 3.3+ has KMP artifacts, and this is a version/artifact question rather than a code question |
@@ -250,6 +250,16 @@ kotlin {
             implementation(libs.coil.compose)
             implementation(libs.coil.core)
 
+            // MaterialKolor 5.0.0 is a genuine KMP artifact: its published
+            // `.module` carries `android`, `iosArm64`, `iosSimulatorArm64`,
+            // `jvm`, `macosArm64`, `js` and `wasmJs` variants. `DetailsPalette.kt`
+            // sat in `androidMain` partly because `rememberDynamicColorScheme`
+            // was believed to be Android-only -- it is not, and reading
+            // `available-at` targets is what settles that. It moves here for the
+            // same reason `coil-compose` did: the file it is used from is now in
+            // `commonMain`.
+            implementation(libs.material.kolor)
+
             // `paging-common` is the multiplatform half of paging, and it is a
             // real KMP artifact: 3.5.1 publishes android, desktop, iosArm64,
             // iosSimulatorArm64, macosArm64, linuxX64, js and wasmJs. That is
@@ -354,7 +364,6 @@ kotlin {
             // desktop and iOS builds configure is a Phase 5/6 runtime question.
             implementation(libs.coil.network.okhttp)
             implementation(libs.coil.svg)
-            implementation(libs.material.kolor)
             implementation(libs.metrics.performance)
 
             implementation(libs.androidyoutubeplayer)
