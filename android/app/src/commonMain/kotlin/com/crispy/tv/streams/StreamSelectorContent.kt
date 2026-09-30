@@ -49,7 +49,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,14 +58,28 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.ui.components.rememberCrispyImageModel
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.crispy.tv.playerui.episodeRowMeta
 
 internal const val SHEET_HEIGHT_FRACTION = 0.92f
 
 internal val SHEET_MAX_WIDTH = 420.dp
 
+/**
+ * The bottom sheet that picks a provider and then a stream.
+ *
+ * [isCompact] is a slot rather than a `LocalConfiguration` read for the reason
+ * recorded when `DetailsHeader` moved: `LocalConfiguration` lives in
+ * `ui-android`'s `AndroidCompositionLocals_androidKt`, so no `commonMain` file can
+ * name it and **no jar-grep of the Compose artifacts finds it either**. The
+ * question it answered -- "is this window narrower than 600dp?" -- is not a
+ * platform fact, and all three callers already have the answer or can read it, so
+ * the value crosses as data.
+ *
+ * It has **no default**, so a call site cannot forget it and silently get the
+ * wrong sheet width. The threshold stays at the callers, deliberately: 600dp is a
+ * design decision about this sheet's `sheetMaxWidth`, and a caller that measures
+ * its own window differently should be visible rather than absorbed.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StreamSelectorSheet(
@@ -78,14 +91,13 @@ fun StreamSelectorSheet(
     onAccentColor: Color,
     useCrispyImageModel: Boolean = false,
     scrimColor: Color? = null,
+    isCompact: Boolean,
     onDismiss: () -> Unit,
     onProviderSelected: (String?) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
 ) {
     if (!visible) return
 
-    val configuration = LocalConfiguration.current
-    val isCompact = configuration.screenWidthDp < 600
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -309,35 +321,39 @@ private fun StreamSheetHeader(
     }
 }
 
-private fun episodeHeaderMetadata(
+/**
+ * The metadata line under a title in the provider sheet: the episode's
+ * `S<n> E<m> • <release date>`, or the show's year when there is no episode.
+ *
+ * ## Why this delegates instead of repeating
+ *
+ * Lines 320-327 of this function used to be **byte-identical** to
+ * [episodeRowMeta] in `playerui` — the same `S$season E$episodeNumber` prefix, the
+ * same date, the same ` • ` join. Two copies of one decision is the same defect as
+ * a decision no test can reach: it is not coverage, it is an invitation to change
+ * one and forget the other. The episode half is now [episodeRowMeta], and what
+ * remains here is the one question this function alone answers, which is what to
+ * show when there is no episode at all.
+ *
+ * The `if` is load-bearing and is deliberately **not** an `?:` chain. When
+ * `episode != null` but contributes nothing — no season/episode pair and no
+ * parseable release date — the original returned **null**; an
+ * `episode?.let { … } ?: details?.year…` would have fallen back to the show's
+ * year and put a bare year where the player sheet shows nothing. So the shape is
+ * `if (episode != null) episodeRowMeta(episode) else <year>`, which is exactly
+ * equivalent, and `episodeRowMeta` is the only place that can return null for an
+ * episode.
+ *
+ * `internal` rather than `private` so [EpisodeHeaderMetadataTest] can call it: a
+ * `when`/branch no test can reach is a branch no test can cover.
+ */
+internal fun episodeHeaderMetadata(
     episode: MediaVideo?,
     details: MediaDetails?,
-): String? {
-    if (episode == null) {
-        return details?.year?.trim()?.takeIf { it.isNotBlank() }
-    }
-
-    val parts = mutableListOf<String>()
-    val season = episode.season
-    val episodeNumber = episode.episode
-    if (season != null && episodeNumber != null) {
-        parts += "S$season E$episodeNumber"
-    }
-    formatEpisodeReleaseDate(episode.released)?.let(parts::add)
-    return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
-}
-
-fun formatEpisodeReleaseDate(date: String?): String? {
-    val raw = date?.trim().orEmpty()
-    if (raw.isBlank()) return null
-
-    val iso = if (raw.length >= 10) raw.take(10) else raw
-    return try {
-        val parsed = LocalDate.parse(iso)
-        parsed.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
-    } catch (_: Throwable) {
-        raw
-    }
+): String? = if (episode != null) {
+    episodeRowMeta(episode)
+} else {
+    details?.year?.trim()?.takeIf { it.isNotBlank() }
 }
 
 @Composable

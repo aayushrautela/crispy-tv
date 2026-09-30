@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
@@ -351,6 +352,7 @@ internal fun PlayerOverlay(
             onAccentColor = palette.onAccent,
             useCrispyImageModel = true,
             scrimColor = Color.Transparent,
+            isCompact = LocalConfiguration.current.screenWidthDp < 600,
             onDismiss = onCloseSurface,
             onProviderSelected = {
                 resetControlsTimer()

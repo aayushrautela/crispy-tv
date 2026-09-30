@@ -17,9 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.addons.model.MediaVideo
-import com.crispy.tv.streams.formatEpisodeReleaseDate
+import com.crispy.tv.details.DetailsPaletteColors
+import com.crispy.tv.details.formatLongDate
 
 @Composable
 internal fun EpisodeRow(
@@ -80,6 +80,26 @@ internal fun EpisodeRow(
     }
 }
 
+/**
+ * The single meta line under an episode's title: `S1 E2 • Sep 30, 2026`.
+ *
+ * A release date contributes only if there is one, and the season/episode prefix
+ * only if **both** numbers are present -- an episode with a season and no number
+ * gets neither half rather than a bare `S1`. That is the copy's decision, so it is
+ * stated here rather than left to be re-read from the branches below.
+ *
+ * The date half used to come from `streams.formatEpisodeReleaseDate`, a
+ * `LocalDate.parse` + `DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)`
+ * function at the bottom of a 471-line sheet in the same module. That function and
+ * [formatLongDate] were line-for-line the same -- trim, blank-is-null, truncate to
+ * ten characters, format -- except for the unparseable fallback, where that one
+ * returned the **trimmed** value and this one returns the **untrimmed** original.
+ * So this call site now shows a padded unparseable release date with its padding,
+ * where it used to show it trimmed. That is the only visible difference, it is on
+ * the error path, and it was the price of removing a `java.time` dependency from a
+ * third file rather than writing a second copy of a formatter that already existed
+ * two packages away.
+ */
 internal fun episodeRowMeta(episode: MediaVideo): String? {
     val parts = mutableListOf<String>()
     val season = episode.season
@@ -87,7 +107,7 @@ internal fun episodeRowMeta(episode: MediaVideo): String? {
     if (season != null && episodeNumber != null) {
         parts += "S$season E$episodeNumber"
     }
-    formatEpisodeReleaseDate(episode.released)?.let(parts::add)
+    formatLongDate(episode.released)?.let(parts::add)
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 

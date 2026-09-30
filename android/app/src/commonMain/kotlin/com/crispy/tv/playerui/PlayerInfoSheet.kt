@@ -158,12 +158,26 @@ private fun InfoSheetContent(
     }
 }
 
+/**
+ * The artwork to show above the title, or null to render the title as text.
+ *
+ * `internal` for the reason the other four are. The decision is one rule -- a
+ * usable logo beats the title, an unusable one does not -- but "usable" is the
+ * part worth pinning, because Coil is handed the value whatever it is: a blank
+ * string is a **valid URL as far as `AsyncImage` is concerned**, so without this
+ * guard a details object with `logoUrl = "   "` would render an empty image box
+ * instead of the title and the user would see nothing at all. That is a real
+ * failure mode, not a style question.
+ */
+internal fun logoUrlFor(details: MediaDetails?): String? =
+    details?.logoUrl?.trim()?.takeIf { it.isNotBlank() }
+
 @Composable
 private fun TitleArea(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
 ) {
-    val logoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotBlank() }
+    val logoUrl = logoUrlFor(details)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -172,7 +186,14 @@ private fun TitleArea(
             Box(modifier = Modifier.fillMaxWidth(0.81f)) {
                 AsyncImage(
                     model = logoUrl,
-                    contentDescription = details.title,
+                    // `details?.title` rather than `details.title`: extracting
+                    // `logoUrlFor(details)` above moved the null-check into a
+                    // function, so this branch no longer smart-casts `details` even
+                    // though a non-null `logoUrl` still implies it. Behaviourally
+                    // identical -- the safe call can only differ where the branch is
+                    // unreachable -- and `AsyncImage` already takes a nullable
+                    // `contentDescription`.
+                    contentDescription = details?.title,
                     modifier =
                         Modifier
                             .align(Alignment.Center)
@@ -194,18 +215,61 @@ private fun TitleArea(
     }
 }
 
+/** The five facts the sheet's meta row can show, each normalised or absent. */
+internal data class PlayerMetaRow(
+    val rating: String?,
+    val certification: String?,
+    val year: String?,
+    val runtime: String?,
+    val genres: List<String>,
+) {
+    /** True when every field is absent, which is what makes the row render nothing. */
+    fun isEmpty(): Boolean =
+        rating == null && certification == null && year == null && runtime == null && genres.isEmpty()
+}
+
+/**
+ * Reads the meta row's five facts out of a details object.
+ *
+ * `internal` for the reason the other five functions in this file are, and this is
+ * the clearest case: the *five-way early return* at the old call site was a
+ * condition over five values written inline in a composable, so no test could reach
+ * it and deleting any one clause of it would have failed nothing. As
+ * [PlayerMetaRow.isEmpty] it is one named predicate with a name that says what it
+ * means.
+ *
+ * Three different normalisation policies are in here and they are **not**
+ * interchangeable, which is the thing to keep straight:
+ * - the rating goes through `normalizeRatingText`, which turns a bare number into
+ *   a scaled one and can return null for a value it cannot read;
+ * - the runtime goes through `formatRuntimeForHeader`, which is `null` for a blank
+ *   string and formatted for the rest;
+ * - the year and the certification are trimmed and blank-checked here, and the
+ *   genres are filtered rather than mapped, with **a cap of two** -- the third
+ *   product number in this file, alongside `castNamesFor`'s five.
+ */
+internal fun metaRowFor(details: MediaDetails?): PlayerMetaRow =
+    PlayerMetaRow(
+        rating = normalizeRatingText(details?.rating),
+        certification = details?.certification?.trim()?.takeIf { it.isNotBlank() },
+        year = details?.year?.trim()?.takeIf { it.isNotBlank() },
+        runtime = formatRuntimeForHeader(details?.runtime),
+        genres = details?.genres?.filter { it.isNotBlank() }.orEmpty().take(2),
+    )
+
 @Composable
 private fun MetaRow(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
 ) {
-    val rating = normalizeRatingText(details?.rating)
-    val certification = details?.certification?.trim()?.takeIf { it.isNotBlank() }
-    val year = details?.year?.trim()?.takeIf { it.isNotBlank() }
-    val runtime = formatRuntimeForHeader(details?.runtime)
-    val genres = details?.genres?.filter { it.isNotBlank() }.orEmpty().take(2)
+    val meta = metaRowFor(details)
+    val rating = meta.rating
+    val certification = meta.certification
+    val year = meta.year
+    val runtime = meta.runtime
+    val genres = meta.genres
 
-    if (rating == null && certification == null && year == null && runtime == null && genres.isEmpty()) return
+    if (meta.isEmpty()) return
 
     Row(
         modifier =
@@ -294,16 +358,62 @@ private fun EpisodeContextBlock(
     )
 }
 
+/**
+ * The overview this sheet shows, or null when there is nothing to show.
+ *
+ * Lifted out of [OverviewBlock]'s body for the same reason `searchItemKey` was: a
+ * `?:` chain written inside a `@Composable` cannot be called from a test, so the
+ * only way to pin its two fallbacks would have been to render the whole sheet, and
+ * deleting an arm would have failed nothing. The rule generalises -- **a decision
+ * is not "in the composable" because it renders; it is in the composable only if
+ * it needs the composition**, and these two do not.
+ *
+ * The fallbacks are asymmetric on purpose and both were already there: the
+ * episode's overview wins, the show's `description` is next, and blank loses to
+ * both. The show's side is trimmed and blank-checked; the episode's side is
+ * neither, because [PlayerEpisodeContext] already applies that policy to every
+ * field it carries -- so re-checking it here would be a second, divergent copy of
+ * one decision. That asymmetry is the thing worth pinning.
+ *
+ * **The asymmetry is redundant, not merely deliberate, and a mutation proved it.**
+ * Adding `?.trim()?.takeIf { it.isNotBlank() }` to the episode's side compiles and
+ * every test still passes, because *both* [PlayerEpisodeContext] constructors already
+ * apply exactly that policy to `overview` -- `MediaVideo.toPlayerEpisodeContext`
+ * trims and blank-checks its own field, and `MediaDetails.toPlayerEpisodeContext`
+ * does the same on the episode it picks. So the guard below is the eleventh
+ * redundant one in this repository and the first pair in this file. It is kept for
+ * the same reasons the others are: the `PlayerEpisodeContext` constructors are two
+ * functions away and a future one might not normalise, and this is the statement of
+ * what the reader may rely on. Do not read the surviving mutation as a missing
+ * test -- there is nothing reachable that distinguishes the two spellings.
+ */
+internal fun overviewTextFor(
+    episodeContext: PlayerEpisodeContext?,
+    details: MediaDetails?,
+): String? =
+    episodeContext?.overview
+        ?: details?.description?.trim()?.takeIf { it.isNotBlank() }
+
+/**
+ * The cast names to show, in order, or an empty list when there are none.
+ *
+ * Lifted out of [CastBlock] for the reason above, and because **the cap is a
+ * product decision with no other expression**: `take(5)` says the sheet shows at
+ * most five people, and that number lived inside a composable where a suite could
+ * only reach it by rendering. Blank entries are dropped rather than shown as an
+ * empty line, which is why the count is taken *after* the filter and not before:
+ * five names must not become three names because two rows were blank.
+ */
+internal fun castNamesFor(details: MediaDetails?): List<String> =
+    details?.cast?.filter { it.isNotBlank() }.orEmpty().take(5)
+
 @Composable
 private fun OverviewBlock(
     episodeContext: PlayerEpisodeContext?,
     details: MediaDetails?,
     palette: DetailsPaletteColors,
 ) {
-    val description =
-        episodeContext?.overview
-            ?: details?.description?.trim()?.takeIf { it.isNotBlank() }
-            ?: return
+    val description = overviewTextFor(episodeContext, details) ?: return
     ExpandableDescription(
         text = description,
         textAlign = TextAlign.Center,
@@ -316,7 +426,7 @@ private fun CastBlock(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
 ) {
-    val cast = details?.cast?.filter { it.isNotBlank() }.orEmpty().take(5)
+    val cast = castNamesFor(details)
     if (cast.isEmpty()) return
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -350,7 +460,23 @@ private fun CastBlock(
     }
 }
 
-private fun parseCastEntry(entry: String): Pair<String, String?> {
+/**
+ * Splits one `"Actor as Character"` credit into its two halves.
+ *
+ * `internal` for the reason the three functions above are: this is a decision, it
+ * is pure, and a `private fun` inside a composable file is a decision no test can
+ * reach. The two rules worth naming, because both are easy to "fix" wrongly:
+ *
+ * - **The first `" as "` wins, not the last.** `substring(0, separator)` with
+ *   `indexOf` means a character *named* `As` (`"Ana as Character as The One"`)
+ *   splits at the first occurrence and keeps the rest as the character, which is
+ *   what the sheet has always shown. `lastIndexOf` would be a behaviour change.
+ * - **A name is trimmed but never blank-checked, and the whole entry survives when
+ *   there is no separator at all.** `"Ada Lovelace"` is a bare name and renders
+ *   fine; there is no state in which this returns an empty name for a non-blank
+ *   entry, so a `takeIf` here would be guarding a case that cannot arrive.
+ */
+internal fun parseCastEntry(entry: String): Pair<String, String?> {
     val separator = entry.indexOf(" as ")
     if (separator < 0) return entry to null
     val name = entry.substring(0, separator).trim()
@@ -358,7 +484,33 @@ private fun parseCastEntry(entry: String): Pair<String, String?> {
     return name to character
 }
 
-private fun buildCreditLine(details: MediaDetails?): String? {
+/**
+ * The credit line under the title, or null when the credits are missing.
+ *
+ * `internal` for the reason the three above are. Four decisions are packed in here
+ * and each is a plausible place to break:
+ *
+ * - **The item type is read case-insensitively**, because the backend has been
+ *   known to send `Movie` as well as `movie`, and a case-sensitive compare would
+ *   silently turn a film into "Created by".
+ * - **A missing `itemType` is a series**, not a movie, because `null?.equals(...)`
+ *   is `false`. That default is what makes the else branch correct on a details
+ *   object that never carried the field.
+ * - **The verb follows the branch and not the data**: `Directed by` for directors,
+ *   `Created by` for creators. A film carrying only `creators` therefore shows
+ *   nothing at all, and there is no source edit that could make it show anything
+ *   else: `MediaDetails.directors` is `List<String> = emptyList()`, **not** a
+ *   nullable, so a `?: details?.creators` added to this arm is dead by construction
+ *   rather than merely untested -- the elvis's left operand is never null. That is
+ *   the twelfth redundant guard in this repository, and `aMovieDoesNotFallBackToCreators`
+ *   pins the behaviour regardless.
+ * - **Blank names are dropped before the join and the join is blank-checked after
+ *   it**, so a list of nothing but blanks is `null` rather than `"Directed by "`.
+ *   The second `takeIf` is load-bearing and is *not* the same as the first: the
+ *   filter removes individual blanks, the `takeIf` removes a line made entirely of
+ *   separators.
+ */
+internal fun buildCreditLine(details: MediaDetails?): String? {
     val isMovie = details?.itemType.equals("movie", ignoreCase = true)
     return if (isMovie) {
         details

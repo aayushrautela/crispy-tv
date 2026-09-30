@@ -3,6 +3,7 @@ package com.crispy.tv.home
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.streams.StreamSelectorSheet
 
@@ -19,6 +20,7 @@ internal fun HomeStreamSelector(viewModel: HomeSelectorViewModel) {
         headerEpisode = headerEpisode,
         accentColor = MaterialTheme.colorScheme.primary,
         onAccentColor = MaterialTheme.colorScheme.onPrimary,
+        isCompact = LocalConfiguration.current.screenWidthDp < 600,
         onDismiss = viewModel::dismiss,
         onProviderSelected = viewModel.coordinator::onProviderSelected,
         onStreamSelected = viewModel.coordinator::onStreamSelected,

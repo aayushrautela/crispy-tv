@@ -411,6 +411,11 @@ internal fun DetailsScreen(
                 headerEpisode = selectorHeaderEpisode,
                 accentColor = palette.accent,
                 onAccentColor = palette.onAccent,
+                // The sheet asks its own question (`screenWidthDp < 600`) and this
+                // screen asks its own (`>= 768` and landscape). They share the
+                // `configuration` read above, not a threshold, so both are written
+                // out rather than folded into one name.
+                isCompact = configuration.screenWidthDp < 600,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
                 onStreamSelected = onStreamSelected,
