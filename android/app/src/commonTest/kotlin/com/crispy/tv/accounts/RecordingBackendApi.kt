@@ -8,6 +8,8 @@ import com.crispy.tv.backend.ImportJob
 import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ImportJobsResponse
 import com.crispy.tv.backend.ItemLookupInput
+import com.crispy.tv.backend.MeResponse
+import com.crispy.tv.backend.AccountSettings
 import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.WatchMutationInput
 import com.crispy.tv.backend.ProviderAccountsResponse
@@ -35,9 +37,17 @@ internal class RecordingBackendApi : BackendApi {
     val listImportConnectionsCalls = mutableListOf<Pair<String, String>>()
     val disconnectCalls = mutableListOf<Triple<String, String, ImportProvider>>()
     val startImportCalls = mutableListOf<StartImportCall>()
+    val getMeCalls = mutableListOf<String>()
+    val getAccountSettingsCalls = mutableListOf<String>()
 
     var providerStates: List<ProviderState> = emptyList()
     var startImportResult: StartImportResult? = null
+    var meResponse: MeResponse? = null
+    var accountSettings: AccountSettings? = null
+
+    fun answerMe(response: MeResponse) = apply { meResponse = response }
+
+    fun answerAccountSettings(settings: AccountSettings) = apply { accountSettings = settings }
 
     fun withProviderStates(vararg states: ProviderState) = apply {
         providerStates = states.toList()
@@ -97,7 +107,10 @@ internal class RecordingBackendApi : BackendApi {
     // returning a default is deliberate: a test that reaches one of these has
     // called something it did not mean to, and a silent default would hide that
     // behind an empty result.
-    override suspend fun getMe(accessToken: String): Nothing = unused("getMe")
+    override suspend fun getMe(accessToken: String): MeResponse {
+        getMeCalls += accessToken
+        return meResponse ?: unused("getMe")
+    }
     override suspend fun createProfile(
         accessToken: String,
         name: String,
@@ -129,7 +142,10 @@ internal class RecordingBackendApi : BackendApi {
         profileId: String,
         input: UpdateProfileInput
     ): Nothing = unused("updateProfile")
-    override suspend fun getAccountSettings(accessToken: String): Nothing = unused("getAccountSettings")
+    override suspend fun getAccountSettings(accessToken: String): AccountSettings {
+        getAccountSettingsCalls += accessToken
+        return accountSettings ?: unused("getAccountSettings")
+    }
     override suspend fun patchAccountSettings(
         accessToken: String,
         settings: Map<String, String>

@@ -1,8 +1,6 @@
 package com.crispy.tv.accounts
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.avatar.AvatarUrlResolver
 import com.crispy.tv.domain.account.normalizeLanguageCode
@@ -32,24 +30,6 @@ class AuthViewModel internal constructor(
     private val supabase: AccountApi,
     private val bootstrapRepository: AccountBootstrapRepository,
 ) : ViewModel() {
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return AuthViewModel(
-                            supabase = SupabaseServicesProvider.accountClient(appContext),
-                            bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
-
     private val _state = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _state.asStateFlow()
 
@@ -138,25 +118,6 @@ class ProfileListViewModel internal constructor(
     private val profileRepository: ProfileRepository,
     private val activeProfileStore: ActiveProfileStore,
 ) : ViewModel() {
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(ProfileListViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                    return ProfileListViewModel(
-                        bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
-                        profileRepository = SupabaseServicesProvider.profileRepository(appContext),
-                        activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
-                    ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
-
     private val _state = MutableStateFlow(ProfileListUiState())
     val uiState: StateFlow<ProfileListUiState> = _state.asStateFlow()
 
@@ -269,32 +230,13 @@ data class AccountSettingsUiState(
 )
 
 class AccountSettingsViewModel internal constructor(
-    private val appContext: Context,
+    private val openUrl: (String) -> Unit,
     private val bootstrapRepository: AccountBootstrapRepository,
     private val accountSettingsRepository: AccountSettingsRepository,
     private val syncProviderRepository: SyncProviderRepository,
     private val pendingProviderAuthStore: PendingProviderAuthStore,
 ) : ViewModel() {
     companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(AccountSettingsViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return AccountSettingsViewModel(
-                            appContext = appContext,
-                            bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
-                            accountSettingsRepository = SupabaseServicesProvider.accountSettingsRepository(appContext),
-                            syncProviderRepository = SupabaseServicesProvider.syncProviderRepository(appContext),
-                            pendingProviderAuthStore = SupabaseServicesProvider.pendingProviderAuthStore(appContext),
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-
         // Must match the Android entry in the server's IMPORT_OAUTH_ALLOWED_RETURN_URIS
         // allowlist and the deep link registered in AndroidManifest.xml.
         private const val OAUTH_RETURN_TO = "crispytv://oauth-callback"
@@ -382,11 +324,12 @@ class AccountSettingsViewModel internal constructor(
     }
 
     private fun launchBrowser(url: String) {
-        val intent = android.content.Intent(
-            android.content.Intent.ACTION_VIEW,
-            android.net.Uri.parse(url),
-        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        appContext.startActivity(intent)
+        // The Context this class used to hold was a capability, not wiring: it was read
+        // for one call, opening a browser on an external URL. `android.content.Intent` and
+        // `android.net.Uri` cannot appear in a commonMain signature at all, so the slot
+        // carries the URL and the whole Intent construction lives in the androidMain
+        // factory, which keeps the NEW_TASK flag and uses applicationContext.
+        openUrl(url)
     }
 
     private fun parseImportProvider(value: String): com.crispy.tv.backend.ImportProvider? {

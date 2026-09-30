@@ -30,13 +30,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.avatar.AvatarUrlResolver
-import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.resources.Res
@@ -62,27 +61,25 @@ data class ActiveProfileInfo(
     val avatarUrl: String?,
 )
 
-suspend fun loadActiveProfile(context: android.content.Context): ActiveProfileInfo? {
-    val appContext = context.applicationContext
-    val supabase = SupabaseServicesProvider.accountClient(appContext)
-    val backend = BackendServicesProvider.backendClient(appContext)
-    val activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext)
-    return runCatching {
-        val session = supabase.ensureValidSession() ?: supabase.currentSession() ?: return null
-        val me = backend.getMe(session.accessToken)
-        val userId = (session.userId?.ifBlank { me.user.id } ?: me.user.id).trim()
-        if (userId.isBlank()) return null
-        val activeId = activeProfileStore.getActiveProfileId(userId)?.trim().orEmpty()
-        val profile = me.profiles.firstOrNull { it.id == activeId } ?: me.profiles.firstOrNull()
-        profile?.let {
-            ActiveProfileInfo(
-                id = it.id,
-                name = it.name,
-                avatarUrl = AvatarUrlResolver.resolveAvatarUrl(it.avatarKey),
-            )
-        }
-    }.getOrNull()
-}
+suspend fun loadActiveProfile(
+    supabase: AccountApi,
+    backend: BackendApi,
+    activeProfileStore: ActiveProfileStore,
+): ActiveProfileInfo? = runCatching {
+    val session = supabase.ensureValidSession() ?: supabase.currentSession() ?: return null
+    val me = backend.getMe(session.accessToken)
+    val userId = (session.userId?.ifBlank { me.user.id } ?: me.user.id).trim()
+    if (userId.isBlank()) return null
+    val activeId = activeProfileStore.getActiveProfileId(userId)?.trim().orEmpty()
+    val profile = me.profiles.firstOrNull { it.id == activeId } ?: me.profiles.firstOrNull()
+    profile?.let {
+        ActiveProfileInfo(
+            id = it.id,
+            name = it.name,
+            avatarUrl = AvatarUrlResolver.resolveAvatarUrl(it.avatarKey),
+        )
+    }
+}.getOrNull()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,11 +88,15 @@ fun ProfileMenuRoute(
     onManageProfiles: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
+    // No default: this route is in commonMain, so it cannot take a Context, and the
+    // loader is a capability rather than wiring. The androidMain caller passes a
+    // `remember`ed lambda from `activeProfileLoader(appContext)` -- the remember matters,
+    // because the lambda's identity is a produceState key and a fresh one each
+    // recomposition would restart the load.
+    loadProfile: suspend () -> ActiveProfileInfo?,
 ) {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val profile by produceState<ActiveProfileInfo?>(initialValue = null, appContext) {
-        value = loadActiveProfile(appContext)
+    val profile by produceState<ActiveProfileInfo?>(initialValue = null, loadProfile) {
+        value = loadProfile()
     }
     val scrollBehavior = appBarScrollBehavior()
 

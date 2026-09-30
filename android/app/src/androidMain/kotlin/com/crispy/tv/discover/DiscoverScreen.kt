@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ import androidx.paging.cachedIn
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.search.SearchGenreSuggestion
 import com.crispy.tv.ui.components.CardStyle
@@ -210,6 +212,14 @@ fun DiscoverRoute(
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val scrollBehavior = appBarScrollBehavior()
 
+    // Hoisted out of the app bar's `actions` slot, and out of `remember` too: neither
+    // that lambda nor `remember`'s calculation is a @Composable scope, so
+    // `LocalContext.current` has to be read here in the composable body. These screens are
+    // androidMain and already hold a Context, so building the loader here is cheaper than
+    // threading a slot through each public signature.
+    val profileContext = LocalContext.current
+    val loadProfile = remember(profileContext) { activeProfileLoader(profileContext.applicationContext) }
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -221,7 +231,13 @@ fun DiscoverRoute(
                     CrispySectionAppBarTitle(label = "Discover")
                 },
                 actions = {
-                    ProfileIconButton(onClick = onOpenAccountsProfiles)
+ProfileIconButton(
+                        onClick = onOpenAccountsProfiles,
+                        // Built here rather than passed in: these three screens are
+                        // androidMain, so they already hold a Context, and threading a
+                        // slot through each of their public signatures would be churn.
+                        loadProfile = loadProfile,
+                    )
                 },
                 scrollBehavior = scrollBehavior,
                 colors = topLevelAppBarColors(),

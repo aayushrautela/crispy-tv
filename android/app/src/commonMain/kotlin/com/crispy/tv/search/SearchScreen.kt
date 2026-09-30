@@ -52,7 +52,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crispy.tv.accounts.ActiveProfileInfo
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyShelfSection
@@ -67,9 +69,31 @@ import com.crispy.tv.ui.resources.ic_history
 import com.crispy.tv.ui.theme.CrispySpinner
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
+
+/**
+ * The identity Compose gives a recent-search chip and a suggestion row.
+ *
+ * Both rows used to spell this as a lambda inline, `key = { it.lowercase() }`, and that
+ * expression used to be `it.lowercase(Locale.ROOT)`. Deleting an explicit `Locale.ROOT`
+ * is exact rather than approximate -- Kotlin's no-arg `String.lowercase()` is specified
+ * locale-invariant, and the argument-taking overload is not -- so the two are the same
+ * function by definition. That is why `java.util.Locale` could be deleted rather than
+ * moved.
+ *
+ * **It is a named `internal` function and not an inline lambda because an inline lambda
+ * cannot be tested.** It is an argument to `items(...)` inside a `LazyRow`, so no test can
+ * invoke it; the suite could only re-spell `lowercase()` and prove the standard library,
+ * which is not evidence about this code. A mutation that made the key case-sensitive
+ * survived that suite and was reported as untested behaviour, when it is very much
+ * reachable behaviour: without the fold, `"Trakt"` and `"trakt"` become two distinct rows
+ * and the list loses its identity when the user edits the case of what they typed. Naming
+ * it makes the same rule that lifted the rating badge's builders out of `private` apply
+ * here -- a decision no test can call is a decision no test can cover. See
+ * `SearchScreenTest`, which calls this function rather than a helper of its own.
+ */
+internal fun searchItemKey(query: String): String = query.lowercase()
 
 @Composable
 fun SearchRoute(
@@ -77,8 +101,14 @@ fun SearchRoute(
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
+    // Both are values rather than composable slots: `viewModel(factory = ...)` keys on
+    // factory identity, so a slot would be re-invoked every recomposition and defeat the
+    // `remember` that keeps the store alive. No defaults -- a commonMain route cannot take
+    // a Context, so the androidMain nav graph builds both and passes them down.
+    viewModelFactory: ViewModelProvider.Factory,
+    loadProfile: suspend () -> ActiveProfileInfo?,
 ) {
-    val viewModel = rememberSearchViewModel()
+    val viewModel = rememberSearchViewModel(viewModelFactory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val browseGridState = rememberLazyGridState()
     val resultsListState = rememberLazyListState()
@@ -100,7 +130,10 @@ fun SearchRoute(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            SearchTopBar(onOpenAccountsProfiles = onOpenAccountsProfiles)
+            SearchTopBar(
+                onOpenAccountsProfiles = onOpenAccountsProfiles,
+                loadProfile = loadProfile,
+            )
         },
     ) { paddingValues ->
         val contentModifier =
@@ -250,7 +283,11 @@ private fun RecentSearchStrip(
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(
             items = recentSearches,
-            key = { it.lowercase(Locale.ROOT) },
+            // `lowercase(Locale.ROOT)` -> `lowercase()` is exact, not an approximation: the
+            // no-arg form is the locale-invariant one. Unlike the `Locale.US` call sites
+            // in DetailsUseCases and WatchCtaResolver, nothing here relies on the
+            // argument being ASCII.
+            key = { searchItemKey(it) },
         ) { query ->
             RecentSearchChip(
                 query = query,
@@ -269,7 +306,11 @@ private fun SuggestionStrip(
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(
             items = suggestions,
-            key = { it.lowercase(Locale.ROOT) },
+            // `lowercase(Locale.ROOT)` -> `lowercase()` is exact, not an approximation: the
+            // no-arg form is the locale-invariant one. Unlike the `Locale.US` call sites
+            // in DetailsUseCases and WatchCtaResolver, nothing here relies on the
+            // argument being ASCII.
+            key = { searchItemKey(it) },
         ) { suggestion ->
             SuggestionChip(
                 suggestion = suggestion,

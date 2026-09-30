@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.accounts.ActiveProfileInfo
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -64,13 +65,14 @@ private val SearchAiLoadingColors =
 @Composable
 fun SearchTopBar(
     onOpenAccountsProfiles: () -> Unit,
+    loadProfile: suspend () -> ActiveProfileInfo?,
     modifier: Modifier = Modifier,
 ) {
     StandardTopAppBar(
         title = { CrispySectionAppBarTitle(label = "Search") },
         modifier = modifier,
         actions = {
-            ProfileIconButton(onClick = onOpenAccountsProfiles)
+            ProfileIconButton(onClick = onOpenAccountsProfiles, loadProfile = loadProfile)
         },
     )
 }

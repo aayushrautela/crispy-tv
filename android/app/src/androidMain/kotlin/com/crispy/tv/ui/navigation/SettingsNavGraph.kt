@@ -4,12 +4,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import coil3.compose.LocalPlatformContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.accounts.ProfileManagementRoute
+import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.ImageQuality
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider
@@ -61,9 +63,12 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {
+        val context = LocalPlatformContext.current
+        val appContext = remember(context) { context.applicationContext }
         ProfileManagementRoute(
             onBack = { navController.popBackStack() },
             onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
+            viewModelFactory = remember(appContext) { profileListViewModelFactory(appContext) },
         )
     }
 

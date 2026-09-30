@@ -4,10 +4,16 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import coil3.compose.LocalPlatformContext
+import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.search.SearchRoute
+import com.crispy.tv.search.searchViewModelFactory
 
 internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController) {
     composable(AppRoutes.SearchRoute) { entry ->
+        val context = LocalPlatformContext.current
+        val appContext = remember(context) { context.applicationContext }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             SearchRoute(
             onItemClick = { item, sharedElementKey ->
@@ -33,6 +39,8 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
                 onScrollToTopConsumed = {
                     entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
                 },
+                viewModelFactory = remember(appContext) { searchViewModelFactory(appContext) },
+                loadProfile = remember(appContext) { activeProfileLoader(appContext) },
             )
         }
     }

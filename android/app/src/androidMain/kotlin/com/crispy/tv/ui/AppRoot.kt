@@ -27,6 +27,8 @@ import kotlinx.coroutines.delay
 import com.crispy.tv.accounts.AppBootstrapViewModel
 import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.AuthRoute
+import com.crispy.tv.accounts.authViewModelFactory
+import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.accounts.BootstrapState
 import com.crispy.tv.accounts.ProfileSelectorRoute
 import com.crispy.tv.ui.brand.CrispyIntroSplash
@@ -64,12 +66,16 @@ fun AppRoot() {
             )
         }
         state == BootstrapState.NeedsAuth -> {
-            AuthRoute(onSignedIn = { bootstrapViewModel.refresh() })
+            AuthRoute(
+                onSignedIn = { bootstrapViewModel.refresh() },
+                viewModelFactory = remember(appContext) { authViewModelFactory(appContext) },
+            )
         }
         state == BootstrapState.NeedsProfileSelection -> {
             ProfileSelectorRoute(
                 onComplete = { bootstrapViewModel.refresh() },
                 onBack = { bootstrapViewModel.onSignedOut() },
+                viewModelFactory = remember(appContext) { profileListViewModelFactory(appContext) },
             )
         }
         state == BootstrapState.Ready -> {

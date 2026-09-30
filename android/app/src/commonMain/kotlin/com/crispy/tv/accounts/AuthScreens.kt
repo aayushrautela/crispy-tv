@@ -63,6 +63,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.CrispyIcon
@@ -88,10 +89,14 @@ private val ProfileAddStroke = 2.dp
 @Composable
 fun AuthRoute(
     onSignedIn: () -> Unit,
+    // A plain value, not a composable slot: `viewModel(factory = ...)` keys on factory
+    // identity, so a composable slot would be re-invoked every recomposition and defeat
+    // the `remember` that keeps the store alive. The platform hoists the whole
+    // LocalContext -> applicationContext -> remember -> factory block into the nav graph
+    // and passes the result here. See AccountViewModelFactories.kt.
+    viewModelFactory: ViewModelProvider.Factory,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: AuthViewModel = viewModel(factory = remember(appContext) { AuthViewModel.factory(appContext) })
+    val viewModel: AuthViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.signedIn) {
@@ -446,10 +451,14 @@ private fun SocialLoginButton(
 fun ProfileSelectorRoute(
     onComplete: () -> Unit,
     onBack: () -> Unit,
+    // A plain value, not a composable slot: `viewModel(factory = ...)` keys on factory
+    // identity, so a composable slot would be re-invoked every recomposition and defeat
+    // the `remember` that keeps the store alive. The platform hoists the whole
+    // LocalContext -> applicationContext -> remember -> factory block into the nav graph
+    // and passes the result here. See AccountViewModelFactories.kt.
+    viewModelFactory: ViewModelProvider.Factory,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: ProfileListViewModel = viewModel(factory = remember(appContext) { ProfileListViewModel.factory(appContext) })
+    val viewModel: ProfileListViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
@@ -779,10 +788,14 @@ private fun ProfileAddCard(onClick: () -> Unit) {
 fun ProfileManagementRoute(
     onBack: () -> Unit,
     onOpenAccountSettings: () -> Unit,
+    // A plain value, not a composable slot: `viewModel(factory = ...)` keys on factory
+    // identity, so a composable slot would be re-invoked every recomposition and defeat
+    // the `remember` that keeps the store alive. The platform hoists the whole
+    // LocalContext -> applicationContext -> remember -> factory block into the nav graph
+    // and passes the result here. See AccountViewModelFactories.kt.
+    viewModelFactory: ViewModelProvider.Factory,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: ProfileListViewModel = viewModel(factory = remember(appContext) { ProfileListViewModel.factory(appContext) })
+    val viewModel: ProfileListViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
@@ -1039,10 +1052,14 @@ private fun AvatarPickerGrid(
 fun AccountSettingsRoute(
     onBack: () -> Unit,
     onSignedOut: () -> Unit,
+    // A plain value, not a composable slot: `viewModel(factory = ...)` keys on factory
+    // identity, so a composable slot would be re-invoked every recomposition and defeat
+    // the `remember` that keeps the store alive. The platform hoists the whole
+    // LocalContext -> applicationContext -> remember -> factory block into the nav graph
+    // and passes the result here. See AccountViewModelFactories.kt.
+    viewModelFactory: ViewModelProvider.Factory,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: AccountSettingsViewModel = viewModel(factory = remember(appContext) { AccountSettingsViewModel.factory(appContext) })
+    val viewModel: AccountSettingsViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }

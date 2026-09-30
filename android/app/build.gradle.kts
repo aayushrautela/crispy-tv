@@ -24,9 +24,9 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 85 of the 178 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 92 of the 180 main-source files are there.
  *
- * The remaining 93 are held by three things, and only three: a type that
+ * The remaining 88 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
  * `androidx.paging`, media3), a composition root that by definition needs a
  * platform to resolve against, and screen code that is not yet split
@@ -283,9 +283,18 @@ kotlin {
     // measured by declaring it here and compiling the `desktop` target, not read from a
     // doc. ViewModel, ViewModelProvider and viewModelScope are therefore all reachable
     // from commonMain, which is what lets a viewmodel move there whole instead of being
-    // split factory-from-viewmodel. `lifecycle-viewmodel-ktx` and `-compose` stay in
-    // androidMain; they are the Android-flavoured halves of the same family.
+    // split factory-from-viewmodel.
     implementation(libs.androidx.lifecycle.viewmodel)
+    // `lifecycle-viewmodel-compose` is the fifth premise in this file that did not
+    // survive checking. The comment above used to say it "stays in androidMain" as one of
+    // the "Android-flavoured halves of the same family". Its `.module` publishes android,
+    // desktop, iosArm64, iosSimulatorArm64, js, linuxArm64, linuxX64, macosArm64,
+    // mingwX64, both tvos targets, wasmJs and the watchos targets -- so the composable
+    // `viewModel()` and `ViewModelProvider.Factory` are reachable from commonMain, which
+    // is what lets a route composable live there and take a factory as a value.
+    // (`lifecycle-viewmodel-ktx` is the one that really did go away: 2.11 folded it into
+    // `lifecycle-viewmodel`.)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
             // NOT `:android:native-engine`. It is a plain `com.android.library`,
             // so it publishes no JVM variant and cannot be consumed from a KMP
@@ -337,7 +346,6 @@ kotlin {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.lifecycle.runtime.ktx)
             implementation(libs.androidx.lifecycle.runtime.compose)
-            implementation(libs.androidx.lifecycle.viewmodel.compose)
             implementation(libs.androidx.activity.compose)
 
             implementation(libs.androidx.navigation.compose)

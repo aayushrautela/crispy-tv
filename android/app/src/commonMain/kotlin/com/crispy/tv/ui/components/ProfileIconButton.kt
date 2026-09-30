@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +30,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import com.crispy.tv.accounts.ActiveProfileInfo
-import com.crispy.tv.accounts.loadActiveProfile
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_person
 import org.jetbrains.compose.resources.painterResource
@@ -40,13 +38,17 @@ private val ProfileIconButtonSize = 40.dp
 private val ProfileIconContainerSize = 32.dp
 
 @Composable
-fun ProfileIconButton(onClick: () -> Unit) {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
+fun ProfileIconButton(
+    onClick: () -> Unit,
+    // No default, and a value rather than a composable slot. The loader is a capability the
+    // caller already has a Context for, and the lambda's identity is a produceState key, so
+    // the caller must pass a `remember`ed one -- see `activeProfileLoader`.
+    loadProfile: suspend () -> ActiveProfileInfo?,
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshKey by remember { mutableIntStateOf(0) }
-    val profile by produceState<ActiveProfileInfo?>(initialValue = null, appContext, refreshKey) {
-        value = loadActiveProfile(appContext)
+    val profile by produceState<ActiveProfileInfo?>(initialValue = null, loadProfile, refreshKey) {
+        value = loadProfile()
     }
 
     DisposableEffect(lifecycleOwner) {

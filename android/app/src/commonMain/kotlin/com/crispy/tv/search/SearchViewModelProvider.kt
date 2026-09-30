@@ -1,22 +1,17 @@
 package com.crispy.tv.search
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun rememberSearchViewModel(
+    viewModelFactory: ViewModelProvider.Factory,
     viewModelStoreOwner: ViewModelStoreOwner = checkNotNull(LocalViewModelStoreOwner.current),
-): SearchViewModel {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    return viewModel(
+): SearchViewModel =
+    viewModel(
         viewModelStoreOwner = viewModelStoreOwner,
-        factory = remember(appContext) {
-            searchViewModelFactory(appContext)
-        },
+        factory = viewModelFactory,
     )
-}
