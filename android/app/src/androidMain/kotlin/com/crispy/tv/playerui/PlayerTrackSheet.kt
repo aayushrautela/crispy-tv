@@ -53,63 +53,8 @@ import com.crispy.tv.ui.resources.ic_check_filled
 import com.crispy.tv.ui.resources.ic_graphic_eq_filled
 import com.crispy.tv.ui.resources.ic_music_note_filled
 import com.crispy.tv.ui.resources.ic_subtitles_filled
-import java.util.Locale
 import org.jetbrains.compose.resources.painterResource
 
-private val ISO639_2_TO_1 =
-    mapOf(
-        "eng" to "en", "spa" to "es", "fre" to "fr", "deu" to "de", "ger" to "de",
-        "ita" to "it", "por" to "pt", "rus" to "ru", "jpn" to "ja", "kor" to "ko",
-        "chi" to "zh", "zho" to "zh", "ara" to "ar", "hin" to "hi", "nld" to "nl",
-        "dut" to "nl", "tur" to "tr", "pol" to "pl", "vie" to "vi", "tha" to "th",
-        "ind" to "id", "msa" to "ms", "may" to "ms", "tam" to "ta", "tel" to "te",
-        "ben" to "bn", "mal" to "ml", "guj" to "gu", "kan" to "kn", "mar" to "mr",
-        "pan" to "pa", "urd" to "ur", "fas" to "fa", "per" to "fa", "heb" to "he",
-        "swe" to "sv", "nor" to "no", "dan" to "da", "fin" to "fi", "ell" to "el",
-        "gre" to "el", "ces" to "cs", "cze" to "cs", "hun" to "hu", "ron" to "ro",
-        "rum" to "ro", "bul" to "bg", "ukr" to "uk", "hrv" to "hr", "srp" to "sr",
-        "slv" to "sl", "lit" to "lt", "lav" to "lv", "est" to "et", "cat" to "ca",
-        "gle" to "ga", "isl" to "is", "ice" to "is", "mkd" to "mk", "mac" to "mk",
-        "sqi" to "sq", "alb" to "sq", "afr" to "af", "aka" to "ak", "amh" to "am",
-        "bod" to "bo", "bos" to "bs", "mya" to "my", "cmn" to "zh", "cym" to "cy",
-        "eus" to "eu", "fao" to "fo", "glg" to "gl", "hat" to "ht",
-        "hau" to "ha", "hye" to "hy", "ibo" to "ig", "jav" to "jv", "kat" to "ka",
-        "kaz" to "kk", "khm" to "km", "kin" to "rw", "kir" to "ky", "lao" to "lo",
-        "mon" to "mn", "mri" to "mi", "nya" to "ny", "ori" to "or",
-        "pus" to "ps", "que" to "qu", "sun" to "su", "swa" to "sw", "tgk" to "tg",
-        "tuk" to "tk", "uig" to "ug", "uzb" to "uz", "wol" to "wo", "yor" to "yo",
-        "zul" to "zu",
-    )
-
-internal fun languageLabelForCode(code: String?): String {
-    if (code.isNullOrBlank()) return "Unknown"
-    val lower = code.trim().lowercase()
-    return when (lower) {
-        "none", "off" -> "Off"
-        "forced" -> "Forced"
-        "default" -> "Default"
-        "device" -> "Device language"
-        "original" -> "Original"
-        "und" -> "Undetermined"
-        else -> {
-            val two = if (code.trim().length == 3) ISO639_2_TO_1[lower] ?: code.trim() else code.trim()
-            runCatching {
-                val display = Locale.forLanguageTag(two).getDisplayLanguage(Locale.ENGLISH)
-                if (display.isNotBlank() && !display.equals(two, ignoreCase = true)) {
-                    display.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ENGLISH) else it.toString() }
-                } else {
-                    code.trim().uppercase(Locale.ENGLISH)
-                }
-            }.getOrDefault(code.trim().uppercase(Locale.ENGLISH))
-        }
-    }
-}
-
-private fun normalizeLang(code: String?): String {
-    val raw = code?.trim().orEmpty().lowercase()
-    if (raw.isBlank()) return "und"
-    return if (raw.length == 3) ISO639_2_TO_1[raw] ?: raw else raw
-}
 
 private data class LanguageGroup<T>(
     val key: String,
@@ -121,7 +66,7 @@ private fun groupAudioByLanguage(tracks: List<NativeTrack>): List<LanguageGroup<
     if (tracks.isEmpty()) return emptyList()
     return tracks
         .groupBy { normalizeLang(it.language) }
-        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key), items) }
+        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, ::englishDisplayNameForTag), items) }
         .sortedBy { it.label }
 }
 
@@ -139,9 +84,9 @@ private data class EngineSubtitleOption(
     override val isSelected: Boolean,
 ) : SubtitleOption {
     override val key = track.id
-    override val label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language)
+    override val label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, ::englishDisplayNameForTag)
     override val language = track.language
-    override val subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language) }
+    override val subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, ::englishDisplayNameForTag) }
     override val trackId = track.id
 }
 
@@ -149,7 +94,7 @@ private data class CatalogSubtitleOption(
     val addonSubtitle: AddonSubtitle,
 ) : SubtitleOption {
     override val key = externalSubtitleTrackId(addonSubtitle.url)
-    override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language) }
+    override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language, ::englishDisplayNameForTag) }
     override val language = addonSubtitle.language
     override val subtitle = addonSubtitle.addonName?.takeIf { it.isNotBlank() }
     override val isSelected = false
@@ -160,7 +105,7 @@ private fun groupSubtitlesByLanguage(options: List<SubtitleOption>): List<Langua
     if (options.isEmpty()) return emptyList()
     return options
         .groupBy { normalizeLang(it.language) }
-        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key), items) }
+        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, ::englishDisplayNameForTag), items) }
         .sortedBy { it.label }
 }
 
@@ -207,8 +152,8 @@ internal fun PlayerAudioSheet(
                     items(group.items, key = { it.id }) { track ->
                         val title = track.title?.takeIf { it.isNotBlank() }
                         TrackRow(
-                            label = title ?: languageLabelForCode(track.language),
-                            subtitle = title?.let { languageLabelForCode(track.language) },
+                            label = title ?: languageLabelForCode(track.language, ::englishDisplayNameForTag),
+                            subtitle = title?.let { languageLabelForCode(track.language, ::englishDisplayNameForTag) },
                             isSelected = track.id == selectedAudioTrackId,
                             palette = palette,
                             leadingIcon = if (track.language == null) Res.drawable.ic_music_note_filled else Res.drawable.ic_graphic_eq_filled,

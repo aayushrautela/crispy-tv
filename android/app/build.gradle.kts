@@ -78,7 +78,19 @@ plugins {
  * ten of its types are declared only in `:android:native-engine`, which is a
  * plain `com.android.library` and therefore cannot be named from a KMP
  * `commonMain` whatever we write here.
- * That one is a Phase 5/6 decision about the media engine.
+ * `PlayerTrackSheet` is behind the **same** wall for the **same** reason -- it
+ * names `NativeTrack` and `externalSubtitleTrackId`, both from
+ * `:android:native-engine` -- and checking that before planning the move is what
+ * turned its landing from a batch into an extraction: the sheet's language
+ * labelling is pure data over a string and moved to
+ * `commonMain/playerui/LanguageLabels.kt` with a no-default
+ * `englishDisplayName: (String) -> String` slot, while 450 lines of composition
+ * stayed behind. **The file count is the misleading number here: `PlayerTrackSheet`
+ * still contains no `java.*` import, and it still cannot move.** What tells the
+ * two apart is a type, not an import, so check `grep -rn "class NativeTrack"`
+ * against the module type in `plugins { }` before planning any file the audit
+ * calls clean.
+ * Both are Phase 5/6 decisions about the media engine.
  *
  * The method that produced this table is the one to repeat: move the batch,
  * let the compiler name the hubs, revert what fails. It has now been run four
