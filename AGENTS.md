@@ -275,6 +275,19 @@ Kotlin Multiplatform modules (in progress; see `check-local.sh`):
   - **`android { }` is current; `androidLibrary { }` is deprecated** as of Kotlin `2.4.10`, which says so outright: *"'androidLibrary' block is deprecated. Please use 'android' instead."* Earlier guidance — the JetBrains migration guide, and earlier revisions of this file — said the opposite and described a real failure with `android { }`. That failure is gone; JetBrains converged the two blocks. Write `android { }` on new code. `:sharedUI` still uses `androidLibrary { }` and compiles, with a deprecation warning.
   - **CMP 1.11.x ships `androidx.compose.*`, not `org.jetbrains.compose.*`.** Verified by unzipping the resolved AARs: 790 `androidx/compose` classes in `runtime-android`, 1336 in `ui-android`, and **zero** `org/jetbrains/compose` in any of them. The `org.jetbrains.compose.*` coordinates are thin aliases. So moving a Compose file from `:app` to `:sharedUI` changes the **artifact coordinates in `build.gradle.kts`**, never the imports in the file, and `import org.jetbrains.compose.*` does not compile anywhere.
   - **No `linuxX64` on Compose modules.** CMP publishes no linuxX64 artifacts — its targets are Android, iOS and Desktop (JVM) only — so declaring it makes every `compose.*` dependency fail to resolve. `jvm("desktop")` is the local purity gate for Compose modules instead. This is why the `linuxX64` rule above is scoped to pure-Kotlin modules.
+  - **`CrispyPalette` is the token layer both surfaces read, and `:tv` maps two roles onto it.**
+    `:sharedUI` and `:tv` both keep their own `Theme.kt` — different Material3 libraries, so
+    neither is deletable — but both build their `darkColorScheme` from the one `object
+    CrispyPalette` in `:sharedUI`'s `commonMain`. `:tv` needs **no new dependency**: it already
+    had `implementation(project(":android:sharedUI"))` at `android/tv/build.gradle.kts:150`. Its
+    only special case is `border = CrispyPalette.outline, borderVariant =
+    CrispyPalette.outlineVariant`, because `androidx.tv.material3` names those roles `border`
+    where `androidx.compose.material3` names them `outline`. **Those two mapping lines are
+    written out rather than derived, and a missing one is a silent colour change, not a compile
+    error** — which is why the values behind them are pinned in `commonTest`. `:sharedUI` also
+    gained `withHostTest {}` and its **first test file** in this landing; without the block a
+    `commonTest` source directory exists but nothing compiles or runs it on Android and AGP only
+    warns.
   - `LocalConfiguration` is Android-only even under CMP — it lives in `AndroidCompositionLocals_androidKt` inside the `ui-android` AAR, so a grep of the class lists cannot see it either. **This line once recommended `LocalWindowInfo.current.containerDpSize` as the replacement, and `LocalWindowInfo` does not exist in any resolved Compose artifact at any version.** There is no portable composition local for the window size here: the answer is that the caller already holds the value. A screen that needs to know whether it is wide takes a no-default `isWideScreen: Boolean` and the caller passes it — see *Rules* §1.
   - **Material3 Expressive is available on every target, and is used on every target. Settled — do not re-litigate, and do not "fix" it by dropping it.** The whole blocker was one line in a build file. This repo recorded, in three places, that Phase 4 "has to drop or replace Material3 Expressive" because `androidx.compose.material3:1.5.0-alpha26` publishes no `material3-desktop` artifact. That was inferred from a coordinate mismatch and was **wrong**, and acting on it would have deleted a shipping design feature to work around a version pin.
     The fix is to declare **`org.jetbrains.compose.material3:material3`** (`libs.compose.material3`) instead of either the androidx coordinate or the `compose.material3` alias. That coordinate is a thin alias that delegates per target, verified by resolving the graph: on Android it becomes `androidx.compose.material3:material3-android:1.5.0-alpha27` — genuine AndroidX, one alpha *forward* of what the app shipped — and on desktop/iOS it becomes `org.jetbrains.compose.material3:material3-desktop:1.13.0-alpha01`, the real fork carrying `LoadingIndicator`, `MaterialShapes` and `WavyProgressIndicator`. So there is exactly one material3 on any classpath, the `androidx.compose.material3` package and imports are identical everywhere, and **no `expect`/`actual` seam is needed**. The 12 Expressive call sites are untouched.
@@ -323,6 +336,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 - **Diff every moved file against its original in `HEAD`.** `diff <(git show HEAD:<src>) <dest>` is
   the cheapest check in the workflow and the only one that proves a *non-executed* line survived.
   Four of the six moves in one batch were byte-identical, which is the strongest form of the answer.
+- **Two libraries naming one role differently is a mapping, not a divergence — and it is
+  invisible until you put the two files side by side.** `:tv`'s `androidx.tv.material3`
+  calls the border roles `border`/`borderVariant`; `:sharedUI`'s `androidx.compose.material3`
+  calls the same roles `outline`/`outlineVariant`. Both sides held the *same two hex
+  values* (`0xFF333333`, `0xFF262626`) written out twice. Read as two schemes side by side
+  this looks exactly like a deliberate TV palette divergence that must be preserved, and it
+  is in fact a pure de-duplication worth zero pixels. `:tv`'s own `DetailPalette.kt` already
+  mapped the roles by hand at its last four lines — read it *before* deciding a divergence
+  is a product decision, because it is independent proof when it is not.
+- **A duplicated `public` constant can be dead, and the same name in a different package is
+  what hides it.** `:tv` re-declared `CrispySpinner = Color(0xFFF56E3C)` under the *same
+  name* as `:sharedUI`'s, both `public`, in different packages — so no compiler error, no
+  lint, and no import audit flagged it. `git grep` showed all **11** call sites importing
+  `:sharedUI`'s and **zero** referencing `:tv`'s. This is the §1.1 same-package trap from
+  the other direction: there, a type is reachable with no import; here, an identical
+  declaration is reachable with no diff.
 
 ### 2. Ports, seams and slots
 
@@ -405,6 +434,28 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   reads like a set of real failures that did not happen.
 - **When a `getOrElse` sits on a path in production, an empty result proves nothing** until you have
   established the double answered, and for the right call number.
+- **A name that excludes N and a body that does not is the same defect twice, and the fix is
+  one shared constant both use.** A test called `everyRoleExceptTheAccentAndTheErrorIsAGrey`
+  listed 35 roles *including* `errorContainer`, `onErrorContainer` and `inverseSurface` — and
+  the rewritten version had the identical bug, iterating all 37 unfiltered. Two tests each
+  spelling out the excluded set is two places to forget to update, and the failure mode is a
+  test that **skips** a role rather than a test that fails. Declare the set once
+  (`private val colouredRoles = setOf(...)`, `private fun isGrey(colour: Color)`) and have both
+  tests read it.
+- **"Is every role in this group neutral?" is only worth asserting as a *set* comparison.**
+  A hand-picked list is a sample: a newly added role that quietly picked up a tint is not in
+  the list and the suite passes silently. `assertEquals(colouredRoles, roles.filterValues { !isGrey(it) }.keys)`
+  inverts that — it turns "a role I did not think of changed" into a failure. And **assert the
+  key set before the values**: comparing keys first reports a new role as "the list changed"
+  rather than as a confusing value diff. Always **name the role in the failure message** — 32
+  roles in a loop with a shared message identifies nothing.
+- **A `Color(0xFF141414)` literal is ARGB, not RGB.** A first pass parsed byte 0 as red and
+  reported 27 of 37 palette roles non-neutral, which is why the "obvious" answer is worth
+  checking against the type. Once measured correctly: 37 roles, **5** non-neutral
+  (`spinner`, `error`, `errorContainer`, `onErrorContainer`, `inverseSurface`), 32 neutral —
+  and **two of the five are not R > G > B**: `error` (`0xFFE8455C`) and `errorContainer`
+  (`0xFFB03040`) are pink-red with blue above green, so a blanket "is it warm?" assertion
+  fails on exactly the two roles it most needed to check. Measure each direction, then pin it.
 
 ### 4. Coroutines in tests
 
@@ -500,6 +551,18 @@ Every rule in this section is stated in each driver's docstring, because a drive
 - **After any revert, check `git status --short` for ` D` in the index** and compile *both* source
   sets; a revert that only compiles the source set you moved *from* proves nothing, and the index
   half is the part people forget.
+- **A file's first line is not its `package` line.** A `@file:OptIn(...)` or `@file:JvmName`
+  annotation may come first, so a patch that rewrites the region above the package declaration
+  eats the package statement and leaves the import pasted onto it — `import com.crispy.tv.ui.theme.CrispyPalettepackage com.crispy.tv.playerui`.
+  **The signature is one distinct unresolved name, `CrispyPalettepackage`, inside a 328-error
+  cascade**; find that mangled name before reading the cascade, and locate the package line with
+  `len(re.findall(r"^package com\.crispy\.tv\.\S+$", s, re.M)) == 1` rather than indexing line 0.
+- **`open(path, "w")` truncates before the argument is evaluated.** A single-expression rewrite
+  that computes its new content *inside* the `write()` call can raise — on a bad anchor, a
+  `ValueError: substring not found` — **after** the file has already been emptied. One such
+  patch destroyed a 368-line file and the exception named the patch, not the file. Build a
+  `results` dict of every new content **first**, and only then open any file for writing; that
+  ordering also means an assertion failure on the seventh file leaves the first six untouched.
 
 ## Compose resources (Phase 4 Step 1)
 

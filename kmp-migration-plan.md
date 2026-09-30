@@ -77,7 +77,7 @@ is not waiting on Phase 4.
 |---|---|---|
 | `core-domain` | 29 | 0 |
 | `platform-core` | 7 | 0 |
-| `sharedUI` | 4 | 0 |
+| `sharedUI` | 5 | 0 |
 | `player` | 6 | 0 |
 | `addons` | 10 | 5 |
 | `backend` | 9 | 8 |
@@ -85,7 +85,7 @@ is not waiting on Phase 4.
 | `network` | 2 | 4 |
 | `watchhistory` | 2 | 3 |
 | **`:app`** | **106** | **80** |
-| **total** | **187** | **104** |
+| **total** | **188** | **104** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
@@ -539,6 +539,32 @@ left to be discovered.
   two different libraries, not two copies of one, so neither `Theme.kt` is
   deletable and `:tv` cannot simply be pointed at `:sharedUI`'s. What *is*
   shareable is the token layer — the colour and shape values — and only that.
+  **DONE, as a token layer only.** `:sharedUI` now holds `CrispyPalette`, one object
+  of 38 constants that both `darkColorScheme` calls build from; `:tv` keeps its own
+  `Theme.kt` and maps `border = CrispyPalette.outline`, `borderVariant =
+  CrispyPalette.outlineVariant`. Three things the measurement overturned, all of
+  which had been assumed:
+  - **The two schemes were already value-identical.** All 27 shared roles matched
+    exactly, and the two border roles held the *same* hex values under different
+    names (`0xFF333333` and `0xFF262626`). So the only divergence was the role
+    *name* between two libraries, which is a **mapping, not a divergence** — there
+    was no deliberate TV colour to preserve, and the extraction changed zero pixels.
+    `:tv`'s own `DetailPalette.kt` already mapped the roles by hand at its last four
+    lines, which is independent proof they are the same role.
+  - **A duplicated `public` constant can be dead.** `:tv` re-declared
+    `CrispySpinner = Color(0xFFF56E3C)` under the *same name* as `:sharedUI`'s, both
+    `public`, different packages — so nothing flagged it. `git grep` showed all
+    **11** call sites importing `:sharedUI`'s, and `:tv`'s had zero. Deleted.
+  - **`:tv` already depended on `:sharedUI`** (`android/tv/build.gradle.kts:150`), so
+    the token layer needed no new dependency and no new module.
+  The 7 roles `:tv` cannot express (Material3 Expressive's surface-container family)
+  are in the palette and `:tv` simply does not use them. `:tv`'s `DetailPalette.kt`
+  is untouched and out of scope: it is the dynamic seed-colour feature and is
+  Android-only by nature (`Bitmap`, `Context`, `LruCache`, coil3, `com.materialkolor`).
+  `CrispyPaletteTest` (`:sharedUI`'s first test file) pins every value in `commonTest`,
+  which runs on Android, desktop and both iOS targets — necessary because **the golden
+  suite does not render `:tv` at all**, so a mistyped hex on that surface would
+  otherwise ship green.
 - Move screens from `:app` into shared code, **in vertical slices, one screen at a time**, each with a golden-screenshot diff.
   - **Corrected 2026-09-29:** the first destination is **`:app`'s own `commonMain`**, not `:sharedUI`'s. `:sharedUI` owns the design system and its assets; phone/tablet UI that `:tv` does not use goes to `:app/commonMain`, and `:app`'s empty `commonMain` is the thing that needed proving. Anything genuinely shared by both surfaces goes to `:sharedUI`.
 - The import rule in §4.1 applies to every file moved: coordinates change, imports do not.

@@ -47,7 +47,7 @@ import com.crispy.tv.ui.resources.ic_check
 import com.crispy.tv.ui.resources.ic_check_filled
 import com.crispy.tv.ui.resources.ic_event
 import com.crispy.tv.ui.resources.ic_open_in_new_filled
-import com.crispy.tv.ui.theme.CrispySpinner
+import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
@@ -168,7 +168,7 @@ ProfileIconButton(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LoadingIndicator(color = CrispySpinner)
+                    LoadingIndicator(color = CrispyPalette.spinner)
                 }
             }
         } else if (pagingItems.itemCount == 0) {

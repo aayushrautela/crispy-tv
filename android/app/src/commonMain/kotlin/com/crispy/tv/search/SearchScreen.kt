@@ -66,7 +66,7 @@ import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_close
 import com.crispy.tv.ui.resources.ic_history
-import com.crispy.tv.ui.theme.CrispySpinner
+import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.flow.StateFlow
@@ -427,7 +427,7 @@ private fun SearchResultsContent(
 
             else -> {
                 if (isLoading) {
-                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CrispySpinner) }
+                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CrispyPalette.spinner) }
                 }
                 if (buckets.movies.isNotEmpty()) {
                     item(key = "movies") {

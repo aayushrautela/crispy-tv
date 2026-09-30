@@ -38,6 +38,15 @@ kotlin {
         androidResources {
             enable = true
         }
+
+        // Enables `androidHostTest`, the compilation that runs `commonTest` on
+        // the Android target. Without it a `commonTest` source directory exists
+        // but nothing compiles or runs it on Android, and AGP only *warns*
+        // ("The 'commonTest' source directory exists, but android host tests are
+        // not enabled") -- so the warning reads like a build-file nit and is
+        // actually the tests not running where the module ships. It must be
+        // added in the same change as any `commonTest` this module gains.
+        withHostTest {}
     }
 
     jvm("desktop")

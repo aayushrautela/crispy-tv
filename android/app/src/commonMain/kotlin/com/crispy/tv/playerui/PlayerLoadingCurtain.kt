@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.theme.CrispySpinner
+import com.crispy.tv.ui.theme.CrispyPalette
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -33,7 +33,7 @@ fun PlayerLoadingCurtain(
         ) {
             LoadingIndicator(
                 modifier = Modifier.size(64.dp),
-                color = CrispySpinner,
+                color = CrispyPalette.spinner,
             )
         }
     }

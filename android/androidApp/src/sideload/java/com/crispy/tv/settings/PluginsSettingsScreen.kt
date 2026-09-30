@@ -54,7 +54,7 @@ import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_arrow_back
 import com.crispy.tv.ui.resources.ic_delete
 import com.crispy.tv.ui.resources.ic_refresh
-import com.crispy.tv.ui.theme.CrispySpinner
+import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -287,7 +287,7 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                         enabled = !uiState.isInstalling,
                     ) {
                         if (uiState.isInstalling) {
-                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp, color = CrispySpinner)
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp, color = CrispyPalette.spinner)
                             Spacer(modifier = Modifier.height(0.dp))
                         } else {
                             Text("Install repository")

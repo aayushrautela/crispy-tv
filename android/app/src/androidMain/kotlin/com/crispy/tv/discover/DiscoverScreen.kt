@@ -85,7 +85,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import com.crispy.tv.ui.resources.ic_check
 import com.crispy.tv.ui.resources.ic_keyboard_arrow_down
 import com.crispy.tv.ui.resources.ic_layers
-import com.crispy.tv.ui.theme.CrispySpinner
+import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -503,7 +503,7 @@ private fun DiscoverScreen(
                                 .padding(vertical = Dimensions.ListItemPadding),
                             contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(20.dp), color = CrispySpinner)
+                            LoadingIndicator(modifier = Modifier.size(20.dp), color = CrispyPalette.spinner)
                         }
                     }
                 } else if (appendState is LoadState.Error) {

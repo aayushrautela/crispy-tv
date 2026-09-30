@@ -76,7 +76,7 @@ import com.crispy.tv.ui.resources.ic_lock
 import com.crispy.tv.ui.resources.ic_mail
 import com.crispy.tv.ui.resources.ic_visibility
 import com.crispy.tv.ui.resources.ic_visibility_off
-import com.crispy.tv.ui.theme.CrispySpinner
+import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import org.jetbrains.compose.resources.painterResource
@@ -231,7 +231,7 @@ private fun AuthScreen(
                             shape = RoundedCornerShape(8.dp),
                         ) {
                             if (uiState.isBusy) {
-                                LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispySpinner)
+                                LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispyPalette.spinner)
                             } else {
                                 Text("Get Started")
                             }
@@ -345,7 +345,7 @@ private fun AuthScreen(
                                 shape = RoundedCornerShape(8.dp),
                             ) {
                                 if (uiState.isBusy) {
-                                    LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispySpinner)
+                                    LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispyPalette.spinner)
                                 } else {
                                     Text("Sign In")
                                 }
@@ -525,13 +525,13 @@ private fun ProfileSelectorScreen(
 
             if (isSetup) {
                 if (uiState.isBusy) {
-                    LoadingIndicator(color = CrispySpinner)
+                    LoadingIndicator(color = CrispyPalette.spinner)
                 } else {
                     ProfileSetupScreen(onFinishSetup = onFinishSetup)
                 }
             } else {
                 if (uiState.isBusy && uiState.profiles.isEmpty()) {
-                    LoadingIndicator(color = CrispySpinner)
+                    LoadingIndicator(color = CrispyPalette.spinner)
                 } else {
                     ProfileGrid(
                         profiles = uiState.profiles,
@@ -878,7 +878,7 @@ private fun ProfileManagementScreen(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        LoadingIndicator(color = CrispySpinner)
+                        LoadingIndicator(color = CrispyPalette.spinner)
                     }
                 }
             }
