@@ -13,6 +13,8 @@ import com.crispy.tv.platform.desktop.DesktopPaths
 import com.crispy.tv.platform.desktop.DesktopSecretStore
 import com.crispy.tv.platform.desktop.DesktopTimeSource
 import com.crispy.tv.platform.desktop.FileKeyValueStore
+import com.crispy.tv.settings.ImageSettingsRepository
+import com.crispy.tv.settings.KeyValueStoreImageSettingsRepository
 import java.io.File
 
 /**
@@ -67,4 +69,28 @@ internal class DesktopEnvironment(
     val settings: KeyValueStore = FileKeyValueStore(dataDirectory, SETTINGS_STORE_NAME)
 
     val tokens: SecretStore = DesktopSecretStore(File(dataDirectory, "secrets/token.key"))
+
+    /**
+     * `:android:app`'s own image-quality screen and repository, wired to a desktop
+     * store.
+     *
+     * Neither half is duplicated here. `ImageSettingsScreen` is a public
+     * `commonMain` composable and `KeyValueStoreImageSettingsRepository` was
+     * widened from `internal` for exactly this call site -- the same rule
+     * `ContinueWatchingRail` was widened under, and for the same reason: a
+     * `commonMain` declaration that gains a caller outside its module has to be
+     * public, and only the one that actually gained one is.
+     *
+     * The repository takes an `onQualityChanged` callback with **no default**,
+     * because dropping the decoded-image cache is a Coil concern that cannot live
+     * in a repository. On Android something passes a cache invalidator. Here the
+     * desktop renders no artwork at all, so the honest callback is the empty one --
+     * and because the parameter has no default, saying so is a decision written
+     * down here rather than a runtime surprise on the first quality change.
+     */
+    val imageSettings: ImageSettingsRepository =
+        KeyValueStoreImageSettingsRepository(
+            store = FileKeyValueStore(dataDirectory, IMAGE_SETTINGS_STORE_NAME),
+            onQualityChanged = {},
+        )
 }

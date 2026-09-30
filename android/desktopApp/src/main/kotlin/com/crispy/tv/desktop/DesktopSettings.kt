@@ -18,6 +18,19 @@ package com.crispy.tv.desktop
  */
 internal const val SETTINGS_STORE_NAME: String = "settings"
 
+/**
+ * The store name for anything the user changes through a screen.
+ *
+ * A **separate store** from [SETTINGS_STORE_NAME], not a second key prefix inside
+ * it, and the reason is the rule `FileKeyValueStore` already documents: one file
+ * per store name, because a prefix has to be re-applied on every read and write
+ * and one missed prefix is a silent leak between stores. The window size is
+ * incidental to the build; the image quality is the user's. They change on
+ * different schedules, and the day one of them wants a schema the other will not
+ * want to be in the same file.
+ */
+internal const val IMAGE_SETTINGS_STORE_NAME: String = "image-settings"
+
 /** Window width in density-independent pixels. */
 internal const val WINDOW_WIDTH_KEY: String = "window.width"
 

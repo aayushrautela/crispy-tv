@@ -32,7 +32,7 @@ interface ImageSettingsRepository {
  * second writer on these preferences would be the only thing that could need
  * one, and there is none.
  */
-internal class KeyValueStoreImageSettingsRepository(
+class KeyValueStoreImageSettingsRepository(
     private val store: KeyValueStore,
     private val onQualityChanged: (ImageQuality) -> Unit,
 ) : ImageSettingsRepository {

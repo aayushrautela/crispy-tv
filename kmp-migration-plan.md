@@ -57,7 +57,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
 | 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **106 of 186 `:app` files moved** |
-| 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders `ContinueWatchingRail` from its `commonMain`, so the seam is no longer a claim about compilation. It is still 3 files, not an app, and it reaches **none** of the six `platform-core` ports |
+| 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
 
@@ -182,6 +182,37 @@ but the thing that actually made it useful was separate. `ContinueWatchingRail` 
 `public` for it to be callable at all, because `:app`'s screen composables are `internal`
 and widening all of them would be API surface nobody asked for. So the seam was already
 built and unused; what was missing was a single `public` entry point.
+
+**The second screen repeated the shape, which is the useful part.** `ImageSettingsScreen`
+was already `public` with no walls at all — no `NativeTrack`, no `:native-engine`, no
+`paging-compose`, no `androidx.navigation` — and the only thing standing between it and the
+desktop was the *same* one-word wall: `KeyValueStoreImageSettingsRepository` was `internal`.
+One production caller (`:androidMain`'s `ImageSettingsRepositoryProvider`), so widening it
+cost nothing else. **The lesson worth keeping is not "widen `internal`" but that a
+`commonMain` screen's reachability is decided by its repository's visibility, not its
+own.** A public composable over an internal repository is as unreachable as an internal
+composable, and it reads as reachable.
+
+**What this landing did *not* do, deliberately: build a navigation shell.** The window
+switches between the two screens with a `remember`ed enum and a `BasicText` affordance,
+which is four lines of wiring and looks like a placeholder because it is one. The
+alternative was inventing a portable `NavHost` for two screens, in a landing whose
+point is something else — and `:app` has no navigation seam to grow one into, because
+`androidx.navigation` is not on the `commonMain` classpath at all. **A screen count is
+not a product:** what makes desktop a runnable target is a *stateful* surface reached
+through a real port round trip, and the image-quality screen is the first one that
+actually is (see below). The shell is the next thing, and it belongs in `:app`'s
+`appUi` source set rather than in the entry point.
+
+**The one test that matters here, and why no other test covers it.** Every test of
+`KeyValueStoreImageSettingsRepository` runs in `:app`'s `commonTest` against a fake;
+every test of `FileKeyValueStore` runs in `:platform-desktop` against a hand-written
+caller. Neither ever puts the two together — so a `KeyValueStore` satisfying its own
+contract and a repository satisfying its own could still fail to interoperate, and that
+is the entire claim of a port. `DesktopImageSettingsTest` (8 cases) drives a real
+`:app` repository over a real desktop store and asserts the value is on disk, survives a
+second environment, and lives in a **separate file** from the window settings, which is
+the one-file-per-store-name rule checked rather than assumed.
 
 **RETRACTED — the claim this section used to make.** It said:
 

@@ -1,10 +1,23 @@
 package com.crispy.tv.desktop
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.crispy.tv.settings.ImageSettingsScreen
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.watchhistory.ContinueWatchingRail
 
@@ -20,10 +33,22 @@ import com.crispy.tv.watchhistory.ContinueWatchingRail
  * mock of either. See the comment at the top of this module's build file for what
  * it deliberately does *not* render yet, and why.
  *
- * The rail is `:app` code reached through `:app`'s `desktop` JVM variant -- this
- * module holds no presentation of its own, only the window, the fixture seed and
- * the [DesktopEnvironment] that supplies the platform ports.
+ * Both screens are `:app` code reached through `:app`'s `desktop` JVM variant. This
+ * module holds the window, the fixture seed, the [DesktopEnvironment] that supplies
+ * the platform ports, and the two-entry-point switch between them.
+ *
+ * ## Why the switch is here and not in `:app`
+ *
+ * Because `:app` has no navigation seam yet, and inventing one for two screens
+ * would be a design decision made in a landing whose point is something else. The
+ * two screens live in `commonMain` and are reachable; what does not exist is a
+ * portable `NavHost`, and `androidx.navigation` is not on the `commonMain`
+ * classpath at all. So the switch is four lines of `remember`ed state, and it is
+ * written to be replaced rather than extended: when `:app` grows a real shell,
+ * this file loses the `when` and keeps the two calls.
  */
+private enum class DesktopScreen { WATCHING, IMAGE_SETTINGS }
+
 fun main() {
     val environment = DesktopEnvironment()
     val seed = SeedData.load()
@@ -52,10 +77,51 @@ fun main() {
             title = "Crispy",
             state = windowState,
         ) {
-            ContinueWatchingRail(
-                items = seed.items,
-                contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding),
-            )
+            var screen by remember { mutableStateOf(DesktopScreen.WATCHING) }
+
+            when (screen) {
+                DesktopScreen.WATCHING -> Column {
+                    DesktopAffordance("Image quality") { screen = DesktopScreen.IMAGE_SETTINGS }
+                    ContinueWatchingRail(
+                        items = seed.items,
+                        contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding),
+                    )
+                }
+
+                DesktopScreen.IMAGE_SETTINGS -> {
+                    val settings by environment.imageSettings.settings.collectAsState()
+                    ImageSettingsScreen(
+                        settings = settings,
+                        // The repository's other half: a real `:app` screen writing
+                        // through a real `KeyValueStore`, so a quality chosen here
+                        // is still there on the next launch. Nothing invalidates an
+                        // image cache because nothing decodes one.
+                        onQualityChanged = environment.imageSettings::setQuality,
+                        onBack = { screen = DesktopScreen.WATCHING },
+                    )
+                }
+            }
         }
     }
+}
+
+/**
+ * A label that opens the other screen.
+ *
+ * `BasicText` and `Modifier.clickable` rather than a Material3 `TextButton`, and
+ * the reason is the dependency shape: `:app` renders Material3 internally, but
+ * naming a Material3 symbol *here* would need it on this module's own compile
+ * classpath, and the affordance is a placeholder until `:app` has a shell to put
+ * a real one in. It is a `Column` child so it costs a slot rather than a
+ * `Box` overlay the rail's own background would have to be told about.
+ */
+@Composable
+private fun DesktopAffordance(label: String, onClick: () -> Unit) {
+    BasicText(
+        text = label,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(Dimensions.PageBottomPadding),
+    )
 }
