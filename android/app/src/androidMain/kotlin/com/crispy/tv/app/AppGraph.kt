@@ -19,6 +19,8 @@ import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.optimistic.FileBackedPendingMutationStore
 import com.crispy.tv.optimistic.UserMediaMutationExecutor
 import com.crispy.tv.optimistic.UserMutationOutbox
+import com.crispy.tv.platform.android.AndroidAppLogger
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,13 +48,24 @@ class AppGraph(
     }
 
     private val detailsUseCases: DetailsUseCases by lazy {
+        // `AiInsightsRepository` stays in androidMain and its functions take a
+        // `Locale`, which `commonMain` cannot name. The round trip through a
+        // BCP-47 tag (`toLanguageTag` at the caller, `forLanguageTag` here)
+        // preserves the language the wire and the cache key on.
+        fun localeFor(languageTag: String): Locale = Locale.forLanguageTag(languageTag)
         DetailsUseCases(
             sessionRepository = sessionRepository,
             catalogRepository = catalogRepository,
             userMediaRepository = userMediaRepository,
-            crispyBackendClient = BackendServicesProvider.backendClient(appContext),
-            aiRepository = aiInsightsRepository,
             backendContextResolver = BackendContextResolverProvider.get(appContext),
+            backendApi = BackendServicesProvider.backendClient(appContext),
+            logger = AndroidAppLogger(appContext),
+            cachedInsights = { itemId, languageTag ->
+                aiInsightsRepository.loadCached(itemId, localeFor(languageTag))
+            },
+            generateInsights = { itemId, languageTag ->
+                aiInsightsRepository.generate(itemId, localeFor(languageTag))
+            },
         )
     }
 

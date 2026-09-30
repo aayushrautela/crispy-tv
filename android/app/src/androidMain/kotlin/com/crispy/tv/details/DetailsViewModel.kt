@@ -303,7 +303,7 @@ class DetailsViewModel internal constructor(
             if (!aiItemId.isNullOrBlank()) {
                 val cached =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadCachedAiInsights(aiItemId, aiLocale)
+                        detailsUseCases.loadCachedAiInsights(aiItemId, aiLocale.toLanguageTag())
                     }
                 if (cached != null && isCurrentGeneration(generation)) {
                     _uiState.update { it.copy(aiInsights = cached) }
@@ -476,7 +476,7 @@ class DetailsViewModel internal constructor(
                     withContext(Dispatchers.IO) {
                         detailsUseCases.generateAiInsights(
                             itemId = itemId,
-                            locale = locale,
+                            languageTag = locale.toLanguageTag(),
                         )
                     }
                 }.onSuccess { result ->

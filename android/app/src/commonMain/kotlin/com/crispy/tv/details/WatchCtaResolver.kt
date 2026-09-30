@@ -6,7 +6,6 @@ import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.watchhistory.matchesMediaType
-import java.util.Locale
 import kotlin.math.roundToInt
 
 internal data class ProviderState(
@@ -31,7 +30,9 @@ internal class WatchCtaResolver(
     )
 
     suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
-        val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
+        val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase()
+        // `lowercase()` without a locale: these are backend ids (`tt...`, item ids),
+        // ASCII by construction, where the Unicode default mapping agrees with US.
         if (fromField != null) return details.copy(imdbId = fromField)
         return details
     }
@@ -77,8 +78,8 @@ suspend fun resolveContinueWatchingEntry(
     expectedType: MetadataLabMediaType,
     nowMs: Long,
   ): CanonicalContinueWatchingItem? {
-    val targetId = details.id.trim().lowercase(Locale.US)
-    val targetItemId = details.itemId?.trim()?.lowercase(Locale.US)
+    val targetId = details.id.trim().lowercase()
+    val targetItemId = details.itemId?.trim()?.lowercase()
     if (targetId.isBlank() && targetItemId.isNullOrBlank()) {
       return null
     }
@@ -88,8 +89,8 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
   return snapshot.entries
     .asSequence()
     .filter { entry ->
-      val entryItemId = entry.titleItemId.trim().lowercase(Locale.US)
-      val entryId = entry.id.trim().lowercase(Locale.US)
+      val entryItemId = entry.titleItemId.trim().lowercase()
+      val entryId = entry.id.trim().lowercase()
       val matchesIdentity =
         when {
           !targetItemId.isNullOrBlank() -> entryItemId == targetItemId || entryId == targetItemId

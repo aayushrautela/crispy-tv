@@ -1,10 +1,9 @@
 package com.crispy.tv.details
 
-import android.util.Log
-import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.CrispyBackendClient
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
@@ -14,8 +13,8 @@ import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.mapping.toMediaVideo
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
-import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
+import com.crispy.tv.backend.BackendApi
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.backend.ClientMediaCard
 import com.crispy.tv.backend.MetadataTitleDetailResponse
 import com.crispy.tv.backend.MetadataTitleExtrasResponse
@@ -62,16 +61,27 @@ internal class DetailsUseCases(
     private val sessionRepository: SessionRepository,
     private val catalogRepository: CatalogRepository,
     internal val userMediaRepository: UserMediaRepository,
-    private val aiRepository: AiInsightsRepository,
     private val backendContextResolver: BackendContextResolver,
-    private val crispyBackendClient: CrispyBackendClient,
+    private val backendApi: BackendApi,
+    private val logger: AppLogger,
+    // The AI repository stays in androidMain (Context, Supabase, backend
+    // providers), and its functions take a `Locale` this source set cannot
+    // name. So the two operations cross as function slots over BCP-47 tags,
+    // and the `Locale.forLanguageTag` adapter lives at the construction site.
+    private val cachedInsights: (itemId: String, languageTag: String) -> AiInsightsResult?,
+    private val generateInsights: suspend (itemId: String, languageTag: String) -> AiInsightsResult,
 ) {
     private val episodeWatchStateResolver = EpisodeWatchStateResolver(
-        crispyBackendClient = crispyBackendClient,
+        crispyBackendClient = backendApi,
         backendContextResolver = backendContextResolver,
         userMediaRepository = userMediaRepository,
     )
-    private val cachedBaseResults = ConcurrentHashMap<String, DetailsScreenLoadResult>()
+    // `ConcurrentHashMap` is not in commonMain. Its only job here was making
+    // single get/put/remove thread-safe across concurrent `loadScreen` calls --
+    // there are no compound operations to protect -- so a Mutex-guarded
+    // `mutableMapOf` is the same guarantee with no JDK type.
+    private val cacheMutex = Mutex()
+    private val cachedBaseResults = mutableMapOf<String, DetailsScreenLoadResult>()
 
     fun clearEpisodeWatchStateCache() {
     }
@@ -87,8 +97,9 @@ internal class DetailsUseCases(
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
         val accessToken = backendContext?.accessToken ?: session?.accessToken
         val profileId = backendContext?.profileId
-        cachedBaseResults[cacheKey]?.takeIf { cached -> cached.details != null && accessToken != null }?.let { cached ->
-            Log.d(
+        cacheMutex.withLock { cachedBaseResults[cacheKey] }
+            ?.takeIf { cached -> cached.details != null && accessToken != null }?.let { cached ->
+            logger.debug(
                 TAG,
                 "loadScreen CACHE HIT requestedItemId=$itemId -> cachedItemId=${cached.details?.itemId} cachedTitle=${cached.details?.title}",
             )
@@ -110,7 +121,7 @@ internal class DetailsUseCases(
         val titleDetail = titleDetailResult?.getOrNull()
         val titleDetailError = titleDetailResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
-        Log.d(
+        logger.debug(
             TAG,
             "loadScreen requestedItemId=$itemId requestedType=$requestedMediaType -> responseItemId=${details?.itemId} responseTitle=${details?.title}",
         )
@@ -137,10 +148,12 @@ internal class DetailsUseCases(
             continueVideoId = ctaResolution.continueVideoId,
             seasons = seasons,
         )
-        if (result.details != null) {
-            cachedBaseResults[cacheKey] = result
-        } else {
-            cachedBaseResults.remove(cacheKey)
+        cacheMutex.withLock {
+            if (result.details != null) {
+                cachedBaseResults[cacheKey] = result
+            } else {
+                cachedBaseResults.remove(cacheKey)
+            }
         }
         return result
     }
@@ -201,7 +214,7 @@ internal class DetailsUseCases(
 
         val titleExtras =
             if (accessToken == null) {
-                Log.w(TAG, "Skipping title extras load: missing access token for itemId=$itemId")
+                logger.warn(TAG, "Skipping title extras load: missing access token for itemId=$itemId")
                 null
             } else {
                 runCatching {
@@ -210,12 +223,12 @@ internal class DetailsUseCases(
                         itemId = itemId,
                     )
                 }.onSuccess { extras ->
-                    Log.d(
+                    logger.debug(
                         TAG,
                         "Loaded title extras for itemId=$itemId seasons=${extras.seasons.size} reviews=${extras.reviews.size} lists=${extras.lists.map { "${it.key}:${it.items.size}" }}",
                     )
                 }.onFailure { error ->
-                    Log.w(TAG, "Failed to load title extras for itemId=$itemId", error)
+                    logger.warn(TAG, "Failed to load title extras for itemId=$itemId", error)
                 }.getOrNull()
             }
 
@@ -229,7 +242,7 @@ internal class DetailsUseCases(
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
         val accessToken = backendContext?.accessToken ?: session?.accessToken
         if (accessToken == null) {
-            Log.w(TAG, "Skipping series episodes load: missing access token for itemId=$itemId")
+            logger.warn(TAG, "Skipping series episodes load: missing access token for itemId=$itemId")
             return emptyList()
         }
 
@@ -240,9 +253,9 @@ internal class DetailsUseCases(
                 season = null,
             )
         }.onSuccess { response ->
-            Log.d(TAG, "Loaded series episodes for itemId=$itemId count=${response.items.size}")
+            logger.debug(TAG, "Loaded series episodes for itemId=$itemId count=${response.items.size}")
         }.onFailure { error ->
-            Log.w(TAG, "Failed to load series episodes for itemId=$itemId", error)
+            logger.warn(TAG, "Failed to load series episodes for itemId=$itemId", error)
         }.getOrNull()
             ?.items
             ?.mapNotNull(ClientMediaCard::toMediaVideo)
@@ -311,7 +324,7 @@ internal class DetailsUseCases(
                 season = season,
             )
         }.onFailure { error ->
-            Log.w(TAG, "Failed to load episodes for itemId=$seriesItemId season=$season", error)
+            logger.warn(TAG, "Failed to load episodes for itemId=$seriesItemId season=$season", error)
         }.getOrNull()
 
         val videos = response
@@ -348,21 +361,23 @@ internal class DetailsUseCases(
         itemId: String,
         requestedMediaType: MetadataLabMediaType,
     ): String {
-        return "${requestedMediaType.name.lowercase(Locale.US)}:${itemId.trim()}"
+        // `lowercase()` without a locale: enum names are ASCII, where the Unicode
+        // default mapping agrees with US.
+        return "${requestedMediaType.name.lowercase()}:${itemId.trim()}"
     }
 
     fun loadCachedAiInsights(
         itemId: String,
-        locale: Locale = Locale.getDefault(),
+        languageTag: String,
     ): AiInsightsResult? {
-        return aiRepository.loadCached(itemId, locale)
+        return cachedInsights(itemId, languageTag)
     }
 
     suspend fun generateAiInsights(
         itemId: String,
-        locale: Locale = Locale.getDefault(),
+        languageTag: String,
     ): AiInsightsResult {
-        return aiRepository.generate(itemId, locale)
+        return generateInsights(itemId, languageTag)
     }
 
     private companion object {
