@@ -71,7 +71,7 @@ internal fun HomeRoute(
     )
     val selectorViewModel: HomeSelectorViewModel = viewModel(
         factory = remember(appContext) {
-            HomeSelectorViewModel.factory(appContext)
+            homeSelectorViewModelFactory(appContext)
         },
     )
 
