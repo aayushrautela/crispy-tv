@@ -30,6 +30,7 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.SettingsRoute) { entry ->
         SettingsScreen(
+            pluginsUiSupported = distribution.capabilities.pluginsUiSupported,
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
             },

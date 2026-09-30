@@ -15,19 +15,27 @@ internal tailrec fun Context.findActivity(): Activity? =
         else -> null
     }
 
-internal class PlayerGestureController(
+/**
+ * The only [PlayerGestureController] there is.
+ *
+ * It is `androidMain` because every member of it reaches a framework API:
+ * `Activity.window.attributes` for brightness, `AudioManager` for the volume
+ * fraction, and `Settings.System` for the screen brightness a window does not
+ * override. The interface it implements is in `commonMain` so the drag-gesture
+ * modifier can be written once.
+ *
+ * The nested `AudioLevel` this used to declare is gone -- it is a top-level type in
+ * the interface's file, because `PlayerGestures.kt` names it as a parameter type.
+ * The name is deliberately unchanged so no consumer needed an import edit.
+ */
+internal class AndroidPlayerGestureController(
     private val activity: Activity,
     private val audioManager: AudioManager,
-) {
-    data class AudioLevel(
-        val fraction: Float,
-        val isMuted: Boolean,
-    )
-
+) : PlayerGestureController {
     private val originalBrightness = activity.window.attributes.screenBrightness
     private var brightnessRestored = false
 
-    fun currentBrightness(): Float {
+    override fun currentBrightness(): Float {
         val windowValue = activity.window.attributes.screenBrightness
         return if (windowValue in 0f..1f) {
             windowValue.coerceIn(0.02f, 1f)
@@ -36,7 +44,7 @@ internal class PlayerGestureController(
         }
     }
 
-    fun setBrightness(level: Float): Float {
+    override fun setBrightness(level: Float): Float {
         val target = level.coerceIn(0.02f, 1f)
         val attributes = activity.window.attributes
         attributes.screenBrightness = target
@@ -44,7 +52,7 @@ internal class PlayerGestureController(
         return target
     }
 
-    fun currentVolume(): AudioLevel {
+    override fun currentVolume(): AudioLevel {
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(0, maxVolume)
         return AudioLevel(
@@ -53,7 +61,7 @@ internal class PlayerGestureController(
         )
     }
 
-    fun setVolume(level: Float): AudioLevel {
+    override fun setVolume(level: Float): AudioLevel {
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val targetVolume = (level.coerceIn(0f, 1f) * maxVolume.toFloat())
             .roundToInt()
@@ -65,7 +73,7 @@ internal class PlayerGestureController(
         )
     }
 
-    fun restoreBrightness() {
+    override fun restoreBrightness() {
         if (brightnessRestored) return
         brightnessRestored = true
         val attributes = activity.window.attributes
@@ -90,5 +98,5 @@ internal class PlayerGestureController(
 internal fun tryCreateGestureController(activity: Activity?): PlayerGestureController? {
     if (activity == null) return null
     val audioManager = activity.getSystemService(Activity.AUDIO_SERVICE) as? AudioManager ?: return null
-    return PlayerGestureController(activity, audioManager)
+    return AndroidPlayerGestureController(activity, audioManager)
 }

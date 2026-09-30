@@ -25,7 +25,7 @@ internal const val VERTICAL_GESTURE_DOMINANCE_RATIO = 1.2f
 internal fun Modifier.playerVerticalDragGestures(
     gestureController: PlayerGestureController?,
     onBrightnessChange: (Float) -> Unit,
-    onVolumeChange: (PlayerGestureController.AudioLevel) -> Unit,
+    onVolumeChange: (AudioLevel) -> Unit,
 ): Modifier = this.then(
     if (gestureController == null) {
         Modifier
@@ -43,7 +43,7 @@ internal fun Modifier.playerVerticalDragGestures(
                 }
 
                 val initialBrightness: Float? = if (region == GestureRegion.BRIGHTNESS) gestureController.currentBrightness() else null
-                val initialVolume: PlayerGestureController.AudioLevel? = if (region == GestureRegion.VOLUME) gestureController.currentVolume() else null
+                val initialVolume: AudioLevel? = if (region == GestureRegion.VOLUME) gestureController.currentVolume() else null
                 if (region == GestureRegion.BRIGHTNESS && initialBrightness == null) return@awaitEachGesture
                 if (region == GestureRegion.VOLUME && initialVolume == null) return@awaitEachGesture
 
@@ -148,7 +148,7 @@ internal fun Modifier.playerTapGestures(
 internal fun formatGestureBrightness(level: Float): String =
     "${(level.coerceIn(0f, 1f) * 100f).roundToInt()}%"
 
-internal fun formatGestureVolume(level: PlayerGestureController.AudioLevel): String =
+internal fun formatGestureVolume(level: AudioLevel): String =
     if (level.isMuted) "Muted" else "${(level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()}%"
 
 private enum class GestureRegion {

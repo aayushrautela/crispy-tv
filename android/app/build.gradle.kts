@@ -24,9 +24,9 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 97 of the 182 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 104 of the 189 main-source files are there.
  *
- * The remaining 85 are held by three things, and only three: a type that
+ * The remaining 80 are held by three things, and only three: a type that
  * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
  * `androidx.paging`, media3), a composition root that by definition needs a
  * platform to resolve against, and screen code that is not yet split
@@ -91,6 +91,22 @@ plugins {
  * against the module type in `plugins { }` before planning any file the audit
  * calls clean.
  * Both are Phase 5/6 decisions about the media engine.
+ *
+ * `PlayerGestureController` was a hub of exactly the kind this table exists to
+ * name, and freeing it took a port rather than a move. `PlayerGestures.kt` used it
+ * with no import at all -- same package -- which is why an import audit called the
+ * file clean and the compiler produced **15 of the 17** errors in the batch that
+ * moved it. The class reaches `Activity.window.attributes`, `WindowManager`,
+ * `AudioManager` and `Settings.System`, so it stays; the `interface
+ * PlayerGestureController` and its `AudioLevel` moved to
+ * `commonMain/playerui/PlayerGestureController.kt`, the implementation became
+ * `AndroidPlayerGestureController`, and no consumer needed an import edit because
+ * **the interface took the class's name**. `AudioLevel` had to be lifted out of
+ * the class body to do it: a nested type is as pinned as the file declaring it,
+ * because `PlayerGestures.kt` names it as a parameter type. **The last five files
+ * that the audit called clean were all this in different costumes -- run the
+ * audit, then read the errors once, and reduce them by distinct unresolved
+ * *names* rather than by line.**
  *
  * The method that produced this table is the one to repeat: move the batch,
  * let the compiler name the hubs, revert what fails. It has now been run four

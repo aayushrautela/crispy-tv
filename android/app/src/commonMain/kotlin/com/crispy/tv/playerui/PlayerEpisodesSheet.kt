@@ -40,6 +40,38 @@ import com.crispy.tv.ui.resources.ic_close_filled
 import com.crispy.tv.ui.theme.Dimensions
 import org.jetbrains.compose.resources.painterResource
 
+/**
+ * The season chip that should read as selected.
+ *
+ * A caller that has never chosen lands on the first season rather than on nothing,
+ * which is why this is a named function rather than a `?:` at the call site: the
+ * fallback is a decision, and the sheet consults it from two places, one of them
+ * only when the chip row has already been scrolled (`if (selected != activeSeason) -1`
+ * on the LazyRow's initial scroll index). An empty list answers null, which the
+ * caller guards with `seasons.isNotEmpty()` before asking.
+ */
+internal fun selectedSeasonOrFirst(seasons: List<Int>, selectedSeason: Int?): Int? =
+    selectedSeason ?: seasons.firstOrNull()
+
+/**
+ * The episodes the sheet lists: ordered by number, then by title, then capped.
+ *
+ * Extracted from a `remember` block that held three decisions inline and none of
+ * them were reachable from a test. The order matters more than it looks:
+ *
+ * - **`episode == null` sorts last, not first.** `?: Int.MAX_VALUE` puts an episode
+ *   with no number after every numbered one, so a specials row does not open the
+ *   list. A `?: 0` would put it first.
+ * - **Title breaks ties**, so two rows with no number -- two specials -- have a
+ *   stable order instead of whatever the backend sent.
+ * - **The cap is 50 and it is applied last**, after the sort, so a season with 80
+ *   episodes shows numbers 1..50 rather than an arbitrary 50.
+ */
+internal fun visibleEpisodes(seasonEpisodes: List<MediaVideo>): List<MediaVideo> =
+    seasonEpisodes
+        .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
+        .take(50)
+
 @Composable
 internal fun PlayerEpisodesSheet(
     visible: Boolean,
@@ -101,7 +133,7 @@ internal fun PlayerEpisodesSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (seasons.isNotEmpty()) {
-                    val selected = selectedSeason ?: seasons.firstOrNull()
+                    val selected = selectedSeasonOrFirst(seasons, selectedSeason)
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -126,9 +158,7 @@ internal fun PlayerEpisodesSheet(
 
                 val episodes =
                     remember(seasonEpisodes) {
-                        seasonEpisodes
-                            .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
-                            .take(50)
+                        visibleEpisodes(seasonEpisodes)
                     }
 
                 when {
@@ -145,7 +175,7 @@ internal fun PlayerEpisodesSheet(
                     episodes.isNotEmpty() -> {
                         val currentIndex =
                             remember(episodes, activeSeason, activeEpisode, selectedSeason) {
-                                val selected = selectedSeason ?: seasons.firstOrNull()
+                                val selected = selectedSeasonOrFirst(seasons, selectedSeason)
                                 if (selected != activeSeason) -1
                                 else episodes.indexOfFirst { it.episode == activeEpisode }
                             }

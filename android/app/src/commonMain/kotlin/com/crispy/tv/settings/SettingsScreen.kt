@@ -32,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
@@ -69,7 +68,24 @@ data class SettingsGroup(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * The settings root.
+ *
+ * [pluginsUiSupported] is the one value the composition root owns: it decides
+ * whether a whole Integrations row exists, and it used to be read here as
+ * `AppDistribution.current.capabilities.pluginsUiSupported`. `AppDistribution`
+ * *is* the composition root -- it resolves `CrispyApplication` and a
+ * `NavGraphBuilder` -- so it cannot be named from `commonMain`, and no seam
+ * collapses it: the decision is not "what does the distribution support" but "does
+ * this build show a plugins row", which is a boolean the caller already has.
+ *
+ * No default, deliberately: a defaulted capability would let a call site silently
+ * hide a row the build ships. The caller in `ui/navigation/SettingsNavGraph.kt`
+ * already holds the `AppDistribution` it read at composition time, so it passes
+ * `distribution.capabilities.pluginsUiSupported` rather than re-resolving anything.
+ */
 fun SettingsScreen(
+    pluginsUiSupported: Boolean,
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPluginsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
@@ -125,7 +141,7 @@ fun SettingsScreen(
                 title = "INTEGRATIONS",
                 items =
                     buildList {
-                        if (AppDistribution.current.capabilities.pluginsUiSupported) {
+                        if (pluginsUiSupported) {
                             add(
                                 SettingsItem(
                                     label = "Plugins",
