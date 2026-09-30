@@ -84,8 +84,8 @@ is not waiting on Phase 4.
 | `home` | 13 | 4 |
 | `network` | 2 | 4 |
 | `watchhistory` | 2 | 3 |
-| **`:app`** | **106** | **80** |
-| **total** | **188** | **104** |
+| **`:app`** | **107** | **80** |
+| **total** | **189** | **104** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
@@ -130,8 +130,12 @@ What moved `:app` was mostly **not** UI work. It was removing the things that we
 
 - *"Split `PlayerSessionViewModel` (1,410 lines)"* — still 1,409 and untouched. Unchanged
   and still the highest-likelihood regression in the migration.
-- *"Verify the 28 shared-transition call sites"* — there are **10**, not 28, and they span
-  6 files. Cheaper than planned.
+- *"Verify the 28 shared-transition call sites"* — re-measured 2026-09-30: **27 files**, not
+  28 and not 10, and the split that matters is **14 in `:app` `commonMain` against 13 in
+  `androidMain`**. The participants, the composition local and the transition mechanism were
+  already shared; the single provider was not, so the 14 shared ones silently found `null`
+  on any target that is not the Android one. That provider is now `CrispySharedTransitionLayout`
+  in `commonMain` — see the Phase 4 bullet below.
 - *"Delete the `:app`↔`:tv` duplicate `Theme.kt`"* — already corrected in place above. Both
   files still exist and neither is deletable; `:tv` now depends on `:sharedUI` and reads
   its tokens.
@@ -570,7 +574,12 @@ left to be discovered.
 - The import rule in §4.1 applies to every file moved: coordinates change, imports do not.
 - `R.font.archivo_top10` → `composeResources`. Superseded by **Step 1: resources** below, which is the real prerequisite for moving any composable and splits it into two parts that must not be bundled.
 - Split `PlayerSessionViewModel` along use-case lines. **Highest-likelihood behavioural regression in the migration** — state, coroutine scoping and recomposition are all in play. Diff behaviour, not just pixels. **Still 1,409 lines and entirely untouched as of 2026-09-29.** Do it while the golden gate is fresh rather than at the end.
-- Verify the shared-transition call sites against CMP's documented limitations (no `AndroidView` interop, `ContentScale` snapping, no shape-clip animation). **Corrected 2026-09-29: there are 10, not 28, across 6 files** — `DetailsHero`, `HomeCalendarComponents` (×2), `HomeHeroCarousel`, `PersonDetailsRoute`, `PersonCircleCard`, `SharedCardBackdrop`, plus the scope itself in `LocalSharedTransitionScopes.kt` and the host in `AppNavHost.kt`.
+- Verify the shared-transition call sites against CMP's documented limitations (no `AndroidView` interop, `ContentScale` snapping, no shape-clip animation). **The host is DONE and the count is corrected. 2026-09-30.**
+  - **The count was wrong twice, and the second error was the informative one.** The plan said 28, then 10 across 6 files; measured over tracked sources it is **27 files — 14 in `:app` `commonMain`, 13 in `androidMain`**. The per-file list is in `AGENTS.md`.
+  - **"Bound to navigation" is a statement about the file, not about the mechanism.** Across the whole repository there are exactly three distinct imports of shared-transition machinery: six sites of `com.crispy.tv.ui.navigation.LocalSharedTransitionScope`, **one** of `androidx.compose.animation.SharedTransitionScope` and **one** of `androidx.compose.animation.SharedTransitionLayout`. **Zero** of the 27 participants import `androidx.navigation` for the transition itself — `androidx.compose.animation` is Compose Multiplatform and present on every target. Navigation is what *navigates*; the thing that *transitions* is Compose.
+  - **The bug this hid, and it was a real one on every non-Android target:** the scope was provided from two lines inside `AppNavHost.kt` (`androidMain`), so all **14 `commonMain` participants read `null` off Android and rendered with no transition — silently, with no error anywhere.** The participants were correct all along; only the host was missing.
+  - **Fixed by a new `CrispySharedTransitionLayout` in `:app` `commonMain`**, public, with a no-default `content` slot so a caller cannot obtain a provider that provides nothing. `AppNavHost.kt` shrank by four lines and stays `androidMain` (it is genuinely `NavHost`-bound), and `desktopApp` now wraps its screens in it — so a shared transition is exercised on a non-Android target for the first time. `DesktopSharedTransitionTest` asserts the scope is non-null under the host **and** null without it, which is what makes the first assertion mean "the host supplied it" rather than "the local defaults to it".
+  - **Still open, and genuinely Phase 5's:** the five `*NavGraph.kt` files stay `androidMain`. They declare `NavGraphBuilder` graphs and `androidx.navigation` has no KMP artifact at all, so this is a navigation problem and not a transition one. Do not read the remaining `androidMain` participants as transition work.
 - Tokenise the design system so a 10-foot TV surface and a resizable desktop window are both servable **without changing today's appearance**.
 - **Material3 Expressive: use it on every target.** This supersedes an earlier revision
   of this plan that said Phase 4 "has to drop or replace Material3 Expressive". That

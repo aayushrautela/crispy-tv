@@ -2,14 +2,12 @@ package com.crispy.tv.ui.navigation
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -37,80 +35,78 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     onSignedOut: () -> Unit = {},
 ) {
-    SharedTransitionLayout {
-        CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
-            NavHost(
+    CrispySharedTransitionLayout {
+        NavHost(
+            navController = navController,
+            startDestination = TopLevelDestination.Home.route,
+            modifier = modifier,
+            enterTransition = {
+                when {
+                    roleOf(targetState.destination.route) == NavigationRole.Overlay -> overlayEnterFromRight()
+                    roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                        roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                        if (topLevelRouteIndex(targetState.destination.route) > topLevelRouteIndex(initialState.destination.route)) {
+                            tabEnterFromRight()
+                        } else {
+                            tabEnterFromLeft()
+                        }
+                    }
+                    else -> EnterTransition.None
+                }
+            },
+            exitTransition = {
+                when {
+                    roleOf(targetState.destination.route) == NavigationRole.Overlay -> ExitTransition.None
+                    roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                        roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                        if (topLevelRouteIndex(targetState.destination.route) > topLevelRouteIndex(initialState.destination.route)) {
+                            tabExitToLeft()
+                        } else {
+                            tabExitToRight()
+                        }
+                    }
+                    else -> ExitTransition.None
+                }
+            },
+            popEnterTransition = {
+                when {
+                    roleOf(initialState.destination.route) == NavigationRole.Overlay -> EnterTransition.None
+                    roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                        roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                        if (topLevelRouteIndex(initialState.destination.route) < topLevelRouteIndex(targetState.destination.route)) {
+                            tabEnterFromRight()
+                        } else {
+                            tabEnterFromLeft()
+                        }
+                    }
+                    else -> EnterTransition.None
+                }
+            },
+            popExitTransition = {
+                when {
+                    roleOf(initialState.destination.route) == NavigationRole.Overlay -> overlayExitToRight()
+                    roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                        roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                        if (topLevelRouteIndex(initialState.destination.route) < topLevelRouteIndex(targetState.destination.route)) {
+                            tabExitToLeft()
+                        } else {
+                            tabExitToRight()
+                        }
+                    }
+                    else -> ExitTransition.None
+                }
+            },
+        ) {
+            addHomeNavGraph(navController)
+            addSearchNavGraph(navController)
+            addDiscoverNavGraph(navController)
+            addLibraryNavGraph(navController)
+            addSettingsNavGraph(navController)
+            addAccountNavGraph(
                 navController = navController,
-                startDestination = TopLevelDestination.Home.route,
-                modifier = modifier,
-                enterTransition = {
-                    when {
-                        roleOf(targetState.destination.route) == NavigationRole.Overlay -> overlayEnterFromRight()
-                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
-                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
-                            if (topLevelRouteIndex(targetState.destination.route) > topLevelRouteIndex(initialState.destination.route)) {
-                                tabEnterFromRight()
-                            } else {
-                                tabEnterFromLeft()
-                            }
-                        }
-                        else -> EnterTransition.None
-                    }
-                },
-                exitTransition = {
-                    when {
-                        roleOf(targetState.destination.route) == NavigationRole.Overlay -> ExitTransition.None
-                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
-                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
-                            if (topLevelRouteIndex(targetState.destination.route) > topLevelRouteIndex(initialState.destination.route)) {
-                                tabExitToLeft()
-                            } else {
-                                tabExitToRight()
-                            }
-                        }
-                        else -> ExitTransition.None
-                    }
-                },
-                popEnterTransition = {
-                    when {
-                        roleOf(initialState.destination.route) == NavigationRole.Overlay -> EnterTransition.None
-                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
-                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
-                            if (topLevelRouteIndex(initialState.destination.route) < topLevelRouteIndex(targetState.destination.route)) {
-                                tabEnterFromRight()
-                            } else {
-                                tabEnterFromLeft()
-                            }
-                        }
-                        else -> EnterTransition.None
-                    }
-                },
-                popExitTransition = {
-                    when {
-                        roleOf(initialState.destination.route) == NavigationRole.Overlay -> overlayExitToRight()
-                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
-                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
-                            if (topLevelRouteIndex(initialState.destination.route) < topLevelRouteIndex(targetState.destination.route)) {
-                                tabExitToLeft()
-                            } else {
-                                tabExitToRight()
-                            }
-                        }
-                        else -> ExitTransition.None
-                    }
-                },
-            ) {
-                addHomeNavGraph(navController)
-                addSearchNavGraph(navController)
-                addDiscoverNavGraph(navController)
-                addLibraryNavGraph(navController)
-                addSettingsNavGraph(navController)
-                addAccountNavGraph(
-                    navController = navController,
-                    onSignedOut = onSignedOut,
-                )
-                addPlayerDestination(navController)
-            }
+                onSignedOut = onSignedOut,
+            )
+            addPlayerDestination(navController)
         }
     }
 }

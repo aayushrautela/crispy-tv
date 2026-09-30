@@ -159,6 +159,18 @@ bash .github/scripts/fetch-torrserver-binaries.sh
 Gradle modules (common targets):
 - `:android:androidApp`: the Android entry point (`com.android.application`) — manifest, `res/` that only the application needs, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden-screenshot tests
 - `:android:app`: the shared UI and presentation layer, a Kotlin Multiplatform library. Its `commonMain` now holds the design-agnostic UI (routes, `ui/components`, `ui/navigation`, `ui/edge_to_edge`, `ui/utils`, the seek/gesture feedback surfaces) and `androidMain` holds the rest; `commonMain` is a strict subset of the Android build, so the phone app and the desktop app compile the same files. Its `androidHostTest` source set (see *Composition-root tests* below) is where the composition root is pinned.
+  - **`CrispySharedTransitionLayout` is the shared host, and it is in `commonMain` because the
+    mechanism is not navigation.** 14 `commonMain` files participate in a shared-element
+    transition by reading `LocalSharedTransitionScope` (a `staticCompositionLocalOf<SharedTransitionScope?> { null }`
+    in `ui/navigation/LocalSharedTransitionScopes.kt`, also in `commonMain`). Until recently the
+    only provider was two lines inside `AppNavHost.kt`, so on any non-Android target all 14 read
+    `null` and rendered with **no transition and no error**. `CrispySharedTransitionLayout`
+    supplies the scope from `androidx.compose.animation.SharedTransitionLayout` -- Compose
+    Multiplatform, on every target -- and is called by `AppNavHost` and by `desktopApp`. Its
+    `content` slot has **no default**, so a caller cannot obtain a provider that provides
+    nothing. `AppNavHost.kt` is still `androidMain` and still four lines shorter: it is genuinely
+    `NavHost`-bound, and **the five `*NavGraph.kt` files remain Phase 5's problem** because they
+    declare `NavGraphBuilder` graphs and `androidx.navigation` has no KMP artifact at all.
 - `:android:sharedUI`: the design system **and the design assets** (Phase 4 Step 1) — `composeResources`, the theme tokens, the brand composables
 - `:android:ui-assets`: Android-only assets that cannot be `composeResources` — launcher mipmaps, the splash colour and its two drawables, the nine provider-logo SVGs
 - `:android:youtube-extractor`: sideload-only YouTube stream extraction (NewPipeExtractor)
@@ -352,6 +364,42 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `:sharedUI`'s and **zero** referencing `:tv`'s. This is the §1.1 same-package trap from
   the other direction: there, a type is reachable with no import; here, an identical
   declaration is reachable with no diff.
+
+- **"This is bound to navigation" is a statement about the file, not about the mechanism, and
+  reading the provider settles it in one grep.** `kmp-migration-plan.md` filed the shared-element
+  transitions under Phase 4 with the reason "`androidx.navigation` is not on the `commonMain`
+  classpath", and that reason was **false as stated**: across the whole repository there are
+  exactly **three** distinct imports of shared-transition machinery -- six sites of
+  `com.crispy.tv.ui.navigation.LocalSharedTransitionScope`, **one** of
+  `androidx.compose.animation.SharedTransitionScope` and **one** of
+  `androidx.compose.animation.SharedTransitionLayout`. **Zero** of the 27 participating files
+  import `androidx.navigation` for the transition itself. `androidx.compose.animation` is Compose
+  Multiplatform and present on Android, desktop JVM and both iOS targets. *Navigation is what
+  navigates; the thing that transitions is Compose.* The single provider was two lines inside
+  `AppNavHost.kt` -- in a package called `ui/navigation`, which is exactly why it read as
+  navigation-bound -- and **neither of those two lines named navigation.** The dependency is in the
+  file, not in the lines that matter.
+- **The count was wrong twice, and the second error was the informative one.** The plan said 28,
+  then "10, not 28, across 6 files". Measured over tracked sources: **27 files, 14 in `:app`
+  `commonMain` and 13 in `androidMain`** -- `commonMain`: `details/DetailsBody.kt`,
+  `details/DetailsCastSection.kt`, `home/{HomeCalendarComponents,HomeCatalogComponents,
+  HomeHeroCarousel,HomeTop10Components,HomeWideRailComponents}.kt`, `library/LibraryScreen.kt`,
+  `search/SearchScreen.kt`, `ui/components/{LandscapeCard,PersonCircleCard,SharedCardBackdrop}.kt`,
+  `ui/navigation/{AppRoutes,LocalSharedTransitionScopes}.kt`; `androidMain`:
+  `catalog/CatalogScreen.kt`, `details/{DetailsHero,DetailsRoute,DetailsScreen}.kt`,
+  `discover/DiscoverScreen.kt`, `home/CalendarScreen.kt`, `person/PersonDetailsRoute.kt`,
+  `ui/navigation/{AppNavHost,AppRoutesBuilders,DiscoverNavGraph,HomeNavGraph,LibraryNavGraph,
+  SearchNavGraph}.kt`. **Each correction made the job look cheaper and the truth was the opposite**,
+  because what grew was the count of *shared* participants, and the framing that paid off was
+  *the participants, the scope and the mechanism are all already shared; only the host was Android*.
+- **A missing provider is a silent null, so "the code is already shared" is not evidence that
+  anything runs.** All 14 `commonMain` participants read `LocalSharedTransitionScope`, whose default
+  is `null` -- so off Android every one of them rendered with **no transition and no error
+  anywhere**, and the goldens did not see it because the golden suite does not render those
+  screens. A participant written against a `null`-defaulting local is correct and *inert*. When a
+  landing supplies a host, assert the value is non-null **under the host and null without it** --
+  the second assertion is what makes the first mean "the host supplied it" rather than "the local
+  defaults to it", and it pins the fallback the participants rely on.
 
 ### 2. Ports, seams and slots
 

@@ -18,6 +18,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.crispy.tv.settings.ImageSettingsScreen
+import com.crispy.tv.ui.navigation.CrispySharedTransitionLayout
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.watchhistory.ContinueWatchingRail
 
@@ -79,26 +80,28 @@ fun main() {
         ) {
             var screen by remember { mutableStateOf(DesktopScreen.WATCHING) }
 
-            when (screen) {
-                DesktopScreen.WATCHING -> Column {
-                    DesktopAffordance("Image quality") { screen = DesktopScreen.IMAGE_SETTINGS }
-                    ContinueWatchingRail(
-                        items = seed.items,
-                        contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding),
-                    )
-                }
+            CrispySharedTransitionLayout {
+                when (screen) {
+                    DesktopScreen.WATCHING -> Column {
+                        DesktopAffordance("Image quality") { screen = DesktopScreen.IMAGE_SETTINGS }
+                        ContinueWatchingRail(
+                            items = seed.items,
+                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding),
+                        )
+                    }
 
-                DesktopScreen.IMAGE_SETTINGS -> {
-                    val settings by environment.imageSettings.settings.collectAsState()
-                    ImageSettingsScreen(
-                        settings = settings,
-                        // The repository's other half: a real `:app` screen writing
-                        // through a real `KeyValueStore`, so a quality chosen here
-                        // is still there on the next launch. Nothing invalidates an
-                        // image cache because nothing decodes one.
-                        onQualityChanged = environment.imageSettings::setQuality,
-                        onBack = { screen = DesktopScreen.WATCHING },
-                    )
+                    DesktopScreen.IMAGE_SETTINGS -> {
+                        val settings by environment.imageSettings.settings.collectAsState()
+                        ImageSettingsScreen(
+                            settings = settings,
+                            // The repository's other half: a real `:app` screen writing
+                            // through a real `KeyValueStore`, so a quality chosen here
+                            // is still there on the next launch. Nothing invalidates an
+                            // image cache because nothing decodes one.
+                            onQualityChanged = environment.imageSettings::setQuality,
+                            onBack = { screen = DesktopScreen.WATCHING },
+                        )
+                    }
                 }
             }
         }
