@@ -12,6 +12,10 @@ scaffolding — refactor rather than layer) and the phase map. This file carries
 an agent needs *while working*, and deliberately does not restate the plan: a second copy
 of a source of truth drifts from it, and that has happened once already.
 
+The other three root planning documents — `TAKEOUT.md`, `phase1-split-plan.md`,
+`phase2-data-layer-plan.md` — are **deliberately untracked** and are not part of the
+project record. Do not commit them, and do not point anything tracked at them.
+
 Two things worth knowing that a reader would otherwise have to rediscover:
 
 - **The plan is not measured status.** Its per-module counts go stale between landings.
@@ -22,7 +26,9 @@ Two things worth knowing that a reader would otherwise have to rediscover:
   git ls-files android/app/src/androidMain | grep -c '\.kt$'
   ```
   The two `commonMain` commands must agree. A count that came from one command is a
-  claim, not a measurement.
+  claim, not a measurement. **Refresh §1's counts in the same commit as any landing that
+  moves files** — the plan is now tracked, so its only verified section being wrong is
+  visible to every reader.
 - **A `commonMain` file is worth nothing until a non-Android target consumes it.** A
   file count is therefore not progress on its own; ask what runs it. The `apple.yml` and
   `:android:desktopApp` entries under *Project Layout* are where that gets answered.
