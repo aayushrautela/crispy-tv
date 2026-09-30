@@ -9,6 +9,8 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import com.crispy.tv.domain.watch.ContinueWatchingCandidate
 import com.crispy.tv.domain.watch.ContinueWatchingPlanItem
 import com.crispy.tv.domain.watch.planContinueWatching
+import com.crispy.tv.watchhistory.ContinueWatchingRail
+import com.crispy.tv.watchhistory.describe
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -39,8 +41,14 @@ import kotlin.test.assertTrue
  * that the design system composes, that the planner's real output reaches the
  * screen, and that the responsive spacing helper resolves off-Android. The
  * Android Roborazzi gate remains the rendering gate.
+ *
+ * What it renders is `ContinueWatchingRail` from `:android:app`'s `commonMain`,
+ * reached through `:app`'s `desktop` JVM variant. This module holds the window and
+ * the fixture seed and no presentation of its own, so a regression in the rail
+ * fails here as well as in `:app`'s own suites -- and it is the first test in the
+ * repository that compiles `:app` code for a target that is not Android.
  */
-class ContinueWatchingScreenTest {
+class ContinueWatchingRailTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
@@ -55,7 +63,7 @@ class ContinueWatchingScreenTest {
         assertEquals(2, items.size, "fixture setup should produce two items")
 
         runComposeUiTest {
-            setContent { ContinueWatchingScreen(items = items) }
+            setContent { ContinueWatchingRail(items = items) }
 
             onNodeWithText("Continue watching").assertIsDisplayed()
             assertAllItemsDisplayed(items)
@@ -88,7 +96,7 @@ class ContinueWatchingScreenTest {
         assertEquals(expected.map { it.progressPercent }, seed.items.map { it.progressPercent })
 
         runComposeUiTest {
-            setContent { ContinueWatchingScreen(items = seed.items) }
+            setContent { ContinueWatchingRail(items = seed.items) }
             assertAllItemsDisplayed(seed.items)
         }
     }
@@ -108,7 +116,7 @@ class ContinueWatchingScreenTest {
             val fixture = Json.parseToJsonElement(file.readText()).jsonObject
             val seed = SeedData.fromFixture(fixture)
             runComposeUiTest {
-                setContent { ContinueWatchingScreen(items = seed.items) }
+                setContent { ContinueWatchingRail(items = seed.items) }
                 onNodeWithText("Continue watching").assertIsDisplayed()
             }
         }
@@ -118,7 +126,7 @@ class ContinueWatchingScreenTest {
     @Test
     fun anEmptyPlanStillRendersTheHeaderRatherThanABlankScreen() {
         runComposeUiTest {
-            setContent { ContinueWatchingScreen(items = emptyList()) }
+            setContent { ContinueWatchingRail(items = emptyList()) }
             onNodeWithText("Continue watching").assertIsDisplayed()
         }
     }

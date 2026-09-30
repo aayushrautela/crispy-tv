@@ -2,79 +2,30 @@
 
 ## Goal
 
-**Convert this app to Kotlin Multiplatform so that the same codebase runs on Android,
-desktop (Windows, macOS, Linux) and iOS.** That is the objective every decision below
-serves, and it is the reason this file exists. Android is where it is today; desktop and
-iOS are the point.
+**This project converts the Crispy TV Android app to Kotlin Multiplatform, so that one
+codebase runs on Android, Android TV, iOS and desktop (Windows, macOS, Linux).** Android
+and TV ship today; the other two targets are the point of the work.
 
-**What "done" means, concretely:**
+**Read `kmp-migration-plan.md` §0 before choosing a landing.** It is the source of truth
+for the goal, the non-negotiables (production grade, nothing deferred, no compatibility
+scaffolding — refactor rather than layer) and the phase map. This file carries only what
+an agent needs *while working*, and deliberately does not restate the plan: a second copy
+of a source of truth drifts from it, and that has happened once already.
 
-- `:app` — the whole UI and presentation layer — is `commonMain`. It is a Kotlin
-  Multiplatform library targeting Android, `desktop` JVM and both iOS targets.
-- `:sharedUI` holds the design system in `commonMain` under Compose Multiplatform, and
-  produces the `CrispyUI` iOS framework.
-- `:core-domain` holds the rules, free of platform types, with its contract suite in
-  `commonTest` so it runs on every target.
-- `:desktopApp` renders the real design system over real domain code, seeded from a real
-  contract fixture. It is the **seam proof**: proof that the seams are in the right places,
-  not just that the module graph compiles.
-- `ios/project.yml` builds a real iOS and a real tvOS app, gated by `apple.yml` through
-  `xcodebuild`.
+Two things worth knowing that a reader would otherwise have to rediscover:
 
-**The gap you will otherwise assume is closed, stated plainly: `CrispyUI` is built and
-exported, and nothing imports it yet.** The Apple apps are Swift shells over
-`ios/CrispyKit` — a **hand-written** Swift package of 19 files (its own networking,
-auth, and per-screen view models) that depends on `ios/ContractRunner` for the
-contract types. So "the iOS app works" today means the placeholder compiles, not
-that the Kotlin UI is on the device. `grep -rn "import CrispyUI" ios/` returns
-nothing, and that is the fact to measure rather than the framework's existence.
-**Do not describe the Apple side as further along than this.**
-
-**Where it actually is.** Re-measure rather than trust this number:
-
-```sh
-find android/app/src/commonMain -name '*.kt' | wc -l   # currently 105 of 185
-```
-
-The scaffolding for desktop and iOS exists and is gated on CI. The port is **not** done.
-The blocking reason for most remaining files is the *type* they are pinned by, not an
-import count — see *Rules* §1 and the hub table in `android/app/build.gradle.kts`. Two hard
-walls are settled decisions rather than backlog: `:android:native-engine` is a plain
-`com.android.library`, so its types cannot be named from a `commonMain` whatever the code
-looks like (Phase 5/6), and `org.json` is a class of the Android platform rather than a
-dependency, so a file that parses or writes JSON stays in `androidMain` permanently.
-
-**Check that number against git, not against me.** "104 of the 189" shipped in `45e70d69`
-and was wrong: `git ls-tree -r 45e70d69 -- android/app/src/commonMain | grep -c '\.kt$'`
-says **105**, the same as the working tree, so the total was wrong too. The cause was not
-established and is not guessed at here. The check that settles it is a pair:
-
-```sh
-find android/app/src/commonMain -name '*.kt' | wc -l                              # 105
-git ls-files android/app/src/commonMain | grep -c '\.kt$'                         # 105
-git ls-files android/app/src/androidMain | grep -c '\.kt$'                        # 80
-```
-
-They must agree, and the two totals must sum to the file count the header claims. A
-count that only ever came from one command is a claim, not a measurement.
-
-**Two consequences worth stating because they surprise people:**
-
-- **Apple cannot be verified on Linux.** The KMP Apple targets and the `xcodebuild` gate
-  only run in `apple.yml`. Never run aggregate Gradle tasks (`build`, `check`, `allTests`)
-  locally — they reach the Kotlin/Native targets and fail. `apple.yml` is the Apple gate.
-  Detail: *Project Layout* → `:android:desktopApp` and the GitHub Actions notes.
-- **Desktop rendering needs a host font.** Skia requires `libGL.so.1`, `libX11.so.6` and
-  `libfontconfig.so.1` plus at least one font; `test-fonts/` at the repository root bundles
-  one and a generated `fonts.conf`. CI's `ubuntu-latest` has all three. Without them the
-  test reports a Skiko native-load error that says nothing about the seam. Detail and the
-  three rpm-extraction traps: *Project Layout* → `:android:desktopApp`.
-
-**Not portable on purpose, and settled:** Material3 Expressive is used on every target;
-the nine provider-logo SVGs stay in `:ui-assets` because Compose Multiplatform's SVG
-support excludes Android; `androidx.paging`'s compose half is Android-only. Do not
-re-open these to "fix" a version pin — the notes under *Project Layout* carry the
-measurements.
+- **The plan is not measured status.** Its per-module counts go stale between landings.
+  Re-measure rather than trust them, and check a count against git, not against prose:
+  ```sh
+  find android/app/src/commonMain -name '*.kt' | wc -l
+  git ls-files android/app/src/commonMain | grep -c '\.kt$'
+  git ls-files android/app/src/androidMain | grep -c '\.kt$'
+  ```
+  The two `commonMain` commands must agree. A count that came from one command is a
+  claim, not a measurement.
+- **A `commonMain` file is worth nothing until a non-Android target consumes it.** A
+  file count is therefore not progress on its own; ask what runs it. The `apple.yml` and
+  `:android:desktopApp` entries under *Project Layout* are where that gets answered.
 
 Also orthogonal to the goal but binding on every change: Android and Swift must stay
 aligned with `contracts/SPEC.md` (`android/core-domain` and `ios/ContractRunner`).
@@ -281,7 +232,7 @@ Kotlin Multiplatform modules (in progress; see `check-local.sh`):
 - `:android:home`: the home feature module — a KMP library declaring `iosArm64`/`iosSimulatorArm64`, so on Linux **`compileKotlinLinuxX64` is the only check its Apple targets get** and it is in `check-local.sh` for that reason. It is where the composition root's home data lives, and two facts about it are easy to get wrong:
   - **It shares the package `com.crispy.tv.home` with `:app`, so a type declared in its `androidMain` is reachable from `:app` with no import at all.** This is the purest form of the trap that makes an import-only migration audit report confidently-empty answers. `CalendarEpisodeItem` is declared in `:home/src/androidMain` and was used from `:app/src/androidMain` with nothing in the import list to show for it.
   - **`CalendarService`'s cache is per-profile and written only on a non-error fetch.** `cachedCalendarSnapshot` carries the `profileId` it was written for, `loadCalendar` reads it only on a `takeIf { it.profileId == context.profileId }` match, and a fetch that throws returns the cached snapshot rather than overwriting it. The two non-obvious consequences: a cache written for one profile is never handed to another, and a failed read never replaces a good snapshot. Both are pinned by `CalendarServiceTest`; the `isError` guard on the write is deliberately redundant (see the redundant-guard finding above) and says so where it is.
-- `:android:desktopApp`: the desktop entry point and the **seam proof** (plan §3) — one JVM module for Windows, macOS and Linux. Renders `:android:sharedUI`'s design system over `:android:core-domain`'s real `planContinueWatching`, seeded from a real contract fixture. It is a semantic-assertion test, not a golden: a Skia raster varies by Skia version and font availability, and the Android Roborazzi gate is already the rendering gate. **Host prerequisites:** Skia needs `libGL.so.1`, `libX11.so.6` and `libfontconfig.so.1`, and needs at least one font. The font is bundled in `test-fonts/` (repository root, shared with `:android:androidApp`) and reached through a generated `fonts.conf`. Without those the test reports a Skiko native-load error or `IllegalStateException: Could not load font` — neither says anything about the seam. CI's `ubuntu-latest` has all of them.
+- `:android:desktopApp`: the desktop entry point and the **seam proof** (plan §3) — one JVM module for Windows, macOS and Linux. Renders `:android:sharedUI`'s design system over `:android:core-domain`'s real `planContinueWatching`, seeded from a real contract fixture. **It now depends on `:android:app` and renders `ContinueWatchingRail` from `:app`'s `commonMain`**, which makes it the first non-Android target to consume `:app` code, and `ContinueWatchingRailTest` the first test in the repository that compiles `:app` for a non-Android target. Three things that landing established, each measured rather than assumed. **A plain `kotlin.jvm` module consuming a KMP library's `jvm` variant is a compile, not a documented guarantee** — it works, and the dependency is worth writing down as a measurement. **A `commonMain` composable that gains a caller outside its module has to be `public`, and the rest stay `internal`:** `:app`'s screen composables are internal because their callers are in-module, and widening all of them is API surface nobody asked for, so widen only the one a second target actually calls. **A module can carry a premise that a dependency invalidates:** the desktop rail's `CARD_CORNER_RADIUS` duplicated `CardStyle.CardCornerRadiusDp` with a KDoc saying it could not be imported because that constant lives in `:app`'s `androidMain` "which the desktop target cannot see" — the constant was in `commonMain` all along, and the duplicate was dead the moment the dependency existed. It is a semantic-assertion test, not a golden: a Skia raster varies by Skia version and font availability, and the Android Roborazzi gate is already the rendering gate. **Host prerequisites:** Skia needs `libGL.so.1`, `libX11.so.6` and `libfontconfig.so.1`, and needs at least one font. The font is bundled in `test-fonts/` (repository root, shared with `:android:androidApp`) and reached through a generated `fonts.conf`. Without those the test reports a Skiko native-load error or `IllegalStateException: Could not load font` — neither says anything about the seam. CI's `ubuntu-latest` has all of them.
 - `:android:sharedUI`: KMP + Compose Multiplatform `1.11.1`, targeting Android + `desktop` JVM + `iosArm64` + `iosSimulatorArm64`, and producing the `CrispyUI` iOS framework. Holds the design system in `commonMain`. Three rules that are expensive to relearn:
   - **`android { }` is current; `androidLibrary { }` is deprecated** as of Kotlin `2.4.10`, which says so outright: *"'androidLibrary' block is deprecated. Please use 'android' instead."* Earlier guidance — the JetBrains migration guide, and earlier revisions of this file — said the opposite and described a real failure with `android { }`. That failure is gone; JetBrains converged the two blocks. Write `android { }` on new code. `:sharedUI` still uses `androidLibrary { }` and compiles, with a deprecation warning.
   - **CMP 1.11.x ships `androidx.compose.*`, not `org.jetbrains.compose.*`.** Verified by unzipping the resolved AARs: 790 `androidx/compose` classes in `runtime-android`, 1336 in `ui-android`, and **zero** `org/jetbrains/compose` in any of them. The `org.jetbrains.compose.*` coordinates are thin aliases. So moving a Compose file from `:app` to `:sharedUI` changes the **artifact coordinates in `build.gradle.kts`**, never the imports in the file, and `import org.jetbrains.compose.*` does not compile anywhere.

@@ -63,6 +63,16 @@ dependencies {
     // identically on every target.
     implementation(project(":android:core-domain"))
 
+    // THE SEAM. `:app` declares `jvm("desktop")` (android/app/build.gradle.kts:204)
+    // and wires an `appUi` source set that androidMain, jvmMain and iosMain all
+    // depend on, so its desktop JVM variant already compiles every `commonMain`
+    // screen. Before this line, 105 files of `commonMain` were worth nothing here:
+    // this module rendered its own 198-line `ContinueWatchingScreen` and no line of
+    // `:app` at all. Adding the dependency is the measurement -- whether a plain
+    // `kotlin.jvm` module can consume a KMP library's jvm variant is not a
+    // documented guarantee, it is a compile.
+    implementation(project(":android:app"))
+
     // Compose Multiplatform accessors rather than AndroidX coordinates, because
     // this module is desktop-only and does not have the Material3 Expressive
     // problem described above.
