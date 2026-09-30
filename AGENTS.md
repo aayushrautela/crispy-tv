@@ -1,6 +1,83 @@
-# Agent Guide (Build, Test, Style)
+# Agent Guide (Goal, Build, Test, Style)
 
-Android + iOS rewrite workspace with contract-driven parity. Keep Android (`android/core-domain`) and Swift (`ios/ContractRunner`) aligned with `contracts/SPEC.md`.
+## Goal
+
+**Convert this app to Kotlin Multiplatform so that the same codebase runs on Android,
+desktop (Windows, macOS, Linux) and iOS.** That is the objective every decision below
+serves, and it is the reason this file exists. Android is where it is today; desktop and
+iOS are the point.
+
+**What "done" means, concretely:**
+
+- `:app` — the whole UI and presentation layer — is `commonMain`. It is a Kotlin
+  Multiplatform library targeting Android, `desktop` JVM and both iOS targets.
+- `:sharedUI` holds the design system in `commonMain` under Compose Multiplatform, and
+  produces the `CrispyUI` iOS framework.
+- `:core-domain` holds the rules, free of platform types, with its contract suite in
+  `commonTest` so it runs on every target.
+- `:desktopApp` renders the real design system over real domain code, seeded from a real
+  contract fixture. It is the **seam proof**: proof that the seams are in the right places,
+  not just that the module graph compiles.
+- `ios/project.yml` builds a real iOS and a real tvOS app, gated by `apple.yml` through
+  `xcodebuild`.
+
+**The gap you will otherwise assume is closed, stated plainly: `CrispyUI` is built and
+exported, and nothing imports it yet.** The Apple apps are Swift shells over
+`ios/CrispyKit` — a **hand-written** Swift package of 19 files (its own networking,
+auth, and per-screen view models) that depends on `ios/ContractRunner` for the
+contract types. So "the iOS app works" today means the placeholder compiles, not
+that the Kotlin UI is on the device. `grep -rn "import CrispyUI" ios/` returns
+nothing, and that is the fact to measure rather than the framework's existence.
+**Do not describe the Apple side as further along than this.**
+
+**Where it actually is.** Re-measure rather than trust this number:
+
+```sh
+find android/app/src/commonMain -name '*.kt' | wc -l   # currently 105 of 185
+```
+
+The scaffolding for desktop and iOS exists and is gated on CI. The port is **not** done.
+The blocking reason for most remaining files is the *type* they are pinned by, not an
+import count — see *Rules* §1 and the hub table in `android/app/build.gradle.kts`. Two hard
+walls are settled decisions rather than backlog: `:android:native-engine` is a plain
+`com.android.library`, so its types cannot be named from a `commonMain` whatever the code
+looks like (Phase 5/6), and `org.json` is a class of the Android platform rather than a
+dependency, so a file that parses or writes JSON stays in `androidMain` permanently.
+
+**Check that number against git, not against me.** "104 of the 189" shipped in `45e70d69`
+and was wrong: `git ls-tree -r 45e70d69 -- android/app/src/commonMain | grep -c '\.kt$'`
+says **105**, the same as the working tree, so the total was wrong too. The cause was not
+established and is not guessed at here. The check that settles it is a pair:
+
+```sh
+find android/app/src/commonMain -name '*.kt' | wc -l                              # 105
+git ls-files android/app/src/commonMain | grep -c '\.kt$'                         # 105
+git ls-files android/app/src/androidMain | grep -c '\.kt$'                        # 80
+```
+
+They must agree, and the two totals must sum to the file count the header claims. A
+count that only ever came from one command is a claim, not a measurement.
+
+**Two consequences worth stating because they surprise people:**
+
+- **Apple cannot be verified on Linux.** The KMP Apple targets and the `xcodebuild` gate
+  only run in `apple.yml`. Never run aggregate Gradle tasks (`build`, `check`, `allTests`)
+  locally — they reach the Kotlin/Native targets and fail. `apple.yml` is the Apple gate.
+  Detail: *Project Layout* → `:android:desktopApp` and the GitHub Actions notes.
+- **Desktop rendering needs a host font.** Skia requires `libGL.so.1`, `libX11.so.6` and
+  `libfontconfig.so.1` plus at least one font; `test-fonts/` at the repository root bundles
+  one and a generated `fonts.conf`. CI's `ubuntu-latest` has all three. Without them the
+  test reports a Skiko native-load error that says nothing about the seam. Detail and the
+  three rpm-extraction traps: *Project Layout* → `:android:desktopApp`.
+
+**Not portable on purpose, and settled:** Material3 Expressive is used on every target;
+the nine provider-logo SVGs stay in `:ui-assets` because Compose Multiplatform's SVG
+support excludes Android; `androidx.paging`'s compose half is Android-only. Do not
+re-open these to "fix" a version pin — the notes under *Project Layout* carry the
+measurements.
+
+Also orthogonal to the goal but binding on every change: Android and Swift must stay
+aligned with `contracts/SPEC.md` (`android/core-domain` and `ios/ContractRunner`).
 
 Repo agent rules:
 - No `.cursor/rules/` or `.cursorrules` found.

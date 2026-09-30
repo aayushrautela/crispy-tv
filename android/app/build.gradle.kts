@@ -24,16 +24,21 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 104 of the 189 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 105 of the 185 main-source files are there.
  *
- * The remaining 80 are held by three things, and only three: a type that
- * cannot be named off Android (a `Context`, `SharedPreferences`, `org.json`,
- * `androidx.paging`, media3), a composition root that by definition needs a
- * platform to resolve against, and screen code that is not yet split
- * factory-from-viewmodel. The two rules that decide what is worth changing are
- * in AGENTS.md under *A type-level port is the lever that moves files*. The
- * two counts above are a `find` away and are re-measured rather than trusted
- * as the module moves.
+ * The remaining 80 are held by three things: a type that cannot be named off
+ * Android (a `Context`, `SharedPreferences`, `org.json`, `androidx.paging`,
+ * `:android:native-engine`'s own types), a composition root that by definition
+ * needs a platform to resolve against, and screen code still split
+ * factory-from-viewmodel. The third of those is the smallest: the viewmodels
+ * themselves are already in `commonMain`, so what is left is the factories and
+ * the nav graph that resolve them. The rules that decide what is worth changing
+ * are in AGENTS.md under *Rules* sections 1 and 2. The two counts above are a
+ * `find` away and are re-measured rather than trusted as the module moves --
+ * **and they have been wrong once already**: the "104 of the 189" that shipped in
+ * 45e70d69 was a miscount, because a file that moved in an earlier landing was
+ * double-counted against its own destination. `find ... | wc -l` next to
+ * `git ls-files <dir> | grep -c '\.kt$'` is the check that would have caught it.
  *
  * ### The three are not three things, they are seven named hubs
  *
