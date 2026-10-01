@@ -30,7 +30,8 @@ plugins {
  * | `StreamResolver` | `commonMain` | a type-level port over `CachingStreamResolver`, whose caching is the only thing the class adds and only `cachedStreams` can observe. It is **not** a transport abstraction: `AddonStreamsService` wraps `CrispyHttpClient`, which leaks `okhttp3` |
  * | `CachingStreamResolver` | `androidMain` | OkHttp, and `AddonStreamsService` is a final class built from a `Context` and an `okhttp3` client. It is also the class the port's KDoc points at — the port is the half that could travel, the cache is the half that cannot. Its `System.currentTimeMillis()` calls are a second, independent reason it could not move on its own merits |
  * | `BackendEpisodeListProvider` | `commonMain` | moved once both of its parameters became `BackendApi` / `AccountApi` ports. It had no Android type of its own |
- * | `MetadataAddonRegistry`, `RemoteMetadataLabDataSource`, `RemoteSupabaseSyncLabService` | `androidMain` | `Context` and `org.json` |
+ * | `RemoteSupabaseSyncLabService` | `commonMain` | was listed here for "`Context` and `org.json`", and **neither was ever true**: it named no `org.json` type, and the `Context` was a parameter the class did not read, under a `@Suppress("UNUSED_PARAMETER")` that said so on the class itself. A parameter nobody consults is not a dependency, so deleting it -- rather than slotting it -- is what moved the file. `Dispatchers.IO` became an `ioDispatcher` with no default, and it is the second member of the interface that does *not* enter it (`syncNow`), which `commonTest` pins |
+     * | `MetadataAddonRegistry`, `RemoteMetadataLabDataSource` | `androidMain` | `Context`, and for the registry `android.net.Uri` plus a SHA-1 of an addon id. The `Uri` half is the wall: no URL parser exists in any `commonMain`, and `core-domain`'s `normalizeAddonUrl` is a much stricter rule, not a substitute |
  */
 kotlin {
     jvmToolchain(21)
@@ -93,6 +94,13 @@ kotlin {
 
         commonTest.dependencies {
             implementation(kotlin("test"))
+
+            // `runTest` and `UnconfinedTestDispatcher`, for
+            // `RemoteSupabaseSyncLabService`. Nine of its ten members are suspend and it
+            // has a second decision that only a dispatcher can observe: eight members
+            // enter the injected dispatcher and `syncNow` does not. Neither is testable
+            // from a synchronous harness, so the block has to name this.
+            implementation(libs.coroutines.test)
         }
 
         androidMain.dependencies {

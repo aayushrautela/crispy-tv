@@ -611,6 +611,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   caller is not
   a statement about the function** — a comment explaining *why* one caller behaves unusually is a
   comment about that caller, and being in the file is not the same as having read it.
+  **And a build file's per-file table is the same kind of premise, and it was wrong about both of
+  the entries it listed for one file.** `:addons`' KDoc table said `RemoteSupabaseSyncLabService` was
+  in `androidMain` for "`Context` and `org.json`". It named no `org.json` type at all, and the
+  `Context` was a constructor parameter **the class never read** — it had been under a
+  `@Suppress("UNUSED_PARAMETER")` on the class the whole time. **So the pin was a parameter nobody
+  consulted, and the fix was to DELETE it rather than slot it: a wrapper's parameter list pins a
+  file exactly as hard as its imports do, and an import scan cannot see it.** The same file in
+  `:app` had a second one (`watchHistoryService` on a `newSupabaseSyncService(context, …)` helper),
+  and removing it from the private function *and* from the public hook's type
+  `(Context, WatchHistoryService) -> …` changed nothing else — the hook had zero users outside the
+  file, which is what you measure before deciding the type can change. **Read the property
+  initialisers of a wrapper before planning its port, not its import list and not its KDoc row.**
   **And a premise about the *ecosystem* ages in one direction, so "no equivalent exists" is the
   version that rots.** Three KDocs asserted "`java.util.UUID` has no Kotlin/Native equivalent",
   and it was true when written: `kotlin.uuid` did not exist. It is now `Uuid.random()`, **stable**
@@ -1036,6 +1048,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   use `"10"` → `"10.0"`. Same shape: a cap case whose fixture was already sorted could not see a
   cap applied *before* the sort. **When a normaliser has an identity input, that is the input to
   avoid in the fixture meant to prove the normaliser ran.**
+  **The same defect has a counting shape, and it fires when the number is written from memory.**
+  Nine error messages in a service class asserted as a set — and the *count* was asserted from
+  recall as 7 when the answer is **8**, because `initialize`'s string differs from `syncNow`'s by one
+  inserted word, which is precisely the copy-paste pair the suite exists to catch. *A count is a
+  claim about the code; read the strings before asserting how many there are.*
+  **And a list built eagerly is already cumulative by the time a loop reads it** — the
+  dispatcher-slot test built all nine results first, so the counter a `RecordingDispatcher` was
+  holding had already reached 8 when the loop inspected its first member, and the failure
+  (`expected:<1> but was:<8>`) read like a production bug. **When the property under test is a
+  running total, the collection has to be invoked member-by-member and measured by a before/after
+  delta** — a counter asserted against a pre-collected result list proves nothing about ordering,
+  and it fails with a number that looks like a defect in the code rather than in the test.
 - **A test asserting a guard's *reason* needs the two answers to differ in exactly one respect.**
   Write down what each world would answer; if the strings are equal, the case is decoration.
 - **A stub cannot be evidence about the value it replaces.** Assert on what production computed

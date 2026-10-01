@@ -33,6 +33,7 @@ import com.crispy.tv.player.TorrentResolver
 import com.crispy.tv.player.TorrentSupportUnavailableException
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
+import kotlinx.coroutines.Dispatchers
 
 private fun newMetadataResolver(context: Context): MetadataLabResolver {
     val appContext = context.applicationContext
@@ -73,15 +74,24 @@ private fun newEpisodeListProvider(context: Context): EpisodeListProvider {
     )
 }
 
-@Suppress("UNUSED_PARAMETER")
-private fun newSupabaseSyncService(
-    context: Context,
-    watchHistoryService: WatchHistoryService
-): SupabaseSyncLabService {
+/**
+ * `RemoteSupabaseSyncLabService` used to take a `Context` and this used to take a
+ * [WatchHistoryService], and **neither was ever read** -- both carried
+ * `@Suppress("UNUSED_PARAMETER")` at the far end of the chain. A parameter no body
+ * consults is not a dependency, and both were holding one `commonMain` file in
+ * `androidMain` for nothing: the `Context` in particular was the *whole* pin, so
+ * deleting it is what moved the file rather than working around it.
+ *
+ * The factory hook lost its [WatchHistoryService] parameter for the same reason.
+ * That hook is read and written nowhere outside this file, so nothing outside it
+ * had to change -- and keeping the parameter would have only moved the dead
+ * argument up one level rather than removing it.
+ */
+private fun newSupabaseSyncService(context: Context): SupabaseSyncLabService {
     val appContext = context.applicationContext
     return RemoteSupabaseSyncLabService(
-        context = appContext,
         supabase = SupabaseServicesProvider.accountClient(appContext),
+        ioDispatcher = Dispatchers.IO,
     )
 }
 
@@ -160,11 +170,8 @@ object PlaybackDependencies {
     }
 
     @Volatile
-    var supabaseSyncServiceFactory: (Context, WatchHistoryService) -> SupabaseSyncLabService = { context, watchHistoryService ->
-        newSupabaseSyncService(
-            context = context,
-            watchHistoryService = watchHistoryService
-        )
+    var supabaseSyncServiceFactory: (Context) -> SupabaseSyncLabService = { context ->
+        newSupabaseSyncService(context = context)
     }
 
     @Volatile

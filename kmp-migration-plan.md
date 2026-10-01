@@ -94,7 +94,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `platform-core` | 7 | 0 | 1 |
 | `sharedUI` | 5 | 0 | 1 |
 | `player` | 6 | 0 | 2 |
-| `addons` | 11 | 5 | 2 |
+| `addons` | 12 | 4 | 3 |
 | `backend` | 17 | 1 | 5 |
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
@@ -147,13 +147,13 @@ pinned until the receiver moved.**
 | `platform-core` | 7 | 0 |
 | `sharedUI` | 5 | 0 |
 | `player` | 6 | 0 |
-| `addons` | 11 | 5 |
+| `addons` | 12 | 4 |
 | `backend` | 17 | 1 |
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
 | **`:app`** | **127** | **69** |
-| **total** | **224** | **85** |
+| **total** | **225** | **84** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
@@ -752,7 +752,7 @@ Each gate is a real check.
 
 - `:network` — `HttpClientPort` around OkHttp. ~~`YouTubeTrailerExtractor` behind a `commonMain` interface; its flavour split disappears and becomes a `DistributionCapabilities` check.~~ **DONE early, in Phase 1**, because the split made the flavour axis unbuildable: a KMP library is single-variant, so `:app` could not choose between `:android:network`'s `store` and `sideload` variants and Gradle failed with an ambiguous-variant error. `:android:network` is now flavour-free, `TrailerExtractor` is an interface in its `main` source set, and the NewPipeExtractor implementation is the sideload-only `:android:youtube-extractor`. **Also done in Phase 2:** that interface is now in `commonMain` and the module is multiplatform. **`HttpClientPort` is deferred to the `:android:watchhistory` step**, where a portable caller exists -- designing it here would be guesswork, and migrating its 36 call sites across six not-yet-portable modules is the mistake §3 warns about. **`DistributionComponents.trailerExtractor` is kept, not retired**: it is how `:app` reaches the variant's extractor, so deleting it would make `:android:youtube-extractor` unreachable. **Coil is not in `:network`** -- `coil3` is used only by `:app`, `:tv` and `:androidApp`, so its portable engine is Phase 4 work on `:app`, not here.
 - `:backend` — `SecureTokenStore`, `ActiveProfileStore` onto `platform-core`.
-- `:addons` — 5 leaking services onto interfaces. Assess `AddonStreamsService` (1,068 lines) for statefulness.
+- `:addons` — **4 leaking services left**, down from 5, and the one that left says why the count is not the measure. `RemoteSupabaseSyncLabService` was listed for "`Context` and `org.json`" and **neither was true**: it named no `org.json` type at all, and the `Context` was a constructor parameter the class never read, sitting under a `@Suppress("UNUSED_PARAMETER")` that had been on the class the whole time. **A parameter nobody consults is not a dependency, so deleting it — rather than slotting it — is what moved the file, and a wrapper's parameter list can pin a file exactly as hard as its imports can.** The remaining four are real: `AddonStreamsService` (1,068) holds `Context` plus OkHttp and is the base type `CachingStreamResolver` names, `MetadataAddonRegistry` (573) needs `android.net.Uri` for which no `commonMain` in this repository has any answer, and `RemoteMetadataLabDataSource` (597) needs `URLEncoder`.
 - `:home` — 10 imports total (`@Immutable` ×5, `Log` ×2, `Context` ×2, `SharedPreferences` ×1). Trivial; `@Immutable` is portable.
 - `:watchhistory` — `KeystoreSecretStore` → `SecretStore`; `WatchProgressStore` → `KeyValueStore`; inject `TimeSource`.
 - `:player` — interfaces stay pure; Media3/mpv stay in `native-engine`.
