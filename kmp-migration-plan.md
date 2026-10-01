@@ -68,7 +68,12 @@ first, then subtracting every type declared in every module's `commonMain` — l
 `androidx.navigation` (the 9-file nav layer — **the coordinate swap landed and the
    artifact is on the `commonMain` classpath now**, so this one is a `Context` reached
    through a *call*, not an import),
-`paging-compose` (`DiscoverScreen`, `library/LibraryRoute`), the composition root,
+`paging-compose` (whose `commonMain` declaration landed -- `paging-compose:3.5.1`
+   publishes `platform.type=common` plus `iosArm64`/`iosSimulatorArm64`, so the *Compose*
+   half is free; `paging-runtime:3.5.1` is a real `.aar` depending on `androidx.recyclerview`
+   and really is Android-only, and it is pinned on `catalog/CatalogViewModel.kt` and
+   `discover/DiscoverScreen.kt` rather than on the two files named first), the composition
+   root,
 :android:native-engine` (the four `playerui` files), and `org.json` — which was recorded
 here as permanent and **is not**: the node type is **decided**, `kotlinx.serialization.json.JsonElement`,
 and `WatchProgressStore.kt` was the first file it moved. That file was 405 lines of `androidMain`
@@ -184,7 +189,7 @@ buckets sum to 77 with nothing unmatched**:
 | **54** | `android.jar` itself | no — it is the platform |
 | **7** | the nav layer, and **the coordinate is already swapped** | no — see the note below: the *artifact* is no longer the pin, each file's second pin is an `androidMain` factory it **calls** |
 | **7** | the player and introskip (`playerui/`, `introskip/`) | no — a plain `com.android.library` publishing no JVM variant, **permanent by standing decision** |
-| **2** | `androidx.paging.compose` (`CatalogScreen`, `LibraryRoute`) | no KMP artifact exists — **a dependency decision** |
+| **2** | the `paging` family, and **the Compose half is now on the `commonMain` classpath** | no — `paging-compose:3.5.1` is KMP and was declared, but `paging-runtime:3.5.1` is a real `.aar` depending on `androidx.recyclerview` and is pinned on `CatalogViewModel.kt` and `DiscoverScreen.kt`. `CatalogScreen.kt` and `LibraryRoute.kt` name **only** the Compose half and are still dead behind a *second* pin: `CatalogScreen.kt:58` writes `androidx.compose.ui.platform.LocalContext.current` **fully qualified with no import at all** and calls `CatalogViewModel.factory(context = ...)`; `LibraryRoute.kt` is behind `LocalContext:30`, `deviceUtcOffsetMillis:24` and `activeProfileLoader:36`. **A bucket measured by which artifacts a family imports is also a claim about which file in the family imports them, and the two can be different files.** |
 | **2** | an `R` reference | no, and **already correct**: both KDocs record that the pure half is in `commonMain` behind a no-default composable slot |
 | **1** | `java.io.File` + `Dispatchers.IO` — `optimistic/FileBackedPendingMutationStore.kt` | okio or `kotlin.io.path` — **a dependency decision**, and the store's own KDoc already says exactly this |
 | **1** | `appGraph()` + `LocalContext` — `DetailsRoute.kt` | no — a ViewModel-factory route |

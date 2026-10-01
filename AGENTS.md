@@ -516,8 +516,10 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   exist** in any resolved Compose artifact; `LocalConfiguration` is Android-only and lives in
   `ui-android`'s `AndroidCompositionLocals_androidKt`, so a jar-grep cannot see it either; `coil3`'s
   `commonMain` already declares `LocalPlatformContext`. **Measure the artifact you are about to
-  declare, never the family** — `paging-common` is KMP while `paging-compose` and `paging-runtime` are
-  Android-only, in the same family, in the same module. And **a KDoc sentence about one caller is not
+  declare, never the family -- and the recorded answer here was itself half false**: `paging-common` is
+  KMP, `paging-runtime` really is Android-only, and **`paging-compose` is KMP**, which this sentence used
+  to deny. Three siblings, one module, one family, three different answers. And **a KDoc sentence about one
+  caller is not
   a statement about the function** — a comment explaining *why* one caller behaves unusually is a
   comment about that caller, and being in the file is not the same as having read it.
   **And a premise about the *ecosystem* ages in one direction, so "no equivalent exists" is the
