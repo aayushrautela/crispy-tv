@@ -71,7 +71,27 @@ first, then subtracting every type declared in every module's `commonMain` — l
 So Phase 4's remaining file count is a misleading measure of the work left, and Phase 5
 is not waiting on Phase 4.
 
-**Where the files are, measured per module:**
+**Where the files are, measured per module.** The `commonTest` column is the one that
+was missing and is the reason four modules held untested `commonMain`; `git ls-files
+<module>/src/commonTest | grep -c '\.kt$'` settles it per module in one command.
+
+| Module | `commonMain` | `androidMain` | `commonTest` |
+|---|---|---|---|
+| `core-domain` | 29 | 0 | 28 |
+| `platform-core` | 7 | 0 | 1 |
+| `sharedUI` | 5 | 0 | 1 |
+| `player` | 6 | 0 | 1 |
+| `addons` | 10 | 5 | 1 |
+| `backend` | 9 | 8 | 4 |
+| `home` | 13 | 4 | 6 |
+| `network` | 2 | 4 | 0 |
+| `watchhistory` | 2 | 3 | 0 |
+| **`:app`** | **110** | **81** | **41** |
+
+`:network` and `:watchhistory` are the two left with a `commonMain` and no test source
+set; `:player` had the same shape until this landing and is the sharpest of the four
+findings, because unlike `:addons` **its `androidMain` is empty** — nothing about it
+looks untestable.
 
 | Module | `commonMain` | `androidMain` |
 |---|---|---|
@@ -603,7 +623,7 @@ left to be discovered.
 - `R.font.archivo_top10` → `composeResources`. Superseded by **Step 1: resources** below, which is the real prerequisite for moving any composable and splits it into two parts that must not be bundled.
 - **Split `PlayerSessionViewModel` along use-case lines — DONE 2026-10-01, and the plan filed it wrong twice.** It was called "the highest-likelihood behavioural regression in the migration" *and* an `androidMain`-to-`androidMain` restructure that "moves no files into `commonMain`", on the grounds that 15 of its 45 `com.crispy.tv` imports are `:android:nativeengine.playback.*`. **Both were wrong, and four landings prove it.** The file went **1,411 lines / 54 functions → 1,202**, and **three whole clusters moved into `commonMain` with 55 tests between them**: `DetailsMetadataLoader` (`51836533`), `PlaybackProgressReporter` (`f16f6867`) and `SeasonEpisodesLoader` (`b989025b`), plus the four pure decisions extracted first (`0207161b`) because a class that cannot be constructed has nothing to characterise. `:app` went **106 → 110 `commonMain`** while `androidMain` stayed 81 — **every one of the four clusters turned out to be fully portable the moment its types were measured, because `:addons`, `:backend`, `:home`, `:player` and `:platform-core` are all already on `:app`'s `commonMain` classpath.** What genuinely stayed `androidMain`, each measured: the episode-metadata cluster (`PlaybackSource` is declared in `:android:native-engine`, a plain `com.android.library`), the subtitle cluster (`languageFromTrack` reads `NativeTrack`; `fetchAddonSubtitles` is 11 lines of `android.util.Log`), `pollPlaybackState` (holds `PlaybackController` and `AudioFocusManager`), and `handleChosenStream` (calls `resolvePlaybackSource`). **The rule that replaced the file's guess: the `:native-engine` wall pins the clusters that *return* one of its types, not every cluster in the file** — measure the members, not the member count.
 
-  Two things this phase found that are not about the view model. **A module with no test source set can hold a large untested `commonMain`**: `:android:addons` compiled for five targets with **no `commonTest` at all**, because five of its files are `Context`/OkHttp/`org.json` Android adapters and creating a test directory for one file in an Android-shaped module reads as wrong. That left **171 lines of nine pure functions** (`StreamLookupSupport.kt`) with zero tests anywhere; `:addons` now has `withHostTest {}` and 28 cases. And **two copies of the same episode load disagree on what a failed request means** — the player says "Failed to load episodes.", `DetailsUseCases.loadSeasonEpisodes` (which `DetailsViewModel` already delegates to) says "No episodes found for this season.", so a failed request there claims there were none. **Unresolved: that is a product decision, not a refactor, and the two copies were deliberately left alone rather than unified.**
+  Four things this phase found that are not about the view model. **A module with no test source set can hold a large untested `commonMain`**: `:android:addons` compiled for five targets with **no `commonTest` at all**, because five of its files are `Context`/OkHttp/`org.json` Android adapters and creating a test directory for one file in an Android-shaped module reads as wrong. That left **171 lines of nine pure functions** (`StreamLookupSupport.kt`) with zero tests anywhere; `:addons` now has `withHostTest {}` and 28 cases. The `:addons` explanation does not generalise, though — `:android:player` had the same gap with an **empty `androidMain`**, so nothing about it looked untestable, and the real cause is that its build file calls itself "the one that establishes the recipe the other five follow" and **the recipe omitted a test source set**. `git ls-files <module>/src/commonTest` across every module is the one-command sweep that finds all of them. And **one guard matches a segment where a reader sees a prefix**: `bridgeCandidateIds` in `:core-domain` bridges a tmdb id to the imdb id on its own record only when `contentId.contains(":tmdb:")` — a colon on *both* sides — so a **bare `"tmdb:1234"` id never bridges**, even with a perfectly good imdb id sitting in the record. Only a provider-scoped id such as `"provider:tmdb:1234"` matches. Nothing in the repository said so until `:player`'s new suite asserted it, and whether the bare form is *meant* to bridge is a question about the providers rather than about the code. **Unresolved: recorded in `MetadataLabResolverTest.aBareTmdbIdIsNeverBridgedBecauseTheMarkerIsASegmentNotAPrefix`, deliberately not changed.** And **two copies of the same episode load disagree on what a failed request means** — the player says "Failed to load episodes.", `DetailsUseCases.loadSeasonEpisodes` (which `DetailsViewModel` already delegates to) says "No episodes found for this season.", so a failed request there claims there were none. **Unresolved: that is a product decision, not a refactor, and the two copies were deliberately left alone rather than unified.**
   - `PlayerSessionDecisions.kt` holds `resolveInitialEngine`, `statusMessage`,
     `initialSeekDecision` (a `sealed interface` of `Wait`/`Clear`/`Seek`) and
     `shouldFallBackToMpv`, all `internal` in the same package. Two of the two literal

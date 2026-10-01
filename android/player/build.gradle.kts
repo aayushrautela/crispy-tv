@@ -24,6 +24,16 @@ kotlin {
         namespace = "com.crispy.tv.player"
         compileSdk = 37
         minSdk = 26
+
+        // This module had no test source set at all, and unlike `:addons` there is
+        // no Android-shaped sibling here to explain it: all six files are
+        // `commonMain` and `androidMain` is empty. So 233 lines of
+        // `WatchHistoryService` -- including a progress computation and twelve
+        // fallback bodies -- and 156 lines of `MetadataLabResolver` ran on four
+        // targets and were asserted by none of them. Without this block the
+        // `commonTest` directory below exists, nothing compiles or runs it on
+        // Android, and AGP only warns.
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -44,6 +54,16 @@ kotlin {
         commonMain.dependencies {
             api(project(":android:core-domain"))
             api(libs.coroutines.core)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            // `runTest`. Every member of `WatchHistoryService` is `suspend` and both
+            // `MetadataLabResolver.resolve` and the data source it calls are too, so
+            // `kotlin("test")` alone leaves the whole suite unable to call the code it
+            // is about: 30 errors, and every one of them a cascade from this one missing
+            // artifact rather than a mistake in a test.
+            implementation(libs.coroutines.test)
         }
     }
 }

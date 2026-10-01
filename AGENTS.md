@@ -339,6 +339,17 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   sharp one, because it holds the six port interfaces *and* `SecretFormat`, the
   encrypted-secret contract both platform stores implement. So this is a whole-repo
   sweep rather than a per-file audit, and it costs one loop over the module list.
+- **The `:addons` explanation does not generalise, and assuming it does hides the more useful
+  cause.** The bullet above says a module went untested because its `androidMain` files made a
+  `commonTest` look silly — and `:android:player` is the counter-example that identifies the
+  real mechanism. All six of its files are `commonMain` and its `androidMain` is **empty**, so
+  there is no Android-shaped sibling and nothing about the module looks untestable. Its own
+  build-file KDoc says it is "the first Phase 2 module to become multiplatform, and the one
+  that establishes the recipe the other five follow" — **and the recipe it established did not
+  include a test source set**, which is how five later modules inherited the gap. So when a
+  module has no tests, read its KDoc before theorising: a module that describes itself as the
+  template has told you the other five are copies. 389 lines of `:player` ran on four targets
+  asserted by none of them, and it is now 51 cases on desktop JVM *and* Android host.
 - **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an
   import*. Subtracting every type declared in every module's `commonMain` from the capitalised
   identifiers a file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare
@@ -782,6 +793,48 @@ Every rule in this section is stated in each driver's docstring, because a drive
   looked like stronger evidence than the honest five minimal ones — a longer failure list is not
   a more specific one. **Check that a caught entry's failure list is close to its `expect` set**;
   a superset means the log is shared.
+- **`--tests` names a *class*, and a filter that matches nothing fails the task in a shape a
+  mutation driver reads as a survivor.** `scripts/mutate_player.py` passed
+  `--tests com.crispy.tv.player.<methodName>` to narrow each entry. Gradle resolves the filter
+  as a class pattern, matches no class, and fails with "No tests found for given includes" — a
+  `BUILD FAILED` carrying **no `e:` line and no per-test `FAILED` line**. A driver deciding
+  `CAUGHT`/`SURVIVED` by reading failure names then scored **19 of 23 entries SURVIVED** with
+  `no_evidence=0` and `compile_failed=0`, which reads as a suite in trouble. **The tell was that
+  all four caught entries were the only four with *two* expected failures** — the four the
+  unfiltered path happened to cover; when N of your entries share a code path and only the
+  others report, the difference in the path is the bug. The suite was correct: a hand-run of
+  the first entry failed exactly as the suite claims, in the documented
+  `Class[desktop] > method FAILED` shape. **Never pass a method name to `--tests`, and treat
+  "many survivors, no compile errors" as a driver verdict before it is a suite verdict** — this
+  is the `NO EVIDENCE` rule's blind spot, because a filter that matches nothing *does* produce
+  evidence, it just produces the wrong kind. **The next bullet is the same trap with one entry
+  instead of twenty-three, and it survived this fix because a tally of 22 caught and 1 survived
+  looks reasonable rather than alarming** — which is the real lesson: a driver verdict is not
+  evidence of anything until you have read a failure name.
+- **Two more ways a driver invents a survivor, and one of them is a *stale `expect` list* — which
+  looks exactly like a genuine survivor and is invisible in the tally.** Entry 21 of
+  `scripts/mutate_player.py` (`CoreDomainMetadataLabResolver`'s `addonLookupId`) survived four
+  consecutive runs, and the causes were **three different things, one per run**:
+  1. **A real suite gap** — nothing asserted that line at all, because the one nearby test drove
+     `DefaultMetadataLabResolver` instead. Fixed by adding the case.
+  2. **A `FROM-CACHE` test task.** Without `--no-build-cache`, Gradle served
+     `:android:player:desktopTest` **`FROM-CACHE`** and left `compileKotlinDesktop`
+     `UP-TO-DATE`, so the mutated source was **never compiled**; the task reported
+     `BUILD SUCCESSFUL in 1s` and the driver wrote a confident verdict about code it had not
+     built. The `NO EVIDENCE` rule cannot catch this — the task *did* report a verdict — so the
+     guard has to be a text match on `> Task :…:desktopTest (FROM-CACHE|UP-TO-DATE)`. **A
+     one-second green from a task you just perturbed is not a result.**
+  3. **A stale `expect` list, after the suite was already correct.** The fix in (1) added a
+     better test, but the entry still named the *old* one, so the driver's substring test found
+     no hit and reported `SURVIVED` — while printing the failing test's name in plain sight on
+     the `(failures seen: […])` line. **When an entry names the case you just replaced, or a
+     hand-run shows the suite catching something the driver calls a survivor, the driver's
+     expectation is what is stale.** Read the `(failures seen: …)` line before writing any
+     code: it is the cheapest evidence in the whole workflow, and a `SURVIVED` verdict printed
+     directly above a correct failure name is a self-evident bug. Generalising all three: *the
+     verdict was sound every time and the evidence was about a different run* — which is the
+     same shape as the log-truncation rule above, and the reason "no test failed" is a finding
+     to investigate rather than a result to record.
 - **A survivor can mean the *case* was caught by the wrong one of two conditions defending the
   same rule — and then the guard was fine and the test was not.** `parseLookupId`'s arity
   check (`parts.size >= 3`) and its numeric check (`toIntOrNull()` and `> 0`) both defend
