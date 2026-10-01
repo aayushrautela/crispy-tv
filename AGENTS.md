@@ -169,7 +169,7 @@ Gradle modules (common targets):
     Multiplatform, on every target -- and is called by `AppNavHost` and by `desktopApp`. Its
     `content` slot has **no default**, so a caller cannot obtain a provider that provides
     nothing. `AppNavHost.kt` is still `androidMain` and still four lines shorter: it is genuinely
-    `NavHost`-bound, and **the five `*NavGraph.kt` files remain Phase 5's problem** because they
+    `NavHost`-bound, and **the seven `*NavGraph.kt` files remain Phase 5's problem** because they
     declare `NavGraphBuilder` graphs and `androidx.navigation` has no KMP artifact at all.
 - `:android:sharedUI`: the design system **and the design assets** (Phase 4 Step 1) — `composeResources`, the theme tokens, the brand composables
 - `:android:ui-assets`: Android-only assets that cannot be `composeResources` — launcher mipmaps, the splash colour and its two drawables, the nine provider-logo SVGs
@@ -449,6 +449,19 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `lifecycle-viewmodel-compose` and MaterialKolor are genuine KMP artifacts. **Measure the artifact
   you are about to declare, never the family** — `paging-common` is KMP while `paging-compose` and
   `paging-runtime` are not, in the same family, in the same module.
+- **A count written about a set that later grows is stale silently, and re-measuring it is one
+  command -- so re-measure it.** Three separate undercounts, each in a document rather than in
+  code, and each one making a piece of work look smaller than it is. `CrispyTvDarkColorsMappingTest`'s
+  KDoc said `:tv` leaves "seven" palette roles unmapped; it is **eight** (the `spinner` role was
+  never a Material3 role at all, so it was never in the sentence). `CrispySharedTransitionLayout`'s
+  KDoc said "The five `*NavGraph.kt` files stay in `androidMain`"; it is **seven** -- `AuthNavGraph`,
+  `PlayerNavGraph` and `SettingsNavGraph` were all added after the sentence was written, and
+  `AGENTS.md` repeated the same stale number, so two documents agreed with each other and both
+  disagreed with the tree. And the `:player` suite's own case count was recorded as 51 when it is
+  52. The general form: **an omission nobody mentioned reads as a decision nobody made**, and the
+  place it is most dangerous is a count a reader would use to *scope* something --
+  `git ls-files <path> | grep -c <pattern>` settles it in under a second, and a count that two
+  documents share is twice as likely to be believed and no more likely to be right.
 - **A target declaration is a claim, and a target no CI job builds cannot fail -- so it asserts
   nothing about whether the code is platform-free.** Ten modules declared
   `iosArm64`/`iosSimulatorArm64`. `apple.yml` compiled **two** of them (`:core-domain`,

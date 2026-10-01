@@ -29,7 +29,9 @@ import androidx.compose.runtime.CompositionLocalProvider
  *
  * ## What is deliberately not here
  *
- * The five `*NavGraph.kt` files stay in `androidMain`. They declare
+ * The seven `*NavGraph.kt` files stay in `androidMain` -- `AuthNavGraph`,
+ * `DiscoverNavGraph`, `HomeNavGraph`, `LibraryNavGraph`, `PlayerNavGraph`,
+ * `SearchNavGraph` and `SettingsNavGraph`. They declare
  * `NavGraphBuilder` graphs and are genuinely bound to `androidx.navigation`,
  * which is not on the `commonMain` classpath at all -- there is no KMP artifact
  * for it (its only `available-at` files are `-android-` and `*Stubs*`, and the
