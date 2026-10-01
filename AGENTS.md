@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 126 `commonMain` / 70 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 127 `commonMain` / 69 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -473,6 +473,26 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   can still be unpinnable, because the blocker can be a _type_**: `grep -rn "class X"` its distinctive
   types and read the owning module's `plugins { }` block. A plain `com.android.library` publishes no
   JVM variant, so no KMP `commonMain` can name its types however clean the code looks.
+  **The same-package trap fired on the file this rule most obviously predicts, and
+  the census that found it is worth more than the landing it blocked.** A
+  two-direction scan of all 70 `:app` `androidMain` files reported **exactly four
+  with no hard pin**, and three of the four are not candidates at all:
+  `PlayerSessionSupport.kt` (50) names `:native-engine`'s `PlaybackSource`, so it
+  is the plain-`com.android.library` case above; `AndroidLanguageLabels.kt` (30) is
+  the **platform answer** that `commonMain`'s `languageLabelForCode` already takes
+  as a `::englishDisplayNameForTag` slot, so it is *correctly* in `androidMain` and
+  moving it would delete the platform step the slot exists to supply; and
+  `AppDistribution.kt` (77) is the recorded `:native-engine` product decision. The
+  fourth, `HouseholdAddonsCloudSync.kt` (143), looked like a one-pin move — twelve
+  `android.util.Log` calls and nothing else — and it is blocked one layer down:
+  `MetadataAddonRegistry` and `CloudAddonRow` are declared in **`android/addons/src/androidMain`**
+  and are reachable with **no import**, so the forward scan cannot see them. 19
+  `Unresolved reference` errors on `registry` and `reconcileCloudAddons` is what
+  says so, and the first of them names `com.crispy.tv.addons.registry` on a line
+  that imports it, which is the signature. **So a census answer of "one pin" is a
+  claim about the file that was scanned, not about the set the file belongs to, and
+  three of four is a partition worth writing down rather than four landings to
+  discover.**
   **And a pin is per file, not per token — the token you hunted is rarely the one that decides
   whether the file moves, and a scan that tests for the tokens you are chasing is not a test for
   the pins you are not.** `DetailsRoute.kt`'s only `java.*` use was `Locale.US` at `:35`, which
