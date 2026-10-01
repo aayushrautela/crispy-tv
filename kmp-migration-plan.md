@@ -92,7 +92,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **110** | **83** | **41** |
+| **`:app`** | **111** | **82** | **41** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -145,22 +145,60 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **110** | **83** |
-| **total** | **205** | **99** |
+| **`:app`** | **111** | **82** |
+| **total** | **206** | **98** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 110 of 193, i.e. **57%**, and
-the 83 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 111 of 193, i.e. **58%**, and
+the 82 that remain are behind the walls listed in the table above.
 
-**The 57% is the one figure here that survived unchanged, and it survived by
-coincidence.** It was `106 of 186` and it is now `110 of 193` — both operands
-moved and both round to the same integer, so the percentage is right for a reason
-that has nothing to do with being right. *A ratio is the worst kind of count to
-quote, because it can stay constant while every number in it is being corrected.*
+**The percentage is the figure that outlived one correction and died on the next,
+which is the whole argument for not quoting a ratio.** It was `106 of 186`, became
+`110 of 193` and round-tripped through the *same* 57%, and one file later it is
+`111 of 193` = **58%**. Nothing about the module changed in that last step that the
+percentage could see. *A ratio is the worst kind of count to quote, because it can
+stay constant while every number in it is being corrected — and then move when
+nothing it describes has.*
+
+### The 82 that remain, in four families, and three of them no static scan can see
+
+`:app`'s remaining `androidMain` files were re-audited from both directions. A first
+pass named 21 files with zero framework imports, and a better one named 14, and the
+final one found **exactly one** movable file among them. The five it rejected are
+worth more than the one it accepted, because **three of the four pin families are
+invisible to every static measurement** — no import scan, no reverse `com.crispy.tv`
+audit, and no jar-grep:
+
+1. **A plain `com.android.library` cannot be consumed from a KMP `commonMain` at all.**
+   `NativePlaybackState`, `NativePlaybackEngine`, `NativePlaybackSnapshot`,
+   `NativePlaybackError`, `NativeTrack`, `externalSubtitleTrackId`, `IntroSkipSegmentType`
+   and `IntroSkipInterval` are all `:android:native-engine`, which publishes no JVM
+   variant. **Structurally unreachable at any version, so the files naming them are not
+   candidates and should not be re-audited** — `PlayerSessionDecisions.kt` (162 lines)
+   and `PlayerTrackSheet.kt` (449 lines) are out of reach for good, not pending.
+2. **Android-only Compose locals.** `LocalConfiguration` and **`LocalContext`** — the
+   second of which this plan had never named. **No import scan and no jar-grep can see
+   either**, because neither has a `commonMain` declaration anywhere in the repository.
+   *A `commonMain` file can reference a name that exists in no `commonMain` source set
+   at all, and the only oracle for that is the compiler.*
+3. **A same-package `androidMain` sibling, reachable with no import.**
+   `englishDisplayNameForTag`, at
+   `android/app/src/androidMain/kotlin/com/crispy/tv/playerui/AndroidLanguageLabels.kt:25`,
+   used by `PlayerTrackSheet.kt`. **The forward import scan cannot see it because there
+   is no import** — and a reverse audit keyed on imports cannot either.
+4. **A receiver in the module's own `androidMain`.** `CatalogViewModel` in
+   `CatalogScreen.kt`, the same family as `:backend`'s 39 `CrispyBackendClient` parsers
+   and `:watchhistory`'s `BackendWatchHistoryService`.
+
+**A per-file error count is not a pin count.** The compile that rejected them produced
+123 errors across five files, and **only 27 of those name a pin**: an unresolved
+receiver wipes out smart casts and manufactures 14 errors from 3 causes, and an
+unresolved enum manufactures a non-exhaustive-`when` error that is not a defect at all.
+*The honest number is the count of distinct unresolved names.*
 
 What moved `:app` was mostly **not** UI work. It was removing the things that were
 *pinning* UI to `androidMain`:
