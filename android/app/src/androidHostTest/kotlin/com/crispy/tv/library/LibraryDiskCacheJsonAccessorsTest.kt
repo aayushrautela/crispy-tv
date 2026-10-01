@@ -115,43 +115,106 @@ class LibraryDiskCacheJsonAccessorsTest {
     }
 
     /**
-     * Divergence 2, and the reason this function is pinned at all: **it cannot
-     * return `null` for a value that is present and unreadable.** It delegates
-     * to `org.json`'s `optBoolean`, which returns the `Boolean` or its `false`
-     * default. `:backend`'s copy matches on the *value* and answers `null` for
-     * anything that is not a boolean and not one of the two words.
+     * **This case asserted the opposite until the fix, and the name asserted it
+     * too** — `…IsFalseAndNotNullBecauseNothingCanBeNullHere` claimed the defect
+     * was correct. A name narrower or wider than its body is the same defect
+     * twice, so both moved.
      *
-     * All four rows are the same answer — `false` — and `:backend` answers
-     * `null` to all four. `org.json`'s `optBoolean` is strict on **both**
-     * implementations (only a real `Boolean`, or case-insensitive
-     * `"true"`/`"false"`; everything else is the `false` default), so this is
-     * not a cross-implementation difference — it is this copy discarding the
-     * difference itself, which is the worse of the two failures because it
-     * leaves no trace in the value.
+     * The old body delegated to `org.json`'s `optBoolean`, which returns the
+     * `Boolean` or its `false` default and can never return `null`. All four
+     * fixtures below therefore read `false` from a function whose return type
+     * is `Boolean?`, and `:backend` answers `null` to all four. That is not a
+     * cross-implementation difference — `optBoolean` is strict on **both** — it
+     * was this copy discarding the difference itself, which is the worse of the
+     * two failures because it leaves no trace in the value.
+     *
+     * All four are now `null`, and the shape worth noticing is that the
+     * *string* `"1"` and the *number* `1` are both unreadable as booleans. A
+     * reader expecting `1` to be truthy gets the same answer from both, which
+     * is the correct one: neither is a rating.
      */
     @Test
-    fun aPresentButUnreadableBooleanIsFalseAndNotNullBecauseNothingCanBeNullHere() {
+    fun aPresentButUnreadableBooleanIsNullBecauseTheReturnTypeIsNamedForNullable() {
         val json = JSONObject("""{"word":"banana","yesish":"yes","numeric":1,"numericText":"1"}""")
         val withNull = JSONObject("""{"nullish":null}""")
 
-        assertEquals(false, json.optBooleanOrNull("word"), "present and unreadable")
-        assertEquals(false, json.optBooleanOrNull("yesish"), "present and unreadable")
-        assertEquals(false, json.optBooleanOrNull("numeric"), "present and unreadable")
-        assertEquals(false, json.optBooleanOrNull("numericText"), "present and unreadable")
+        assertNull(json.optBooleanOrNull("word"), "present and unreadable")
+        assertNull(json.optBooleanOrNull("yesish"), "present and unreadable")
+        assertNull(json.optBooleanOrNull("numeric"), "present and unreadable, and 1 is not a rating")
+        assertNull(json.optBooleanOrNull("numericText"), "and the string 1 is not either")
 
-        // So the only two ways to get null are the guard's two, and both of
-        // them are about the key rather than the value.
+        // The three ways to get null are all answered now, and none of them is
+        // a special case in the body.
         assertNull(json.optBooleanOrNull("missing"), "an absent key")
         assertNull(withNull.optBooleanOrNull("nullish"), "a JSON null")
     }
 
+    /**
+     * The old name here was `theTwoWaysToGetNullAreBothAboutTheKeyAndNeitherIs
+     * AboutTheValue`, and its thesis is now false: a value that is neither a
+     * boolean nor one of the two words is a third way to get `null`, and it is
+     * the only one of the three that is about the value.
+     */
     @Test
-    fun theTwoWaysToGetNullAreBothAboutTheKeyAndNeitherIsAboutTheValue() {
-        val json = JSONObject("""{"value":0,"nullish":null}""")
+    fun theThreeWaysToGetNullAreAbsentAJsonNullAndAValueThatIsNotABoolean() {
+        val json = JSONObject("""{"value":0,"no":false,"nullish":null,"word":"banana"}""")
 
         assertTrue(json.has("value"), "a zero is present, and present is enough")
         assertFalse(json.isNull("value"), "and it is not a JSON null")
-        assertEquals(false, json.optBooleanOrNull("value"), "so it is read, as false")
-        assertNull(json.optBooleanOrNull("nullish"))
+        // The old case read this key as `false` and said "so it is read, as
+        // false". Under the fixed policy a zero is a *number*, and the policy
+        // is about the value rather than the key, so it is the third way to
+        // get null. **Being present was never the question** -- that was the
+        // assumption the removed guard encoded, and the fix takes it out.
+        assertNull(json.optBooleanOrNull("value"), "a zero is present, but a number is not a boolean")
+        assertEquals(false, json.optBooleanOrNull("no"), "while a real false is still false")
+        assertNull(json.optBooleanOrNull("nullish"), "a JSON null")
+        assertNull(json.optBooleanOrNull("word"), "and an unreadable value, which is the third")
+    }
+
+    /**
+     * The reason the fix is worth making, and the reason the previous answer
+     * was a defect rather than a policy difference: **`null` and `false` reach
+     * different pixels.**
+     *
+     * Every consumer of `CatalogItem.liked` branches two ways and never three.
+     * `DetailsHeader` does `selected = liked == true` and `selected = liked ==
+     * false` for the like and dislike buttons, so a `false` renders the dislike
+     * button *pressed*. `LibraryScreen` filters
+     * `RATING_BAND_DISLIKED -> items.filter { it.liked == false }`, so the item
+     * lands in the Disliked band. `DetailScreen` labels the action
+     * `"Disliked"` rather than `"Dislike"` on the same comparison.
+     *
+     * So before the fix, a cached `liked` that was a string or a number — which
+     * `LibraryDiskCacheStore`'s own writer never produces, since it writes
+     * `liked ?: JSONObject.NULL` — was reported as a positive claim about the
+     * user's own data: liked-nothing, actively disliked. It is now no rating at
+     * all, which is what every other path already does for an absent one.
+     *
+     * Pinned at the accessor because that is where the answer is produced; the
+     * consumers are the reason it matters, and they are not what this function
+     * decides.
+     */
+    @Test
+    fun nullAndFalseAreDifferentAnswersAndTheConsumersBranchOnTheDifference() {
+        val explicitFalse = JSONObject("""{"liked":false}""")
+        val unreadable = JSONObject("""{"liked":"banana"}""")
+        val absent = JSONObject("""{}""")
+
+        assertEquals(false, explicitFalse.optBooleanOrNull("liked"), "the document said false")
+        assertNull(unreadable.optBooleanOrNull("liked"), "the document said nothing usable")
+        assertNull(absent.optBooleanOrNull("liked"), "the document said nothing at all")
+
+        // The distinction, stated as the two-way comparison every consumer
+        // actually writes. `liked == false` is what selects Disliked, so an
+        // unreadable value must not satisfy it.
+        // The first draft of these two asserted the comparison itself with
+        // `assertNull`. That compiled, because `assertNull` takes `Any?`, and
+        // then failed: `null == false` is Kotlin `false`, a `Boolean`, and
+        // never a `null`. **An assertion whose type contradicts its intent
+        // still compiles**, so the compiler was no help here and the failure
+        // was the only witness.
+        assertEquals(false, unreadable.optBooleanOrNull("liked") == false, "and so it is not a dislike")
+        assertEquals(true, explicitFalse.optBooleanOrNull("liked") == false, "while a real false is")
     }
 }

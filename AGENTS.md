@@ -31,7 +31,25 @@ Two things worth knowing that a reader would otherwise have to rediscover:
   visible to every reader.
 - **A `commonMain` file is worth nothing until a non-Android target consumes it.** A
   file count is therefore not progress on its own; ask what runs it. The `apple.yml` and
-  `:android:desktopApp` entries under *Project Layout* are where that gets answered.
+  `:android:desktopApp` entries under *Project Layout* are where that gets answered. **Two
+  consequences that a migration plans hit in this exact order.** **A file whose receiver is
+  pinned cannot be freed by changing its arguments** — 39 of `CrispyBackendParsers.kt`'s 45
+  functions are `internal fun CrispyBackendClient.parseX(json: JSONObject)`, so the pin rides in
+  on the *extension receiver*, and a `JsonElement` parameter would have changed nothing about
+  where the function lives. **And a consumer that cannot move makes its helpers worth nothing to
+  move either**: `:app`'s two JSON accessor files are pure, with zero `android` imports and one
+  consumer each, and porting them moves zero files, because the consumers are
+  `ProfileDataShadowStore` (pinned by `getSharedPreferences`) and `LibraryDiskCacheStore` (60+
+  `org.json` touchpoints plus `java.io.File` and `MessageDigest`).
+  **The node type was the visible pin, and the real pin was one layer down** — a transport's
+  response type in one case, a storage API in the other. `CrispyBackendClient` speaks OkHttp in
+  only three places and never touches `OkHttpClient` at all, so it reads as nearly free to port;
+  what pins it is `CrispyHttpResponse(val url: HttpUrl, …, val headers: Headers, …)`, which
+  names OkHttp in its own **constructor**, so closing it is a transport migration reaching ~100
+  call sites. **1,226 lines of behaviour-preserving churn with no consumer is the same defect as
+  padding a mutation driver with `expect_survive` entries** — and it is worth an order of
+  magnitude more to record the *negative result* than to spend the churn, because the finding is
+  what stops the work being re-attempted.
 
 Also orthogonal to the goal but binding on every change: Android and Swift must stay
 aligned with `contracts/SPEC.md` (`android/core-domain` and `ios/ContractRunner`).
@@ -401,7 +419,13 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   it would pass on either implementation — sorting `prefix + s` is the same order as sorting `s` for
   a constant prefix. Record it rather than assert it, and pin the comment's *real* content (that it
   sorts at all, because the underlying collection carries no order guarantee). **A statement of intent
-  with no state to change is a redundant guard wearing prose.**
+  with no state to change is a redundant guard wearing prose.** The other instance is
+  `optBooleanOrNull`'s `if (!has(key) || isNull(key)) return null` in front of a `when` that
+  already answers all three cases: `opt(name)` is Java `null` for an absent key, `JSONObject.NULL`
+  for a stored one, and `JSONObject.NULL` is neither a `Boolean` nor a `String` so it reaches
+  `else -> null`. **Deleting it was the fix, not a cleanup** — the guard was hiding that the
+  function could never return `null` for a present-but-unreadable value, which is the defect the
+  return type was named for.
 - **A document's own heading, prose class, or type names are not evidence about the code — and a
   second numbered plan for one repository is a defect even when every sentence in it is correct.**
   `architecture.md` used **seven type names that never existed**, and `DataSource`'s only hits are
@@ -439,6 +463,17 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **An assertion nothing executes is not a weak assertion, it is no assertion** — and the gate needed
   proving before it could be trusted (its first version built `compileKotliniosArm64` where the task is
   `compileKotlinIosArm64` and reported all twenty tasks missing on a workflow that invoked every one).
+  **A gate that could not have been written is a stronger version of the same thing, and prose
+  about one reads exactly like prose about a weak one.** `LibraryDiskCacheJsonAccessors.kt`'s
+  KDoc deferred a consolidation on the grounds that *"`JsonAccessorsDivergenceTest` in
+  `androidHostTest` pins both sides of every row"* — and that suite does not exist: zero tracked
+  files match `Divergence`, and the only hit repo-wide is the KDoc line naming it. **Worse, it
+  could not exist where it was named**: both copies are `internal` in two different modules, so
+  `:app`'s tests cannot see `:backend`'s and vice versa, and no source set in the graph sees both.
+  The deferral's stated reason was *"a behaviour change on three call paths"*, which is the count
+  of the three **files** a consolidation would touch; the defective function had exactly **one**
+  call site. **A count in a KDoc is a claim about the code and re-measuring it is one command**,
+  and here the claim overstated the work by 3x while the gate it deferred to did not exist.
 - **The Apple client is not this codebase, and a promise in a module's KDoc is not a plan.**
   `:platform-android`'s KDoc promised Apple port implementations "in Phase 6"; measured, there are
   **zero** Swift hits for all six ports, `ios/CrispyKit` is a 19-file Swift reimplementation of the
@@ -706,7 +741,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   until you have established **what the code's rule actually is**, and the cheapest way to
   establish it is to read the body rather than infer the rule from the method's name — the
   name here described an *intention* ("consulted only when…") while the code described an
-  *order*.
+  *order*. **An assertion whose *type* contradicts its intent still compiles**, and the type
+  system is no help at all: `assertNull(value == false)` type-checks because `assertNull` takes
+  `Any?`, so a `Boolean` is an acceptable argument to an assertion about nullness. It then fails,
+  and the failure is the only witness — `null == false` is `false` in Kotlin, never a `null`.
+  The second half is that the *name* is a claim too, and a rename is part of a behaviour change
+  rather than a follow-up to it: two cases here were named
+  `aPresentButUnreadableBooleanIsFalseAndNotNullBecauseNothingCanBeNullHere` and
+  `theTwoWaysToGetNullAreBothAboutTheKeyAndNeitherIsAboutTheValue`, and both names state the old
+  policy in prose, so both had to move with their bodies.
 - **Robolectric's `android-all` lives in `~/.m2`, not in the Gradle cache, and a `find` in the
   wrong place is evidence of nothing.** `:backend`'s first host test wants a real `org.json` rather
   than a `Context`, and `find ~/.gradle/caches -iname '*android-all*'` returned **0 results** on
@@ -927,6 +970,7 @@ GitHub Actions (`.github/workflows/`), all `workflow_dispatch`-only by deliberat
 - Distribution is a permanent two-flavor axis: `store` (Play/App Store) and `sideload` (APK/IPA). Optional engines are excluded **structurally** — the torrent engine, the QuickJS plugin runtime and the YouTube extractor are separate modules that only `sideload` depends on. Never reintroduce a null-returning stub for something the store build should simply not contain. Two guards enforce this: `./gradlew :android:androidApp:verifyDistributionExclusions` reads the resolved dependency graph, and `scripts/verify_apk_distribution.py` reads the built dex and asserts in both directions.
 - The flavour axis does not stop the migration; it moves with the entry point. `:app` *is* now a flavor-less KMP library, because the KMP plugin cannot carry `productFlavors` while the flavour axis is a product requirement. `:androidApp` is the `com.android.application` that declares them, and `:app` reaches the variant through the `DistributionComponents` seam rather than through source sets.
 - Apple targets are declared but cannot compile on Linux. Never run aggregate tasks (`build`, `check`, `allTests`); they reach the Kotlin/Native targets and fail. Use `./check-local.sh` or targeted tasks.
+- **One gate per tree, and a unique log path per run — a `GATE_EXIT` read from a log two processes wrote to is not a result.** Launching a second `check-local.sh` while the first was in flight, both redirecting to the same file with `>`, truncated the log the first was writing and interleaved the two: the failed run ended in `BUILD FAILED` with **zero `e:` lines, no `What went wrong`, and mangled task lines like `> Ta> Task …`**, which reads as a compile failure and is not one. The clean second run returned `0` on the same tree with nothing changed. *Gradle serialises its own tasks, which is exactly why the assumption that a second gate is harmless feels safe — the corruption is in the redirect, not in the daemon.* Give each run its own `/tmp/opencode/gate-<name>.log`, and if a failure's only evidence is a mangled log, **re-run before diagnosing: a `BUILD FAILED` with no `e:` line and no `What went wrong` is task selection or harness noise, not compilation.**
 - **A plain `com.android.library` cannot be consumed from a KMP `commonMain` at all.** Only a `com.android.kotlin.multiplatform.library` publishes a JVM variant. `:android:native-engine` and `:ui-assets` are both plain libraries, so neither can be a `commonMain` dependency — the same wall that stopped `:ui-assets` being used from a shared module. Check `plugins { }` in the module's `build file` before adding it to a common source set's `dependencies`; the compiler error is an ambiguous-variant listing with no hint that the cause is the module *type*.
 - **`git mv` preserves mtime, so Gradle's incremental Kotlin compile can skip a moved file and report `BUILD SUCCESSFUL` with no class produced.** This bit the move of `PlayerStreamHandoff` back from `commonMain` to `androidMain`: the class file was already in `build/classes/kotlin/android/main`, so the compile reported failure while the output was correct-looking, and the errors (`Unresolved reference` in three files, plus `Destructuring of type 'Any'` cascades) read as a missing declaration. **Always run a moved file's compilation with `--rerun-tasks` once, and treat any `Unresolved reference` for a class you can see in `build/classes` as this.** The `verify_kmp_outputs.py` gate is the detector, not a fix.
 - **A revert that only compiles the source set you moved *from* proves nothing about the source set you moved *to*, and a partial revert looks exactly like a completed one.** Moving two `PagingSource`s out of `androidMain` failed, so they were reverted; `git status` showed them as staged deletions afterwards, because `git reset -q HEAD <dest>` resets the *destination* path and the file never came back. `compileKotlinDesktop` was green the whole time, because a file only referenced from `androidMain` is not on the desktop compile path — the breakage was invisible to the one command I ran. `:app:compileAndroidMain` then failed with 20 errors, the largest being `Unresolved reference 'LibrarySectionPageUi'` for a type declared in a file I had deleted. **After any revert, run `git status --short` and look for `D ` in the index, and compile *both* source sets.** `git restore --staged --worktree <path>` is the reliable restore; the index is the part people forget.

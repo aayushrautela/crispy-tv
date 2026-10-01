@@ -27,24 +27,33 @@ import org.json.JSONObject
  * copy -- so the policy is reachable from one module and unreachable from
  * another, decided by an `internal` keyword nobody revisited.
  *
- * The two copies disagree, and the disagreements are behavioural:
+ * The two copies disagreed, and `optBooleanOrNull` was the row that mattered.
+ * It has been fixed, so **one row of the table is left**:
  *
  * | input | `:backend` | here |
  * |---|---|---|
  * | the literal string `"null"` | `null` | `"null"` |
- * | `"banana"` as a boolean | `null` | `false` |
- * | `1` as a boolean | `null` | `false` |
- * | `"  x  "` as a string value | `"x"` | `"x"` |
  *
- * The second row is the sharp one: **the `:backend` copy can return `null` for
- * a present-but-unparseable value and this one cannot, so a function named
- * `optBooleanOrNull` returns `false`.** `org.json`'s `optBoolean` never returns
- * `null` -- it returns the `Boolean` itself or its `false` default.
+ * **That row stays on purpose, and it is not the platform-rendering bug it
+ * looks like.** `:backend`'s branch is
+ * `takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }`, and
+ * backend payloads really do carry that string, so it is defensive parsing of a
+ * real shape. Nothing here filters it, and the case named for it says so
+ * explicitly. The two rows that *were* the bug — a present-but-unreadable
+ * boolean answering `false` — are gone because this copy now matches
+ * `:backend`; the reasoning is on the function.
  *
- * **Nothing here decides which copy is right.** Consolidating them is a
- * behaviour change on three call paths, so `JsonAccessorsDivergenceTest` in
- * `androidHostTest` pins both sides of every row above, and the duplication
- * stays until it is a deliberate act.
+ * **The suite this file used to name does not exist, and could not have.** It
+ * cited `JsonAccessorsDivergenceTest` as the thing that "pins both sides of
+ * every row", and cited "three call paths" as the reason to wait. Both claims
+ * were wrong. There is no such file in the repository, and there is no source
+ * set in the module graph from which one could exist: these two functions are
+ * `internal` in two different modules, so `:app`'s tests cannot see `:backend`'s
+ * and `:backend`'s cannot see `:app`'s. **A gate that could not be written is
+ * not a weak gate, it is no gate** — the divergence was being held by prose
+ * alone. The "three call paths" was the count of the three *files* a
+ * consolidation would touch; the one defective function had a single call site
+ * (`LibraryDiskCacheStore.kt:126`), which is what made the fix cheap.
  *
  * These tests must live in `androidHostTest`, not `commonTest`: `org.json` is a
  * class of the Android platform supplied by `android.jar`, so it is absent from
@@ -57,7 +66,37 @@ internal fun JSONObject.optNullableString(key: String): String? {
     return optString(key).trim().takeIf { it.isNotEmpty() }
 }
 
+/**
+ * `:backend`'s policy, transcribed, because this copy is the one that was
+ * wrong.
+ *
+ * **The `has`/`isNull` guard this used to open with is gone, and its removal
+ * is the point rather than a simplification.** `org.json`'s `opt(name)` answers
+ * Java `null` for an absent key and `JSONObject.NULL` for a stored JSON null,
+ * and `JSONObject.NULL` is neither a `Boolean` nor a `String`, so it reaches
+ * the `else` arm and answers `null` like the other two. A guard that decided
+ * nothing is a statement of intent with no state to change.
+ *
+ * **The `is String` arm is what makes the answer `null` rather than `false`.**
+ * `optBoolean` could never do it: it returns the `Boolean` or its `false`
+ * default, so a function named `optBooleanOrNull` returned `false` for
+ * `"banana"`, for `1`, and for a number that was never a boolean at all. Every
+ * consumer here branches on `liked == false` against `liked == true`, and those
+ * are different answers — see the case in the suite named for that.
+ */
 internal fun JSONObject.optBooleanOrNull(key: String): Boolean? {
-    if (!has(key) || isNull(key)) return null
-    return optBoolean(key)
+    return opt(key)?.let { value ->
+        when (value) {
+            is Boolean -> value
+            is String -> value.trim().lowercase().let {
+                when (it) {
+                    "true" -> true
+                    "false" -> false
+                    else -> null
+                }
+            }
+
+            else -> null
+        }
+    }
 }

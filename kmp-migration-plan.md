@@ -837,9 +837,56 @@ title or artwork. Moving files has hit its floor. **Phase 5 is not waiting on Ph
 
 | Bucket | Files (at 120 remaining) | What it takes |
 |---|---|---|
-| Hard wall | **84** | `Context` (59), `java.*` (31), `androidx.navigation` (9), `androidx.media3` (6), `native-engine` (10), `org.json` (5), `okhttp3` (3), `materialkolor` (1) |
+| Hard wall | **84** | `Context` (59), `java.*` (31), `androidx.navigation` (9), `androidx.media3` (6), | `native-engine` (10), `org.json` (5, **measured permanent**), `okhttp3` (3), `materialkolor` (1) |
 | `coil3` only | 13 | real work, not a blocker: coil3 is multiplatform, these need the same `Int` → resource porting the drawables already got |
 | No wall | 23 | but 0 of them are closable without upstream moves; the largest gate is **4 files** |
+
+### Measured 2026-10-01 (later) — the five JSON-pinned files are permanent, and the node type was the wrong thing to measure
+
+`WatchProgressStore.kt` was the first file moved onto `JsonElement` (405 lines, out
+of `androidMain` and into `commonMain`, its 44 cases now on both targets). That
+made the remaining four look like the same work. **They are not, and the reason is
+that the node type was never their pin.** Together they are **1,226 lines of
+behaviour-preserving churn that would buy zero non-Android consumers**, which is
+the same defect as padding a mutation driver with `expect_survive` entries. Both
+chains were measured; neither is an estimate.
+
+**1. `:backend`'s JSON layer — 811 lines (165 accessors + 646 parsers) — is
+`androidMain` because of the transport, not the parser.** 39 of the 45
+top-level functions in `CrispyBackendParsers.kt` are
+`internal fun CrispyBackendClient.parseX(json: JSONObject)`, so the *receiver*
+carries the pin into every signature. `CrispyBackendClient` (497 lines) has a
+small OkHttp surface of its own — `authHeaders` and `JSON_MEDIA_TYPE`, three
+places, and **it never touches `OkHttpClient`**; it talks through
+`CrispyHttpClient`. The wall is one layer further down: `CrispyHttpResponse` is
+declared `data class CrispyHttpResponse(val url: HttpUrl, val code: Int, val
+headers: Headers, val body: String)`, so **the response type names OkHttp in its
+constructor.** Closing this means a different response type (`url: String`,
+`headers: Map<String, String>`) rippling through ~100 call sites that read
+`response.url`, `response.header(…)` and `response.code` — a transport
+migration, not a node-type migration. *`CrispyBackendClient`'s own KDoc already
+said it is `androidMain` because it speaks OkHttp and `org.json`; the measurement
+refutes the `org.json` half and keeps the OkHttp half, so the sentence survives by
+accident rather than by being right.*
+
+**2. `:app`'s two JSON stores — 415 lines (118 accessors + 297 stores) — are
+`androidMain` because of Android storage.** `ProfileDataShadowStore` is pinned by
+`Context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)`.
+`LibraryDiskCacheStore` is not a light adapter at all: **60+ `org.json`
+touchpoints**, including a `JSONObject.toCatalogItem()` that calls
+`optNullableString` 14 times and a `toCacheJson()` with 19 chained `.put(…)`,
+alongside `java.io.File`, `StandardCharsets`, `MessageDigest` and
+`Dispatchers.IO`. Porting the 118-line accessors alone would move **zero files**,
+and a `commonMain` `JsonElement` accessor cannot be called from an `androidMain`
+store holding an `org.json.JSONObject` at all — the type system rejects mixing
+them, since `json.optJSONArray("items")` needs a `JSONObject`.
+
+**The generalisable form, which is the part worth keeping:** *the node type was
+the visible pin, and the real pin was one layer down — a transport's response type
+in one case and a storage API in the other.* So the honest order is **port the
+wall, then the pin**: `HttpClientPort` first, and only then `:backend`'s parsers.
+A file whose *receiver* is pinned cannot be freed by changing its arguments, and a
+consumer that cannot move makes its helpers worth nothing to move either.
 
 The per-file counts above are **historical** (measured with 120 files left, and several
 of those blockers have since been removed by the service-locator conversion). The buckets
@@ -861,7 +908,10 @@ actually unblocks once the transitive blockers are counted:
    itself becomes portable. **This is the single highest-leverage remaining move**, and
    it is the thing `Context` in 59 files is really about.
 2. **`CrispyBackendClient` (17) and `SupabaseAccountClient` (10)** are `androidMain`
-   because they speak OkHttp and `org.json` — the same reason `BackendTypes.kt` had to
+   because the **transport** is: `CrispyHttpResponse` carries `HttpUrl` and `Headers`
+   in its own constructor, so the pin is one layer below the client rather than in
+   the JSON. The `org.json` half of the old sentence is now moot, since the node type
+   is decided and moved. This is the same reason `BackendTypes.kt` had to
    leave the client. Their *vocabulary* is already portable; what is missing is a
    transport port (`HttpClientPort`, still deferred) so the interface can be commonMain
    while the implementation stays Android.
