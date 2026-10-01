@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 124 `commonMain` / 72 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 125 `commonMain` / 71 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -353,7 +353,24 @@ inside the client's own two envelope methods, and nothing else. **The real cost 
 **`:app`'s `androidMain` is a knot, not a list of independent files, and the table of what holds what
 lives in `android/app/build.gradle.kts`** — read it before planning any move. **A replacement for a JVM
 library call goes in the file that already replaces that library, not next to the caller** — look for
-the existing replacement before writing a second one in the same repo. **Push the pure half of a split
+the existing replacement before writing a second one in the same repo. **`okio` is that replacement for
+`java.io.File` and it arrived through `coil3`**: `coil-core` 3.5.0 resolves `okio:3.17.0`, and
+`FileBackedPendingMutationStore` uses it with **no dependency line of its own** — so
+`desktopCompileClasspath | grep -c okio` answers "is it there" and
+`dependencyInsight --dependency com.squareup.okio` answers "from where" in two commands. **Its
+`commonMain` API is smaller than the JVM jar suggests, and the extra classes are the point**: okio 3.17.0
+has `source`/`sink`/`metadataOrNull`/`createDirectories`/`Path.parent` and **no `read`/`write` String
+overloads at all** (the older `-read(Path, readerAction)` and `-write(Path, mustCreate, writerAction)` are
+the internal inline forms, and calling them fails with `No value passed for parameter 'readerAction'`).
+**There are no `okio.FileSystemKt` / `Okio__OkioKt` String helpers to find** — a sorted `javap` sweep over
+all 88 top-level classes is what settled it, and the two probes that *did* resolve are the whole API.
+**The test half is a separate artifact and does need declaring**: `okio-fakefilesystem` (version-matched
+to the `okio` that resolves, because a `FileSystem` subclass compiled against a different okio is an
+abstract-method error at best) is the only reason `FileBackedPendingMutationStore`'s wire format has any
+coverage, and it is what caught the `flush`/`close` bug below. **A strict in-memory `FileSystem` is
+worth a test dependency for one reason: it fails where `FileSystem.SYSTEM` succeeds.** `FileSystem.SYSTEM`
+wrote a file that `readText` then read as `""`, and every green test in the world would have said the
+store worked. **Push the pure half of a split
 toward `commonMain` and the platform half toward `androidMain`, even when the platform half is the
 smaller one** — otherwise the pure half is untestable. A **large file holding a small pure thing no test
 can reach is an *extraction*, not a move**: deciding which is the measurement.
@@ -838,6 +855,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   url retryable. **So the port gained exactly one member with exactly one caller**, and the
   decision came from reading each caller's body rather than from the three sites sharing a name.
   **`null` means "this was never a request"; a throw still means "the request failed".**
+- **`flush()` is not `close()`, and nothing in the old code said the difference mattered.**
+  Porting `File.writeText` to okio, `writeUtf8(t).flush()` compiles, reads like a
+  completed write, and **silently commits nothing** -- okio buffers, and an
+  unclosed sink has not been handed to the filesystem. A read on the same path
+  then sees the *previous* contents, and a second write fails with `file is
+  already open for writing`. **The signature of a missing `close` is seventeen of
+  twenty-one tests failing at once with a mix of `List is empty` and
+  `expected:<[…]> but was:<[]>`** -- i.e. every assertion that reads back what it
+  just wrote -- which is not what a bad fixture looks like, and a reader who
+  assumed it was one would start rewriting fixtures. **`File.writeText` closed
+  implicitly, so the obligation was invisible until the port made it explicit,
+  and `flush` discharges the *other* half of the same mental model.** The fix is
+  `.use { it.writeUtf8(t) }`, and the same applies to every `source`/`sink` pair.
+  **A strict in-memory `FileSystem` is what made this visible on any target** --
+  see the next bullet, which is why the fake was worth a dependency.
+
 - **A `null` and a `throw` are different answers, and `runCatching { }.getOrNull()` collapses
   them silently.** `SeasonEpisodesLoader` asks for a session; the original reported "Failed to
   load episodes." when that lookup *threw* and "Sign in to load episodes." when it returned null.

@@ -500,6 +500,15 @@ kotlin {
             // `runTest`, for the suspend-shaped ports. The settings tests are all
             // synchronous and did not need it; the account repositories are not.
             implementation(libs.coroutines.test)
+            // okio's in-memory filesystem, for `FileBackedPendingMutationStore`.
+            // The store takes a `FileSystem` precisely so its wire format can be
+            // exercised on every target; the production artifact `okio` reaches
+            // `commonMain` through `coil3` and carries no fake, so the test half
+            // has to be asked for by name. It is version-matched to the `okio`
+            // that resolves (3.17.0, via `coil-core` 3.5.0) rather than pinned
+            // independently -- a `FileSystem` subclass compiled against a
+            // different okio is an abstract-method error at best.
+            implementation(libs.okio.fakefilesystem)
         }
 
         // The composition root's own tests. `withHostTest {}` above is what creates

@@ -10,7 +10,7 @@ import com.crispy.tv.domain.optimistic.SeasonWatchedMutation
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.optimistic.UserMutation
 import com.crispy.tv.domain.optimistic.WatchlistMutation
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import com.crispy.tv.library.jsonPrimitiveOrNull
 import com.crispy.tv.library.optBooleanOrNull
@@ -30,37 +30,85 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.io.File
+import okio.FileSystem
+import okio.Path
+import okio.buffer
 
 /**
  * The [PendingMutationStore] implementation that persists to a single JSON file.
  *
- * **It was `androidMain` for three reasons, and this port deletes one of them.**
- * It reached for `org.json`, which is a class of the Android platform supplied by
- * `android.jar` rather than a dependency of this project. The other two are
- * `java.io.File` and `Dispatchers.IO` (which is `public` on the JVM and `internal`
- * on Kotlin/Native), and **both would remain if the JSON went away tomorrow** --
- * so the file stays where it is and the original claim that `org.json` was why is
- * now simply gone, because keeping it would invite a reader to re-derive the
- * file's placement from a reason that stopped being true.
+ * **This is the third reason that was listed here to be discharged, and it is the
+ * last one.** The file used to be `androidMain` for `org.json` (a class of the
+ * Android platform supplied by `android.jar`, not a dependency of this project),
+ * then for `java.io.File` and `Dispatchers.IO` on top of that. `org.json` went
+ * first; this landing takes both of the others, and the file is now `commonMain`.
+ *
+ * **The filesystem is a constructor parameter rather than a default, and the
+ * dispatcher is too, and neither fact is a style choice.** `Dispatchers.IO` is
+ * `public` on the JVM and `internal` on Kotlin/Native, so a `commonMain` file that
+ * named it would not compile for a native target -- and a *defaulted* dispatcher
+ * would compile everywhere while silently putting blocking file IO on a
+ * CPU-sized pool, which is the failure mode the parameter exists to prevent. The
+ * same reasoning applies to the [FileSystem]: injecting it is what lets a
+ * `commonTest` drive the store with an in-memory filesystem on any target, which
+ * is the coverage the wire format below had never had.
+ *
+ * **okio is already on this module's `commonMain` classpath, and it is on it
+ * because of an image-loading library, not because of this file** -- it arrives
+ * through `coil3` (`coil-core` depends on `okio`). So there is no dependency
+ * line to add here, and the reason it is worth using is that it is *already*
+ * there: a replacement for a JVM library call belongs where the existing
+ * replacement already lives, and adding a second filesystem abstraction next to
+ * it would be the layering this project does not do.
  */
 internal class FileBackedPendingMutationStore(
-    private val file: File,
+    private val fileSystem: FileSystem,
+    private val path: Path,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : PendingMutationStore {
     override suspend fun loadAll(): List<UserMutation> =
-        withContext(Dispatchers.IO) {
-            if (!file.exists()) return@withContext emptyList()
+        withContext(ioDispatcher) {
+            // okio's `read` would answer the same question in one call, but it
+            // does not exist in the version resolved here -- `FileSystem` has
+            // `source`/`sink` and no string overloads -- so the absent-file check
+            // is a separate `metadataOrNull`. The old code asked `File.exists()`,
+            // which is also a metadata question, so this is one call moved rather
+            // than a new guard: an unreadable file still falls through to the
+            // `runCatching` below and still answers `emptyList()`.
+            if (fileSystem.metadataOrNull(path) == null) return@withContext emptyList()
             runCatching {
-                val array = Json.parseToJsonElement(file.readText()).jsonArray
+                val array = Json.parseToJsonElement(fileSystem.source(path).buffer().use { it.readUtf8() }).jsonArray
                 array.mapNotNull { decode(it as? JsonObject) }
             }.getOrDefault(emptyList())
         }
 
     override suspend fun saveAll(mutations: List<UserMutation>): Unit =
-        withContext(Dispatchers.IO) {
-            file.parentFile?.mkdirs()
+        withContext(ioDispatcher) {
             val array = buildJsonArray { mutations.forEach { add(encode(it)) } }
-            runCatching { file.writeText(array.toString()) }
+            // The old code called `file.parentFile?.mkdirs()` and ignored the
+            // result, then wrote. `Path.parent` is nullable for the same reason
+            // `File.parentFile` was -- a bare relative filename has no parent --
+            // so the null check is the existing guard, not a new one. The
+            // directory creation moved *inside* the `runCatching` because
+            // okio's `createDirectories` throws where `mkdirs()` returned a
+            // boolean: leaving it outside would turn a swallowed write failure
+            // into an escaping exception, which is a behaviour change in the
+            // direction of crashing the caller.
+            runCatching {
+                path.parent?.let { fileSystem.createDirectories(it) }
+                // **`use`, and not `flush`.** This is the one line the first
+                // version of this port got wrong, and the in-memory filesystem in
+                // `FileBackedPendingMutationStoreTest` is what caught it: okio
+                // buffers, and a flushed-but-unclosed sink has not been committed,
+                // so a read on the same path saw the *previous* contents and a
+                // second write failed with "file is already open for writing".
+                // Seventeen of twenty-one tests failed at once, which is the
+                // signature of a missing `close` rather than of a bad fixture.
+                // `java.io.File.writeText` closed implicitly, so nothing in the old
+                // code said "this has to be closed" -- the port is what made the
+                // obligation explicit, and `flush` reads like it discharges it.
+                fileSystem.sink(path).buffer().use { it.writeUtf8(array.toString()) }
+            }
         }
 
     private fun encode(mutation: UserMutation): JsonObject {

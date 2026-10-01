@@ -23,6 +23,8 @@ import com.crispy.tv.platform.android.AndroidAppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import okio.FileSystem
+import okio.Path.Companion.toPath
 import java.io.File
 
 class AppGraph(
@@ -81,8 +83,15 @@ class AppGraph(
     }
 
     val userMutationOutbox: UserMutationOutbox by lazy {
+        // The store itself is `commonMain`; the three things it deliberately does
+        // not name are supplied here, at the composition root. `FileSystem.SYSTEM`
+        // is okio's real filesystem and okio reaches this module through `coil3`,
+        // so there is no dependency line for it in `build.gradle.kts` -- see the
+        // KDoc on `FileBackedPendingMutationStore`.
         val store = FileBackedPendingMutationStore(
-            File(appContext.filesDir, "pending_mutations.json"),
+            fileSystem = FileSystem.SYSTEM,
+            path = File(appContext.filesDir, "pending_mutations.json").absolutePath.toPath(),
+            ioDispatcher = Dispatchers.IO,
         )
         val executor = UserMediaMutationExecutor(userMediaRepository)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

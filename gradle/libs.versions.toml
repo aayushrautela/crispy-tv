@@ -125,6 +125,9 @@ okhttp = "5.5.0"
 # --- Image loading ---
 coil = "3.5.0"
 
+# --- Filesystem (transitive through `coil-core`; only the test fake is declared) ---
+okio = "3.17.0"
+
 # --- Coroutines ---
 coroutines = "1.11.0"
 
@@ -221,6 +224,13 @@ coil-core = { group = "io.coil-kt.coil3", name = "coil-core", version.ref = "coi
 coil-singleton = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 coil-svg = { group = "io.coil-kt.coil3", name = "coil-svg", version.ref = "coil" }
+
+# `okio` itself is NOT declared as a library: it reaches `commonMain` through
+# `coil-core`, and declaring a second version of something already on the
+# classpath is how a module ends up compiled against one and run with another.
+# This is the test-only half, which the production artifact does not carry, and
+# its version is pinned to the one `okio` resolves to rather than chosen here.
+okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
