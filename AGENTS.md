@@ -350,6 +350,24 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   module has no tests, read its KDoc before theorising: a module that describes itself as the
   template has told you the other five are copies. 389 lines of `:player` ran on four targets
   asserted by none of them, and it is now 51 cases on desktop JVM *and* Android host.
+- **The two ends of that sweep are opposites, and the opposite end is the one that hides a
+  decision.** `:android:player` had an empty `androidMain` and nothing looked untestable;
+  `:android:network` is the mirror — **all four of its `androidMain` files are OkHttp/`Context`
+  adapters that no `commonMain` can ever reach** (OkHttp publishes no Kotlin/Native artifact),
+  so the module reads as Android-only, and its `commonMain` is 27 lines of pure string
+  handling whose four-alternative hand-rolled regex is exactly the kind of thing that rots
+  silently. `:network` is now 27 cases. **A module that looks untestable is not a module
+  with nothing to test** — read the `commonMain` file list and its line counts before
+  concluding anything from the `androidMain` shape.
+- **A module with no test source set is a question, not a defect, and one of the four is a
+  measured non-finding.** `:android:watchhistory`'s `commonMain` is `WatchHistoryConfig.kt`
+  — one field defaulting to `"dev"` — and `sync/WatchSyncSource.kt`, a three-method interface
+  with empty bodies. A suite there re-asserts the compiler, the same reasoning recorded below
+  for `ProfileRepository` and `AccountSettingsRepository`. **This is why the sweep is written
+  down with its answer**: the four-module finding is closed, and closing it means recording
+  that one module was asked and deliberately left alone. Its three `androidMain` files are
+  blocked by `org.json`, by reaching `:backend`/`:player`, and by OkHttp respectively, as its
+  own build-file KDoc records.
 - **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an
   import*. Subtracting every type declared in every module's `commonMain` from the capitalised
   identifiers a file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare
@@ -835,6 +853,46 @@ Every rule in this section is stated in each driver's docstring, because a drive
      verdict was sound every time and the evidence was about a different run* — which is the
      same shape as the log-truncation rule above, and the reason "no test failed" is a finding
      to investigate rather than a result to record.
+- **A surviving mutation is not the only way a case can fail to be the one doing the work — a
+  *caught* one can too, and the tell is that the failure list does not contain the case you
+  would have named.** `scripts/mutate_network.py` entry 13 drops `?` from the pattern's
+  `[?&]v=`, leaving `&v=`, and the driver reported `SURVIVED` for
+  `theQueryParameterFormIsReadWithOrWithoutTheAmpersand`. The `(failures seen: […])` line
+  printed **three other cases** and not that one — and reading them showed the named case's
+  body asserted **only the `&` form**, while its *name* claimed both. The mutation was caught;
+  the case that names the rule simply did not write the rule down. This is the mirror of the
+  stale-`expect` bullet above and the same lesson from the other direction: **a caught
+  mutation is evidence that *some* test caught it, not that the test you would have pointed at
+  is the one that did.** So the `expect` set and the `(failures seen: […])` list are two
+  different claims, and when they disagree the right move is to open the test the mutation
+  actually broke and ask whether its name overstates its body. Overstated names are a defect
+  in their own right — a reader trusts the name and skips the body.
+- **A guard can be *masked* by a neighbouring condition, and masking is indistinguishable from
+  absence until you write the input that reaches the guard and fails only there.**
+  `extractYouTubeVideoId`'s `contains("youtu", ignoreCase = true)` gate looks redundant. It is
+  not: drop `ignoreCase = true` and the mutation survives — because the *obvious* fixture, an
+  uppercase `YOUTU.BE/dQw4w9WgXcQ`, passes the gate, then fails the lowercase-only
+  `youtu\.be/` alternative, then falls through to the `?: trimmed` fallback, and **that is the
+  same string a case-sensitive gate would have returned anyway**. Both worlds answer alike, so
+  the case is decoration. The fixture that separates them is an uppercase host carrying a
+  **lowercase** `v=` or `/embed/` — `https://YOUTU.com/watch?v=abcdefghijk` returns
+  `"abcdefghijk"` with the guard and the whole URL without it. **The sixteen "redundant guard"
+  findings in this file are all claims that a guard has no effect; this is the other side of
+  that, and it is worse to miss, because the mutation result looks like agreement.** When a
+  guard's own fixture returns a value that a *fallback* could also produce, the guard is
+  untested rather than redundant — write down what each world would answer, and if the strings
+  are equal the case is decoration. The `parseLookupId` arity/numeric pair below is the same
+  shape, and the discriminator there was a purely numeric `"5:7"`; here it is a lower-case
+  alternative reached through an upper-case gate.
+- **A test whose name states a rule its body does not check is a hole shaped like coverage.**
+  `theQueryParameterFormIsReadWithOrWithoutTheAmpersand` covered only the `&` form, so the
+  `?` half of the character class was unasserted *by the case that names it* — the other
+  cases caught the mutation, so nothing was red, and the name was the only thing wrong. This
+  is the generalisation of the "a test that samples the cases instead of enumerating them
+  tests the sample" rule from the other end: there the body was narrower than the intent,
+  here the *name* is wider than the body. **When a name says "with and without", "either",
+  or "every", the body has to enumerate both halves** — and a mutation caught by some *other*
+  case is not evidence that this one does its job.
 - **A survivor can mean the *case* was caught by the wrong one of two conditions defending the
   same rule — and then the guard was fine and the test was not.** `parseLookupId`'s arity
   check (`parts.size >= 3`) and its numeric check (`toIntOrNull()` and `> 0`) both defend

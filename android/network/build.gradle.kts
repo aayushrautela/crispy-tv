@@ -52,6 +52,17 @@ kotlin {
         namespace = "com.crispy.tv.network"
         compileSdk = 37
         minSdk = 26
+
+        // This module's testable surface is exactly two files, and nothing asserted
+        // them. Its `androidMain` is four OkHttp/`Context` adapters that no
+        // `commonMain` can name, so a reader skimming the module concludes there is
+        // nothing here to test -- and the two `commonMain` files that do exist
+        // (`TrailerSource.kt` above all: a hand-rolled regex with a non-null fallback,
+        // and a classifier that matches two literals where the regex matches four
+        // shapes) are the part no target could ever have caught. Without this block
+        // the `commonTest` directory below exists, nothing compiles or runs it on
+        // Android, and AGP only warns.
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -69,6 +80,14 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            // No `libs.coroutines.test`, unlike `:app`, `:home` and `:player`: both
+            // functions under test are plain and non-suspend, so a coroutine test
+            // dispatcher would be dead weight. Recording the omission so the next
+            // agent does not add it "for consistency" with the other four.
+        }
+
         androidMain.dependencies {
             implementation(libs.coroutines.android)
 
