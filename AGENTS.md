@@ -318,6 +318,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 ### 1. Audit before you plan
 
+- **A module's untested `commonMain` is usually untested because its `androidMain` files meant
+  nobody ever added a test source set — so the absence of tests is a fact about the module's
+  build file, not about any individual file.** `:android:addons` compiles for Android, desktop
+  JVM, `linuxX64` and both iOS targets, and had **no test source set at all** across all five.
+  Five of its files are `Context`/OkHttp/`org.json` Android adapters, and that is exactly why
+  nobody created `commonTest`: it would have been a directory with one test in it, in a module
+  that reads as Android-shaped. The consequence was that **`StreamLookupSupport.kt` carried 171
+  lines of nine pure functions** — lookup-id parsing, subtitle building, episode matching,
+  provider merging — with **zero tests anywhere in the repository**, while `:app`'s
+  `androidMain` files had 445. Nothing about those 171 lines says they were undertested; the
+  only place the answer was written down was the module's *plugin block*. So when you conclude
+  "this pure file is covered" or "this module is thin", check `git ls-files <module>/src/commonTest`
+  **first** — it is one command, and it finds an entire untested surface that no per-file audit
+  will surface. `:addons` now has `withHostTest {}` and a `commonTest`, and its 28 cases run on
+  desktop JVM *and* Android host.
 - **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an
   import*. Subtracting every type declared in every module's `commonMain` from the capitalised
   identifiers a file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare
@@ -587,6 +602,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   assertion nor the two lists. A one-line `private fun outcomes(vararg v: SeasonEpisodesOutcome):
   List<SeasonEpisodesOutcome> = v.toList()` makes the expected side explicit and reads better than
   spelling the type argument at four call sites.
+- **An assertion can describe a rule the code does not have, and the failure reads as a
+  production bug.** `theCachedListIsOnlyConsultedWhenTheCurrentOneHasNoAnswer` asserted that a
+  cached episode is *shadowed* by the current season's list, so it expected the current
+  list's answer when both held a match. The code does the opposite: it concatenates current
+  then cached and takes the **first** match, so "shadowing" would mean *dropping* the cached
+  answer — and the failure was `expected:<only> but was:<other>`, a pair of plausible episode
+  ids that reads as "the cache returned the wrong episode". It was entirely the assertion.
+  This is the `getOrElse` rule's other face: an empty or wrong-looking result proves nothing
+  until you have established **what the code's rule actually is**, and the cheapest way to
+  establish it is to read the body rather than infer the rule from the method's name — the
+  name here described an *intention* ("consulted only when…") while the code described an
+  *order*.
 
 ### 4. Coroutines in tests
 
@@ -734,6 +761,20 @@ Every rule in this section is stated in each driver's docstring, because a drive
   looked like stronger evidence than the honest five minimal ones — a longer failure list is not
   a more specific one. **Check that a caught entry's failure list is close to its `expect` set**;
   a superset means the log is shared.
+- **A survivor can mean the *case* was caught by the wrong one of two conditions defending the
+  same rule — and then the guard was fine and the test was not.** `parseLookupId`'s arity
+  check (`parts.size >= 3`) and its numeric check (`toIntOrNull()` and `> 0`) both defend
+  "a season/episode pair is only read from a three-part id". Loosening the arity to `>= 2`
+  left the case **unobservable**: my input `"tt1234:5"` makes `parts[lastIndex-1]` = `"tt1234"`,
+  whose `toIntOrNull()` is null, so the *numeric* guard caught it and the answer did not move.
+  The discriminator is the input that **reaches the guard you meant and fails only there** —
+  a purely numeric pair, `"5:7"`, which with the arity loosened claims season 5, episode 7 and
+  an **empty** base id. This is the redundant-guard finding seen from the other side: those
+  sixteen say a guard has no effect, and this says **a guard can have an effect that a
+  neighbouring condition is masking**, which is indistinguishable from "no effect" from the
+  outside. When a survivor turns out to be defended by a sibling condition, write the second
+  case before deciding the guard is or is not real — and say in the test's comment *why the
+  case exists*, because nothing about it looks load-bearing.
 
 ### 6. Editing safely
 

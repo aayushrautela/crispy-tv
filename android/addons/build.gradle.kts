@@ -39,6 +39,15 @@ kotlin {
         namespace = "com.crispy.tv.addons"
         compileSdk = 37
         minSdk = 26
+
+        // This module had no test source set at all, so its `commonMain` went
+        // untested on every target -- including the 171 lines of pure lookup and
+        // subtitle logic in `StreamLookupSupport.kt`, which is exactly the kind of
+        // code that belongs in `commonMain` precisely because it is pure and needs
+        // no harness. The block has to be here and not merely implied by a
+        // `commonTest` source directory: without it the directory exists, nothing
+        // compiles or runs it on Android, and AGP only *warns*.
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -69,6 +78,10 @@ kotlin {
             // file could not be moved while `:backend` was reachable only from
             // `androidMain`. `normalizedCatalogMediaType` alone blocked 8 `:app` files.
             implementation(project(":android:backend"))
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
 
         androidMain.dependencies {
