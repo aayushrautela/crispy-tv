@@ -33,6 +33,7 @@ import kotlinx.serialization.json.put
 import okio.FileSystem
 import okio.Path
 import okio.buffer
+import okio.use
 
 /**
  * The [PendingMutationStore] implementation that persists to a single JSON file.
@@ -107,6 +108,19 @@ internal class FileBackedPendingMutationStore(
                 // `java.io.File.writeText` closed implicitly, so nothing in the old
                 // code said "this has to be closed" -- the port is what made the
                 // obligation explicit, and `flush` reads like it discharges it.
+                //
+                // **`import okio.use`, not the stdlib `kotlin.io.use`.** On the JVM
+                // okio's `Closeable` *is* `java.io.Closeable`, so the stdlib `use`
+                // for `AutoCloseable` applies -- and both local gates are JVM, so
+                // both compile it. On Kotlin/Native okio's `Closeable` is its own
+                // interface, `BufferedSink` is not an `AutoCloseable`, and the
+                // stdlib `use` has no applicable candidate. `apple.yml` is the
+                // only gate that can see this, and it saw it:
+                // `compileKotlinIosArm64` failed with `Inapplicable candidate(s):
+                // fun <T : AutoCloseable?, R> T.use`, which names the wrong `use`
+                // and nothing else. **This is the `Dispatchers.IO` mistake one
+                // function over: a symbol that resolves on the JVM and is shaped
+                // differently on Native, in a file a green JVM build certifies.**
                 fileSystem.sink(path).buffer().use { it.writeUtf8(array.toString()) }
             }
         }

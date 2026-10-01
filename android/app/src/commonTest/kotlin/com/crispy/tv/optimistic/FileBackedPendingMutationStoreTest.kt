@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import okio.Path
 import okio.Path.Companion.toPath
 import okio.buffer
+import okio.use
 import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
