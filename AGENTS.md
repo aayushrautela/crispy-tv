@@ -480,6 +480,17 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   to edit.
 ### 3. Tests
 
+- **`build/test-results/<task>/` is not cleared when the compile fails, so it reports the
+  previous run.** A `desktopTest` invocation reported `EXIT=1` with 444 tests and the
+  *identical* two failures while the log's real content was
+  `> Task :android:app:compileTestKotlinDesktop FAILED`. The cause was a rename of a shared
+  fixture constant that missed **one** call site — the survivor lacked the trailing comma the
+  other 21 had, so `grep` output showed two identical lines. **Always `rm -rf` the results
+  directory before reading it**, and run `compileTestKotlinDesktop` first and read the XML only
+  if that succeeded. **The tell is a failure list that does not move when the code under it
+  changed** — byte-identical messages across an edit you know altered behaviour mean you are
+  reading the previous run.
+
 - **A decision no test can call is a decision no test can cover — name it in production.**
   `searchItemKey`, `watchCtaSubtext`, `selectedSeasonOrFirst`, `visibleEpisodes` and about a dozen
   others were `private` and are now `internal`. A test's own private re-implementation of a decision
@@ -550,6 +561,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   When a failure message quotes your own label text as the *actual*, the assertion is misordered.
 ### 4. Coroutines in tests
 
+- **A manual clock with a per-read `stepMs` is the only way to make a method's two readings of
+  the same poll disagree — and that is what makes the ordering testable at all.**
+  `PlaybackProgressReporter.syncWatchHistory` reads `MonotonicClock` twice, once for the
+  seek-settle guard and once for the persist-interval stamp, and its KDoc claims the second is
+  strictly later. A fixed clock makes the two readings identical, so *any* assertion about the
+  gap is vacuous. The test drives `TestClock(nowMs, stepMs = 9)` and asserts no progress at
+  60 000 and progress at 60 009, which a collapse-to-one-reading fails. Whenever a KDoc claims
+  two calls are not one call, ask what fixture makes them differ.
+
 - **`advanceUntilIdle()` drives the scope the test body runs in, and `backgroundScope` is
   neither that scope nor a durable one.** A `commonTest` loader taking an **explicit**
   `CoroutineScope` got 14 of 19 tests failing with no error -- the synchronous half ran, the
@@ -582,6 +602,25 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 ### 5. Mutation drivers
 
 Every rule in this section is stated in each driver's docstring, because a driver is run unattended.
+
+- **Read the replacement, not the entry's `name` and `why`.** A mutation entry's prose can
+  describe a mutation its `old`/`new` does not implement, and the result is a **SURVIVED**
+  verdict that reads identically to a genuine suite gap. One entry was named and documented as
+  removing *both* the start branch's timestamp assignment *and* its `return`, and its patch
+  removed only the assignment — the anchor existed, `check_anchors()` printed `occurs 1x`,
+  and it survived. The rule below says to read every replacement as code; this is the second
+  instance of the same thing inside my own driver. **The tell is a comment reasoning
+  carefully about an outcome its code cannot produce** — read `old`/`new` side by side with
+  `name` before believing either.
+- **An empty failure list is not a survivor — a survivor is the absence of a failure *after
+  positive evidence that the task ran*.** A driver's first run reported `0 caught` with
+  `DRIVER_EXIT=0` for all four entries because `subprocess.run(env={"JAVA_TOOL_OPTIONS": ...})`
+  **replaces** the environment rather than merging it, stripping `PATH` and `JAVA_HOME`, so
+  `./gradlew` never started; the log was 24 lines of `ERROR: JAVA_HOME is not set`. Use
+  `env = {**os.environ, ...}` and give the driver a `NO EVIDENCE` verdict requiring
+  `"BUILD SUCCESSFUL"` or `"BUILD FAILED"` in the output. **When a driver reports every entry
+  surviving at once, suspect the driver before the code** — the same family as the `-q` rule
+  below and the `finditer(s, re.M)` rule: the verdict survives and the evidence is lost.
 
 - **A narrowing mutation over a key two fields populate identically is not a mutation.** The
   first entry for `DetailsMetadataLoader`'s recommendation filter was
@@ -642,7 +681,16 @@ Every rule in this section is stated in each driver's docstring, because a drive
 - **A surviving mutation is a claim about the code, so check it by hand.** Read the callee. If the
   guard is genuinely unreachable, keep it and write the measurement **at the guard** — fourteen so
   far, in three files, the last two of them *pairs in one file*, which is the tell. If it is
-  reachable, the test was missing. **Fifteen now**, in four files.
+  reachable, the test was missing. **Fifteen now**, in four files. **Sixteen**, in five.
+  The sixteenth is `PlaybackProgressReporter.syncWatchHistory`'s trailing `return` in the
+  start branch, and it is the first one where **the guard and the assignment above it both
+  answer the same question and neither is visible in the other's KDoc** — deleting the
+  `return` alone changes no answer, because the fall-through below is ended twice over, once
+  by `hasReportedPlaybackStart` being set and once by the delta being 0. Deleting *both* is
+  caught, and the test that catches it had to be written first: a poll with the clock already
+  past `PROGRESS_SYNC_INTERVAL_MS`, so the interval guard is not what ends the fall-through.
+  **Two lines that look redundant and together cover one rule is the shape to watch for
+  here** — ask which of them a reader would delete if the other were gone.
 - **The `[desktop]` suffix on a Gradle `FAILED` line is not always there, so a regex that requires
   it silently extracts no evidence.** `desktopTest` prints `Class[desktop] > method FAILED`; the
   host task prints `Class > method FAILED` with no bracket. Six androidMain entries were caught

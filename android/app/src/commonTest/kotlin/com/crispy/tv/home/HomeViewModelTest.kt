@@ -11,8 +11,8 @@ import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryRequest
-import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.testing.FakeKeyValueStore
+import com.crispy.tv.testing.FakeWatchHistoryService
 import com.crispy.tv.testing.RecordingAppLogger
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import kotlinx.coroutines.CoroutineStart
@@ -71,38 +71,6 @@ class HomeViewModelTest {
         ): CatalogPageResult = throw AssertionError("fetchCatalogPage is not stubbed")
 
         override suspend fun cachedHomeExpiresAtMs(): Long? = expiresAtMs
-    }
-
-    private class FakeWatchHistoryService : WatchHistoryService {
-        var continueWatchingAnswer: CanonicalContinueWatchingResult =
-            CanonicalContinueWatchingResult(statusMessage = "")
-        var continueWatchingFailures: Int = 0
-        val continueWatchingCalls = mutableListOf<Long>()
-        var removeAnswer: WatchHistoryResult = WatchHistoryResult(statusMessage = "", accepted = true)
-        val removedIds = mutableListOf<String>()
-
-        override suspend fun getCanonicalContinueWatching(
-            limit: Int,
-            nowMs: Long,
-        ): CanonicalContinueWatchingResult {
-            continueWatchingCalls += nowMs
-            if (continueWatchingFailures > 0) {
-                continueWatchingFailures--
-                throw IllegalStateException("offline")
-            }
-            return continueWatchingAnswer
-        }
-
-        override suspend fun removeFromPlayback(playbackId: String): WatchHistoryResult {
-            removedIds += playbackId
-            return removeAnswer
-        }
-
-        override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult =
-            throw AssertionError("markWatched is not stubbed")
-
-        override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryResult =
-            throw AssertionError("unmarkWatched is not stubbed")
     }
 
     private class FakeSyncSource : WatchSyncSource {

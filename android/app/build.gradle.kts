@@ -24,7 +24,7 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 108 of the 189 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 109 of the 190 main-source files are there.
  *
  * The remaining 81 are held by three things: a type that cannot be named off
  * Android (a `Context`, `SharedPreferences`, `org.json`, `androidx.paging`,

@@ -24,6 +24,8 @@ import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.lookup.resolveStreamLookupTargetFromIdentity
 import com.crispy.tv.details.DetailsMetadataLoader
 import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.platform.MonotonicClock
+import com.crispy.tv.platform.android.AndroidMonotonicClock
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.home.HomeRefreshBus
@@ -57,7 +59,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -170,11 +171,6 @@ class PlayerSessionViewModel(
     private var activeSubtitle: String? = null
     private var activeArtworkUrl: String? = null
     private var lastHandledErrorToken: Long? = null
-    private var hasReportedPlaybackStart = false
-    private var hasReportedPlaybackStop = false
-    private var lastProgressSyncAtElapsedMs = 0L
-    private var seekSettleUntilElapsedMs = 0L
-    private var seekSettleJob: Job? = null
     private var pendingInitialSeekMs: Long? = null
     private var autoSelectPending = false
     private var initialTarget: StreamLookupTarget? = null
@@ -201,6 +197,25 @@ class PlayerSessionViewModel(
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /**
+     * Owns the `playback_started` / `playback_progress` / `playback_stopped` reports and the
+     * post-seek settle window. It lives in `commonMain` because nothing it touches is
+     * Android-only -- see its own KDoc for which type used to pin these three methods here.
+     *
+     * `AndroidMonotonicClock` is the same reading the three methods took directly from
+     * `SystemClock.elapsedRealtime()`, so nothing about the timing changes; it is a
+     * constructor argument of the clock rather than a default so no caller can leave the
+     * wall clock in by accident.
+     */
+    private val progressReporter = PlaybackProgressReporter(
+        watchHistoryService = watchHistoryService,
+        clock = AndroidMonotonicClock(),
+        scope = backgroundScope,
+        identity = { activeIdentity },
+        currentPositionMs = { playbackMetrics.positionMs },
+        currentDurationMs = { playbackMetrics.durationMs },
+    )
 
     /**
      * The details page's two extras fetches, moved out of this class.
@@ -310,7 +325,7 @@ class PlayerSessionViewModel(
     fun seekTo(positionMs: Long) {
         playbackController.seekTo(positionMs)
         syncPlaybackSnapshot(playbackController.snapshot())
-        scheduleProgressSyncAfterSeek()
+        progressReporter.scheduleProgressSyncAfterSeek()
     }
 
     fun setResizeMode(mode: PlayerResizeMode) {
@@ -964,15 +979,11 @@ class PlayerSessionViewModel(
     ) {
         val previousIdentity = activeIdentity
         if (previousIdentity != null && previousIdentity != identity) {
-            reportPlaybackStopped(previousIdentity)
+            progressReporter.reportPlaybackStopped(previousIdentity)
         }
         // Fresh playback session: clear reporting state so the next settled poll emits
         // a new playback_started event rather than reusing the previous item's flags.
-        hasReportedPlaybackStart = false
-        hasReportedPlaybackStop = false
-        lastProgressSyncAtElapsedMs = 0L
-        seekSettleJob?.cancel()
-        seekSettleUntilElapsedMs = 0L
+        progressReporter.resetReportingState()
 
         activePlaybackSource = source
         activeIdentity = identity
@@ -1116,7 +1127,7 @@ class PlayerSessionViewModel(
             } else {
                 audioFocusManager.release("main")
             }
-            syncWatchHistory(
+            progressReporter.syncWatchHistory(
                 positionMs = playbackMetrics.positionMs,
                 durationMs = playbackMetrics.durationMs,
                 isPlaying = uiState.value.isPlaying,
@@ -1160,7 +1171,7 @@ class PlayerSessionViewModel(
             is InitialSeekDecision.Seek -> {
                 playbackController.seekTo(decision.positionMs)
                 pendingInitialSeekMs = null
-                scheduleProgressSyncAfterSeek()
+                progressReporter.scheduleProgressSyncAfterSeek()
             }
         }
     }
@@ -1197,12 +1208,8 @@ class PlayerSessionViewModel(
         requestPlayback(engine = NativePlaybackEngine.MPV)
         // The engine switch is a brand new playback session: drop the stale start/stop
         // flags and let the settled MPV position emit a fresh playback_started event.
-        hasReportedPlaybackStart = false
-        hasReportedPlaybackStop = false
-        lastProgressSyncAtElapsedMs = 0L
-        seekSettleJob?.cancel()
-        seekSettleUntilElapsedMs = 0L
-        scheduleProgressSyncAfterSeek()
+        progressReporter.resetReportingState()
+        progressReporter.scheduleProgressSyncAfterSeek()
         return true
     }
 
@@ -1215,91 +1222,10 @@ class PlayerSessionViewModel(
         publishMediaSessionFromUiState()
     }
 
-    private fun syncWatchHistory(
-        positionMs: Long,
-        durationMs: Long,
-        isPlaying: Boolean,
-    ) {
-        val playbackIdentity = activeIdentity ?: return
-        if (durationMs <= 0L) {
-            return
-        }
-
-        // While the player settles after a seek/load/engine switch the engine reports a
-        // transient 0. Skip reporting until the settle window passes, then resume.
-        if (SystemClock.elapsedRealtime() < seekSettleUntilElapsedMs) {
-            return
-        }
-
-        val nowElapsedMs = SystemClock.elapsedRealtime()
-        if (!hasReportedPlaybackStart && isPlaying && positionMs >= MIN_PROGRESS_POSITION_MS) {
-            hasReportedPlaybackStart = true
-            hasReportedPlaybackStop = false
-            lastProgressSyncAtElapsedMs = nowElapsedMs
-            backgroundScope.launch {
-                watchHistoryService.onPlaybackStarted(
-                    identity = playbackIdentity,
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                )
-            }
-            return
-        }
-
-        if (!hasReportedPlaybackStart || nowElapsedMs - lastProgressSyncAtElapsedMs < PROGRESS_SYNC_INTERVAL_MS) {
-            return
-        }
-
-        lastProgressSyncAtElapsedMs = nowElapsedMs
-        backgroundScope.launch {
-            watchHistoryService.onPlaybackProgress(
-                identity = playbackIdentity,
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isPlaying = isPlaying,
-            )
-        }
-    }
-
-    private fun scheduleProgressSyncAfterSeek() {
-        seekSettleJob?.cancel()
-        seekSettleUntilElapsedMs = SystemClock.elapsedRealtime() + PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS
-        seekSettleJob = backgroundScope.launch {
-            delay(PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS)
-            // Clearing the settle window also forces an immediate progress push on the
-            // next poll instead of waiting out the full persist interval.
-            seekSettleUntilElapsedMs = 0L
-            lastProgressSyncAtElapsedMs = 0L
-        }
-    }
-
-    private fun reportPlaybackStopped(playbackIdentity: PlaybackIdentity) {
-        if (hasReportedPlaybackStop) {
-            return
-        }
-        hasReportedPlaybackStop = true
-
-        val lastDurationMs = playbackMetrics.durationMs
-        if (lastDurationMs <= 0L) {
-            return
-        }
-
-        backgroundScope.launch {
-            withTimeoutOrNull(STOP_REPORT_TIMEOUT_MS) {
-                watchHistoryService.onPlaybackStopped(
-                    identity = playbackIdentity,
-                    positionMs = playbackMetrics.positionMs,
-                    durationMs = lastDurationMs,
-                )
-                HomeRefreshBus.emit(HomeRefreshEvent.PlaybackEnded)
-            }
-        }
-    }
-
     override fun onCleared() {
         // Stop reporting is fire-and-forget so teardown never blocks on network I/O; the
         // media session must be released synchronously to free the process-wide slot.
-        activeIdentity?.let(::reportPlaybackStopped)
+        activeIdentity?.let(progressReporter::reportPlaybackStopped)
         audioFocusManager.release("main")
         audioFocusManager.unregisterSource("main")
         mediaSessionManager.release()
@@ -1340,7 +1266,3 @@ private class PlaybackMetricsHolder {
 }
 
 private const val TAG = "PlayerSessionViewModel"
-private const val PROGRESS_SYNC_INTERVAL_MS = 60_000L
-private const val PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS = 700L
-private const val MIN_PROGRESS_POSITION_MS = 1000L
-private const val STOP_REPORT_TIMEOUT_MS = 3_000L
