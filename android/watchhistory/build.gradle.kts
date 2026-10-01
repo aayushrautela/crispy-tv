@@ -150,15 +150,26 @@ kotlin {
             // all; see the comment there for why the note's stated reason was not
             // the real one.
             //
-            // `:android:network` is the last dependency that genuinely cannot.
-            // Its only consumer in this module is `OkHttpWatchSyncSource.kt` --
-            // **the one `androidMain` file that remains** -- and that file is
-            // pinned by OkHttp itself (6 `okhttp3` sites, `okio.BufferedSource`,
-            // 2 `org.json` sites) while implementing `WatchSyncSource`, which is
-            // already a `commonMain` interface. So this is not an ordering
-            // constraint at all: it is a dependency that will stay here until that
-            // one file gets a second implementation over `:network`'s
-            // `CrispyHttpClient` port, the same move `OkHttpCrispyHttpClient` was.
+            // `:android:network` is the last dependency here, and the reason is
+            // the ordinary one after all: its only consumer in this module is
+            // `OkHttpWatchSyncSource.kt`, **the one `androidMain` file that
+            // remains**, so the dependency cannot move down until that file does.
+            //
+            // **What that file is actually blocked on is not OkHttp.** The note
+            // here used to say it would be freed by "a second implementation over
+            // `:network`'s `CrispyHttpClient` port, the same move
+            // `OkHttpCrispyHttpClient` was" -- and that is not a thing that can be
+            // written. `OkHttpWatchSyncSource` is an **SSE client**: it opens one
+            // long-lived call and reads the body *line by line* off a
+            // `BufferedSource`, dispatching on `event:` / `data:` frames, for up
+            // to 30 minutes. `CrispyHttpClient` is a **request/response** port --
+            // `get` reads the entire body and returns `CrispyHttpResponse(code,
+            // body)` -- so **no member of it can express an unterminated stream.**
+            //
+            // **So the pin is the port's shape, not the port's existence**, and the
+            // fix is a streaming member on the transport seam with exactly one
+            // caller -- a product decision, not a mechanical move. `:network`
+            // itself stays here for the ordinary ordering reason stated above.
             implementation(project(":android:network"))
 
             implementation(libs.coroutines.android)
