@@ -275,9 +275,47 @@ Kotlin Multiplatform modules (in progress; see `check-local.sh`):
   There is no version to bump and no artifact to swap, so a KMP module simply does not have it.
   Replacing it means adding `kotlinx.serialization`, which is a behaviour change on a parsing
   boundary rather than plumbing. **Consequence: a file that parses or writes JSON stays in
-  `androidMain`, permanently.** In `:app` that is `SearchHistoryStore`, `AiInsightsCacheStore`,
-  `ProfileDataShadowStore` and `PendingMutationStore`; in `:watchhistory` it is the single thing
-  keeping `WatchProgressStore` out of `commonMain`.
+  `androidMain`, permanently** — and this sentence used to name the wrong five files, in three
+  ways, all three found by measuring rather than reading.
+  - **27 tracked files `import org.json`**, not five. (52 *mention* it; the other 25 only in KDoc,
+    including five already in a `commonMain`.) The surface is 261 `JSONObject`, 246 `.optString(`,
+    106 `JSONArray`, 96 `.optJSONObject(`, 75 `.optJSONArray(`, 27 `.optBoolean(`, 21 `.optLong(`,
+    14 `.optInt(`, 6 `.optDouble(`, 2 `JSONException`.
+  - **For the four `:app` files it named, JSON is *not* the pin.** `AiInsightsCacheStore` (86) and
+    `SharedPreferencesSearchHistoryStore` (106) are `Context`/`SharedPreferences`;
+    `ProfileDataShadowStore` (73) is `Context`; `FileBackedPendingMutationStore` (172) is
+    `java.io.File`. **Deleting `org.json` moves those four zero files** — they are platform
+    storage adapters, and a storage adapter stays on the platform.
+  - **And it named none of the four where JSON *is* the sole remaining pin**:
+    `CrispyBackendJsonExtensions.kt` (165), `CrispyBackendParsers.kt` (646),
+    `CachingHomeCatalogService.kt` (493), `WatchProgressStore.kt` (405) — **1,709 lines**, all four
+    with **zero** tests anywhere in the repository. A module with no test source set is a
+    question, not a defect, and this is the same shape: the absence of tests is a fact about the
+    build file, so characterisation has to come *before* the move.
+  - **The load-bearing decision is the node type, not the accessor policy.** **42 of
+    `CrispyBackendParsers.kt`'s 45 top-level functions name an `org.json` node in the signature**,
+    overwhelmingly `internal fun CrispyBackendClient.parseX(json: JSONObject)` — extensions on a
+    client that is itself OkHttp-pinned. So `:backend` is bound twice over, and neutralising the
+    accessors alone moves zero parsers. 13 of the 15 functions in the 165-line extensions file are
+    pinned by *signature* too. **The candidates are `kotlinx.serialization`'s `JsonElement` —
+    already in `gradle/libs.versions.toml` as `serializationJson = "1.11.0"` with *zero* consumers
+    repo-wide — and a `:core-domain` node of our own**, and the repo has half-built the latter's
+    shape (`toAnyMap`/`toAnyList`/`toKotlinValue` → `Map<String,Any?>`/`List<Any?>`). **An untyped
+    `Any?` tree cannot carry it: `JSONObject.NULL` and an absent key are different events**, and
+    `optNullableString` depends on exactly that. So this stays a recorded decision, not a refactor.
+  - **The same policies are declared three times at three visibility levels, and the two `:app`
+    copies are not the same function.** `:backend`'s `toStringMap` is the one `public` declaration
+    in its file (nullable receiver, trims, drops blanks, `linkedMapOf`);
+    `ProfileDataShadowStore:50` has a `private` copy on a **non-null** receiver doing none of those
+    and returning `mutableMapOf`; `LibraryDiskCacheStore:99/:104` has `private` copies of
+    `optNullableString` and `optBooleanOrNull`. **`:home` imports the `:backend` copy and `:app`
+    cannot, because `:app` is another module — so the policy is reachable from one module and
+    unreachable from the other, decided by an `internal` keyword nobody revisited.** That is the
+    `:tv`-duplicate-`CrispySpinner` shape a third time. Two differences are semantic and
+    unflagged: `:backend`'s `optBooleanOrNull` returns `null` for a present-but-unparseable value
+    while `:app`'s delegates to `optBoolean`, which cannot return null — **so a function named
+    `OrNull` returns `false`** — and `toJsonObject` sorts its keys in `:app` and not in `:backend`
+    (different receiver types, so they are not overloads).
 - **`:app`'s `androidMain` is a knot, not a list of independent files, and the table of what holds
   what lives in `android/app/build.gradle.kts`** — read it before planning any move. The
   `:app` + `:home` + `:addons` package overlap is why an import audit can call a file clean and be
@@ -815,6 +853,29 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   establish it is to read the body rather than infer the rule from the method's name — the
   name here described an *intention* ("consulted only when…") while the code described an
   *order*.
+- **Robolectric's `android-all` lives in `~/.m2`, not in the Gradle cache, and a `find` in the
+  wrong place is evidence of nothing.** `:backend`'s first host test wants a real `org.json` rather
+  than a `Context`, and `find ~/.gradle/caches -iname '*android-all*'` returned **0 results** on
+  the host where Robolectric then ran 33 tests without fetching anything. The jar is at
+  `~/.m2/repository/org/robolectric/android-all-instrumented/15-robolectric-12650502-i7/`, and
+  Robolectric's **`15` is Android 15, i.e. API 35** — so the existing `sdk = [35]` rule is also a
+  cache rule: **the SDKs a host has needed are the only ones it has fetched, so the absence of the
+  one you just asked for is absence of evidence, not evidence of absence.** Reading that as
+  "Robolectric cannot run here" nearly cost this landing.
+- **The library that ships is not the library a JVM test can stand in for, and for `org.json` the
+  two disagree on exactly the input a guard is written for.** `android-all` carries AOSP's
+  `libcore/json`; `org.json:json:20240303` — the artifact in this repository's Gradle cache, used
+  by `:plugins` — is a *different* implementation. Measured, in both directions:
+  **`optString` of a `JSONObject.NULL` is `"null"` on AOSP and `""` on the reference**, while `opt`
+  of one is `JSONObject.NULL` on both and of an absent key is Java `null` on both; and a
+  **fractional** number is `Double` on AOSP and `BigDecimal` on the reference, while **both agree
+  on every whole number** (`1`→`Integer`, `-7`→`Integer`, `3000000000`→`Long`). **So there is no
+  common answer for a fractional number, which is the argument for reading every JSON number as
+  `Number`** — exactly what `optIntOrNull`'s `is Number ->` / `is String ->` arms do, and the only
+  reason they were portable before anyone measured any of this. `optBoolean` is strict on **both**
+  (`Boolean`, or case-insensitive `"true"`/`"false"`; `"yes"`, `1`, `"1"` all→`false`), so a suite
+  pinned against either one agrees about it. **The substitute's answer is not the platform's
+  answer, and on a parsing boundary the substitute's answer is the one a JVM test reports.**
 
 ### 4. Coroutines in tests
 
@@ -1083,6 +1144,28 @@ Every rule in this section is stated in each driver's docstring, because a drive
   outside. When a survivor turns out to be defended by a sibling condition, write the second
   case before deciding the guard is or is not real — and say in the test's comment *why the
   case exists*, because nothing about it looks load-bearing.
+
+- **A claim about one line, justified by a measurement of a *different* line, survives a mutation
+  run and then refutes a true claim — and the rule above is what catches it.** I asserted that
+  AOSP's `optString` of a JSON null is `"null"` where the reference gives `""`, and that
+  `CrispyBackendJsonExtensions`'s `it.equals("null", ignoreCase = true)` branch exists *because*
+  of it. Deleting the branch failed only a fixture holding `{"nullText":"null"}` — a **string** —
+  while `theStringNullBranchIsCarriedByThePlatformsOwnRenderingOfAJsonNull`, the case written to
+  carry the claim, **passed**: it asserted `json.get("nullish").toString()`, the **sentinel's own**
+  `toString`, not `optString`. I read that as a refutation and rewrote the KDoc to record the
+  divergence as false. Rewriting the case to assert `optString` directly then **failed**
+  `expected:<[]> but was:<[null]>`, so the original measurement was right all along. **Why the
+  mutation could not see it is the body:** `optNullableString` is
+  `if (!json.has(key) || json.isNull(key)) return null` **then** `optString(key)`, so **a JSON null
+  never reaches `optString`** — the guard one line above is what rejects it, and the `equals`
+  branch is carried by a genuine string value reading `"null"`, which the guard does not catch
+  (`has = true`, `isNull = false`). **Three lines, two of which look redundant, and a test written
+  to observe the divergence is defeated by the middle one.** The rule this leans on is the one
+  above — a caught mutation is evidence that *some* test caught it, not that the one you would
+  have pointed at did the catching — **and here it did a job it was not written for: it corrected
+  a false claim rather than a stale `expect` list, which is the more valuable of the two, because
+  a stale list costs a re-run and a false claim costs a KDoc that tells the next reader the guard
+  is redundant.**
 
 ### 6. Editing safely
 

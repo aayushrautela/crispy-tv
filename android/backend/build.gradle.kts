@@ -105,5 +105,43 @@ kotlin {
             // way production runs it rather than on `runBlocking`.
             implementation(libs.coroutines.test)
         }
+
+        // Robolectric is here for `org.json` itself, which is the first time in
+        // this repository it has been needed for a framework class other than a
+        // `Context`. :app's host tests want a `Context` to hand to a
+        // composition root; this one wants a *real* `org.json.JSONObject`.
+        //
+        // The reason it cannot be `commonTest`, and cannot be a plain JVM test,
+        // is the whole point of this source set. `org.json` is a class of the
+        // Android platform, supplied by `android.jar`, and there are two
+        // implementations of it:
+        //
+        //   * the platform's (AOSP `libcore/json`), which is what the app ships
+        //     and what Robolectric loads out of `android-all`, and
+        //   * `org.json:json`, a reference implementation on Maven Central that
+        //     looks interchangeable and is not.
+        //
+        // They disagree on the type of a *fractional* number: AOSP hands back
+        // a `Double`, `org.json:json` a `BigDecimal`, while agreeing on every
+        // whole number. A cast to `Double` therefore works on every device this
+        // app ships to and fails against the artifact, and the reverse for
+        // `BigDecimal` -- there is no answer that is right on both. Written
+        // against `org.json:json`, the artifact this repository already depends
+        // on in :android:plugins and the obvious thing to add here, this suite
+        // would describe an `org.json` no device has.
+        //
+        // The first draft of this comment claimed a different divergence, on
+        // `optString` of a JSON null, and said both had been measured. Neither
+        // had: the claim was derived by reading AOSP's `JSON.toString` in
+        // isolation and `optString` itself was never checked. A mutation run
+        // refuted it -- see `JsonAccessorPolicyHostTest` and AGENTS.md.
+        //
+        // `@Config(manifest = Config.NONE)` is right here and
+        // `isIncludeAndroidResources` is not: no view is inflated and no
+        // resource is read, because `android-all` supplies `org.json` whether or
+        // not there is a manifest.
+        getByName("androidHostTest").dependencies {
+            implementation(libs.robolectric)
+        }
     }
 }
