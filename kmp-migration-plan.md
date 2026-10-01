@@ -92,7 +92,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **117** | **78** | **43** |
+| **`:app`** | **118** | **77** | **43** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -145,29 +145,31 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **117** | **78** |
-| **total** | **212** | **95** |
+| **`:app`** | **118** | **77** |
+| **total** | **213** | **94** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 117 of 195, i.e. **60%**, and
-the 78 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 118 of 195, i.e. **61%**, and
+the 77 that remain are behind the walls listed in the table above.
 
 **The percentage is the figure that outlived one correction and died on the next,
 which is the whole argument for not quoting a ratio.** It was `106 of 186`, became
-`110 of 193` and round-tripped through the *same* 57%, and 7 files later it is
-`117 of 195` = **60%**. Nothing about the module changed in any of those steps that the
-percentage could see — a file or two each time, and every move freed real files.
+`110 of 193` and round-tripped through the *same* 57%, sat at `117 of 195` = **60%**
+through two landings in which real files moved, and is `118 of 195` = **61%** after one
+more — **a single 16-line file, the whole denominator unchanged, moved it a point.**
+Nothing about the module changed in any of those steps that the percentage could see — a
+file or two each time, and every move freed real files.
 *A ratio is the worst kind of count to quote, because it can stay constant while
 every number in it is being corrected — and then move when nothing it describes has.*
 **Two steps is the sample that makes the point: it survived a 4-file correction and
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 78 that remain, in four families, and three of them no static scan can see
+### The 77 that remain, in four families, and three of them no static scan can see
 
 `:app`'s remaining `androidMain` files were re-audited from both directions. A first
 pass named 21 files with zero framework imports, and a better one named 14, and the
@@ -225,6 +227,24 @@ measured: **39 of `CrispyBackendParsers.kt`'s 45 functions are
 freed by changing its arguments, and this time the receiver is the thing to change.*
 Recorded as the next `:backend`-level port rather than attempted here, because it reaches
 every one of those 45 parsers.
+
+**One of the four pin families was not a wall at all, and three KDocs said so.** `UserMutationIds.kt`
+— 16 lines, `fun newUserMutationId(): String = UUID.randomUUID().toString()` — sat in `androidMain`
+behind a measured-sounding claim, recorded verbatim in three files: *"`UUID` is a JDK class with no
+Kotlin/Native equivalent"*, and in `LibraryViewModelFactory.kt` *"`java.util.UUID` has no Kotlin/Native
+equivalent, which is the only reason it is a slot"*. **It is false, and the measurement is the
+artifact rather than the family**: `kotlin-stdlib-2.4.10.jar` carries a full `kotlin/uuid/` package,
+and `Uuid.random()` is **stable** there — the class is annotated `kotlin.WasExperimental`, and of the
+companion's members only `generateV4` still carries `kotlin.uuid.ExperimentalUuidApi` — so it needs
+no `@OptIn` and no dependency was added. **A premise about the ecosystem rots in one direction, and
+"no equivalent exists" is the direction that rots**; the claim was true when written, and
+`LibraryScreen.kt:123` carried it *inside `commonMain`*, so a shared-code reader was being told a
+shared file could not exist. All three copies are corrected in the same commit as the move, and
+`UserMutationIdsTest` now pins what the slots cannot: these are **stored** mutation ids, so their
+text is a key format, and the suite asserts the canonical lowercase 8-4-4-4-12 form with the version
+nibble at index 14 and the RFC 4122 variant nibble at index 19 — *a suite that only counted hyphens
+would pass on an uppercased string and on a v7 id, and those are the two changes that would silently
+re-key a user's stored mutations.*
 
 What moved `:app` was mostly **not** UI work. It was removing the things that were
 *pinning* UI to `androidMain`:

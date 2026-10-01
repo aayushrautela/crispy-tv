@@ -23,8 +23,13 @@ import kotlinx.coroutines.Dispatchers
  * - the `okhttp` socket behind [LibraryViewModel]'s `watchSyncFactory` slot, the
  *   same slot [com.crispy.tv.home.HomeViewModel] takes;
  * - the platform clock, as `clock`;
- * - the mutation-id generator, as `newMutationId` -- `java.util.UUID` has no
- *   Kotlin/Native equivalent, which is the only reason it is a slot.
+ * - the mutation-id generator, as `newMutationId`. This note used to say the slot was
+ *   there because `java.util.UUID` has no Kotlin/Native equivalent, "which is the only
+ *   reason it is a slot" -- and that was false, measured against the resolved stdlib:
+ *   `kotlin.uuid.Uuid.random()` is stable in Kotlin 2.4.10, so the mint now lives in
+ *   `commonMain` in `newUserMutationId`. The slot's actual reason is determinism: a
+ *   viewmodel that mints its own ids cannot be asserted on, and that has nothing to do
+ *   with where the generator is written.
  *
  * The locale-aware month name is *not* built here. It is a rendering decision, so
  * it belongs with the other two renderers in

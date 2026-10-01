@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 117 `commonMain` / 78 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 118 `commonMain` / 77 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -479,6 +479,19 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   Android-only, in the same family, in the same module. And **a KDoc sentence about one caller is not
   a statement about the function** — a comment explaining *why* one caller behaves unusually is a
   comment about that caller, and being in the file is not the same as having read it.
+  **And a premise about the *ecosystem* ages in one direction, so "no equivalent exists" is the
+  version that rots.** Three KDocs asserted "`java.util.UUID` has no Kotlin/Native equivalent",
+  and it was true when written: `kotlin.uuid` did not exist. It is now `Uuid.random()`, **stable**
+  in the resolved Kotlin 2.4.10 stdlib — and *stable* is a measurement, not a version number:
+  the class carries `kotlin.WasExperimental`, and of the companion's members **only `generateV4`
+  still carries `kotlin.uuid.ExperimentalUuidApi`** (with `SinceKotlin 2.3`). `javap` and the
+  constant pool answer the opt-in question that a version number cannot, and the compile answers
+  the rest — it produced no `ExperimentalUuidApi` warning, which is how a jar-dump reading becomes
+  a fact. **The three claims were in three different files, and one of them was in `commonMain`** —
+  so a `commonMain` reader was being told a `commonMain` file could not exist. **When a KDoc names
+  a platform capability as the reason a file cannot move, re-run that claim against the resolved
+  artifact before planning the file, and correct every copy in the same commit: a corrected premise
+  with two surviving copies is worse than the original, because the next reader finds both.**
 - **A count written about a set that later grows is stale silently, and re-measuring it is one
   command.** Three undercounts, each making work look smaller than it is, and each corrected twice
   over (a plan said 28 shared-transition files, then "10 across 6", and the measurement was **27**).

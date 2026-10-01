@@ -120,9 +120,14 @@ class LibraryViewModel internal constructor(
         onEffect: (WatchSyncEffect) -> Unit,
     ) -> WatchSyncSource,
     private val clock: () -> Long,
-    // `java.util.UUID` has no Kotlin/Native equivalent, so the mint lives in
-    // androidMain. DetailsViewModel takes this same slot under this same name for
-    // the same reason, and both supply it from the same function.
+    // The slot exists so this screen's own ids are deterministic under test, and nothing
+    // else. It used to carry a second, load-bearing reason -- "java.util.UUID has no
+    // Kotlin/Native equivalent, so the mint lives in androidMain" -- which was false, and
+    // that is why this file, already in commonMain, still could not name the function
+    // that mints the ids it stores. `kotlin.uuid.Uuid.random()` is stable in Kotlin
+    // 2.4.10, so `newUserMutationId` is in commonMain now and the slot is the only
+    // thing between this screen and it. DetailsViewModel takes this same slot under this
+    // same name, and both supply it from that one function.
     private val newMutationId: () -> String,
     /**
      * The dispatcher the library disk cache is read on.
