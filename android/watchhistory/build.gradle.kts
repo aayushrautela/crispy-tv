@@ -61,6 +61,15 @@ kotlin {
     sourceSets {
         getByName("androidHostTest").dependencies {
             implementation(libs.robolectric)
+
+            // `UnconfinedTestDispatcher`, for the recorded reason: a class that
+            // takes a `CoroutineScope` and would otherwise build its own is only
+            // testable once the scope is injected, and `Dispatchers.setMain` is
+            // not the answer -- it replaces `Dispatchers.Main` and the class
+            // never uses it. Unconfined runs the body eagerly on the calling
+            // thread, so `WatchProgressStoreHostTest` needs no
+            // `advanceUntilIdle` and nothing in it waits out a debounce.
+            implementation(libs.coroutines.test)
         }
 
         commonTest.dependencies {

@@ -516,6 +516,47 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   no `cancel`, no `onDestroy` — so injecting the caller's scope **would move the antipattern up
   a level rather than remove it**. That is a design question about where a long-lived
   background service's scope comes from, and it is written down rather than guessed at.
+- **A composite key built by string concatenation is a parser, and the parser is wrong on exactly
+  the inputs the format cannot represent.** `WatchProgressStore.removeAllWatchProgressForContent`
+  reconstructs each episode id with `key.split(':')` and `subList(2, size)`, which assumes the key
+  is `type:id[:episodeId]` — that is, **that the id contributes exactly one part.**
+  `buildWpKeyString` does not enforce that, so a provider-qualified id produces more parts and the
+  reconstruction drops the leading ones. Measured on `"series:provider:show:season:1:2"`:
+  `subList(2, 6)` rejoins to `"show:season:1:2"`, so the removal addresses
+  `"series:provider:show:season:show:season:1:2"`, **which does not exist.** Both halves are
+  asserted — the progress survives **and** a tombstone is left at the bogus key, and that tombstone
+  is what would later block a legitimate write. **Recorded, not fixed:** the key format cannot carry
+  a colon-bearing id unambiguously *at all*, so the choice is between changing the format (which
+  orphans every already-stored key, and this is a user-visible resume position) and declaring
+  colon-bearing ids unsupported on this path. **A format that cannot round-trip is a product
+  decision to migrate or to constrain, not a parsing bug to patch** — and the suite found it only
+  because the fixture was written to provoke it. **A separator in a composite key is a claim that
+  the field cannot contain it, and nothing here states that claim anywhere.**
+  Three of that suite's other four first-run failures were mine, and all three the same mistake:
+  **`getAllWatchProgress` returns a map keyed by `type:id`, not by the content id, and nothing in
+  `WatchProgressStore` says so** — `removeAllWatchProgressForContent` relies on it (it filters on
+  `prefix = "$type:$id"`), so a caller reading the map has to know it or it will look up a content id
+  and find nothing. I wrote the expectation from the **parameter names** rather than from the key
+  format. **A key format is not visible in a signature.**
+- **A comment claiming a choice between two orderings that coincide is unobservable, and a test for
+  it would be a test that passes on either implementation.** `getAllWatchProgress`'s comment says
+  the returned order is by the *full prefixed key* rather than the stripped one. **Every key shares
+  one constant prefix and one separator, and sorting `prefix + s` is the same order as sorting `s`**,
+  so the two are not alternatives. Recorded in the test's KDoc rather than asserted; the comment's
+  real content — *sorting at all*, because `keys()` carries no order guarantee and the old code
+  iterated `prefs.all`, a `HashMap` — is pinned by a case that writes in one order and asserts
+  another. **Seventeen redundant guards so far, and this one is a comment rather than a guard: a
+  statement of intent with no state to change is the same finding wearing prose.**
+- **An `androidMain` class cannot be tested from `commonTest` at all, so "put it in `commonTest`
+  because `commonTest` is the one that runs everywhere" is backwards for it.** `WatchProgressStore`
+  lives in `androidMain` (its sole pin is `org.json`), and `org.json` is absent from every other
+  target's classpath — so its 26 cases are in `:android:watchhistory:androidHostTest` under
+  Robolectric, while the four pure functions lifted to `commonMain` in the previous landing are in
+  `commonTest` and run on **both** tasks. **Which source set a test belongs in follows the source
+  set of the code under test, and that is a fact to read rather than a preference to express.**
+  Robolectric here is for `org.json` itself and **not** for a `Context`, because the two
+  implementations disagree — see the `e27619cb` measurements. Every scope is injected as
+  `CoroutineScope(UnconfinedTestDispatcher())`, so nothing sleeps out a debounce.
 - **A document's own heading, prose class, or type names are not evidence about the code — and a
   second numbered plan for one repository is a defect even when every sentence in it is correct.**
   `architecture.md` was rewritten for the ported codebase and both halves of that bullet came from
