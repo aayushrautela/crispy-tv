@@ -10,6 +10,8 @@ import com.crispy.tv.library.libraryViewModelFactory
 import com.crispy.tv.details.localeDateFormatters
 import androidx.compose.runtime.remember
 import coil3.compose.LocalPlatformContext
+import com.crispy.tv.accounts.activeProfileLoader
+import com.crispy.tv.library.deviceUtcOffsetMillis
 
 import com.crispy.tv.library.LibraryRoute
 
@@ -25,6 +27,17 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
             LibraryRoute(
             viewModelFactory = remember(appContext) { libraryViewModelFactory(appContext) },
             monthName = remember(appContext) { localeDateFormatters(appContext).monthName },
+            // Three more platform values, for a route that is `commonMain` now. The
+            // clock and the offset are lambdas rather than values on purpose: the
+            // offset is read fresh per call because an offset remembered at
+            // composition time is wrong either side of a daylight-saving change, and
+            // this screen groups rows by month. `loadProfile` is a lambda because
+            // `ProfileIconButton` uses it as a `produceState` key, so a fresh
+            // instance each recomposition would restart the profile load -- see
+            // `ProfileIconButton`'s own KDoc.
+            clock = { System.currentTimeMillis() },
+            utcOffsetMillis = { deviceUtcOffsetMillis() },
+            loadProfile = remember(appContext) { activeProfileLoader(appContext) },
             onItemClick = { item, sharedElementKey ->
                 Log.d(
                     "LibraryNav",

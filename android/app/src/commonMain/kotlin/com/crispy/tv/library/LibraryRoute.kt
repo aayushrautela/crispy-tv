@@ -20,20 +20,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import com.crispy.tv.accounts.ActiveProfileInfo
 import com.crispy.tv.library.currentMonthKeyOf
-import com.crispy.tv.library.deviceUtcOffsetMillis
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
@@ -57,12 +55,24 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun LibraryRoute(
     // A `Context` cannot be named in a `commonMain` signature, and this route is
-    // androidMain anyway because it reads `collectAsLazyPagingItems`, which needs
-    // `paging-compose`. So the viewmodel factory crosses as the value the nav graph
-    // already holds a `Context` for, and the two renderings this screen needs cross
-    // as arguments. Same shape as the auth and search routes.
+    // `commonMain` now -- so the three platform values it used to read for itself
+    // cross as required parameters. `viewModelFactory` and `monthName` were already
+    // slots before this file moved; the other three are new, and the same shape as
+    // the auth, search and settings routes.
+    //
+    // `loadProfile` stays a **lambda**, unlike the factories: `ProfileIconButton`
+    // takes it as a `produceState(initialValue = null, loadProfile, refreshKey)` key,
+    // so a fresh instance each recomposition would restart the profile load. Its own
+    // KDoc says the same thing, and the caller `remember`s it. `clock` and
+    // `utcOffsetMillis` are lambdas for their own reasons -- `deviceUtcOffsetMillis()`
+    // is deliberately read fresh per call, because an offset remembered at composition
+    // time is wrong for the hours either side of a daylight-saving change, and this
+    // screen groups rows by month.
     viewModelFactory: ViewModelProvider.Factory,
     monthName: (String) -> String,
+    clock: () -> Long,
+    utcOffsetMillis: () -> Long,
+    loadProfile: suspend () -> ActiveProfileInfo?,
     onItemClick: (CatalogItem, String?) -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
@@ -70,8 +80,6 @@ fun LibraryRoute(
     onScrollToTopConsumed: () -> Unit,
 ) {
     val viewModel: LibraryViewModel = viewModel(factory = viewModelFactory)
-    val clock: () -> Long = { System.currentTimeMillis() }
-    val utcOffsetMillis: () -> Long = { deviceUtcOffsetMillis() }
     val currentMonthKey = currentMonthKeyOf(clock, utcOffsetMillis())
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
@@ -104,14 +112,15 @@ fun LibraryRoute(
         }
     }
 
-    // Hoisted out of the app bar's `actions` slot, and out of `remember` too: neither
-    // that lambda nor `remember`'s calculation is a @Composable scope, so
-    // `LocalContext.current` has to be read here in the composable body. These screens are
-    // androidMain and already hold a Context, so building the loader here is cheaper than
-    // threading a slot through each public signature.
-    val profileContext = LocalContext.current
-    val loadProfile = remember(profileContext) { activeProfileLoader(profileContext.applicationContext) }
-
+    // The three values below used to be read here: `LocalContext.current` for the
+    // profile loader, a `System.currentTimeMillis()` default, and the same-package
+    // `deviceUtcOffsetMillis()` from `LibraryViewModelFactory.kt`. All three crossed
+    // as required parameters instead. The comment that used to sit here argued the
+    // opposite -- "these screens are androidMain and already hold a Context, so
+    // building the loader here is cheaper than threading a slot through each public
+    // signature" -- and the reason it preferred that was the pin: the screens being
+    // `androidMain` is what the slot removes, so the comment argued for its own
+    // cause.
     Box(modifier = Modifier.fillMaxSize()) {
         CrispyScreen(
         topBar = {
@@ -123,9 +132,6 @@ fun LibraryRoute(
                     }
 ProfileIconButton(
                         onClick = onOpenAccountsProfiles,
-                        // Built here rather than passed in: these three screens are
-                        // androidMain, so they already hold a Context, and threading a
-                        // slot through each of their public signatures would be churn.
                     loadProfile = loadProfile,
                     )
                 },

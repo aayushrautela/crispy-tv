@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 121 `commonMain` / 74 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 122 `commonMain` / 73 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -200,7 +200,14 @@ is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
 inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
 and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
 cannot obtain a provider that provides nothing. **`SearchNavGraph.kt` and `AuthNavGraph.kt` are now in `commonMain`** and
-the other five graphs are still in `androidMain`, **and the reason recorded here for years was wrong
+the other five graphs are still in `androidMain` -- and the finding is that **the graphs are no
+longer the unit of work: a file can move once its _callees_ are in `commonMain`, so movement
+propagates upward from the leaves, and the leaves are the screens.** `LibraryRoute.kt` (247)
+moved on exactly that evidence, and every one of its callees -- `currentMonthKeyOf`,
+`LibraryFiltersRow`, `LibraryStatusMessage`, `LibraryEmptyState`, `LibraryAppendState`,
+`historyItems`, `CrispyScreen`, `ProfileIconButton`, `ItemActionSheet`, `StandardTopAppBar`,
+`topLevelAppBarColors`, `responsivePageHorizontalPadding`, `appBarScrollBehavior` -- was already
+in `commonMain`. **The reason recorded here for years was wrong
 twice before it was right once**. It said they stay because `androidx.navigation` has no KMP
 artifact — true of Google's artifact, and false once `:app` swapped to
 `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` (measured across five
