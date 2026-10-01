@@ -76,8 +76,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
-import org.json.JSONArray
-import org.json.JSONObject
+import com.crispy.tv.library.optJsonArray
+import com.crispy.tv.library.optStringOrEmpty
+import com.crispy.tv.library.stringAtOrEmpty
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 @Immutable
 internal data class InstalledAddonUi(
@@ -267,7 +275,12 @@ internal class AddonsSettingsViewModel(
             }
 
             runCatching {
-                JSONObject(pending.manifestJson)
+                // `Json.parseToJsonElement` raises `SerializationException` where
+                // `JSONObject(String)` raised `JSONException`; the `runCatching`
+                // absorbs either, and the census measured **zero**
+                // `JSONException` occurrences in `:app`, so nothing could have
+                // depended on the type.
+                Json.parseToJsonElement(pending.manifestJson).jsonObject
             }.getOrNull()?.let { manifest ->
                 addonRegistry
                     .orderedSeeds()
@@ -338,11 +351,11 @@ internal class AddonsSettingsViewModel(
     private fun loadInstalledAddons(): List<InstalledAddonUi> {
         return addonRegistry.orderedSeeds().map { seed ->
             val manifest = parseCachedManifest(seed.cachedManifestJson)
-            val manifestName = nonBlank(manifest?.optString("name"))
-            val addonId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
-            val version = nonBlank(manifest?.optString("version"))
+            val manifestName = nonBlank(manifest?.optStringOrEmpty("name"))
+            val addonId = nonBlank(manifest?.optStringOrEmpty("id")) ?: seed.addonIdHint
+            val version = nonBlank(manifest?.optStringOrEmpty("version"))
             val description =
-                nonBlank(manifest?.optString("description"))
+                nonBlank(manifest?.optStringOrEmpty("description"))
                     ?: seed.manifestUrl
 
             InstalledAddonUi(
@@ -354,25 +367,25 @@ internal class AddonsSettingsViewModel(
                 logoUrl =
                     resolveAddonAssetUrl(
                         baseUrl = seed.baseUrl,
-                        rawAssetUrl = nonBlank(manifest?.optString("logo"))
+                        rawAssetUrl = nonBlank(manifest?.optStringOrEmpty("logo"))
                     ),
                 version = version,
                 resources = parseManifestResources(manifest),
-                types = parseStringArray(manifest?.optJSONArray("types"))
+                types = parseStringArray(manifest?.optJsonArray("types"))
             )
         }
     }
 
     private fun buildPendingInstall(
         manifestUrl: String,
-        manifest: JSONObject
+        manifest: JsonObject
     ): PendingAddonInstallUi {
         val baseUrl = addonBaseUrl(manifestUrl)
-        val addonId = nonBlank(manifest.optString("id"))
-        val name = nonBlank(manifest.optString("name")) ?: addonId ?: "Unknown addon"
-        val description = nonBlank(manifest.optString("description")) ?: manifestUrl
+        val addonId = nonBlank(manifest.optStringOrEmpty("id"))
+        val name = nonBlank(manifest.optStringOrEmpty("name")) ?: addonId ?: "Unknown addon"
+        val description = nonBlank(manifest.optStringOrEmpty("description")) ?: manifestUrl
         val resources = parseManifestResources(manifest)
-        val types = parseStringArray(manifest.optJSONArray("types"))
+        val types = parseStringArray(manifest.optJsonArray("types"))
 
         val warnings = mutableListOf<String>()
         if (manifestUrl.startsWith("http://", ignoreCase = true)) {
@@ -393,11 +406,11 @@ internal class AddonsSettingsViewModel(
             name = name,
             description = description,
             addonId = addonId,
-            version = nonBlank(manifest.optString("version")),
+            version = nonBlank(manifest.optStringOrEmpty("version")),
             logoUrl =
                 resolveAddonAssetUrl(
                     baseUrl = baseUrl,
-                    rawAssetUrl = nonBlank(manifest.optString("logo"))
+                    rawAssetUrl = nonBlank(manifest.optStringOrEmpty("logo"))
                 ),
             resources = resources,
             types = types,
@@ -801,21 +814,21 @@ private fun AddonListRow(
     }
 }
 
-private fun parseCachedManifest(raw: String?): JSONObject? {
+private fun parseCachedManifest(raw: String?): JsonObject? {
     val payload = raw?.trim().orEmpty()
     if (payload.isEmpty()) {
         return null
     }
-    return runCatching { JSONObject(payload) }.getOrNull()
+    return runCatching { Json.parseToJsonElement(payload).jsonObject }.getOrNull()
 }
 
-private fun parseStringArray(array: JSONArray?): List<String> {
+private fun parseStringArray(array: JsonArray?): List<String> {
     if (array == null) {
         return emptyList()
     }
     val values = mutableListOf<String>()
-    for (index in 0 until array.length()) {
-        val value = array.optString(index).trim()
+    for (index in 0 until array.size) {
+        val value = array.stringAtOrEmpty(index).trim()
         if (value.isNotEmpty()) {
             values += value
         }
@@ -823,24 +836,35 @@ private fun parseStringArray(array: JSONArray?): List<String> {
     return values
 }
 
-private fun parseManifestResources(manifest: JSONObject?): List<String> {
-    val resourcesArray = manifest?.optJSONArray("resources") ?: return emptyList()
+private fun parseManifestResources(manifest: JsonObject?): List<String> {
+    val resourcesArray = manifest?.optJsonArray("resources") ?: return emptyList()
     val values = linkedSetOf<String>()
-    for (index in 0 until resourcesArray.length()) {
-        when (val entry = resourcesArray.opt(index)) {
-            is String -> {
-                val normalized = entry.trim()
+    for (entry in resourcesArray) {
+        when (entry) {
+            // **`is JsonPrimitive` is not `is String`, and the difference is this
+            // arm's whole behaviour.** A JSON *number* is a `JsonPrimitive` too,
+            // so widening the arm would start admitting values the old code
+            // dropped -- and `contentOrNull` answers the same string for the
+            // number `1234` and the quoted string `"1234"`, so **`isString` is
+            // the only thing that can tell them apart.** That is the same reason
+            // `:backend`'s `optLongOrDefault` branches on it.
+            is JsonPrimitive -> {
+                val normalized = if (entry.isString) entry.contentOrNull.orEmpty().trim() else ""
                 if (normalized.isNotEmpty()) {
                     values += normalized
                 }
             }
 
-            is JSONObject -> {
-                val name = entry.optString("name").trim()
+            is JsonObject -> {
+                val name = entry.optStringOrEmpty("name").trim()
                 if (name.isNotEmpty()) {
                     values += name
                 }
             }
+
+            // Sealed-type fall-through: a JSON array element matched neither arm
+            // under `org.json` and was dropped without a word.
+            else -> Unit
         }
     }
     return values.toList()
@@ -942,7 +966,7 @@ private fun manifestUrlsMatch(left: String, right: String): Boolean {
     return left.trim().equals(right.trim(), ignoreCase = true)
 }
 
-private suspend fun httpGetJson(httpClient: CrispyHttpClient, url: String): JSONObject? {
+private suspend fun httpGetJson(httpClient: CrispyHttpClient, url: String): JsonObject? {
     val response =
         runCatching {
             httpClient.get(
@@ -959,7 +983,7 @@ private suspend fun httpGetJson(httpClient: CrispyHttpClient, url: String): JSON
     if (body.isBlank()) {
         return null
     }
-    return runCatching { JSONObject(body) }.getOrNull()
+    return runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
 }
 
 private fun nonBlank(value: String?): String? {

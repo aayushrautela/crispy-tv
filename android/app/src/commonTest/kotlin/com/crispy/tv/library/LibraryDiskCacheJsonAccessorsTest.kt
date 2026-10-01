@@ -1,10 +1,9 @@
 package com.crispy.tv.library
 
-import org.json.JSONObject
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import kotlin.test.Test
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -52,9 +51,24 @@ import kotlin.test.assertTrue
  * caller cannot tell that apart from a genuine `false`. That is asserted below
  * rather than left as a claim.
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [35])
 class LibraryDiskCacheJsonAccessorsTest {
+    // **Robolectric is gone, and it was the *node type* that made it necessary.**
+    // `org.json` is a class of the Android platform supplied by `android.jar`
+    // rather than a dependency of this project, so a `commonTest` suite had no
+    // way to construct a node -- which is why this class was an
+    // `androidHostTest` one carrying `@RunWith(RobolectricTestRunner::class)`
+    // and `sdk = [35]`. The accessors it covers are pure over
+    // `kotlinx.serialization.json`'s `JsonElement`, and that is a real KMP
+    // dependency, so **the suite moved to `commonTest` and now runs on desktop
+    // and on both Apple targets** -- the same move
+    // `WatchProgressStoreHostTest` made in `:watchhistory` and
+    // `JsonAccessorPolicyHostTest` made in `:backend`.
+    //
+    // **The blocker was a visibility rule and not a test-framework one.** A
+    // `commonTest` suite cannot see an `internal` declaration in `androidMain`
+    // at all, so the *accessors* had to move to `commonMain` before this suite
+    // could. Both are pure: zero Android imports, and the only `Context` either
+    // one mentions is in prose.
 
     // ---------------------------------------------------------------------
     // optNullableString
@@ -62,7 +76,7 @@ class LibraryDiskCacheJsonAccessorsTest {
 
     @Test
     fun anAbsentKeyAJsonNullAndABlankValueAreAllAbsent() {
-        val json = JSONObject("""{"blank":"   ","nullish":null}""")
+        val json = Json.parseToJsonElement("""{"blank":"   ","nullish":null}""").jsonObject
 
         assertNull(json.optNullableString("missing"), "an absent key is not a value")
         assertNull(json.optNullableString("nullish"), "a JSON null is not a value")
@@ -84,7 +98,7 @@ class LibraryDiskCacheJsonAccessorsTest {
      */
     @Test
     fun theFourCharactersNullAreAValueHereAndNotAValueInBackend() {
-        val json = JSONObject("""{"nullText":"null","NULLText":"NULL"}""")
+        val json = Json.parseToJsonElement("""{"nullText":"null","NULLText":"NULL"}""").jsonObject
 
         assertEquals("null", json.optNullableString("nullText"))
         assertEquals("NULL", json.optNullableString("NULLText"), "and nothing here is case-insensitive")
@@ -92,7 +106,7 @@ class LibraryDiskCacheJsonAccessorsTest {
 
     @Test
     fun aValueIsTrimmedAndAValueThatMerelyLooksNullishIsStillAValue() {
-        val json = JSONObject("""{"padded":"  x  ","zero":"0","count":0,"flag":false}""")
+        val json = Json.parseToJsonElement("""{"padded":"  x  ","zero":"0","count":0,"flag":false}""").jsonObject
 
         assertEquals("x", json.optNullableString("padded"))
         assertEquals("0", json.optNullableString("zero"))
@@ -106,7 +120,7 @@ class LibraryDiskCacheJsonAccessorsTest {
 
     @Test
     fun aBooleanIsReadFromABooleanAndFromTheTwoWordsInAnyCase() {
-        val json = JSONObject("""{"yes":true,"no":false,"upperText":"TRUE","mixedText":"FaLsE"}""")
+        val json = Json.parseToJsonElement("""{"yes":true,"no":false,"upperText":"TRUE","mixedText":"FaLsE"}""").jsonObject
 
         assertEquals(true, json.optBooleanOrNull("yes"))
         assertEquals(false, json.optBooleanOrNull("no"))
@@ -135,8 +149,8 @@ class LibraryDiskCacheJsonAccessorsTest {
      */
     @Test
     fun aPresentButUnreadableBooleanIsNullBecauseTheReturnTypeIsNamedForNullable() {
-        val json = JSONObject("""{"word":"banana","yesish":"yes","numeric":1,"numericText":"1"}""")
-        val withNull = JSONObject("""{"nullish":null}""")
+        val json = Json.parseToJsonElement("""{"word":"banana","yesish":"yes","numeric":1,"numericText":"1"}""").jsonObject
+        val withNull = Json.parseToJsonElement("""{"nullish":null}""").jsonObject
 
         assertNull(json.optBooleanOrNull("word"), "present and unreadable")
         assertNull(json.optBooleanOrNull("yesish"), "present and unreadable")
@@ -157,10 +171,14 @@ class LibraryDiskCacheJsonAccessorsTest {
      */
     @Test
     fun theThreeWaysToGetNullAreAbsentAJsonNullAndAValueThatIsNotABoolean() {
-        val json = JSONObject("""{"value":0,"no":false,"nullish":null,"word":"banana"}""")
+        val json = Json.parseToJsonElement("""{"value":0,"no":false,"nullish":null,"word":"banana"}""").jsonObject
 
-        assertTrue(json.has("value"), "a zero is present, and present is enough")
-        assertFalse(json.isNull("value"), "and it is not a JSON null")
+        // `has` and `isNull` were `org.json` MEMBERS, so they have no
+        // counterpart here; both were in the file's dependency and not in
+        // its subject. `in json` asks the first question (`has`) and
+        // `!is JsonNull` the second, which is why the second needs the type.
+        assertTrue("value" in json, "a zero is present, and present is enough")
+        assertFalse(json["value"] is JsonNull, "and it is not a JSON null")
         // The old case read this key as `false` and said "so it is read, as
         // false". Under the fixed policy a zero is a *number*, and the policy
         // is about the value rather than the key, so it is the third way to
@@ -197,9 +215,9 @@ class LibraryDiskCacheJsonAccessorsTest {
      */
     @Test
     fun nullAndFalseAreDifferentAnswersAndTheConsumersBranchOnTheDifference() {
-        val explicitFalse = JSONObject("""{"liked":false}""")
-        val unreadable = JSONObject("""{"liked":"banana"}""")
-        val absent = JSONObject("""{}""")
+        val explicitFalse = Json.parseToJsonElement("""{"liked":false}""").jsonObject
+        val unreadable = Json.parseToJsonElement("""{"liked":"banana"}""").jsonObject
+        val absent = Json.parseToJsonElement("""{}""").jsonObject
 
         assertEquals(false, explicitFalse.optBooleanOrNull("liked"), "the document said false")
         assertNull(unreadable.optBooleanOrNull("liked"), "the document said nothing usable")

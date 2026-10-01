@@ -85,6 +85,16 @@ kotlin {
         }
 
         androidMain.dependencies {
+
+            // A node-type dependency declared in `androidMain` because that is
+            // where `JsonAccessors.kt` lives: **a file's dependency belongs in the
+            // source set the file is in, not where it used to be.** The three
+            // consumers are `androidMain` for reasons this port does not touch --
+            // `SharedPreferences`, `java.io.File` and construction wiring -- and a
+            // KMP module cannot publish a JVM variant for an `androidMain`-only
+            // class, so `commonMain.dependencies` would resolve nothing for them
+            // and would only be claiming a portability that is not there yet.
+            implementation(libs.serialization.json)
             implementation(project(":android:network"))
             implementation(project(":android:backend"))
 

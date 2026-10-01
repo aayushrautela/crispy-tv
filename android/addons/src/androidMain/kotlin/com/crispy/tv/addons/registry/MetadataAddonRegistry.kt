@@ -2,8 +2,19 @@ package com.crispy.tv.addons.registry
 
 import android.content.Context
 import android.net.Uri
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import com.crispy.tv.addons.optJsonArray
+import com.crispy.tv.addons.optLongOrNull
+import com.crispy.tv.addons.optStringOrEmpty
+import com.crispy.tv.addons.stringAtOrEmpty
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import java.security.MessageDigest
 import java.nio.charset.StandardCharsets
 
@@ -126,13 +137,13 @@ class MetadataAddonRegistry(context: Context) {
     }
 
     @Synchronized
-    fun cacheManifest(seed: AddonManifestSeed, manifest: JSONObject) {
+    fun cacheManifest(seed: AddonManifestSeed, manifest: JsonObject) {
         val state = ensureState()
         val existing = state.installedAddons[seed.installationId] ?: return
         val updated = existing.copy(
             cachedManifestJson = manifest.toString(),
-            manifestAddonId = nonBlank(manifest.optString("id")) ?: existing.manifestAddonId,
-            manifestVersion = nonBlank(manifest.optString("version")) ?: existing.manifestVersion
+            manifestAddonId = nonBlank(manifest.optStringOrEmpty("id")) ?: existing.manifestAddonId,
+            manifestVersion = nonBlank(manifest.optStringOrEmpty("version")) ?: existing.manifestVersion
         )
         if (updated == existing) {
             return
@@ -370,7 +381,10 @@ class MetadataAddonRegistry(context: Context) {
     private fun readStateFromPrefs(): RegistryState {
         val raw = prefs.getString(KEY_STATE, null) ?: return RegistryState.empty()
         return runCatching {
-            RegistryState.fromJson(JSONObject(raw))
+            // `Json.parseToJsonElement` raises `SerializationException` where
+            // `JSONObject(String)` raised `JSONException`; the surrounding
+            // `runCatching` absorbs either.
+            RegistryState.fromJson(Json.parseToJsonElement(raw).jsonObject)
         }.getOrElse {
             RegistryState.empty()
         }
@@ -441,33 +455,48 @@ private data class PersistedAddon(
         }
     }
 
-    fun toJson(): JSONObject {
-        return JSONObject()
-            .put("installation_id", installationId)
-            .put("addon_id_hint", addonIdHint)
-            .put("manifest_url", manifestUrl)
-            .put("original_manifest_url", originalManifestUrl)
-            .put("base_url", baseUrl)
-            .put("encoded_query", encodedQuery)
-            .put("added_at_epoch_ms", addedAtEpochMs)
-            .put("cached_manifest_json", cachedManifestJson)
-            .put("manifest_addon_id", manifestAddonId)
-            .put("manifest_version", manifestVersion)
+    /**
+     * **A null field is an ABSENT key here, and that is not a detail.**
+     *
+     * `org.json`'s `put(key, null)` *removes* the mapping, so the five nullable
+     * fields were written by omitting them. `buildJsonObject`'s
+     * `put(key, value: String?)` does the opposite: it writes `JsonNull`. And the
+     * two are not the same on the way back in — an absent key answers `""` to
+     * `optString`, while a stored JSON null answered the four characters
+     * `"null"` on AOSP. **So a plain `put(…, null)` would have changed what this
+     * file reads back, and the `?.let` below is what keeps the old answer.**
+     */
+    fun toJson(): JsonObject {
+        return buildJsonObject {
+            put("installation_id", installationId)
+            put("addon_id_hint", addonIdHint)
+            put("manifest_url", manifestUrl)
+            originalManifestUrl?.let { put("original_manifest_url", it) }
+            put("base_url", baseUrl)
+            encodedQuery?.let { put("encoded_query", it) }
+            put("added_at_epoch_ms", addedAtEpochMs)
+            cachedManifestJson?.let { put("cached_manifest_json", it) }
+            manifestAddonId?.let { put("manifest_addon_id", it) }
+            manifestVersion?.let { put("manifest_version", it) }
+        }
     }
 
     companion object {
-        fun fromJson(json: JSONObject): PersistedAddon {
+        fun fromJson(json: JsonObject): PersistedAddon {
             return PersistedAddon(
-                installationId = json.optString("installation_id"),
-                addonIdHint = json.optString("addon_id_hint"),
-                manifestUrl = json.optString("manifest_url"),
-                originalManifestUrl = json.optString("original_manifest_url"),
-                baseUrl = json.optString("base_url"),
-                encodedQuery = json.optString("encoded_query").takeIf { it.isNotBlank() },
-                addedAtEpochMs = json.optLong("added_at_epoch_ms", 0L),
-                cachedManifestJson = json.optString("cached_manifest_json").takeIf { it.isNotBlank() },
-                manifestAddonId = json.optString("manifest_addon_id").takeIf { it.isNotBlank() },
-                manifestVersion = json.optString("manifest_version").takeIf { it.isNotBlank() }
+                installationId = json.optStringOrEmpty("installation_id"),
+                addonIdHint = json.optStringOrEmpty("addon_id_hint"),
+                manifestUrl = json.optStringOrEmpty("manifest_url"),
+                originalManifestUrl = json.optStringOrEmpty("original_manifest_url"),
+                baseUrl = json.optStringOrEmpty("base_url"),
+                encodedQuery = json.optStringOrEmpty("encoded_query").takeIf { it.isNotBlank() },
+                // `longOrNull` *parses* where `optLong` *truncated*. The
+                // difference is invisible for a whole number, and this file
+                // writes nothing but a `Long`, so the answer is the same.
+                addedAtEpochMs = json.optLongOrNull("added_at_epoch_ms") ?: 0L,
+                cachedManifestJson = json.optStringOrEmpty("cached_manifest_json").takeIf { it.isNotBlank() },
+                manifestAddonId = json.optStringOrEmpty("manifest_addon_id").takeIf { it.isNotBlank() },
+                manifestVersion = json.optStringOrEmpty("manifest_version").takeIf { it.isNotBlank() }
             )
         }
     }
@@ -478,20 +507,17 @@ private data class RegistryState(
     val addonOrder: List<String>,
     val userRemovedAddonIds: Set<String>
 ) {
-    fun toJson(): JSONObject {
-        val installedArray = JSONArray()
-        installedAddons.values.forEach { addon -> installedArray.put(addon.toJson()) }
-
-        val orderArray = JSONArray()
-        addonOrder.forEach(orderArray::put)
-
-        val removedArray = JSONArray()
-        userRemovedAddonIds.sorted().forEach(removedArray::put)
-
-        return JSONObject()
-            .put("installed_addons", installedArray)
-            .put("addon_order", orderArray)
-            .put("user_removed_addons", removedArray)
+    fun toJson(): JsonObject {
+        // `orderArray::put` was a method reference to `JSONArray.put`; `add` is
+        // the builder's equivalent and takes the element directly.
+        return buildJsonObject {
+            put("installed_addons", buildJsonArray { installedAddons.values.forEach { add(it.toJson()) } })
+            put("addon_order", buildJsonArray { addonOrder.forEach { add(JsonPrimitive(it)) } })
+            put(
+                "user_removed_addons",
+                buildJsonArray { userRemovedAddonIds.sorted().forEach { add(JsonPrimitive(it)) } },
+            )
+        }
     }
 
     companion object {
@@ -503,11 +529,11 @@ private data class RegistryState(
             )
         }
 
-        fun fromJson(json: JSONObject): RegistryState {
+        fun fromJson(json: JsonObject): RegistryState {
             val installed = linkedMapOf<String, PersistedAddon>()
-            val installedArray = json.optJSONArray("installed_addons") ?: JSONArray()
-            for (index in 0 until installedArray.length()) {
-                val objectValue = installedArray.optJSONObject(index) ?: continue
+            val installedArray = json.optJsonArray("installed_addons") ?: JsonArray(emptyList())
+            for (element in installedArray) {
+                val objectValue = element as? JsonObject ?: continue
                 val addon = PersistedAddon.fromJson(objectValue)
                 if (addon.installationId.isNotBlank() && addon.manifestUrl.isNotBlank()) {
                     installed[addon.installationId] = addon
@@ -515,18 +541,18 @@ private data class RegistryState(
             }
 
             val addonOrder = mutableListOf<String>()
-            val orderArray = json.optJSONArray("addon_order") ?: JSONArray()
-            for (index in 0 until orderArray.length()) {
-                val installationId = orderArray.optString(index).trim()
+            val orderArray = json.optJsonArray("addon_order") ?: JsonArray(emptyList())
+            for (index in 0 until orderArray.size) {
+                val installationId = orderArray.stringAtOrEmpty(index).trim()
                 if (installationId.isNotEmpty()) {
                     addonOrder += installationId
                 }
             }
 
             val removedIds = mutableSetOf<String>()
-            val removedArray = json.optJSONArray("user_removed_addons") ?: JSONArray()
-            for (index in 0 until removedArray.length()) {
-                val addonId = removedArray.optString(index).trim()
+            val removedArray = json.optJsonArray("user_removed_addons") ?: JsonArray(emptyList())
+            for (index in 0 until removedArray.size) {
+                val addonId = removedArray.stringAtOrEmpty(index).trim()
                 if (addonId.isNotEmpty()) {
                     removedIds += addonId
                 }

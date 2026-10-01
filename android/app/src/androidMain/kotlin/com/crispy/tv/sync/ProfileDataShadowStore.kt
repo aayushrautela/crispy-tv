@@ -1,7 +1,12 @@
 package com.crispy.tv.sync
 
 import android.content.Context
-import org.json.JSONObject
+import com.crispy.tv.library.optJsonObject
+import com.crispy.tv.library.optStringOrEmpty
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 
 class ProfileDataShadowStore(
     context: Context,
@@ -18,11 +23,14 @@ class ProfileDataShadowStore(
     fun read(profileId: String): Snapshot? {
         val key = keyForProfile(profileId)
         val raw = prefs.getString(key, null) ?: return null
-        val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        // `org.json` threw `JSONException` here and `Json` throws
+        // `SerializationException`; `runCatching` catches either and nothing in
+        // `:app` names that type, so the malformed-value answer is unchanged.
+        val obj = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return null
 
-        val settings = obj.optJSONObject("settings")?.toStringMap() ?: emptyMap()
-        val catalogPrefs = obj.optJSONObject("catalog_prefs")?.toStringMap() ?: emptyMap()
-        val updatedAt = obj.optString("updated_at").trim().ifBlank { null }
+        val settings = obj.optJsonObject("settings")?.toStringMap() ?: emptyMap()
+        val catalogPrefs = obj.optJsonObject("catalog_prefs")?.toStringMap() ?: emptyMap()
+        val updatedAt = obj.optStringOrEmpty("updated_at").trim().ifBlank { null }
 
         return Snapshot(
             profileId = profileId,
@@ -34,10 +42,11 @@ class ProfileDataShadowStore(
 
     fun write(snapshot: Snapshot) {
         val obj =
-            JSONObject()
-                .put("settings", snapshot.settings.toJsonObject())
-                .put("catalog_prefs", snapshot.catalogPrefs.toJsonObject())
-                .put("updated_at", snapshot.updatedAt ?: "")
+            buildJsonObject {
+                put("settings", snapshot.settings.toJsonObject())
+                put("catalog_prefs", snapshot.catalogPrefs.toJsonObject())
+                put("updated_at", snapshot.updatedAt ?: "")
+            }
         prefs.edit().putString(keyForProfile(snapshot.profileId), obj.toString()).apply()
     }
 

@@ -6,8 +6,9 @@ import com.crispy.tv.backend.parseAiInsightsSlides
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.Locale
 
 class AiInsightsCacheStore(context: Context) {
@@ -25,12 +26,14 @@ class AiInsightsCacheStore(context: Context) {
         val normalizedItemId = itemId.trim()
         if (normalizedItemId.isBlank()) return null
         val raw = prefs.getString(keyFor(normalizedItemId, locale), null) ?: return null
-        // **Only the reader converts.** The bytes on disk are JSON whichever
-        // parser reads them, so `save` below still builds with `org.json` and
-        // writes a string, and this line is the whole boundary. The cast is
-        // explicit rather than a helper because `optJsonArray` is `internal` to
-        // `:backend`, and a cross-module `public` accessor would be the second
-        // coupling this port just removed.
+        // **Only the reader used to convert**, and that sentence is what this
+        // port deletes: `save` below now builds with `buildJsonObject` too, so
+        // both sides of the boundary are `JsonElement` and the note that
+        // described the boundary as the reader's alone is gone. `Json.parseToJsonElement`
+        // raises `SerializationException` where `JSONObject(body)` raised
+        // `JSONException`, which the `runCatching` here absorbs either way --
+        // and the census measured **zero** `JSONException` occurrences in
+        // `:app`, so nothing could have depended on the type.
         val json = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
             ?: return null
 
@@ -50,30 +53,38 @@ class AiInsightsCacheStore(context: Context) {
         val slides = result.slides.filter { it.key != AiInsightSlideKey.UNKNOWN }
         if (slides.isEmpty()) return
 
-        val array = JSONArray()
-        slides.forEach { slide ->
-            val obj = JSONObject()
-                .put("key", slide.key.wire)
-                .put("label", slide.label)
-                .put("kind", slide.kind.wire)
-                .put("accent", slide.accent)
-            slide.body?.let { obj.put("body", it) }
-            slide.tag?.let { obj.put("tag", it.wire) }
-            slide.focus?.let { obj.put("focus", it) }
-            slide.context?.let { obj.put("context", it) }
-            if (!slide.backdrop.isEmpty) {
-                obj.put(
-                    "backdrop",
-                    JSONObject().apply {
-                        slide.backdrop.low?.let { put("small", it) }
-                        slide.backdrop.medium?.let { put("medium", it) }
-                        slide.backdrop.high?.let { put("large", it) }
+        // `JSONObject().put(...)` -> `buildJsonObject { ... }`, because
+        // `JSONObject`'s whole API *was* `put` and `JsonObject` has no mutating
+        // members at all. `add` replaces `array.put(obj)`. Every value here is a
+        // `String` or a `String?` on the `AiInsightSlide` data class, so `put`
+        // needs no `JsonPrimitive` wrapper -- which is measured, not assumed.
+        val array = buildJsonArray {
+            slides.forEach { slide ->
+                add(
+                    buildJsonObject {
+                        put("key", slide.key.wire)
+                        put("label", slide.label)
+                        put("kind", slide.kind.wire)
+                        put("accent", slide.accent)
+                        slide.body?.let { put("body", it) }
+                        slide.tag?.let { put("tag", it.wire) }
+                        slide.focus?.let { put("focus", it) }
+                        slide.context?.let { put("context", it) }
+                        if (!slide.backdrop.isEmpty) {
+                            put(
+                                "backdrop",
+                                buildJsonObject {
+                                    slide.backdrop.low?.let { put("small", it) }
+                                    slide.backdrop.medium?.let { put("medium", it) }
+                                    slide.backdrop.high?.let { put("large", it) }
+                                },
+                            )
+                        }
                     },
                 )
             }
-            array.put(obj)
         }
-        val json = JSONObject().put("slides", array)
+        val json = buildJsonObject { put("slides", array) }
 
         prefs.edit().putString(keyFor(normalizedItemId, locale), json.toString()).apply()
     }

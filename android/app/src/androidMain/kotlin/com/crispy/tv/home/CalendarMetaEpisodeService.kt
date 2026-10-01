@@ -7,8 +7,20 @@ import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.addons.lookup.parseLookupId
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import org.json.JSONArray
-import org.json.JSONObject
+import com.crispy.tv.library.optIntOrNull
+import com.crispy.tv.library.optJsonArray
+import com.crispy.tv.library.optJsonObject
+import com.crispy.tv.library.optStringOrEmpty
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 
 internal class CalendarMetaEpisodeService(
     context: Context,
@@ -88,23 +100,37 @@ internal class CalendarMetaEpisodeService(
                 ?: fallbackManifest(seed)
                 ?: return null
 
-        val addonId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
+        val addonId = nonBlank(manifest.optStringOrEmpty("id")) ?: seed.addonIdHint
 
-        val resources = manifest.optJSONArray("resources") ?: JSONArray()
+        val resources = manifest.optJsonArray("resources") ?: JsonArray(emptyList())
         var declaredTypes = emptyList<String>()
 
-        for (index in 0 until resources.length()) {
-            when (val resource = resources.opt(index)) {
-                is String -> {
-                    if (!resource.equals("meta", ignoreCase = true)) continue
+        for (element in resources) {
+            when (val resource = element) {
+                // **`is String` is not a type a JSON string has, and this arm is
+                // the reason the port needed the guard rather than a rename.**
+                // A JSON *number* is a `JsonPrimitive` too, so widening the arm
+                // would admit values `org.json` dropped, and `contentOrNull`
+                // answers the same text for `1234` and `"1234"` -- `isString` is
+                // the only discriminator.
+                is JsonPrimitive -> {
+                    val text = resource.contentOrNull
+                    if (!resource.isString || text == null) continue
+                    if (!text.equals("meta", ignoreCase = true)) continue
                     declaredTypes = listOf("movie", "series")
                 }
 
-                is JSONObject -> {
-                    if (!resource.optString("name").equals("meta", ignoreCase = true)) continue
-                    declaredTypes = parseStringArray(resource.optJSONArray("types"))
+                is JsonObject -> {
+                    if (!resource.optStringOrEmpty("name").equals("meta", ignoreCase = true)) continue
+                    declaredTypes = parseStringArray(resource.optJsonArray("types"))
                     break
                 }
+
+                // `JsonElement` is sealed, where `org.json`'s `Any?` was not, so
+                // the `when` is exhaustiveness-checked now. `else` reproduces the
+                // old fall-through: a JSON array element matched neither arm and
+                // was dropped without a word.
+                else -> Unit
             }
         }
 
@@ -141,7 +167,7 @@ internal class CalendarMetaEpisodeService(
             }
         }
         val response = httpClient.getJsonObject(url) ?: return null
-        return parseMetaDetails(response.optJSONObject("meta"), endpoint.addonId)
+        return parseMetaDetails(response.optJsonObject("meta"), endpoint.addonId)
     }
 
     private suspend fun fetchMetaFromCinemeta(type: String, id: String): MetaDetails? {
@@ -149,31 +175,31 @@ internal class CalendarMetaEpisodeService(
         for (baseUrl in CINEMETA_BASE_URLS) {
             val url = "${baseUrl.trimEnd('/')}/meta/${type.lowercase()}/$encodedId.json"
             val response = httpClient.getJsonObject(url) ?: continue
-            parseMetaDetails(response.optJSONObject("meta"), CINEMETA_ADDON_ID)?.let { return it }
+            parseMetaDetails(response.optJsonObject("meta"), CINEMETA_ADDON_ID)?.let { return it }
         }
         return null
     }
 
-    private fun parseMetaDetails(meta: JSONObject?, addonId: String): MetaDetails? {
+    private fun parseMetaDetails(meta: JsonObject?, addonId: String): MetaDetails? {
         if (meta == null) return null
-        val name = nonBlank(meta.optString("name")) ?: return null
-        val videosArray = meta.optJSONArray("videos") ?: JSONArray()
+        val name = nonBlank(meta.optStringOrEmpty("name")) ?: return null
+        val videosArray = meta.optJsonArray("videos") ?: JsonArray(emptyList())
         val videos = buildList {
-            for (index in 0 until videosArray.length()) {
-                val video = videosArray.optJSONObject(index) ?: continue
-                val season = video.optInt("season", 0).takeIf { it >= 0 } ?: 0
-                val episode = video.optInt("episode", 0).takeIf { it >= 0 } ?: 0
+            for (element in videosArray) {
+                val video = element as? JsonObject ?: continue
+                val season = (video.optIntOrNull("season") ?: 0).takeIf { it >= 0 } ?: 0
+                val episode = (video.optIntOrNull("episode") ?: 0).takeIf { it >= 0 } ?: 0
                 add(
                     MetaVideo(
-                        id = nonBlank(video.optString("id")) ?: "$season:$episode",
-                        title = nonBlank(video.optString("title")),
+                        id = nonBlank(video.optStringOrEmpty("id")) ?: "$season:$episode",
+                        title = nonBlank(video.optStringOrEmpty("title")),
                         season = season,
                         episode = episode,
-                        released = nonBlank(video.optString("released")),
-                        overview = nonBlank(video.optString("overview")),
+                        released = nonBlank(video.optStringOrEmpty("released")),
+                        overview = nonBlank(video.optStringOrEmpty("overview")),
                         thumbnailUrl = firstNonBlank(
-                            video.optString("thumbnail"),
-                            video.optString("thumbnailUrl"),
+                            video.optStringOrEmpty("thumbnail"),
+                            video.optStringOrEmpty("thumbnailUrl"),
                         ),
                     )
                 )
@@ -181,41 +207,50 @@ internal class CalendarMetaEpisodeService(
         }
         return MetaDetails(
             seriesName = name,
-            artworkUrl = firstNonBlank(meta.optString("poster"), meta.optString("background")),
+            artworkUrl = firstNonBlank(meta.optStringOrEmpty("poster"), meta.optStringOrEmpty("background")),
             addonId = addonId,
             videos = videos,
         )
     }
 
-    private fun parseStringArray(array: JSONArray?): List<String> {
+    private fun parseStringArray(array: JsonArray?): List<String> {
         if (array == null) return emptyList()
         return buildList {
-            for (index in 0 until array.length()) {
-                nonBlank(array.optString(index))?.let(::add)
+            for (element in array) {
+                val text = (element as? JsonPrimitive)?.contentOrNull ?: continue
+                nonBlank(text)?.let(::add)
             }
         }
     }
 
-    private fun parseJsonObject(raw: String?): JSONObject? {
+    private fun parseJsonObject(raw: String?): JsonObject? {
         if (raw.isNullOrBlank()) return null
-        return runCatching { JSONObject(raw) }.getOrNull()
+        // `Json.parseToJsonElement` raises `SerializationException` where
+        // `JSONObject(raw)` raised `JSONException`; the `runCatching` absorbs
+        // either, and the `:app` census measured **zero** `JSONException`
+        // occurrences, so nothing could have depended on the type.
+        return runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
     }
 
-    private fun fallbackManifest(seed: AddonManifestSeed): JSONObject? {
+    private fun fallbackManifest(seed: AddonManifestSeed): JsonObject? {
         if (
             seed.addonIdHint.contains("cinemeta", ignoreCase = true) ||
                 seed.manifestUrl.contains("cinemeta", ignoreCase = true)
         ) {
-            return JSONObject()
-                .put("id", CINEMETA_ADDON_ID)
-                .put(
+            return buildJsonObject {
+                put("id", CINEMETA_ADDON_ID)
+                put(
                     "resources",
-                    JSONArray().put(
-                        JSONObject()
-                            .put("name", "meta")
-                            .put("types", JSONArray().put("movie").put("series"))
-                    )
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("name", "meta")
+                                put("types", buildJsonArray { add(JsonPrimitive("movie")); add(JsonPrimitive("series")) })
+                            }
+                        )
+                    }
                 )
+            }
         }
         return null
     }
@@ -300,8 +335,8 @@ internal data class MetaVideo(
     val releasedAtMs: Long = 0L,
 )
 
-private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {
+private suspend fun CrispyHttpClient.getJsonObject(url: String): JsonObject? {
     val response = runCatching { get(url = url) }.getOrNull() ?: return null
     if (response.code !in 200..299) return null
-    return runCatching { JSONObject(response.body) }.getOrNull()
+    return runCatching { Json.parseToJsonElement(response.body).jsonObject }.getOrNull()
 }

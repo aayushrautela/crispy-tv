@@ -16,8 +16,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import com.crispy.tv.addons.optBooleanOrFalse
+import com.crispy.tv.addons.optBooleanOrNull
+import com.crispy.tv.addons.optIntOrNull
+import com.crispy.tv.addons.optJsonArray
+import com.crispy.tv.addons.optJsonObject
+import com.crispy.tv.addons.optLongOrNull
+import com.crispy.tv.addons.optStringOrEmpty
+import com.crispy.tv.addons.stringAtOrEmpty
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
 import java.util.Locale
 
 private const val TAG = "CrispyAddonSubs"
@@ -161,8 +174,8 @@ class AddonStreamsService(
 
     private suspend fun resolveEndpoint(seed: AddonManifestSeed): AddonEndpoint? {
         val manifest = resolveManifest(seed)
-        val providerId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
-        val providerName = nonBlank(manifest?.optString("name")) ?: providerId
+        val providerId = nonBlank(manifest?.optStringOrEmpty("id")) ?: seed.addonIdHint
+        val providerName = nonBlank(manifest?.optStringOrEmpty("name")) ?: providerId
 
         val streamSupport = parseStreamSupport(manifest)
         if (!streamSupport.supported) return null
@@ -177,7 +190,7 @@ class AddonStreamsService(
         )
     }
 
-    private suspend fun resolveManifest(seed: AddonManifestSeed): JSONObject? {
+    private suspend fun resolveManifest(seed: AddonManifestSeed): JsonObject? {
         val networkManifest =
             manifestFetchSemaphore.withPermit {
                 httpClient.getJsonObject(seed.manifestUrl, MANIFEST_REQUEST_POLICY)
@@ -189,20 +202,23 @@ class AddonStreamsService(
         }
 
         val cachedJson = seed.cachedManifestJson ?: return null
-        return runCatching { JSONObject(cachedJson) }.getOrNull()
+        // `Json.parseToJsonElement` raises `SerializationException` where
+        // `JSONObject(String)` raised `JSONException`; the `runCatching`
+        // absorbs either, and `:addons` has zero `JSONException` references.
+        return runCatching { Json.parseToJsonElement(cachedJson).jsonObject }.getOrNull()
     }
 
-    private fun parseStreamSupport(manifest: JSONObject?): StreamSupport {
+    private fun parseStreamSupport(manifest: JsonObject?): StreamSupport {
         val defaultTypes =
-            parseMediaTypes(manifest?.optJSONArray("types"))
+            parseMediaTypes(manifest?.optJsonArray("types"))
                 .ifEmpty { setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME) }
-        val defaultPrefixes = parseStringList(manifest?.optJSONArray("idPrefixes"))
+        val defaultPrefixes = parseStringList(manifest?.optJsonArray("idPrefixes"))
         if (manifest == null) {
             return StreamSupport(supported = true, types = defaultTypes, idPrefixes = defaultPrefixes.toSet())
         }
 
-        val resources = manifest.optJSONArray("resources")
-        if (resources == null || resources.length() == 0) {
+        val resources = manifest.optJsonArray("resources")
+        if (resources == null || resources.size == 0) {
             return StreamSupport(supported = true, types = defaultTypes, idPrefixes = defaultPrefixes.toSet())
         }
 
@@ -210,25 +226,40 @@ class AddonStreamsService(
         val supportedTypes = linkedSetOf<MetadataLabMediaType>()
         val idPrefixes = linkedSetOf<String>()
 
-        for (index in 0 until resources.length()) {
-            when (val resource = resources.opt(index)) {
-                is String -> {
-                    if (resource.equals("stream", ignoreCase = true)) {
+        for (resource in resources) {
+            when (resource) {
+
+                is JsonPrimitive -> {
+                    // `is String` is not a type a JSON string has: a JSON *number*
+                    // is a `JsonPrimitive` too, so widening the arm would admit
+                    // values the old code dropped, and `contentOrNull` answers the
+                    // same string for the number `1234` and the quoted `"1234"`.
+                    // `isString` is the only discriminator.
+                    val text = resource.contentOrNull
+                    if (resource.isString && text != null &&
+                        text.equals("stream", ignoreCase = true)
+                    ) {
                         streamDeclared = true
                         supportedTypes += defaultTypes
                         idPrefixes += defaultPrefixes
                     }
                 }
 
-                is JSONObject -> {
-                    val name = nonBlank(resource.optString("name")) ?: continue
+                is JsonObject -> {
+                    val name = nonBlank(resource.optStringOrEmpty("name")) ?: continue
                     if (!name.equals("stream", ignoreCase = true)) continue
                     streamDeclared = true
 
-                    val types = parseMediaTypes(resource.optJSONArray("types")).ifEmpty { defaultTypes }
+                    val types = parseMediaTypes(resource.optJsonArray("types")).ifEmpty { defaultTypes }
                     supportedTypes += types
-                    idPrefixes += parseStringList(resource.optJSONArray("idPrefixes")).ifEmpty { defaultPrefixes }
+                    idPrefixes += parseStringList(resource.optJsonArray("idPrefixes")).ifEmpty { defaultPrefixes }
                 }
+                // `JsonElement` is SEALED, so this `when` is exhaustiveness-checked
+                // where `org.json`'s `Any?` was not, and a JSON *array* element was
+                // neither a `String` nor a `JSONObject` -- so the old `when` fell
+                // through and did nothing, and so does this arm. It has to be LAST:
+                // the compiler rejects an `else` entry in any other position.
+                else -> Unit
             }
         }
 
@@ -279,27 +310,27 @@ class AddonStreamsService(
     }
 
     private fun parseStreams(
-        payload: JSONObject,
+        payload: JsonObject,
         providerId: String,
         providerName: String,
     ): List<AddonStream> {
-        val array = payload.optJSONArray("streams") ?: JSONArray()
-        if (array.length() == 0) return emptyList()
+        val array = payload.optJsonArray("streams") ?: JsonArray(emptyList())
+        if (array.size == 0) return emptyList()
 
         val dedupe = LinkedHashSet<String>()
-        val out = ArrayList<AddonStream>(array.length())
+        val out = ArrayList<AddonStream>(array.size)
 
-        for (index in 0 until array.length()) {
-            val streamObject = array.optJSONObject(index) ?: continue
-            val name = nonBlank(streamObject.optString("name"))
-            val title = nonBlank(streamObject.optString("title"))
-            val description = nonBlank(streamObject.optString("description")) ?: title
-            val url = nonBlank(streamObject.optString("url"))
-            val infoHash = nonBlank(streamObject.optString("infoHash"))
-            val externalUrl = nonBlank(streamObject.optString("externalUrl"))
+        for (index in 0 until array.size) {
+            val streamObject = array.getOrNull(index) as? JsonObject ?: continue
+            val name = nonBlank(streamObject.optStringOrEmpty("name"))
+            val title = nonBlank(streamObject.optStringOrEmpty("title"))
+            val description = nonBlank(streamObject.optStringOrEmpty("description")) ?: title
+            val url = nonBlank(streamObject.optStringOrEmpty("url"))
+            val infoHash = nonBlank(streamObject.optStringOrEmpty("infoHash"))
+            val externalUrl = nonBlank(streamObject.optStringOrEmpty("externalUrl"))
             val fileIdx = parseIntOrNull(streamObject, "fileIdx")
-            val sources = parseStringList(streamObject.optJSONArray("sources"))
-            val clientResolveObject = streamObject.optJSONObject("clientResolve")
+            val sources = parseStringList(streamObject.optJsonArray("sources"))
+            val clientResolveObject = streamObject.optJsonObject("clientResolve")
             if (url == null && infoHash == null && externalUrl == null && clientResolveObject == null) continue
 
             val dedupeKey =
@@ -312,20 +343,20 @@ class AddonStreamsService(
                 )
             if (!dedupe.add(dedupeKey)) continue
 
-            val hintsObj = streamObject.optJSONObject("behaviorHints")
-            val proxyHeaders = hintsObj?.optJSONObject("proxyHeaders")?.optJSONObject("request")
+            val hintsObj = streamObject.optJsonObject("behaviorHints")
+            val proxyHeaders = hintsObj?.optJsonObject("proxyHeaders")?.optJsonObject("request")
             val requestHeaders = parseRequestHeaders(proxyHeaders)
             val behaviorHints =
                 StreamBehaviorHints(
-                    bingeGroup = nonBlank(hintsObj?.optString("bingeGroup")),
-                    notWebReady = (hintsObj?.optBoolean("notWebReady") ?: false) || proxyHeaders != null,
-                    videoHash = nonBlank(hintsObj?.optString("videoHash")),
-                    videoSize = hintsObj?.optLong("videoSize")?.takeIf { it > 0L },
-                    filename = nonBlank(hintsObj?.optString("filename")),
+                    bingeGroup = nonBlank(hintsObj?.optStringOrEmpty("bingeGroup")),
+                    notWebReady = (hintsObj?.optBooleanOrFalse("notWebReady") ?: false) || proxyHeaders != null,
+                    videoHash = nonBlank(hintsObj?.optStringOrEmpty("videoHash")),
+                    videoSize = (hintsObj?.optLongOrNull("videoSize") ?: 0L).takeIf { it > 0L },
+                    filename = nonBlank(hintsObj?.optStringOrEmpty("filename")),
                     proxyRequestHeaders = requestHeaders.ifEmpty { null },
                 )
             val stableKey = buildStreamStableKey(providerId, dedupeKey)
-            val subtitles = parseStreamSubtitles(streamObject.optJSONArray("subtitles"))
+            val subtitles = parseStreamSubtitles(streamObject.optJsonArray("subtitles"))
             val clientResolve = parseClientResolve(clientResolveObject)
 
             out +=
@@ -341,7 +372,7 @@ class AddonStreamsService(
                     externalUrl = externalUrl,
                     sources = sources,
                     requestHeaders = requestHeaders,
-                    cached = hintsObj?.optBoolean("cached", false) ?: false,
+                    cached = hintsObj?.optBooleanOrFalse("cached") ?: false,
                     stableKey = stableKey,
                     subtitles = subtitles,
                     behaviorHints = behaviorHints,
@@ -352,106 +383,99 @@ class AddonStreamsService(
         return out
     }
 
-    private fun parseClientResolve(obj: JSONObject?): StreamClientResolve? {
+    private fun parseClientResolve(obj: JsonObject?): StreamClientResolve? {
         if (obj == null) return null
         return StreamClientResolve(
-            type = nonBlank(obj.optString("type")),
-            infoHash = nonBlank(obj.optString("infoHash")),
+            type = nonBlank(obj.optStringOrEmpty("type")),
+            infoHash = nonBlank(obj.optStringOrEmpty("infoHash")),
             fileIdx = parseIntOrNull(obj, "fileIdx"),
-            magnetUri = nonBlank(obj.optString("magnetUri")),
-            sources = parseStringList(obj.optJSONArray("sources")),
-            torrentName = nonBlank(obj.optString("torrentName")),
-            filename = nonBlank(obj.optString("filename")),
-            mediaType = nonBlank(obj.optString("mediaType")),
-            mediaId = nonBlank(obj.optString("mediaId")),
-            mediaOnlyId = nonBlank(obj.optString("mediaOnlyId")),
-            title = nonBlank(obj.optString("title")),
+            magnetUri = nonBlank(obj.optStringOrEmpty("magnetUri")),
+            sources = parseStringList(obj.optJsonArray("sources")),
+            torrentName = nonBlank(obj.optStringOrEmpty("torrentName")),
+            filename = nonBlank(obj.optStringOrEmpty("filename")),
+            mediaType = nonBlank(obj.optStringOrEmpty("mediaType")),
+            mediaId = nonBlank(obj.optStringOrEmpty("mediaId")),
+            mediaOnlyId = nonBlank(obj.optStringOrEmpty("mediaOnlyId")),
+            title = nonBlank(obj.optStringOrEmpty("title")),
             season = parseIntOrNull(obj, "season"),
             episode = parseIntOrNull(obj, "episode"),
-            service = nonBlank(obj.optString("service")),
+            service = nonBlank(obj.optStringOrEmpty("service")),
             serviceIndex = parseIntOrNull(obj, "serviceIndex"),
-            serviceExtension = nonBlank(obj.optString("serviceExtension")),
-            isCached = if (obj.has("isCached")) obj.optBoolean("isCached") else null,
-            stream = parseClientResolveStream(obj.optJSONObject("stream")),
+            serviceExtension = nonBlank(obj.optStringOrEmpty("serviceExtension")),
+            isCached = obj.optBooleanOrNull("isCached"),
+            stream = parseClientResolveStream(obj.optJsonObject("stream")),
         )
     }
 
-    private fun parseClientResolveStream(obj: JSONObject?): StreamClientResolveStream? {
+    private fun parseClientResolveStream(obj: JsonObject?): StreamClientResolveStream? {
         if (obj == null) return null
-        return StreamClientResolveStream(raw = parseClientResolveRaw(obj.optJSONObject("raw")))
+        return StreamClientResolveStream(raw = parseClientResolveRaw(obj.optJsonObject("raw")))
     }
 
-    private fun parseClientResolveRaw(obj: JSONObject?): StreamClientResolveRaw? {
+    private fun parseClientResolveRaw(obj: JsonObject?): StreamClientResolveRaw? {
         if (obj == null) return null
         return StreamClientResolveRaw(
-            torrentName = nonBlank(obj.optString("torrentName")),
-            filename = nonBlank(obj.optString("filename")),
-            size = obj.optLong("size").takeIf { it > 0L },
-            folderSize = obj.optLong("folderSize").takeIf { it > 0L },
-            tracker = nonBlank(obj.optString("tracker")),
-            indexer = nonBlank(obj.optString("indexer")),
-            network = nonBlank(obj.optString("network")),
-            parsed = parseClientResolveParsed(obj.optJSONObject("parsed")),
+            torrentName = nonBlank(obj.optStringOrEmpty("torrentName")),
+            filename = nonBlank(obj.optStringOrEmpty("filename")),
+            size = (obj.optLongOrNull("size") ?: 0L).takeIf { it > 0L },
+            folderSize = (obj.optLongOrNull("folderSize") ?: 0L).takeIf { it > 0L },
+            tracker = nonBlank(obj.optStringOrEmpty("tracker")),
+            indexer = nonBlank(obj.optStringOrEmpty("indexer")),
+            network = nonBlank(obj.optStringOrEmpty("network")),
+            parsed = parseClientResolveParsed(obj.optJsonObject("parsed")),
         )
     }
 
-    private fun parseClientResolveParsed(obj: JSONObject?): StreamClientResolveParsed? {
+    private fun parseClientResolveParsed(obj: JsonObject?): StreamClientResolveParsed? {
         if (obj == null) return null
         return StreamClientResolveParsed(
-            rawTitle = nonBlank(obj.optString("raw_title")),
-            parsedTitle = nonBlank(obj.optString("parsed_title")),
+            rawTitle = nonBlank(obj.optStringOrEmpty("raw_title")),
+            parsedTitle = nonBlank(obj.optStringOrEmpty("parsed_title")),
             year = parseIntOrNull(obj, "year"),
-            resolution = nonBlank(obj.optString("resolution")),
-            seasons = parseIntList(obj.optJSONArray("seasons")),
-            episodes = parseIntList(obj.optJSONArray("episodes")),
-            quality = nonBlank(obj.optString("quality")),
-            hdr = parseStringList(obj.optJSONArray("hdr")),
-            codec = nonBlank(obj.optString("codec")),
-            audio = parseStringList(obj.optJSONArray("audio")),
-            channels = parseStringList(obj.optJSONArray("channels")),
-            languages = parseStringList(obj.optJSONArray("languages")),
-            group = nonBlank(obj.optString("group")),
-            network = nonBlank(obj.optString("network")),
-            edition = nonBlank(obj.optString("edition")),
-            duration = obj.optLong("duration").takeIf { it > 0L },
-            bitDepth = nonBlank(obj.optString("bit_depth")),
-            extended = if (obj.has("extended")) obj.optBoolean("extended") else null,
-            theatrical = if (obj.has("theatrical")) obj.optBoolean("theatrical") else null,
-            remastered = if (obj.has("remastered")) obj.optBoolean("remastered") else null,
-            unrated = if (obj.has("unrated")) obj.optBoolean("unrated") else null,
+            resolution = nonBlank(obj.optStringOrEmpty("resolution")),
+            seasons = parseIntList(obj.optJsonArray("seasons")),
+            episodes = parseIntList(obj.optJsonArray("episodes")),
+            quality = nonBlank(obj.optStringOrEmpty("quality")),
+            hdr = parseStringList(obj.optJsonArray("hdr")),
+            codec = nonBlank(obj.optStringOrEmpty("codec")),
+            audio = parseStringList(obj.optJsonArray("audio")),
+            channels = parseStringList(obj.optJsonArray("channels")),
+            languages = parseStringList(obj.optJsonArray("languages")),
+            group = nonBlank(obj.optStringOrEmpty("group")),
+            network = nonBlank(obj.optStringOrEmpty("network")),
+            edition = nonBlank(obj.optStringOrEmpty("edition")),
+            duration = (obj.optLongOrNull("duration") ?: 0L).takeIf { it > 0L },
+            bitDepth = nonBlank(obj.optStringOrEmpty("bit_depth")),
+            extended = obj.optBooleanOrNull("extended"),
+            theatrical = obj.optBooleanOrNull("theatrical"),
+            remastered = obj.optBooleanOrNull("remastered"),
+            unrated = obj.optBooleanOrNull("unrated"),
         )
     }
 
-    private fun parseIntOrNull(obj: JSONObject, name: String): Int? {
-        val raw = obj.opt(name) ?: return null
-        return when (raw) {
-            is Int -> raw.takeIf { it >= 0 }
-            is String -> raw.toIntOrNull()?.takeIf { it >= 0 }
-            else -> null
-        }
+    private fun parseIntOrNull(obj: JsonObject, name: String): Int? {
+        return obj.optIntOrNull(name)?.takeIf { it >= 0 }
     }
 
-    private fun parseStringList(array: JSONArray?): List<String> {
-        if (array == null || array.length() == 0) return emptyList()
-        val out = ArrayList<String>(array.length())
-        for (index in 0 until array.length()) {
-            val value = nonBlank(array.optString(index)) ?: continue
+    private fun parseStringList(array: JsonArray?): List<String> {
+        if (array == null || array.size == 0) return emptyList()
+        val out = ArrayList<String>(array.size)
+        for (index in 0 until array.size) {
+            val value = nonBlank(array.stringAtOrEmpty(index)) ?: continue
             out += value
         }
         return out
     }
 
-    private fun parseIntList(array: JSONArray?): List<Int> {
-        if (array == null || array.length() == 0) return emptyList()
-        val out = ArrayList<Int>(array.length())
-        for (index in 0 until array.length()) {
-            val raw = array.opt(index) ?: continue
-            val value =
-                when (raw) {
-                    is Int -> raw
-                    is String -> raw.toIntOrNull()
-                    else -> null
-                } ?: continue
+    private fun parseIntList(array: JsonArray?): List<Int> {
+        if (array == null || array.size == 0) return emptyList()
+        val out = ArrayList<Int>(array.size)
+        for (index in 0 until array.size) {
+            val raw = array.getOrNull(index) as? JsonPrimitive ?: continue
+            // Same shape as `parseIntOrNull`: the old `is Int` arm is what a
+            // fractional number used to fall past, and `intOrNull` returns null
+            // for a fractional literal, so the answer is the same.
+            val value = raw.intOrNull ?: raw.contentOrNull?.trim()?.toIntOrNull() ?: continue
             out += value
         }
         return out
@@ -479,12 +503,12 @@ class AddonStreamsService(
         return if (endpoint.encodedQuery.isBlank()) base else "$base?${endpoint.encodedQuery}"
     }
 
-    private fun parseMediaTypes(values: JSONArray?): Set<MetadataLabMediaType> {
-        if (values == null || values.length() == 0) return emptySet()
+    private fun parseMediaTypes(values: JsonArray?): Set<MetadataLabMediaType> {
+        if (values == null || values.size == 0) return emptySet()
 
         val out = LinkedHashSet<MetadataLabMediaType>()
-        for (index in 0 until values.length()) {
-            val value = nonBlank(values.optString(index)) ?: continue
+        for (index in 0 until values.size) {
+            val value = nonBlank(values.stringAtOrEmpty(index)) ?: continue
             when (value.lowercase(Locale.US)) {
                 "movie" -> out += MetadataLabMediaType.MOVIE
                 "series", "show", "tv" -> out += MetadataLabMediaType.SERIES
@@ -494,43 +518,45 @@ class AddonStreamsService(
         return out
     }
 
-    private fun parseManifestStringArray(array: JSONArray?): List<String> {
-        if (array == null || array.length() == 0) return emptyList()
+    private fun parseManifestStringArray(array: JsonArray?): List<String> {
+        if (array == null || array.size == 0) return emptyList()
 
-        val out = ArrayList<String>(array.length())
-        for (index in 0 until array.length()) {
-            val value = nonBlank(array.optString(index)) ?: continue
+        val out = ArrayList<String>(array.size)
+        for (index in 0 until array.size) {
+            val value = nonBlank(array.stringAtOrEmpty(index)) ?: continue
             out += value
         }
         return out
     }
 
-    private fun parseRequestHeaders(headersObject: JSONObject?): Map<String, String> {
-        if (headersObject == null || headersObject.length() == 0) return emptyMap()
+    private fun parseRequestHeaders(headersObject: JsonObject?): Map<String, String> {
+        if (headersObject == null || headersObject.size == 0) return emptyMap()
 
         val out = linkedMapOf<String, String>()
-        val iterator = headersObject.keys()
-        while (iterator.hasNext()) {
-            val key = iterator.next()?.trim().orEmpty()
+        for ((rawKey, element) in headersObject) {
+            val key = rawKey.trim()
             if (key.isBlank()) continue
-            val value = headersObject.optString(key).trim()
+            // A VARIABLE key, so the quote-anchored rename above deliberately
+            // left this one alone -- and `optStringOrEmpty` takes a `String`
+            // key exactly as `optString` did.
+            val value = headersObject.optStringOrEmpty(rawKey).trim()
             if (value.isBlank()) continue
             out[key] = value
         }
         return out
     }
 
-    private fun parseStreamSubtitles(subtitlesArray: org.json.JSONArray?): List<StreamSubtitle> {
-        if (subtitlesArray == null || subtitlesArray.length() == 0) return emptyList()
-        val out = ArrayList<StreamSubtitle>(subtitlesArray.length())
-        for (i in 0 until subtitlesArray.length()) {
-            val item = subtitlesArray.optJSONObject(i) ?: continue
-            val url = nonBlank(item.optString("url")) ?: continue
+    private fun parseStreamSubtitles(subtitlesArray: JsonArray?): List<StreamSubtitle> {
+        if (subtitlesArray == null || subtitlesArray.size == 0) return emptyList()
+        val out = ArrayList<StreamSubtitle>(subtitlesArray.size)
+        for (i in 0 until subtitlesArray.size) {
+            val item = subtitlesArray.getOrNull(i) as? JsonObject ?: continue
+            val url = nonBlank(item.optStringOrEmpty("url")) ?: continue
             val lang =
-                nonBlank(item.optString("lang"))
-                    ?: nonBlank(item.optString("language"))
-                    ?: nonBlank(item.optString("languageCode"))
-            val name = nonBlank(item.optString("name")) ?: nonBlank(item.optString("title"))
+                nonBlank(item.optStringOrEmpty("lang"))
+                    ?: nonBlank(item.optStringOrEmpty("language"))
+                    ?: nonBlank(item.optStringOrEmpty("languageCode"))
+            val name = nonBlank(item.optStringOrEmpty("name")) ?: nonBlank(item.optStringOrEmpty("title"))
             out += StreamSubtitle(url = url, lang = lang, name = name)
         }
         return out
@@ -541,7 +567,7 @@ class AddonStreamsService(
     private suspend fun CrispyHttpClient.getJsonObject(
         url: String,
         requestPolicy: JsonRequestPolicy,
-    ): JSONObject? {
+    ): JsonObject? {
         var attempt = 0
         var backoffMs = requestPolicy.initialBackoffMs
 
@@ -609,7 +635,7 @@ class AddonStreamsService(
         val body = response.body.trim()
         if (body.isEmpty()) return JsonFetchResult.EmptyBody
 
-        return runCatching { JSONObject(body) }
+        return runCatching { Json.parseToJsonElement(body).jsonObject }
             .fold(
                 onSuccess = { JsonFetchResult.Success(it) },
                 onFailure = { JsonFetchResult.ParseFailure },
@@ -642,7 +668,7 @@ class AddonStreamsService(
                     Log.d(TAG, "subtitle GET ${endpoint.providerName} -> null (failed/empty)")
                     continue
                 }
-                Log.d(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.length()})")
+                Log.d(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.size})")
                 val subtitles = parseAddonSubtitles(json, endpoint.providerId, endpoint.providerName)
                 Log.d(TAG, "subtitle parsed ${endpoint.providerName} count=${subtitles.size}")
                 for (subtitle in subtitles) {
@@ -665,8 +691,8 @@ class AddonStreamsService(
                             Log.d(TAG, "subtitle endpoint dropped (no 'subtitles' resource): ${seed.addonIdHint}")
                             return@async null
                         }
-                        val providerId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
-                        val providerName = nonBlank(manifest.optString("name")) ?: providerId
+                        val providerId = nonBlank(manifest.optStringOrEmpty("id")) ?: seed.addonIdHint
+                        val providerName = nonBlank(manifest.optStringOrEmpty("name")) ?: providerId
                         Log.d(TAG, "subtitle endpoint kept: $providerName")
                         SubtitleEndpoint(
                             providerId = providerId,
@@ -681,14 +707,18 @@ class AddonStreamsService(
         }.filterNotNull()
     }
 
-    private fun subtitleResourceFor(manifest: JSONObject): SubtitleResourceInfo? {
-        val defaultTypes = parseStringList(manifest.optJSONArray("types"))
-        val defaultPrefixes = parseStringList(manifest.optJSONArray("idPrefixes"))
-        val resources = manifest.optJSONArray("resources") ?: return null
-        for (index in 0 until resources.length()) {
-            when (val resource = resources.opt(index)) {
-                is String -> {
-                    if (resource.equals("subtitles", ignoreCase = true) || resource.equals("subtitle", ignoreCase = true)) {
+    private fun subtitleResourceFor(manifest: JsonObject): SubtitleResourceInfo? {
+        val defaultTypes = parseStringList(manifest.optJsonArray("types"))
+        val defaultPrefixes = parseStringList(manifest.optJsonArray("idPrefixes"))
+        val resources = manifest.optJsonArray("resources") ?: return null
+        for (resource in resources) {
+            when (resource) {
+
+                is JsonPrimitive -> {
+                    val text = resource.contentOrNull
+                    if (resource.isString && text != null &&
+                        (text.equals("subtitles", ignoreCase = true) || text.equals("subtitle", ignoreCase = true))
+                    ) {
                         return SubtitleResourceInfo(
                             types = defaultTypes.toSet(),
                             idPrefixes = defaultPrefixes.toSet(),
@@ -696,13 +726,19 @@ class AddonStreamsService(
                     }
                 }
 
-                is JSONObject -> {
-                    val name = nonBlank(resource.optString("name")) ?: continue
+                is JsonObject -> {
+                    val name = nonBlank(resource.optStringOrEmpty("name")) ?: continue
                     if (!name.equals("subtitles", ignoreCase = true) && !name.equals("subtitle", ignoreCase = true)) continue
-                    val types = parseStringList(resource.optJSONArray("types")).ifEmpty { defaultTypes }.toSet()
-                    val idPrefixes = parseStringList(resource.optJSONArray("idPrefixes")).ifEmpty { defaultPrefixes }.toSet()
+                    val types = parseStringList(resource.optJsonArray("types")).ifEmpty { defaultTypes }.toSet()
+                    val idPrefixes = parseStringList(resource.optJsonArray("idPrefixes")).ifEmpty { defaultPrefixes }.toSet()
                     return SubtitleResourceInfo(types = types, idPrefixes = idPrefixes)
                 }
+                // `JsonElement` is SEALED, so this `when` is exhaustiveness-checked
+                // where `org.json`'s `Any?` was not, and a JSON *array* element was
+                // neither a `String` nor a `JSONObject` -- so the old `when` fell
+                // through and did nothing, and so does this arm. It has to be LAST:
+                // the compiler rejects an `else` entry in any other position.
+                else -> Unit
             }
         }
         return null
@@ -719,27 +755,27 @@ class AddonStreamsService(
     }
 
     private fun parseAddonSubtitles(
-        json: JSONObject,
+        json: JsonObject,
         providerId: String,
         providerName: String,
     ): List<AddonSubtitle> {
-        val array = json.optJSONArray("subtitles") ?: return emptyList()
-        if (array.length() == 0) return emptyList()
-        val out = ArrayList<AddonSubtitle>(array.length())
-        for (index in 0 until array.length()) {
-            val item = array.optJSONObject(index) ?: continue
-            val url = nonBlank(item.optString("url")) ?: continue
+        val array = json.optJsonArray("subtitles") ?: return emptyList()
+        if (array.size == 0) return emptyList()
+        val out = ArrayList<AddonSubtitle>(array.size)
+        for (index in 0 until array.size) {
+            val item = array.getOrNull(index) as? JsonObject ?: continue
+            val url = nonBlank(item.optStringOrEmpty("url")) ?: continue
             val language =
-                nonBlank(item.optString("lang"))
-                    ?: nonBlank(item.optString("language"))
-                    ?: nonBlank(item.optString("languageCode"))
-                    ?: nonBlank(item.optString("locale"))
-                    ?: nonBlank(item.optString("label"))
+                nonBlank(item.optStringOrEmpty("lang"))
+                    ?: nonBlank(item.optStringOrEmpty("language"))
+                    ?: nonBlank(item.optStringOrEmpty("languageCode"))
+                    ?: nonBlank(item.optStringOrEmpty("locale"))
+                    ?: nonBlank(item.optStringOrEmpty("label"))
                     ?: "unknown"
-            val name = nonBlank(item.optString("label")) ?: nonBlank(item.optString("name")) ?: language
+            val name = nonBlank(item.optStringOrEmpty("label")) ?: nonBlank(item.optStringOrEmpty("name")) ?: language
             out +=
                 AddonSubtitle(
-                    id = "$providerId-${nonBlank(item.optString("id")) ?: index}",
+                    id = "$providerId-${nonBlank(item.optStringOrEmpty("id")) ?: index}",
                     url = url,
                     language = language,
                     display = "$language - $providerName",
@@ -790,7 +826,7 @@ class AddonStreamsService(
 
     private sealed interface JsonFetchResult {
         data class Success(
-            val payload: JSONObject,
+            val payload: JsonObject,
         ) : JsonFetchResult
 
         data class HttpFailure(

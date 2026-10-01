@@ -243,6 +243,18 @@ kotlin {
         // grows when a file moves, not before, because a dependency declared
         // here with no consumer yet is a portability claim nothing backs.
         commonMain.dependencies {
+
+        // **The node type, and it is declared here rather than in `androidMain`
+        // because that is where the files now are.**
+        // `LibraryDiskCacheJsonAccessors.kt` and `ProfileDataShadowJsonAccessors.kt`
+        // moved to `commonMain` in the same change that made their two suites
+        // move to `commonTest`, and `JsonAccessorPolicyHostTest` in `:backend`
+        // and `WatchProgressStoreHostTest` in `:watchhistory` already run this
+        // way. A file's dependency belongs in the source set the file is in, not
+        // where it used to be -- declaring it in `androidMain` would have
+        // compiled the accessors and left `commonTest` unable to see the very
+        // declarations it exists to cover.
+        implementation(libs.serialization.json)
             implementation(project(":android:core-domain"))
             implementation(project(":android:platform-core"))
             implementation(project(":android:sharedUI"))

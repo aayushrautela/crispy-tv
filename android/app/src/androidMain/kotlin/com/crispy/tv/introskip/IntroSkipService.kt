@@ -6,7 +6,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import com.crispy.tv.library.optBooleanOrNull
+import com.crispy.tv.library.optDoubleOrNull
+import com.crispy.tv.library.optIntOrNull
+import com.crispy.tv.library.optJsonArray
+import com.crispy.tv.library.optJsonObject
+import com.crispy.tv.library.optStringOrEmpty
+import com.crispy.tv.library.optStringOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
@@ -173,24 +182,24 @@ class RemoteIntroSkipService(
         val payload = parseJsonObject(response.body) ?: return emptyList()
         val intervals = mutableListOf<IntroSkipInterval>()
 
-        addIntroDbInterval(intervals, payload.optJSONObject("intro"), IntroSkipSegmentType.INTRO)
-        addIntroDbInterval(intervals, payload.optJSONObject("recap"), IntroSkipSegmentType.RECAP)
-        addIntroDbInterval(intervals, payload.optJSONObject("outro"), IntroSkipSegmentType.OUTRO)
+        addIntroDbInterval(intervals, payload.optJsonObject("intro"), IntroSkipSegmentType.INTRO)
+        addIntroDbInterval(intervals, payload.optJsonObject("recap"), IntroSkipSegmentType.RECAP)
+        addIntroDbInterval(intervals, payload.optJsonObject("outro"), IntroSkipSegmentType.OUTRO)
 
         return intervals
     }
 
     private fun addIntroDbInterval(
         target: MutableList<IntroSkipInterval>,
-        segment: JSONObject?,
+        segment: JsonObject?,
         segmentType: IntroSkipSegmentType
     ) {
         if (segment == null) {
             return
         }
 
-        val startSec = segment.optDouble("start_sec", Double.NaN)
-        val endSec = segment.optDouble("end_sec", Double.NaN)
+        val startSec = segment.optDoubleOrNull("start_sec") ?: Double.NaN
+        val endSec = segment.optDoubleOrNull("end_sec") ?: Double.NaN
         val interval =
             buildInterval(
                 startMs = secondsToMillis(startSec),
@@ -217,25 +226,25 @@ class RemoteIntroSkipService(
         }
 
         val payload = parseJsonObject(response.body) ?: return emptyList()
-        if (!payload.optBoolean("found", false)) {
+        if (payload.optBooleanOrNull("found") != true) {
             return emptyList()
         }
 
-        val results = payload.optJSONArray("results") ?: return emptyList()
+        val results = payload.optJsonArray("results") ?: return emptyList()
         val intervals = mutableListOf<IntroSkipInterval>()
 
-        for (index in 0 until results.length()) {
-            val item = results.optJSONObject(index) ?: continue
-            val intervalJson = item.optJSONObject("interval") ?: continue
-            val startSec = intervalJson.optDouble("startTime", Double.NaN)
-            val endSec = intervalJson.optDouble("endTime", Double.NaN)
+        for (element in results) {
+            val item = element as? JsonObject ?: continue
+            val intervalJson = item.optJsonObject("interval") ?: continue
+            val startSec = intervalJson.optDoubleOrNull("startTime") ?: Double.NaN
+            val endSec = intervalJson.optDoubleOrNull("endTime") ?: Double.NaN
             val interval =
                 buildInterval(
                     startMs = secondsToMillis(startSec),
                     endMs = secondsToMillis(endSec),
-                    segmentType = IntroSkipSegmentType.fromWire(item.optString("skipType")),
+                    segmentType = IntroSkipSegmentType.fromWire(item.optStringOrEmpty("skipType")),
                     provider = IntroSkipProvider.ANI_SKIP,
-                    skipId = item.optString("skipId").ifBlank { null }
+                    skipId = item.optStringOrEmpty("skipId").ifBlank { null }
                 )
             if (interval != null) {
                 intervals += interval
@@ -253,17 +262,17 @@ class RemoteIntroSkipService(
         }
 
         val payload = parseJsonObject(response.body) ?: return null
-        val mappings = payload.optJSONArray("data") ?: return null
+        val mappings = payload.optJsonArray("data") ?: return null
 
-        for (index in 0 until mappings.length()) {
-            val item = mappings.optJSONObject(index) ?: continue
-            val attributes = item.optJSONObject("attributes") ?: continue
-            val externalSite = attributes.optString("externalSite")
+        for (element in mappings) {
+            val item = element as? JsonObject ?: continue
+            val attributes = item.optJsonObject("attributes") ?: continue
+            val externalSite = attributes.optStringOrNull("externalSite")
             if (externalSite != "myanimelist/anime") {
                 continue
             }
 
-            val externalId = attributes.optString("externalId").toIntOrNull()
+            val externalId = attributes.optStringOrNull("externalId")?.toIntOrNull()
             if (externalId != null && externalId > 0) {
                 return externalId
             }
@@ -280,11 +289,11 @@ class RemoteIntroSkipService(
         }
 
         val payload = parseJsonObject(response.body) ?: return null
-        val results = payload.optJSONArray("results") ?: return null
+        val results = payload.optJsonArray("results") ?: return null
 
-        for (index in 0 until results.length()) {
-            val item = results.optJSONObject(index) ?: continue
-            val malId = item.optInt("myanimelist", -1)
+        for (element in results) {
+            val item = element as? JsonObject ?: continue
+            val malId = item.optIntOrNull("myanimelist") ?: -1
             if (malId > 0) {
                 return malId
             }
@@ -317,13 +326,16 @@ class RemoteIntroSkipService(
         }.getOrNull()
     }
 
-    private fun parseJsonObject(rawBody: String?): JSONObject? {
+    private fun parseJsonObject(rawBody: String?): JsonObject? {
         if (rawBody.isNullOrBlank()) {
             return null
         }
 
         return runCatching {
-            JSONObject(rawBody)
+            // `SerializationException` where this raised `JSONException`; the
+        // caller's `runCatching` absorbs either, and `:app` names neither --
+        // the census measured zero `JSONException` occurrences.
+        Json.parseToJsonElement(rawBody).jsonObject
         }.getOrNull()
     }
 

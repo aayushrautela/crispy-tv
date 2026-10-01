@@ -5,8 +5,16 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.images.ResponsiveImageSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -27,16 +35,20 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
     override suspend fun read(profileId: String, sectionId: String): LibraryCachedPage? = withContext(Dispatchers.IO) {
         val file = cacheFile(profileId, sectionId)
         val raw = runCatching { file.readText(StandardCharsets.UTF_8) }.getOrNull() ?: return@withContext null
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return@withContext null
-        val items = parseItems(json.optJSONArray("items"))
-        if (items.isEmpty() && !json.has("items")) {
+        val json = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return@withContext null
+        val items = parseItems(json.optJsonArray("items"))
+        // `has("items")` asks whether the KEY is there, which is not the same
+        // question as `optJsonArray` -- so it survives the port rather than
+        // collapsing into it. A key present with a null or non-array value is
+        // "present" here and "absent" there.
+        if (items.isEmpty() && "items" !in json) {
             return@withContext null
         }
         LibraryCachedPage(
             items = items,
             nextCursor = json.optNullableString("next_cursor"),
-            hasMore = json.optBoolean("has_more", false),
-            appliedGenerationMs = json.optLong("applied_gen_ms", 0L).takeIf { it > 0L },
+            hasMore = json.optBooleanOrNull("has_more") ?: false,
+            appliedGenerationMs = (json.optLongOrNull("applied_gen_ms") ?: 0L).takeIf { it > 0L },
         )
     }
 
@@ -46,24 +58,39 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
         page: LibrarySectionPageUi,
         appliedGenerationMs: Long?,
     ) = withContext(Dispatchers.IO) {
+        // A chained `JSONObject().put(...).put(...)` becomes ONE
+        // `buildJsonObject { }` block, and the chain's `.apply { ... }` becomes a
+        // plain `if` inside it: there is no receiver left to apply to.
+        // `.toString()` stays, because the cache is written as text either way.
+        //
+        // **`put` here is the BUILDER's extension, not `Map.put`.** Inside the
+        // lambda `JsonObjectBuilder` is the receiver, so `put` resolves to
+        // `JsonObjectBuilder.put`; outside one the name would find
+        // `Map<String, JsonElement>.put`, whose value parameter is a non-null
+        // `JsonElement` — which is why the nullable `next_cursor` needs its
+        // `?.let` below and the two nested `put("items", ...)` cannot.
         val json =
-            JSONObject()
-                .put(
+            buildJsonObject {
+                put(
                     "items",
-                    JSONArray().apply {
+                    buildJsonArray {
                         page.items.forEach { item ->
-                            put(item.toCacheJson())
+                            add(item.toCacheJson())
                         }
                     },
                 )
-                .put("next_cursor", page.nextCursor)
-                .put("has_more", page.hasMore)
-                .apply {
-                    if (appliedGenerationMs != null && appliedGenerationMs > 0L) {
-                        put("applied_gen_ms", appliedGenerationMs)
-                    }
+                // `org.json`'s `put(key, null)` REMOVED the key rather than
+                // writing one, and `put(key, value: String?)` writes `JsonNull`
+                // instead. The two read back identically — `optStringOrEmpty`
+                // answers `""` for an absent key and for a `JsonNull` alike — but
+                // the `?.let` also keeps the stored bytes unchanged, which is
+                // worth more than the shorter line for a file on disk.
+                page.nextCursor?.let { put("next_cursor", it) }
+                put("has_more", page.hasMore)
+                if (appliedGenerationMs != null && appliedGenerationMs > 0L) {
+                    put("applied_gen_ms", appliedGenerationMs)
                 }
-                .toString()
+            }.toString()
         val file = cacheFile(profileId, sectionId)
         runCatching {
             file.parentFile?.mkdirs()
@@ -96,17 +123,17 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
         }
     }
 
-    private fun parseItems(array: JSONArray?): List<CatalogItem> {
+    private fun parseItems(array: JsonArray?): List<CatalogItem> {
         val safe = array ?: return emptyList()
         return buildList {
-            for (i in 0 until safe.length()) {
-                val item = safe.optJSONObject(i) ?: continue
+            for (item in safe) {
+                if (item !is JsonObject) continue
                 add(item.toCatalogItem() ?: continue)
             }
         }
     }
 
-    private fun JSONObject.toCatalogItem(): CatalogItem? {
+    private fun JsonObject.toCatalogItem(): CatalogItem? {
         val normalizedItemId = optNullableString("item_id") ?: return null
         val normalizedTitle = optNullableString("title") ?: return null
         return CatalogItem(
@@ -128,42 +155,55 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
             watchedAt = optNullableString("watched_at"),
             ratedAt = optNullableString("rated_at"),
             lastActivityAt = optNullableString("last_activity_at"),
-            episodeCount = optInt("episode_count", 0).takeIf { it > 0 },
+            // `optInt("episode_count", 0).takeIf { it > 0 }` is a default read
+            // whose default is load-bearing: 0 and absent are the same answer
+            // here on purpose, because the filter below rejects both. So the
+            // nullable form with the old default is the faithful translation,
+            // NOT `optIntOrNull` -- a missing count must not become null and
+            // then reach `.takeIf` as a different type.
+            episodeCount = (optIntOrNull("episode_count") ?: 0).takeIf { it > 0 },
         )
     }
 
-    private fun CatalogItem.toCacheJson(): JSONObject {
-        return JSONObject()
-            .put("item_id", id)
-            .put("entity_item_id", itemId)
-            .put("title", title)
-            .put("artwork_url", artworkUrl)
-            .put("logo_url", logoUrl)
-            .put("artwork", artwork?.toJson())
-            .put("logo", logo?.toJson())
-            .put("addon_id", addonId)
-            .put("type", type)
-            .put("rating", rating)
-            .put("year", year)
-            .put("genre", genre)
-            .put("maturity_rating", maturityRating)
-            .put("liked", liked ?: JSONObject.NULL)
-            .put("added_at", addedAt)
-            .put("watched_at", watchedAt)
-            .put("rated_at", ratedAt)
-            .put("last_activity_at", lastActivityAt)
-            .put("episode_count", episodeCount)
+    private fun CatalogItem.toCacheJson(): JsonObject {
+        return buildJsonObject {
+            put("item_id", id)
+            put("entity_item_id", itemId)
+            put("title", title)
+            put("artwork_url", artworkUrl)
+            put("logo_url", logoUrl)
+            // `Map<String, JsonElement>.put` takes a non-null `JsonElement`, and
+            // `toJson()` answers `JsonObject?`, so the nullable argument needs the
+            // builder overload — which `?.let` also scopes to the non-null case. This
+            // is the same absent-key-versus-`JsonNull` question as `next_cursor`
+            // above, and it has the same answer.
+            artwork?.toJson()?.let { put("artwork", it) }
+            logo?.toJson()?.let { put("logo", it) }
+            put("addon_id", addonId)
+            put("type", type)
+            put("rating", rating)
+            put("year", year)
+            put("genre", genre)
+            put("maturity_rating", maturityRating)
+            put("liked", liked?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("added_at", addedAt)
+            put("watched_at", watchedAt)
+            put("rated_at", ratedAt)
+            put("last_activity_at", lastActivityAt)
+            put("episode_count", episodeCount)
+        }
     }
 
-    private fun ResponsiveImageSet.toJson(): JSONObject {
-        return JSONObject()
-            .put("low", low)
-            .put("medium", medium)
-            .put("high", high)
+    private fun ResponsiveImageSet.toJson(): JsonObject {
+        return buildJsonObject {
+            put("low", low)
+            put("medium", medium)
+            put("high", high)
+        }
     }
 
-    private fun JSONObject.parseResponsiveImage(key: String): ResponsiveImageSet? {
-        val json = optJSONObject(key) ?: return null
+    private fun JsonObject.parseResponsiveImage(key: String): ResponsiveImageSet? {
+        val json = optJsonObject(key) ?: return null
         val low = json.optNullableString("low")
         val medium = json.optNullableString("medium")
         val high = json.optNullableString("high")

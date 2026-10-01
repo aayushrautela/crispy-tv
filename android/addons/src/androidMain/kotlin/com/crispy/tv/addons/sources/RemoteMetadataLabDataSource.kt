@@ -15,8 +15,22 @@ import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.addons.streams.asApiPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import com.crispy.tv.addons.optJsonArray
+import com.crispy.tv.addons.optJsonObject
+import com.crispy.tv.addons.optStringOrEmpty
+import com.crispy.tv.addons.stringAtOrEmpty
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -223,8 +237,8 @@ private class AddonMetadataClient(
             )
         }
 
-        val addonId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
-        val resources = manifest.optJSONArray("resources")
+        val addonId = nonBlank(manifest.optStringOrEmpty("id")) ?: seed.addonIdHint
+        val resources = manifest.optJsonArray("resources")
 
         val supportedTypes = mutableMapOf<AddonResourceKind, MutableSet<MetadataLabMediaType>>()
 
@@ -233,17 +247,26 @@ private class AddonMetadataClient(
             supportedTypes[AddonResourceKind.STREAM] = defaults.toMutableSet()
             supportedTypes[AddonResourceKind.SUBTITLES] = defaults.toMutableSet()
         } else {
-            for (index in 0 until resources.length()) {
-                when (val resource = resources.opt(index)) {
-                    is String -> {
-                        val kind = toResourceKindOrNull(resource) ?: continue
+            for (resource in resources) {
+            when (resource) {
+
+                is JsonPrimitive -> {
+                    // `is String` is not a type a JSON string has: a JSON *number*
+                    // is a `JsonPrimitive` too, so widening this arm would admit
+                    // values `org.json` dropped, and `contentOrNull` cannot tell
+                    // `1234` from `"1234"`. `isString` is the only discriminator,
+                    // and a `when` arm cannot express it -- so it becomes a guard.
+                    val text = resource.contentOrNull
+                    if (resource.isString && text != null) {
+                        val kind = toResourceKindOrNull(text) ?: continue
                         supportedTypes.getOrPut(kind) { mutableSetOf() }.add(MetadataLabMediaType.MOVIE)
                         supportedTypes.getOrPut(kind) { mutableSetOf() }.add(MetadataLabMediaType.SERIES)
                     }
+                }
 
-                    is JSONObject -> {
-                        val kind = toResourceKindOrNull(nonBlank(resource.optString("name"))) ?: continue
-                        val types = parseManifestStringArray(resource.optJSONArray("types"))
+                    is JsonObject -> {
+                        val kind = toResourceKindOrNull(nonBlank(resource.optStringOrEmpty("name"))) ?: continue
+                        val types = parseManifestStringArray(resource.optJsonArray("types"))
                         val targets =
                             if (types.isEmpty()) {
                                 listOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
@@ -255,6 +278,12 @@ private class AddonMetadataClient(
                             supportedTypes.getOrPut(kind) { mutableSetOf() }.add(target)
                         }
                     }
+                    // `JsonElement` is SEALED, so this `when` is exhaustiveness-checked
+                    // where `org.json`'s `Any?` was not, and a JSON *array* element was
+                    // neither a `String` nor a `JSONObject` -- so the old `when` fell
+                    // through and did nothing, and so does this arm. It has to be LAST:
+                    // the compiler rejects an `else` entry in any other position.
+                    else -> Unit
                 }
             }
         }
@@ -269,30 +298,35 @@ private class AddonMetadataClient(
         )
     }
 
-    private fun parseCachedManifest(raw: String?): JSONObject? {
+    private fun parseCachedManifest(raw: String?): JsonObject? {
         if (raw.isNullOrBlank()) {
             return null
         }
-        return runCatching { JSONObject(raw) }.getOrNull()
+        // `Json.parseToJsonElement` raises `SerializationException` where
+        // `JSONObject(String)` raised `JSONException`; the `runCatching`
+        // absorbs either and nothing in `:addons` names either type.
+        return runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
     }
 
-    private fun fallbackManifestFor(seed: AddonManifestSeed): JSONObject? {
+    private fun fallbackManifestFor(seed: AddonManifestSeed): JsonObject? {
         val looksLikeCinemeta =
             seed.addonIdHint.contains("cinemeta", ignoreCase = true) ||
                 seed.manifestUrl.contains("cinemeta", ignoreCase = true)
         if (looksLikeCinemeta) {
-            return JSONObject()
-                .put("id", "com.linvo.cinemeta")
-                .put("types", JSONArray().put("movie").put("series"))
+            return buildJsonObject {
+                put("id", "com.linvo.cinemeta")
+                put("types", buildJsonArray { add("movie"); add("series") })
+            }
         }
 
         val looksLikeOpenSubtitles =
             seed.addonIdHint.contains("opensubtitles", ignoreCase = true) ||
                 seed.manifestUrl.contains("opensubtitles", ignoreCase = true)
         if (looksLikeOpenSubtitles) {
-            return JSONObject()
-                .put("id", "org.stremio.opensubtitlesv3")
-                .put("types", JSONArray().put("movie").put("series"))
+            return buildJsonObject {
+                put("id", "org.stremio.opensubtitlesv3")
+                put("types", buildJsonArray { add("movie"); add("series") })
+            }
         }
 
         return null
@@ -331,7 +365,7 @@ private class AddonMetadataClient(
             AddonResourceKind.STREAM -> "streams"
             AddonResourceKind.SUBTITLES -> "subtitles"
         }
-        return response.optJSONArray(arrayKey)?.length() ?: 0
+        return response.optJsonArray(arrayKey)?.size ?: 0
     }
 
     private suspend fun fetchResource(
@@ -339,7 +373,7 @@ private class AddonMetadataClient(
         resourceKind: AddonResourceKind,
         mediaType: MetadataLabMediaType,
         lookupId: String
-    ): JSONObject? {
+    ): JsonObject? {
         val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
         val typePath = mediaType.asApiPath()
         val url = buildString {
@@ -359,89 +393,134 @@ private class AddonMetadataClient(
         return httpClient.getJsonObject(url)
     }
 
-    private fun parseCastWithDetails(castWithDetails: JSONArray?): List<String> {
+    private fun parseCastWithDetails(castWithDetails: JsonArray?): List<String> {
         if (castWithDetails == null) {
             return emptyList()
         }
 
         val output = mutableListOf<String>()
-        for (index in 0 until castWithDetails.length()) {
-            val item = castWithDetails.opt(index)
-            when (item) {
-                is String -> output += item
-                is JSONObject -> {
-                    val name = nonBlank(item.optString("name"))
-                    val character = nonBlank(item.optString("character"))
+        for (item in castWithDetails) {
+        when (item) {
+
+            is JsonPrimitive -> {
+                    // `is String` is not a type a JSON string has: a JSON *number*
+                    // is a `JsonPrimitive` too, so widening this arm would admit
+                    // values `org.json` dropped, and `contentOrNull` cannot tell
+                    // `1234` from `"1234"`. `isString` is the only discriminator,
+                    // and a `when` arm cannot express it -- so it becomes a guard.
+                    val text = item.contentOrNull
+                    if (item.isString && text != null) {
+                        output += text
+                    }
+                }
+
+                is JsonObject -> {
+                    val name = nonBlank(item.optStringOrEmpty("name"))
+                    val character = nonBlank(item.optStringOrEmpty("character"))
                     if (name != null && character != null) {
                         output += "$name as $character"
                     } else if (name != null) {
                         output += name
                     }
                 }
+                // `JsonElement` is SEALED, so this `when` is exhaustiveness-checked
+                // where `org.json`'s `Any?` was not, and a JSON *array* element was
+                // neither a `String` nor a `JSONObject` -- so the old `when` fell
+                // through and did nothing, and so does this arm. It has to be LAST:
+                // the compiler rejects an `else` entry in any other position.
+                else -> Unit
             }
         }
         return output
     }
 
-    private fun parseSimilarIds(similar: JSONArray?): List<String> {
+    private fun parseSimilarIds(similar: JsonArray?): List<String> {
         if (similar == null) {
             return emptyList()
         }
 
         val output = mutableListOf<String>()
-        for (index in 0 until similar.length()) {
-            val item = similar.opt(index)
-            when (item) {
-                is String -> {
-                    val normalized = nonBlank(item)
+        for (item in similar) {
+        when (item) {
+
+            is JsonPrimitive -> {
+                    // `is String` is not a type a JSON string has: a JSON *number*
+                    // is a `JsonPrimitive` too, so widening this arm would admit
+                    // values `org.json` dropped, and `contentOrNull` cannot tell
+                    // `1234` from `"1234"`. `isString` is the only discriminator,
+                    // and a `when` arm cannot express it -- so it becomes a guard.
+                    val text = item.contentOrNull
+                    if (item.isString && text != null) {
+                    val normalized = nonBlank(text)
                     if (normalized != null) {
                         output += normalized
                     }
+                    }
                 }
 
-                is JSONObject -> {
-                    val id = nonBlank(item.optString("id"))
+                is JsonObject -> {
+                    val id = nonBlank(item.optStringOrEmpty("id"))
                     if (id != null) {
                         output += id
                     }
                 }
+                // `JsonElement` is SEALED, so this `when` is exhaustiveness-checked
+                // where `org.json`'s `Any?` was not, and a JSON *array* element was
+                // neither a `String` nor a `JSONObject` -- so the old `when` fell
+                // through and did nothing, and so does this arm. It has to be LAST:
+                // the compiler rejects an `else` entry in any other position.
+                else -> Unit
             }
         }
         return output
     }
 
-    private fun parseCollectionItems(collection: JSONObject?): List<String> {
-        val items = collection?.optJSONArray("items") ?: return emptyList()
+    private fun parseCollectionItems(collection: JsonObject?): List<String> {
+        val items = collection?.optJsonArray("items") ?: return emptyList()
         val output = mutableListOf<String>()
-        for (index in 0 until items.length()) {
-            val item = items.opt(index)
-            when (item) {
-                is String -> {
-                    val value = nonBlank(item)
+        for (item in items) {
+        when (item) {
+
+            is JsonPrimitive -> {
+                    // `is String` is not a type a JSON string has: a JSON *number*
+                    // is a `JsonPrimitive` too, so widening this arm would admit
+                    // values `org.json` dropped, and `contentOrNull` cannot tell
+                    // `1234` from `"1234"`. `isString` is the only discriminator,
+                    // and a `when` arm cannot express it -- so it becomes a guard.
+                    val text = item.contentOrNull
+                    if (item.isString && text != null) {
+                    val value = nonBlank(text)
                     if (value != null) {
                         output += value
+                    }
                     }
                 }
 
-                is JSONObject -> {
-                    val value = nonBlank(item.optString("id"))
+                is JsonObject -> {
+                    val value = nonBlank(item.optStringOrEmpty("id"))
                     if (value != null) {
                         output += value
                     }
                 }
+                // `JsonElement` is SEALED, so this `when` is exhaustiveness-checked
+                // where `org.json`'s `Any?` was not, and a JSON *array* element was
+                // neither a `String` nor a `JSONObject` -- so the old `when` fell
+                // through and did nothing, and so does this arm. It has to be LAST:
+                // the compiler rejects an `else` entry in any other position.
+                else -> Unit
             }
         }
         return output
     }
 
-    private fun parseStringArray(values: JSONArray?): List<String> {
+    private fun parseStringArray(values: JsonArray?): List<String> {
         if (values == null) {
             return emptyList()
         }
 
         val output = mutableListOf<String>()
-        for (index in 0 until values.length()) {
-            val value = nonBlank(values.optString(index))
+        for (index in 0 until values.size) {
+            val value = nonBlank(values.stringAtOrEmpty(index))
             if (value != null) {
                 output += value
             }
@@ -449,16 +528,18 @@ private class AddonMetadataClient(
         return output
     }
 
-    private fun parseManifestStringArray(values: JSONArray?): List<String> {
+    private fun parseManifestStringArray(values: JsonArray?): List<String> {
         if (values == null) {
             return emptyList()
         }
 
         val output = mutableListOf<String>()
-        for (index in 0 until values.length()) {
-            val raw = values.opt(index)
-            if (raw is String) {
-                nonBlank(raw)?.let { output += it }
+        for (index in 0 until values.size) {
+            val raw = values.getOrNull(index)
+            // A JSON number is a `JsonPrimitive` too, so `isString` is the only
+            // thing that can keep this arm to what `is String` accepted.
+            if (raw is JsonPrimitive && raw.isString) {
+                nonBlank(raw.contentOrNull)?.let { output += it }
             }
         }
         return output
@@ -494,7 +575,7 @@ private fun buildLookupId(contentId: String, season: Int?, episode: Int?): Strin
     }
 }
 
-private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {
+private suspend fun CrispyHttpClient.getJsonObject(url: String): JsonObject? {
     val response =
         runCatching {
             get(
@@ -512,5 +593,5 @@ private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {
         return null
     }
 
-    return runCatching { JSONObject(body) }.getOrNull()
+    return runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
 }

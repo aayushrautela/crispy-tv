@@ -1,10 +1,8 @@
 package com.crispy.tv.sync
 
-import org.json.JSONObject
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import kotlin.test.Test
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -49,8 +47,6 @@ import kotlin.test.assertTrue
  * overloads of one function but two functions with one name, and the key order
  * that reaches the stored profile shadow is sorted by this one only.
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [35])
 class ProfileDataShadowJsonAccessorsTest {
 
     // ---------------------------------------------------------------------
@@ -59,7 +55,7 @@ class ProfileDataShadowJsonAccessorsTest {
 
     @Test
     fun aValueIsStringifiedWholeAndAJsonNullIsSkipped() {
-        val json = JSONObject("""{"count":5,"flag":true,"nullish":null,"nested":{"n":1},"list":[1,"two"]}""")
+        val json = Json.parseToJsonElement("""{"count":5,"flag":true,"nullish":null,"nested":{"n":1},"list":[1,"two"]}""").jsonObject
 
         assertEquals(
             mapOf(
@@ -75,7 +71,7 @@ class ProfileDataShadowJsonAccessorsTest {
 
     @Test
     fun anAbsentKeyIsSimplyNeverVisitedBecauseTheMapIsBuiltFromTheDocumentsOwnKeys() {
-        val json = JSONObject("""{"present":"1"}""")
+        val json = Json.parseToJsonElement("""{"present":"1"}""").jsonObject
 
         assertEquals(mapOf("present" to "1"), json.toStringMap())
         assertTrue("missing" !in json.toStringMap())
@@ -95,7 +91,7 @@ class ProfileDataShadowJsonAccessorsTest {
      */
     @Test
     fun aValueIsNeitherTrimmedNorDroppedWhenItIsBlankAndThatIsWhereTheTwoCopiesDiffer() {
-        val json = JSONObject("""{"padded":"  x  ","empty":"","spaces":"   "}""")
+        val json = Json.parseToJsonElement("""{"padded":"  x  ","empty":"","spaces":"   "}""").jsonObject
 
         assertEquals(
             mapOf("padded" to "  x  ", "empty" to "", "spaces" to "   "),
@@ -111,7 +107,7 @@ class ProfileDataShadowJsonAccessorsTest {
      */
     @Test
     fun theDocumentOrderSurvivesBecauseMutableMapOfIsALinkedMap() {
-        val json = JSONObject("""{"z":"1","a":"2","m":"3"}""")
+        val json = Json.parseToJsonElement("""{"z":"1","a":"2","m":"3"}""").jsonObject
 
         assertEquals(listOf("z", "a", "m"), json.toStringMap().keys.toList())
     }
@@ -124,7 +120,10 @@ class ProfileDataShadowJsonAccessorsTest {
     fun theKeysAreSortedOnTheWayOutAndTheDocumentOrderIsNotPreserved() {
         val encoded = linkedMapOf("z" to "1", "a" to "2", "m" to "3").toJsonObject()
 
-        assertEquals(listOf("a", "m", "z"), encoded.keys().asSequence().toList())
+        // `org.json`'s `keys()` was an iterator; a `JsonObject`'s `keys` is a
+        // `Set`, so the `asSequence().toList()` that made the iterator
+        // comparable is gone and the assertion is the set's order as a list.
+        assertEquals(listOf("a", "m", "z"), encoded.keys.toList())
     }
 
     @Test
