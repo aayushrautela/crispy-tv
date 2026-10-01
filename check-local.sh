@@ -94,6 +94,11 @@ fi
 # with an empty log, which reads as "the tests failed" when no test ever ran.
 "$PY" scripts/validate_workflows.py
 
+# Every module declaring an Apple target must have it compiled in apple.yml. Ten
+# modules declared them and two were built, which is a claim rather than a check.
+# Runs right after the workflow validator because it reads that same file.
+"$PY" scripts/verify_apple_targets.py
+
 # JVM args (including MaxMetaspaceSize=1g for the Kotlin/Native compiler) are
 # set in ~/.gradle/gradle.properties. Passing -Dorg.gradle.jvmargs here would
 # spawn a second daemon with different opts, so we let the user-level config apply.

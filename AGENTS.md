@@ -449,6 +449,40 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `lifecycle-viewmodel-compose` and MaterialKolor are genuine KMP artifacts. **Measure the artifact
   you are about to declare, never the family** — `paging-common` is KMP while `paging-compose` and
   `paging-runtime` are not, in the same family, in the same module.
+- **A target declaration is a claim, and a target no CI job builds cannot fail -- so it asserts
+  nothing about whether the code is platform-free.** Ten modules declared
+  `iosArm64`/`iosSimulatorArm64`. `apple.yml` compiled **two** of them (`:core-domain`,
+  `:platform-core`) through an explicit task list, and **eight carried a target that no workflow
+  on any runner ever compiled.** It turned up while asking a different question -- whether a
+  `platform-apple` module would have a consumer -- which is the third time in this repository that
+  the useful answer came from measuring a *neighbouring* claim rather than the one in front of you.
+  `apple.yml` now compiles **all ten**, and `scripts/verify_apple_targets.py` (run by
+  `check-local.sh` and by `apple.yml`) fails when a module declares a target the workflow does not
+  build. The converse is deliberately unchecked, because **removing a target is a product decision
+  and a script has no business making one.** `scripts/verify_kmp_outputs.py` is the same idea pointed
+  at class files; the general form is that **an assertion nothing executes is not a weak assertion,
+  it is no assertion.** And the gate needed proving before it could be trusted: its first version
+  built `compileKotliniosArm64` where the task is `compileKotlinIosArm64`, so it reported all twenty
+  tasks missing on a workflow that invoked every one -- the repo's own "a gate that fires on correct
+  code gets switched off" trap, reached by the most direct route available.
+- **The Apple client is not this codebase, and `kmp-migration-plan.md`'s Phase 6 is correct while a
+  build file's KDoc is not.** `:platform-android`'s KDoc promised the Apple port implementations
+  "in Phase 6, each against the same `platform-core` interfaces". Measured: `grep -rl <port> ios
+  --include=*.swift` returns **zero hits for all six ports**; `:sharedUI` has **no** `platform-core`
+  dependency; `ios/CrispyKit` is a **19-file Swift reimplementation of the whole data layer** (its
+  own HTTP client, its own Supabase auth, its own session store, its own JSON, its own seven view
+  models); and `ios/project.yml` links only `CrispyKit` and `ContractRunner` -- **`CrispyUI` is built
+  by nothing and imported by nothing.** So **zero lines of Kotlin execute in the shipping iOS/tvOS
+  app**, and a `platform-apple` module would have no consumer: it could only be "verified" by adding
+  it to the `apple.yml` list being edited in order to verify it, which is circular, and it is the
+  speculative-dependency shape the repo's own rules forbid. The desktop equivalent landed
+  (`platform-desktop`) **because `desktopApp` is a real caller**; the Apple gap is a product
+  decision, not a technical block. Note what went wrong in my own reasoning, because it is the
+  generalisable part: **I read that KDoc promise as the plan's next phase, and neither the KDoc nor
+  the plan said what I assumed.** The plan's actual Phase 6 is "Wire `CrispyKit` to the `CrispyUI`
+  framework" and reconcile the six Swift files that duplicate shared code -- a different and
+  already-written answer. **A promise in one module's KDoc is not a plan, and a plan is not a
+  promise; read the plan.**
 - **Measure the JVM's real output before replacing a JVM call, and copy the measurement into the
   test.** A `DateTimeFormatter`'s `yyyy` is a year of *era*; `Math.round(0.999f * 100f)` is 100;
   `mi` renders `Māori` with a macron; `fre` is French and `ger` is German. Six minutes running the

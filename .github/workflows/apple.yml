@@ -93,14 +93,56 @@ jobs:
       - name: Check commonMain purity
         run: python3 scripts/check_common_purity.py
 
+      - name: Every declared Apple target is compiled below
+        # The step after this one is a hand-maintained list, and a hand-maintained
+        # list of things that are supposed to be built is exactly how eight of ten
+        # Apple targets stopped being built without anyone noticing. This step
+        # fails the run if a module declares a target the list does not name, so
+        # the omission is a red build rather than a silent claim. Removing a
+        # target is deliberately not this script's business -- that is a product
+        # decision, and a script making it would be the wrong owner.
+        run: python3 scripts/verify_apple_targets.py
+
       - name: Compile Kotlin Multiplatform Apple targets
+        # Every module that declares an Apple target, and not a hand-picked subset.
+        #
+        # This list used to name only `:core-domain` and `:platform-core`, while
+        # **ten** modules declare `iosArm64`/`iosSimulatorArm64` — so eight of them
+        # carried a target declaration that no workflow, on any runner, ever
+        # compiled. A target nobody builds is a claim, and an unbuilt one cannot
+        # fail, so it says nothing about whether the code is actually
+        # platform-free. The list is now derived from the declarations themselves,
+        # which is also the cheapest way to keep it honest: adding a target
+        # without adding it here is now a visible diff.
+        #
+        # The simulator test source sets are deliberately not compiled for every
+        # module — only `:core-domain`'s is run, and `:core-domain` is the module
+        # the contract suite lives in. Compiling all ten test source sets would
+        # assert that ten test suites are Apple-ready, which is a different claim
+        # than "the production code compiles", and it is not one this step can make.
         run: |
           ./gradlew \
+            :android:addons:compileKotlinIosArm64 \
+            :android:addons:compileKotlinIosSimulatorArm64 \
+            :android:app:compileKotlinIosArm64 \
+            :android:app:compileKotlinIosSimulatorArm64 \
+            :android:backend:compileKotlinIosArm64 \
+            :android:backend:compileKotlinIosSimulatorArm64 \
             :android:core-domain:compileKotlinIosArm64 \
             :android:core-domain:compileKotlinIosSimulatorArm64 \
             :android:core-domain:compileTestKotlinIosSimulatorArm64 \
+            :android:home:compileKotlinIosArm64 \
+            :android:home:compileKotlinIosSimulatorArm64 \
+            :android:network:compileKotlinIosArm64 \
+            :android:network:compileKotlinIosSimulatorArm64 \
             :android:platform-core:compileKotlinIosArm64 \
-            :android:platform-core:compileKotlinIosSimulatorArm64
+            :android:platform-core:compileKotlinIosSimulatorArm64 \
+            :android:player:compileKotlinIosArm64 \
+            :android:player:compileKotlinIosSimulatorArm64 \
+            :android:sharedUI:compileKotlinIosArm64 \
+            :android:sharedUI:compileKotlinIosSimulatorArm64 \
+            :android:watchhistory:compileKotlinIosArm64 \
+            :android:watchhistory:compileKotlinIosSimulatorArm64
 
       - name: Run Kotlin Multiplatform unit tests on the iOS simulator
         run: |

@@ -882,6 +882,34 @@ Grow the Phase 1 skeleton into the shipping app.
 
 ### Phase 6 — iOS + Liquid Glass *(2–3 wks)*
 
+**Measured 2026-10-01, and one thing this phase was assumed to be is not.** The queue read
+"Apple implementations of the six `:platform-core` ports need their own module, symmetric
+with `platform-android` and `platform-desktop`", on the reasoning that `SecretStore` has no
+Apple implementation. That reasoning came from `:platform-android`'s KDoc and from nothing
+else, and measurement kills it:
+
+- `grep -rl <port> ios --include=*.swift` returns **zero hits for all six ports**.
+- `:sharedUI` has **no** `platform-core` dependency at all.
+- `ios/CrispyKit` is a **19-file Swift reimplementation of the entire data layer** — its own
+  HTTP client, Supabase auth, session store, JSON and seven view models.
+- `ios/project.yml` links only `CrispyKit` and `ContractRunner`. **`CrispyUI` is built by
+  nothing and imported by nothing.**
+
+So **zero lines of Kotlin execute in the shipping iOS/tvOS app.** A `platform-apple` module
+would have no consumer, and could only be "verified" by adding it to the `apple.yml` list
+being edited in order to verify it — circular, and the speculative-dependency shape §4.1's
+rules forbid. `platform-desktop` landed because `desktopApp` is a real caller; the Apple gap
+is a **product decision, not a technical block**. The bullets below are unaffected: wiring
+`CrispyKit` to `CrispyUI` is what would *create* the consumer, and it is unchanged.
+
+**What did change is the gate underneath this phase.** Ten modules declared
+`iosArm64`/`iosSimulatorArm64` and `apple.yml` compiled **two**, so eight Apple targets had
+never been built by anything — and a target nothing builds cannot fail, so it asserted
+nothing about platform freedom. `apple.yml` now compiles all ten and
+`scripts/verify_apple_targets.py` keeps the list honest. **That is a real prerequisite for
+this phase rather than a tidy-up**: the first attempt at wiring `:app` into an Apple app will
+be much better informed by a runner that has already compiled all ten.
+
 - Wire `CrispyKit` to the `CrispyUI` framework. Keep the `ContractRunner` import — it is load-bearing, not dead code.
 - **Reconcile the existing Swift presentation layer.** `CrispyKit` already contains six files that reimplement what `sharedUI`/`sharedLogic` will own: `DiscoverViewModel`, `DetailsViewModel`, `HomeViewModel`, `CatalogListViewModel`, `HomeSnapshotMapper`, `MediaCard`. Each must either be repointed at the shared state or deleted. This is the bulk of the phase and it gets its own sub-gate.
 - SwiftUI shell: navigation, tabs, sheets, **Liquid Glass** on iOS 26, with a real fallback for earlier versions.
