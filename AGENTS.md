@@ -199,8 +199,15 @@ is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
 `staticCompositionLocalOf<SharedTransitionScope?> { null }`. The single provider used to be two lines
 inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
 and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
-cannot obtain a provider that provides nothing. The seven `*NavGraph.kt` files stay in `androidMain`
-because `androidx.navigation` has no KMP artifact at all.
+cannot obtain a provider that provides nothing. The seven `*NavGraph.kt` files are still in
+`androidMain`, **and the reason recorded here for years was wrong twice**: it said they stay because
+`androidx.navigation` has no KMP artifact, which was true of Google's artifact and stopped being
+true when `:app` swapped to `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01`
+(measured across five `.module` links, and **compiled** — the fork keeps the
+`androidx.navigation.compose` package, so not one import changed, and the classpath gap is closed).
+What actually holds them now is that **each graph calls a `Context`-taking `androidMain` factory,
+and `AppNavHost` names every graph by name, so the layer is mutually referencing and moves as a
+unit or not at all.** A pin that arrives through a *call* is invisible to every import scan.
 
 **An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two
 halves belong in opposite source sets.** `:app` has **zero** `expect`/`actual`, so introducing one for
@@ -428,8 +435,11 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   clock behind `android.content.Intent`, a `Locale` argument behind `android.util.Log`. The
   per-token census of all 77 files then answered the question none of the four was asking
   — *what does this file import from a platform-only artifact?* — and the answer is that
-  **none of the 77 are movable by code work**: 54 behind `android.jar`, 7 player, 7
-  navigation, 2 `paging-compose`, 2 behind an `R` reference and already correct, 1 behind
+  **none of the 77 are movable by code work**: 54 behind `android.jar`, 7 player, 7 in the
+  nav layer (**whose dependency is now swapped and compiled — so the nav bucket is the
+  fifth census that manufactured candidates, and the correction is that a graph's second
+  pin arrives through a *call*, not an import**), 2 `paging-compose`, 2 behind
+  an `R` reference and already correct, 1 behind
   `java.io.File`, 1 a service locator with 7 `androidMain` reader files, and 4 routes
   behind a *second* pin each. **So classify a family by its blocker before choosing a file
   in it, or each landing finds a different token and each finds it was not the pin** — and

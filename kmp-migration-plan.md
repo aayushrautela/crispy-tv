@@ -65,7 +65,9 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 its `androidMain` are **not** 80 independent jobs. A reverse audit — forbidden imports
 first, then subtracting every type declared in every module's `commonMain` — leaves
 **10 candidates and resolves 0 of them**. Every one is pinned by a measured wall:
-`androidx.navigation` (six nav-graph files, which §Phase 4 already says should stay put),
+`androidx.navigation` (the 9-file nav layer — **the coordinate swap landed and the
+   artifact is on the `commonMain` classpath now**, so this one is a `Context` reached
+   through a *call*, not an import),
 `paging-compose` (`DiscoverScreen`, `library/LibraryRoute`), the composition root,
 :android:native-engine` (the four `playerui` files), and `org.json` — which was recorded
 here as permanent and **is not**: the node type is **decided**, `kotlinx.serialization.json.JsonElement`,
@@ -180,7 +182,7 @@ buckets sum to 77 with nothing unmatched**:
 | n | what pins it | can code work move it? |
 |---|---|---|
 | **54** | `android.jar` itself | no — it is the platform |
-| **7** | `androidx.navigation.compose` | no KMP artifact exists — **a dependency decision** |
+| **7** | the nav layer, and **the coordinate is already swapped** | no — see the note below: the *artifact* is no longer the pin, each file's second pin is an `androidMain` factory it **calls** |
 | **7** | the player and introskip (`playerui/`, `introskip/`) | no — a plain `com.android.library` publishing no JVM variant, **permanent by standing decision** |
 | **2** | `androidx.paging.compose` (`CatalogScreen`, `LibraryRoute`) | no KMP artifact exists — **a dependency decision** |
 | **2** | an `R` reference | no, and **already correct**: both KDocs record that the pure half is in `commonMain` behind a no-default composable slot |
@@ -332,10 +334,16 @@ What moved `:app` was mostly **not** UI work. It was removing the things that we
 - `androidx.lifecycle` publishes for desktop at 2.9.4, and `ViewModel`,
   `viewModelScope` and `ViewModelProvider` are all present under the **same**
   `androidx.lifecycle` package. Imports do not change. 30 files unblocked.
-- **`androidx.navigation-compose` is Android-only.** Its only non-Android variant is
-  `jvmStubs` — stubs, not an implementation. This is the real wall, and it is why the
-  nav-graph files (`AppNavHost`, the six `*NavGraph.kt`) should stay in `androidMain`
-  for now rather than being fought onto desktop.
+- **`androidx.navigation-compose` was Android-only, and the fix was a coordinate, not a
+  port.** Google publishes only `android`, plus `jvmStubs` and `linuxx64Stubs` — and a
+  stubs variant satisfies a `commonMain` *dependency declaration* without satisfying a
+  `commonMain` *compile*, which is the whole shape of the trap. The artifact is now
+  `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01`, measured across
+  five `.module` links and **compiled**; it keeps the `androidx.navigation.compose`
+  package, so no import changed. **And it frees 0 files**: each graph calls a
+  `Context`-taking `androidMain` factory, which is a pin that arrives through a *call*
+  and is therefore invisible to every import scan. The blocker moved from the artifact
+  to the factories it is given, which is a bigger landing in the other direction.
 - `AppRoutes` split cleanly: its 49 route constants and 3 route patterns are portable and
   are in `commonMain`; the 4 builders percent-encode with `android.net.Uri.encode` and are
   `androidMain` extensions on `AppRoutes`, so all 19 call sites are unchanged. See
@@ -445,8 +453,11 @@ composable, and it reads as reachable.
 switches between the two screens with a `remember`ed enum and a `BasicText` affordance,
 which is four lines of wiring and looks like a placeholder because it is one. The
 alternative was inventing a portable `NavHost` for two screens, in a landing whose
-point is something else — and `:app` has no navigation seam to grow one into, because
-`androidx.navigation` is not on the `commonMain` classpath at all. **A screen count is
+point is something else — and `:app` had no navigation seam to grow one into, because
+`androidx.navigation` was not on the `commonMain` classpath at all. **That is no longer
+the reason**: the classpath gap is closed, and what still blocks the layer is that every
+graph calls a `Context`-taking factory. Writing the seam is now a matter of giving those
+factories to the graphs as slots, not of moving a dependency. **A screen count is
 not a product:** what makes desktop a runnable target is a *stateful* surface reached
 through a real port round trip, and the image-quality screen is the first one that
 actually is (see below). The shell is the next thing, and it belongs in `:app`'s
@@ -838,7 +849,7 @@ left to be discovered.
   - **"Bound to navigation" is a statement about the file, not about the mechanism.** Across the whole repository there are exactly three distinct imports of shared-transition machinery: six sites of `com.crispy.tv.ui.navigation.LocalSharedTransitionScope`, **one** of `androidx.compose.animation.SharedTransitionScope` and **one** of `androidx.compose.animation.SharedTransitionLayout`. **Zero** of the 27 participants import `androidx.navigation` for the transition itself — `androidx.compose.animation` is Compose Multiplatform and present on every target. Navigation is what *navigates*; the thing that *transitions* is Compose.
   - **The bug this hid, and it was a real one on every non-Android target:** the scope was provided from two lines inside `AppNavHost.kt` (`androidMain`), so all **14 `commonMain` participants read `null` off Android and rendered with no transition — silently, with no error anywhere.** The participants were correct all along; only the host was missing.
   - **Fixed by a new `CrispySharedTransitionLayout` in `:app` `commonMain`**, public, with a no-default `content` slot so a caller cannot obtain a provider that provides nothing. `AppNavHost.kt` shrank by four lines and stays `androidMain` (it is genuinely `NavHost`-bound), and `desktopApp` now wraps its screens in it — so a shared transition is exercised on a non-Android target for the first time. `DesktopSharedTransitionTest` asserts the scope is non-null under the host **and** null without it, which is what makes the first assertion mean "the host supplied it" rather than "the local defaults to it".
-  - **Still open, and genuinely Phase 5's:** the five `*NavGraph.kt` files stay `androidMain`. They declare `NavGraphBuilder` graphs and `androidx.navigation` has no KMP artifact at all, so this is a navigation problem and not a transition one. Do not read the remaining `androidMain` participants as transition work.
+  - **Still open, and genuinely Phase 5's, but the stated reason was wrong:** the seven `*NavGraph.kt` files plus `AppRoot` and `AppNavHost` are the 9-file nav layer and they are still `androidMain`. They were held there because `androidx.navigation` had no KMP artifact, and **that is now resolved** — the fork is on the `commonMain` classpath and compiles. What holds them is that each graph calls a `Context`-taking `androidMain` factory (`homeViewModelFactory`, `searchViewModelFactory`, `SettingsNavGraph`'s `SupabaseServicesProvider` and `AppDistribution`), and `AppNavHost` names all the graphs, so the layer is mutually referencing and moves as a unit or not at all. **This is still a navigation problem and not a transition one** — the conclusion survives, the cause does not, and the next step is the factories rather than the dependency. Do not read the remaining `androidMain` participants as transition work.
 - Tokenise the design system so a 10-foot TV surface and a resizable desktop window are both servable **without changing today's appearance**.
 - **`architecture.md` updated for the ported codebase. This was the last named item in Phase 4, and it is documentation rather than code. Done.** Measured staleness, all four points verified against the tree: its `## Status` names "the Android and iOS clients", and desktop has shipped; `## Recommended Package Direction` points at `android/app/src/main/java/com/crispy/tv/` with a `feature/` and an `infra/` that do not exist, and the `AppGraph.kt` it names is at `android/app/src/androidMain/kotlin/com/crispy/tv/app/AppGraph.kt`; and `## What To Refactor First` item 2 tells the reader to replace `WatchProvider?`, a type that no longer exists anywhere (`grep -rl WatchProvider android --include=*.kt` returns nothing). Its **backend-first ownership model is still correct and was kept** — so this was a KMP pass over a document whose reasoning survives, not a rewrite. **Reading it in full first was the whole lesson**: patching those four anchors in isolation would have missed the seven non-existent type names, the four already-finished refactor items, and the competing seven-phase plan. What changed: the client set is now all four targets; `## Recommended Package Direction` became `## Recommended Module Direction` and is now the **real module graph** rather than a package tree that was never built, with the two directories that answer the old question named (`domain/repository/` in `:app` `commonMain`, `AppGraph.kt` in `androidMain`); `## What To Refactor First In This Repo` is split into *Still true* and *Done since this list was written* with the numbering kept; `## Migration Plan` is retitled for scope; `## Fetch And Cache Policy` is explicitly labelled a proposal with the `DataSource` collision named; and the mutation lifecycle in `## Offline And Retry Behavior` was replaced with the **real four-state sealed `MutationStatus`** — which has no `CONFIRMED`, because a synced mutation is **deleted**, and no `RETRY_SCHEDULED`, because retry is a `Pending` carrying `nextAttemptAtMs`, and which has a `Conflict(serverValue)` the old list had no word for, so the document's own `## Conflict Resolution` section could not be implemented as written. 594 → 666 lines; `:1-200`, which is the spine, is untouched.
 - **Material3 Expressive: use it on every target.** This supersedes an earlier revision
@@ -1180,9 +1191,15 @@ actually unblocks once the transitive blockers are counted:
    `AccountSessionStore` and a required `nowMs: () -> Long`. **`:backend` now has one
    `androidMain` file**, and it is the one that cannot move.
 3. **The `coil3` 13** — port to the multiplatform API.
-4. **`androidx.navigation-compose` is externally Android-only** (its only non-Android
-   variant is `jvmStubs`). The nav graph cannot be shared without replacing it; that is
-   a decision, not a task.
+4. **`androidx.navigation-compose` was externally Android-only, and the replacement
+   landed.** Google's artifact publishes only `android` plus stubs, so the nav layer could
+   not be shared without replacing it. `:app` now declares the JetBrains fork
+   `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` in `commonMain`
+   and **compiles against it**, with the package preserved and no import changed; `:tv`
+   keeps Google's `2.9.8` under its own alias, because it has no `commonMain` and needs
+   no KMP navigation. **So this item is done and the next one is not this:** the layer
+   still moves 0 files, because each graph's real pin is a `Context`-taking factory it
+   calls. **It was a decision; the decision has been taken, and what is left is a task.**
 5. **media3 and `:native-engine` are Android-only by product decision.** Ten files that
    touch them are correctly parked and should stay parked.
 

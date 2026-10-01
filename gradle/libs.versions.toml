@@ -74,6 +74,43 @@ composeMultiplatform = "1.11.1"
 lifecycle = "2.11.0"
 
 # --- Navigation ---
+# The JetBrains KMP fork, NOT `androidx.navigation:navigation-compose`. Measured
+# link by link against the resolved `.module` files rather than the family:
+#
+#  - `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` publishes
+#    `androidJvm`, `desktop`, `iosArm64` and `iosSimulatorArm64`; Google's
+#    `2.9.8` publishes `android` plus `jvmStubs`/`linuxx64Stubs`, which are
+#    javadoc/dokka artifacts and not compilable KMP variants.
+#  - The fork KEEPS the `androidx.navigation.compose` package -- 13 `.knm`
+#    declaration files under `commonMain/default/linkdata/package_androidx.navigation.compose/`
+#    -- so the seven navigation files need no import change at all.
+#  - The stable `2.9.2` is NOT usable: it is a real KMP artifact but publishes
+#    only `uikitArm64`/`uikitSimulatorArm64`/`uikitX64`, the pre-2.0 Kotlin target
+#    names. The discriminator is the `org.jetbrains.kotlin.platform.type`
+#    attribute, not the version and not "is it multiplatform".
+#  - The fork's `navigation-runtime` carries a `-published` suffix on every
+#    variant, which is Gradle's relocation marker, and its common metadata
+#    depends on Google's `androidx.navigation:navigation-runtime:2.10.0` -- which
+#    is itself KMP (`metadataApiElements` type=common, plus androidJvm, desktop,
+#    iosArm64, iosSimulatorArm64, linuxX64). So the chain resolves to one runtime.
+#  - The repository is already declared: the artifact is on Maven Central and
+#    `settings.gradle.kts` already has `mavenCentral()`.
+#
+# This is a BETA of a FORK replacing a Google artifact in the navigation layer
+# of a shipping app, and it frees no file: the navigation layer is a set of
+# mutually-referencing `androidMain` files, each of which calls a `Context`-taking
+# factory. See the KDoc on `AppNavHost` and the plan's navigation section.
+#
+# It is a SPLIT and not a swap, and the reason is measured rather than designed:
+# `:android:tv` is a plain `com.android.application` that also declared the old
+# alias, so renaming it would have silently repointed the shipping TV app at a
+# beta fork of navigation. `:tv` has no `commonMain` and needs no KMP navigation,
+# so it keeps the Google artifact below and `:app` alone moves to the fork. **The
+# rename is what surfaced this** -- it broke loudly at `:tv`'s build-file compile
+# instead of quietly resolving to a fork nobody had measured against the TV app.
+# **A shared version catalog is a shared decision, and the blast radius of a
+# rename is every module that reads the alias, not the one being edited.**
+jbNavigationCompose = "2.10.0-beta01"
 navigationCompose = "2.9.8"
 
 # --- Paging ---
@@ -151,6 +188,12 @@ androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "l
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "lifecycle" }
 
+# TWO aliases, both named for their provider, because the two artifacts genuinely
+# coexist. An alias still called `androidx-navigation-compose` while resolving to
+# `org.jetbrains.androidx.navigation` would hide which of two same-named
+# coordinates is in play, and the import churn such a swap hides is exactly what a
+# reader needs to see when a navigation API changes underneath seven files.
+jb-navigation-compose = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "jbNavigationCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }

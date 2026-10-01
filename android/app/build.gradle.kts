@@ -62,7 +62,7 @@ plugins {
  * | the viewmodels | `AccountViewModels`, `CatalogViewModel`, `HomeViewModel`, `HomeSelectorViewModel`, `LibraryScreen`, `SearchViewModel`, `AppBootstrapViewModel` | the `Route`/`Screen` files, ~4,000 lines | **not a factory/viewmodel split — that premise was false.** `ViewModelProvider.Factory` is reachable from `commonMain` (see the `lifecycle-viewmodel-compose` comment 277 lines below, which already says so and is right, and the 14 `ViewModelProvider*` classes in that artifact's `-desktop` jar). A route composable can therefore take its factories *as values*. What actually blocked `HomeRoute` was three `Context` reads, and those cross as **no-default slots** on a signature that already carried eleven: `viewModelFactory`, `selectorViewModelFactory`, `loadProfile` — and `HomeStreamSelector` came with it, its `LocalConfiguration` read crossing as `isCompact: Boolean`. **2 files / 359 lines freed, 0 new ports.** The factories keep taking a `Context` and stay in `androidMain`, because a `Context` used for *wiring* belongs in the factory — so it is the call sites that move, not the factories. **That is the fifth time a blocker in this table turned out to be an untested premise.** |
  * | ~~`DetailsPalette.kt`~~ | **freed** | `AiInsightsStoryOverlay`, `DetailsBody`, `DetailsRatingsSection` | **none left -- all three moved.** The three reasons this row claimed were all wrong, and each is worth recording because two of them were premises rather than measurements. `com.materialkolor` 5.0.0 is a genuine KMP artifact (it publishes `android`, `iosArm64`, `iosSimulatorArm64`, `jvm`, `macosArm64`, `js`, `wasmJs`), so `rememberDynamicColorScheme` and `themeColor` were never blockers. `LocalContext` is Coil's own `coil3.compose.LocalPlatformContext` in `commonMain`. And the bitmap is not a blocker either, it is the *return type* of an `expect`: `coil3.toBitmap` yields `android.graphics.Bitmap` on Android and `org.jetbrains.skia.Bitmap` elsewhere, so no `commonMain` signature can name it -- the extraction takes Compose's `ImageBitmap`, which every target shares, and only the two loader composables stayed behind for `Context`. That is the fourth time a blocker in this table turned out to be an untested premise |
  * | the composition root | `SupabaseServicesProvider`, `BackendServicesProvider`, `PlaybackDependencies`, `DistributionComponents`, the two settings `…RepositoryProvider`s | `ProfileMenuRoute`, `CalendarScreen`, `SettingsScreen`, `SettingsNavGraph`, `AppDistribution` | these *are* the root; a screen resolves them in `androidMain` and needs a seam for the values, not for the providers |
- * | `androidx.navigation` | not on the `commonMain` classpath at all | all 6 files in `ui/navigation` | a dependency decision: JetBrains publishes a Multiplatform navigation-compose, and it is not the artifact this module currently resolves |
+ * | `androidx.navigation` | **now on the `commonMain` classpath**, as `libs.jb.navigation.compose` | **0 of 9 files moved** | **swapped, measured 5/5, and it frees nothing — the sixth untested premise in this table.** The JetBrains fork `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` publishes `androidJvm`/`desktop`/`iosArm64`/`iosSimulatorArm64`, keeps the `androidx.navigation.compose` package, and resolves through Google's own now-KMP `navigation-runtime:2.10.0`; Google's `navigation-compose:2.9.8` publishes `android` plus `jvmStubs`, which are dokka artifacts. So the classpath blocker is gone. **What remains is a `Context` that arrives through a call, which an import scan cannot see:** `AppNavHost` calls all six graphs by name, and each graph calls a `Context`-taking factory, so the layer is mutually referencing and moves as a unit or not at all. The `6 files` this row used to name was also wrong: the layer is **9** — 7 graphs in `ui/navigation` (`Auth`, `Discover`, `Home`, `Library`, `Player`, `Search`, `Settings`) plus `AppRoot` and `AppNavHost` |
  * | `androidx.paging` | `paging-common` **is** on the `commonMain` classpath (`:328`); `paging-runtime` and `paging-compose` are not | `LibraryPagingSource`, `BrowsePagingSource` (`CatalogPagingSource` moved to `commonMain`) | measured per artifact, and the two halves of the family answer differently: `paging-common-3.5.1` publishes `iosArm64`/`iosSimulatorArm64`/`linuxX64`/`linuxArm64`/`desktop`, while `paging-runtime-3.5.1` publishes no platform variants at all — so `paging` is not "KMP", it is **two artifacts with opposite answers**, which is why only `paging-common` is a `commonMain` dependency |
  * | `StreamResolver` | `androidMain/.../addons` | `SelectorCoordinator`, `HomeStreamSelector` | the same port treatment as `BackendApi`, applied to a type the project owns |
  * | `R.raw` | `:ui-assets` | `DetailsRatingsSection` (7 logos) | see the rule below: split the file, and push the name matching to `commonMain` the way `ReviewProviderOrNull` did |
@@ -333,15 +333,45 @@ kotlin {
             // the Compose `LazyPagingItems` are the Android-only half, and the
             // three PagingSource files that moved need none of them.
             //
-            // This is NOT the situation with `androidx.navigation`, which
-            // looks symmetric and is not: `navigation-compose:2.9.8` publishes
-            // only `android`, plus `jvmStubs` and `linuxx64Stubs`. Those stubs
-            // are javadoc/dokka artifacts, not compilable KMP ones, so the
-            // six `ui/navigation` files stay blocked. The multiplatform
-            // navigation is the JetBrains fork
-            // (`org.jetbrains.androidx.navigation`), which is a dependency
-            // decision, not a code one.
+            // This used to read "This is NOT the situation with
+            // `androidx.navigation`, which looks symmetric and is not ...
+            // the six `ui/navigation` files stay blocked." Every clause of that
+            // was true and all of it is now false, so it is replaced rather than
+            // amended. Measured, link by link, against the resolved `.module`
+            // files (the five links are written out in gradle/libs.versions.toml):
+            //
+            //  - `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01`
+            //    publishes `androidJvm`, `desktop`, `iosArm64` and
+            //    `iosSimulatorArm64`. Google's `navigation-compose:2.9.8` publishes
+            //    `android` plus `jvmStubs` and `linuxx64Stubs`, which are
+            //    javadoc/dokka artifacts rather than compilable KMP variants --
+            //    the `jvmStubs` name is the tell, and a stubs variant satisfies a
+            //    `commonMain` dependency *declaration* without satisfying a
+            //    `commonMain` compile.
+            //  - The fork keeps the `androidx.navigation.compose` package, so
+            //    the navigation files need no import change.
+            //  - The stable `2.9.2` is unusable: real KMP, but it publishes only
+            //    `uikit*` target names, which Kotlin 2.x no longer has.
+            //
+            // So the two androidx families are now symmetric, and that symmetry is
+            // the whole difference: `paging-common` carries the types this module's
+            // `PagingSource`s need, `paging-compose` carries `LazyPagingItems`, and
+            // only the first is on the `commonMain` classpath.
             implementation(libs.androidx.paging.common)
+
+    // The JetBrains KMP fork of navigation, in `commonMain` for the first time in
+    // this module's history. The alias name carries the provider on purpose --
+    // see gradle/libs.versions.toml.
+    //
+    // **It is a precondition and it moves no file.** The navigation layer is a set
+    // of mutually referencing `androidMain` files: `AppNavHost` calls all six
+    // graphs by name (`:100-105`), and every graph calls a `Context`-taking
+    // factory, so the layer moves as a unit or not at all -- and it cannot move as
+    // a unit until those factories are reachable from `commonMain`. A pin that
+    // arrives through a *call* is invisible to an import scan, which is why five
+    // censuses of this layer each found a different artifact and each found it was
+    // not the pin. The remedy is the no-default-slot pattern, not this coordinate.
+    implementation(libs.jb.navigation.compose)
     // androidx.lifecycle:lifecycle-viewmodel is a genuine KMP artifact at 2.11.0 - this was
     // measured by declaring it here and compiling the `desktop` target, not read from a
     // doc. ViewModel, ViewModelProvider and viewModelScope are therefore all reachable
@@ -410,8 +440,6 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.ktx)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.androidx.activity.compose)
-
-            implementation(libs.androidx.navigation.compose)
 
             implementation(libs.androidx.paging.runtime)
             implementation(libs.androidx.paging.compose)
