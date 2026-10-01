@@ -300,6 +300,31 @@ Kotlin Multiplatform modules (in progress; see `check-local.sh`):
     gained `withHostTest {}` and its **first test file** in this landing; without the block a
     `commonTest` source directory exists but nothing compiles or runs it on Android and AGP only
     warns.
+  - **`:tv`'s mapping is now pinned by `:android:tv`'s first test, and the reason it was recorded
+    as untestable was false.** This bullet used to end at "the values behind them are pinned in
+    `commonTest`", which pinned `CrispyPalette` and left `:tv`'s half of the mapping — the part
+    that can actually be wrong — asserting nothing, for a stated reason that was never checked.
+    **`:tv` is a plain `com.android.application`, and that is not the obstacle it was taken to
+    be**: `CrispyTvDarkColors` is a top-level `val` calling `darkColorScheme(...)`, which builds
+    a `ColorScheme` data class out of `androidx.compose.ui.graphics.Color` — an inline value
+    class over `ULong`, pure Kotlin, no `Context`, no resource, no view. **A plain JVM unit test
+    in `:android:tv/src/test` reaches it, and `:tv` has had no `src/test` at all**; the real
+    obstacle was the `private` modifier, which is why the landing widened it to `internal`
+    (the repo's own rule: *a decision no test can call is a decision no test can cover*). Ten
+    cases, `testDebugUnitTest`, JUnit only and deliberately **not** Robolectric. **So "`:tv` is a
+    plain application module" was a claim about the module type standing in for a fact about the
+    code, and the second time that shape has cost this repository work the first time had already
+    caught it** (the `LocalWindowInfo` rule in §1). Before recording a surface as untestable,
+    find the declaration and look at what it actually *is*.
+  - **`:tv` maps 29 of the palette's 37 roles, and its own KDoc under-counted the gap.** The
+    unmapped eight are the seven `surfaceContainer*`/`surfaceDim`/`surfaceBright` roles the KDoc
+    named **plus `spinner`**, which is not a Material3 role at all. The old wording "under-counted
+    the gap by one and left the `spinner` omission looking deliberate when it was only never
+    considered" — which is the general hazard: **an omission nobody mentioned reads as a decision
+    nobody made.** The other number in that KDoc, "all twenty-seven roles", is the count of
+    *mapped* roles and reads as the palette's size; it is 37. Both figures are now asserted, and
+    `theMappedAndUnmappedRolesPartitionTheWholePalette` fails if the two sides stop summing to
+    `paletteRoles.size`.
   - `LocalConfiguration` is Android-only even under CMP — it lives in `AndroidCompositionLocals_androidKt` inside the `ui-android` AAR, so a grep of the class lists cannot see it either. **This line once recommended `LocalWindowInfo.current.containerDpSize` as the replacement, and `LocalWindowInfo` does not exist in any resolved Compose artifact at any version.** There is no portable composition local for the window size here: the answer is that the caller already holds the value. A screen that needs to know whether it is wide takes a no-default `isWideScreen: Boolean` and the caller passes it — see *Rules* §1.
   - **Material3 Expressive is available on every target, and is used on every target. Settled — do not re-litigate, and do not "fix" it by dropping it.** The whole blocker was one line in a build file. This repo recorded, in three places, that Phase 4 "has to drop or replace Material3 Expressive" because `androidx.compose.material3:1.5.0-alpha26` publishes no `material3-desktop` artifact. That was inferred from a coordinate mismatch and was **wrong**, and acting on it would have deleted a shipping design feature to work around a version pin.
     The fix is to declare **`org.jetbrains.compose.material3:material3`** (`libs.compose.material3`) instead of either the androidx coordinate or the `compose.material3` alias. That coordinate is a thin alias that delegates per target, verified by resolving the graph: on Android it becomes `androidx.compose.material3:material3-android:1.5.0-alpha27` — genuine AndroidX, one alpha *forward* of what the app shipped — and on desktop/iOS it becomes `org.jetbrains.compose.material3:material3-desktop:1.13.0-alpha01`, the real fork carrying `LoadingIndicator`, `MaterialShapes` and `WavyProgressIndicator`. So there is exactly one material3 on any classpath, the `androidx.compose.material3` package and imports are identical everywhere, and **no `expect`/`actual` seam is needed**. The 12 Expressive call sites are untouched.
@@ -784,6 +809,31 @@ Every rule in this section is stated in each driver's docstring, because a drive
 - **Restore in a `finally` with a printed `restored:` line**, end with
   `if __name__ == "__main__": main()` (a driver executes on import otherwise), and print the tally
   `of len(selected)` so a narrowed `RECHECK` run cannot be mistaken for a full one.
+- **Derive a set of *names* by subtracting *names*, and a suite that pins values must say which
+  values it cannot tell apart.** `CrispyTvDarkColorsMappingTest` found both halves of this on its
+  first run. It computed the unmapped palette roles as `allPaletteRoles - mappedRoles.values.toSet()`
+  — a subtraction by **value**, because the map happened to be keyed by palette role and valued by
+  colour. **Ten of `CrispyPalette`'s 37 roles carry the identical value `0xFFFFFFFF`**, and
+  `surfaceContainer` shares `0xFF1F1F1F` with the mapped `surface`, so a value-based difference
+  **deleted the very roles the assertion was about and passed for the wrong reason.** *A value
+  hiding a name is the same shape as `:tv`'s dead `CrispySpinner` duplicate — an identical
+  declaration reachable with no diff.* Subtract by the key, never the value, whenever the key is
+  the thing you mean. And the second half: because so many roles share a value, **no value
+  assertion can tell them apart**, so the suite names the interchangeable set explicitly
+  (`theTenRolesThatShareWhiteAreNamedRatherThanAssumed`) instead of letting a green run imply each
+  role is wired to the right palette entry.
+- **A test's own non-vacuity gate is where a suite learns its limit, and the limit belongs in the
+  assertion, not in a comment.** `noMappedRoleCoincidesWithTheTvLibrarysOwnDefault` asserts that no
+  mapped role carries the value `androidx.tv.material3` would have defaulted to — without it, a
+  suite that forgot to pass a role at all would be green, because the constructed object would hold
+  the default. It failed on the first run and found its own limit: **`scrim` is the one mapped role
+  whose value equals the library's own default** (`0xFF000000`, and the TV library defaults to
+  opaque black), so **no assertion can tell a mapped `scrim` from a dropped one.** It was rewritten
+  to assert the collision set is *exactly* `setOf("scrim")`, so a second collision fails instead of
+  being absorbed into the list — **the difference between documenting a limit and ignoring one.** The
+  suite pins 28 of 29 roles' wiring and its own gate says which one it cannot, which is a better
+  claim than a green suite that implies 29. **When a test cannot cover one case, assert the set of
+  uncovered cases**, so the count is checked and a reader is not left to assume.
 - **A surviving mutation is a claim about the code, so check it by hand.** Read the callee. If the
   guard is genuinely unreachable, keep it and write the measurement **at the guard** — fourteen so
   far, in three files, the last two of them *pairs in one file*, which is the tell. If it is

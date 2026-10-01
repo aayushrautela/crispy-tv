@@ -180,4 +180,14 @@ dependencies {
     implementation(libs.androidx.media3.ui)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // JUnit only, and deliberately not Robolectric. The one thing this module's tests
+    // assert is the token mapping in `ui/theme/Theme.kt`, and that is a plain
+    // `darkColorScheme(...)` call producing a `ColorScheme` data class from
+    // `androidx.compose.ui.graphics.Color` — an inline value class over `ULong`. No
+    // `Context`, no resource, no view. The mapping was recorded as untestable because
+    // `:tv` is a plain `com.android.application`, and that was a claim nobody had
+    // checked: the blocker was the `private` modifier on `CrispyTvDarkColors`, which
+    // the same landing widened to `internal`.
+    testImplementation(libs.junit4)
 }

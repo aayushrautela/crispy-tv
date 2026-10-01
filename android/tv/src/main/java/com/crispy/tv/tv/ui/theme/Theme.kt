@@ -36,10 +36,23 @@ import com.crispy.tv.ui.theme.CrispyPalette
  *
  * ## What `:tv` cannot express
  *
- * The seven `surfaceContainer*`/`surfaceDim`/`surfaceBright` roles have no slot
- * in `androidx.tv.material3`'s `darkColorScheme`, so they are not passed here.
- * They are defined in the shared palette because the phone surface needs them,
- * not because the 10-foot surface was given an opinion about them.
+ * Eight of the palette's 37 roles are not passed here: the seven
+ * `surfaceContainer*`/`surfaceDim`/`surfaceBright` roles, which have no slot in
+ * `androidx.tv.material3`'s `darkColorScheme`, plus `spinner`, which is not a
+ * Material3 role at all. The first seven are defined in the shared palette because
+ * the phone surface needs them, not because the 10-foot surface was given an opinion
+ * about them; `spinner` is absent because nothing on this surface draws a spinner and
+ * `CrispyTvTheme` has no override for it. It used to be listed as the seven, which
+ * under-counted the gap by one and left the `spinner` omission looking deliberate
+ * when it was only never considered.
+ *
+ * `CrispyTvDarkColors` is `internal` rather than `private` so that
+ * `CrispyTvDarkColorsMappingTest` can read the mapping. That is a real change in
+ * reachability and it is the whole reason the mapping is testable: a colour scheme
+ * is a plain data class built from `androidx.compose.ui.graphics.Color`, an inline
+ * value class over `ULong`, so **constructing it needs no Android runtime** and a
+ * plain JVM unit test reaches it. `:tv` being a plain `com.android.application` is
+ * therefore not the obstacle it was recorded as being — the `private` modifier was.
  *
  * ## Not here
  *
@@ -50,7 +63,7 @@ import com.crispy.tv.ui.theme.CrispyPalette
  * `public` and the packages differed. The single definition is now
  * `CrispyPalette.spinner`.
  */
-private val CrispyTvDarkColors = darkColorScheme(
+internal val CrispyTvDarkColors = darkColorScheme(
     primary = CrispyPalette.primary,
     onPrimary = CrispyPalette.onPrimary,
     primaryContainer = CrispyPalette.primaryContainer,
