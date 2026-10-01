@@ -169,51 +169,73 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 77 that remain: **3 are movable, and the partition says which 3**
+### The 77 that remain: **none are movable, and the partition says what pins each**
 
-**This section used to claim a taxonomy and now carries a census, because the
-taxonomy was not the answer and the census is.** Every one of `:app`'s 77
-`androidMain` files was classified by *what it imports from a platform-only
-artifact* — comment lines stripped, first matching rule wins, and **the six
-buckets sum to 77**:
+**This section used to claim a taxonomy, then carried a census, then carried a wrong
+census, and the reason the third one was wrong is the most useful thing in it.** Every
+one of `:app`'s 77 `androidMain` files is now classified by *what it imports from a
+platform-only artifact* — comment lines stripped, first matching rule wins, and **the
+buckets sum to 77 with nothing unmatched**:
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **40** | `android.jar` itself, and nothing else | no — it is the platform |
-| **17** | the player and introskip (`playerui/`, `introskip/`) | no — a plain `com.android.library` publishing no JVM variant, **permanent by standing decision** |
-| **9** | `androidx.navigation.compose` | no KMP artifact exists — **a dependency decision** |
-| **3** | `androidx.paging.compose` | no KMP artifact exists — **a dependency decision** (`:35` in `LibraryRoute.kt`) |
-| **3** | **`LocalContext` / `LocalConfiguration` and nothing else** | **yes — and the remedy is already applied elsewhere in this repository, below**: `CalendarScreen.kt` (321), `DetailsRoute.kt` (120), `PersonDetailsRoute.kt` (537) |
-| **2** | an `R` reference and nothing else | no, and **already correct**: both KDocs record that the pure half is in `commonMain` behind a no-default composable slot |
-| **2** | `java.io.File` — `AppGraph.kt` and `optimistic/FileBackedPendingMutationStore.kt` | okio or `kotlin.io.path` — **a dependency decision**, and the store's own KDoc already says exactly this |
-| **1** | `distribution/AppDistribution.kt` — the `androidMain` sibling `PlaybackDependencies` | no — a service locator with **7 `androidMain` reader files**, correct by its own KDoc |
+| **54** | `android.jar` itself | no — it is the platform |
+| **7** | `androidx.navigation.compose` | no KMP artifact exists — **a dependency decision** |
+| **7** | the player and introskip (`playerui/`, `introskip/`) | no — a plain `com.android.library` publishing no JVM variant, **permanent by standing decision** |
+| **2** | `androidx.paging.compose` (`CatalogScreen`, `LibraryRoute`) | no KMP artifact exists — **a dependency decision** |
+| **2** | an `R` reference | no, and **already correct**: both KDocs record that the pure half is in `commonMain` behind a no-default composable slot |
+| **1** | `java.io.File` + `Dispatchers.IO` — `optimistic/FileBackedPendingMutationStore.kt` | okio or `kotlin.io.path` — **a dependency decision**, and the store's own KDoc already says exactly this |
+| **1** | `appGraph()` + `LocalContext` — `DetailsRoute.kt` | no — a ViewModel-factory route |
+| **1** | `Dispatchers.IO` + `LocalContext` + `System.currentTimeMillis` + provider wiring — `CalendarScreen.kt` | no — a ViewModel-factory route |
+| **1** | `LocalContext` + `java.time.LocalDate` + `java.util.Locale` — `PersonDetailsRoute.kt` | no — the `java.time` port is not a one-liner |
+| **1** | the `androidMain` sibling `PlaybackDependencies` — `distribution/AppDistribution.kt` | no — a service locator with **7 `androidMain` reader files**, correct by its own KDoc |
 
-**17 + 9 + 3 + 3 + 2 + 2 + 1 + 40 = 77, with nothing unmatched and every bucket
-non-empty.** Both properties are asserted because an earlier bash version of this tally
-reported six rows of zeros under a `True` checksum — the rule is in AGENTS.md.
+**54 + 7 + 7 + 2 + 2 + 1 + 1 + 1 + 1 + 1 = 77, with nothing unmatched.**
 
-**Exactly three files are movable by code work, and they are the composition-local
-three.** The JVM-API token work in `:app` is otherwise finished:
+**No file is movable by code work, so the JVM-API token work in `:app` is finished.**
 `System.currentTimeMillis`, `java.util.Locale` and `java.util.UUID` have all been removed
 or reclassified across four consecutive landings, and **none of them is what stands
-between `:app` and `commonMain` any more.** What remains is `android.jar`, three
+between `:app` and `commonMain` any more.** What remains is `android.jar` itself, three
 Android-only `androidx` families, the player, and the composition roots — which are
 *correctly* Android-side, because a `Context` used for wiring belongs in the factory.
-**So all of that remainder is a dependency decision rather than a code one**, which is the
+**So the whole remainder is a dependency decision rather than a code one**, which is the
 same class of finding as the navigation wall below, now measured across a whole module
 instead of argued file by file.
 
-**The remedy for the two Compose locals is already in this codebase and already
-applied.** `coil3`'s `commonMain` declares `LocalPlatformContext`, and the recorded
-rule is that *when a platform composition local is unreachable, the answer is usually a
-value the caller already has* — `isWideScreen`, `isCompact` and `pluginsUiSupported` all
-crossed as data from a value already in scope. So `LocalContext` becomes a `Context`
-handed down as data and `LocalConfiguration` becomes a dimension handed down, exactly the
-way `isWideScreen` did. **The three files that need it are already the three that were
-made to look portable:** `DetailsRoute.kt` and `PersonDetailsRoute.kt` each had a
-`Locale` use deleted this cycle while staying put behind exactly this local, and
-`CalendarScreen.kt` has been carrying `Dispatchers.IO` and `System.currentTimeMillis`
-for a `Context` it only uses for wiring.
+#### The three that were wrongly called movable, and the two rules the error earns
+
+An earlier version of this table claimed **three files behind `LocalContext` and nothing
+else** — `CalendarScreen.kt`, `DetailsRoute.kt`, `PersonDetailsRoute.kt` — and named the
+`coil3` `LocalPlatformContext` remedy as what would free them. **All three were then read
+in full and every one is dead, each behind a second, unrelated pin:** `DetailsRoute.kt:55`
+calls `appContext.appGraph().detailsViewModelFactory(…)`, and `appGraph()` is
+`androidMain`; `CalendarScreen.kt:90` has `withContext(Dispatchers.IO) { … loadCalendar(
+System.currentTimeMillis()) }` *and* builds its ViewModel from `AndroidAppLogger`,
+`BackendContextResolverProvider` and `BackendServicesProvider`; `PersonDetailsRoute.kt`
+carries `java.time.LocalDate` at `:72` and an inline `DateTimeFormatter` at `:535`. **The
+three are routes that construct a ViewModel from a `Context` — a composition root wearing
+a route filename**, which is the same shape as the factory cluster, and the same recorded
+rule: a `Context` used for *wiring* belongs in the factory, and these files **are** the
+factory.
+
+**The error is worth more than the three files would have been, because it is the third
+failure of one shape in this same census.** A bash version reported six rows of zeros
+under a `True` checksum, because the bucket keys contain spaces and `printf '%s\n'
+"${!bucket[@]}"` word-splits them in the reporting loop while the counting loop is
+untouched. The Python rewrite put `^import android\.` first, so the coarse bucket absorbed
+the navigation files. And the "and nothing else" bucket was populated by
+`set(hits) <= {"LocalContext","LocalConfiguration"}` — **which is true for the empty set,
+so a file with no pins at all was classified as Compose-local-only.** That test could not
+fail, and it is the one that produced the false claim.
+
+**So two rules, and both are in AGENTS.md:** *a bucket name that asserts a negative —
+"and nothing else" — is a claim the measurement must TEST, not a label it may print*, and
+*in a first-match-rule partition, the rules after the first are never evaluated for the
+files the first one caught, so a sole-pin bucket cannot be produced that way at all.*
+**Every one of the three failures went the same direction — they manufactured candidates
+rather than losing them** — and a check that does not run is not a weak check, it is no
+check. The same `re.M` omission already recorded for `finditer` is what made the third
+version report 38 files with "no pin at all".
 
 **The four pin *mechanisms* behind those buckets**, because three of them are invisible
 to every static measurement — no import scan, no reverse `com.crispy.tv` audit, and no

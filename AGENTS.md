@@ -428,20 +428,29 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   clock behind `android.content.Intent`, a `Locale` argument behind `android.util.Log`. The
   per-token census of all 77 files then answered the question none of the four was asking
   — *what does this file import from a platform-only artifact?* — and the answer is that
-  **3 of 77 are movable, and the partition says which**: 40 behind `android.jar` alone, 17
-  player, 9 navigation, 3 `paging-compose`, 2 behind an `R` reference and already correct,
-  2 behind `java.io.File`, 1 a service locator with 7 `androidMain` reader files, and
-  **exactly 3 behind `LocalContext`/`LocalConfiguration` and nothing else** — which are the
-  three the remedy below applies to. **So classify a family by its blocker before choosing
-  a file in it, or each landing finds a different token and each finds it was not the pin** —
-  and when the census is near-zero, *recording the partition is worth an order of magnitude
-  more than a landing*, because the finding is what stops the work being re-attempted. The
-  two Compose locals are the one part of that wall with a remedy in this repository: `coil3`
-  declares `LocalPlatformContext`, so hand the `Context` down as data.
-  **The specific rule must be tested before the coarse one, or the coarse bucket absorbs
-  the finding** — putting `^import android\.` first reported 62/4/2/1/1/7 with the
-  navigation files hidden inside it, and the bucket that looks like a discovery is an
-  artefact of the ordering.
+  **none of the 77 are movable by code work**: 54 behind `android.jar`, 7 player, 7
+  navigation, 2 `paging-compose`, 2 behind an `R` reference and already correct, 1 behind
+  `java.io.File`, 1 a service locator with 7 `androidMain` reader files, and 4 routes
+  behind a *second* pin each. **So classify a family by its blocker before choosing a file
+  in it, or each landing finds a different token and each finds it was not the pin** — and
+  when the census is near-zero, *recording the partition is worth an order of magnitude more
+  than a landing*, because the finding is what stops the work being re-attempted. The
+  remainder is therefore **a dependency decision, not a code one**, the same class of
+  finding as the navigation wall.
+  **Three failures produced one wrong census, and all three went the same direction —
+  they manufactured candidates rather than losing them.** A bash tally reported six rows of
+  zeros under a `True` checksum (bucket keys contain spaces; `printf '%s\n' "${!bucket[@]}"`
+  word-splits them in the reporting loop while the counting loop is untouched). A Python
+  rewrite put `^import android\.` first, so the coarse bucket absorbed the navigation files.
+  And **the bucket that made it into the plan as a discovery was populated by
+  `set(hits) <= {"LocalContext","LocalConfiguration"}` — which is true for the empty set**,
+  so every file with no pins at all was classified as Compose-local-only. **So two rules:**
+  *a bucket name that asserts a negative — "and nothing else" — is a claim the measurement
+  must TEST, not a label it may print*, and *in a first-match-rule partition the rules after
+  the first are never evaluated for the files the first one caught, so a sole-pin bucket
+  cannot be produced that way at all.* **A check that does not run is not a weak check, it
+  is no check** — and when a tally produces a bucket that looks like a finding, write down
+  what its rule *excludes* first, then run the script that would refute it.
 - **A private decision is an untestable decision, and a private member is worse than a private
   function** — `private` is a property of the class, not of the file, so a `private` member cannot be
   named by a test in its own module either. Name it in production (`:tv`'s `CrispyTvDarkColors` was
