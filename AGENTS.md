@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 125 `commonMain` / 71 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 126 `commonMain` / 70 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -370,7 +370,22 @@ abstract-method error at best) is the only reason `FileBackedPendingMutationStor
 coverage, and it is what caught the `flush`/`close` bug below. **A strict in-memory `FileSystem` is
 worth a test dependency for one reason: it fails where `FileSystem.SYSTEM` succeeds.** `FileSystem.SYSTEM`
 wrote a file that `readText` then read as `""`, and every green test in the world would have said the
-store worked. **Push the pure half of a split
+store worked. **And okio discharges two more pins, both of which were believed to have no KMP answer
+at all.** `ByteString.Companion.encodeUtf8().sha256().hex()` replaces `MessageDigest.getInstance("SHA-256")`
+plus a hand-rolled nibble loop, and `.md5()` is there too — **so "no `java.security` equivalent" is the
+same shape of false premise as "`java.util.UUID` has no Kotlin/Native equivalent", and the two claims
+were in the same class of file.** A digest that is merely *equivalent* is not good enough, though: see
+the golden rule below. **`delete` answers `Unit` where `java.io.File.delete()` answered `Boolean`**, and
+`LibraryDiskCache.invalidate` returns `Result<Boolean>`, so the answer has to be *reconstructed* with a
+`metadataOrNull` first — `mustExist = true` throws for an absent file and `false` silently succeeds, and
+**neither is the old answer.** The compiler catches this one for free (`Result<Unit>` is not a
+`Result<Boolean>`), which is the strongest argument for reproducing a signature verbatim: the
+mismatch is a red build rather than a caller that quietly stops being able to see whether a delete
+happened. **And `use` needs `import okio.use`, not the stdlib's** — on the JVM okio's `Closeable` *is*
+`java.io.Closeable`, so `kotlin.io.use` applies and every local gate compiles it, while on Native
+`BufferedSink` is not an `AutoCloseable` and the stdlib overload has no applicable candidate. **That
+is the `Dispatchers.IO` rule arriving through a different symbol, and it cost a red `apple.yml` run
+on two lines.** Push the pure half of a split
 toward `commonMain` and the platform half toward `androidMain`, even when the platform half is the
 smaller one** — otherwise the pure half is untestable. A **large file holding a small pure thing no test
 can reach is an *extraction*, not a move**: deciding which is the measurement.
@@ -525,7 +540,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   cannot round-trip is a product decision to migrate or to constrain, not a bug to patch — changing
   it orphans every stored key, and here that is a user-visible resume position. Note also that
   **a key format is not visible in a signature**: three of that suite's first-run failures were me
-  writing expectations from the parameter names rather than the format.
+  writing expectations from the parameter names rather than the format. **And a measured golden is
+  the same mistake one level up, which is harder to see because the measurement is real.**
+  `libraryCacheFileName(profileId, sectionId)` hashes `"library:${profileId.trim()}:${sectionId.trim()}"`
+  and its seven-value golden was built by feeding pre-joined key strings to `MessageDigest` in a
+  standalone JVM — which cannot see the `trim()`. The whitespace row therefore held the digest of
+  the **untrimmed** key `library:  :  `, a string the function never produces, and it failed against
+  `e1db8a0e…`, the correct digest of `library::`. **A correct SHA-256 of a string the function does
+  not build is still a wrong expectation**, and "I measured it" reads like evidence in a way that
+  "I wrote it out" does not. **So a golden has to be measured *through* the function** — a
+  `commonTest` that prints, compared against the old implementation — and never from the format the
+  function is assumed to assemble. The second failure in the same run was the mirror image: the
+  collision pair `("a/b", "c:history")` / `("a", "b/c:history")` does not collide, because a `/`
+  was mistaken for the `:`. The pair that does is `("a", "b:c")` / `("a:b", "c")` — **the separator
+  has to be the field boundary, not a character that looks like one** — and a collision test with no
+  non-collision test beside it is satisfied by a function that hashes only its second argument.
 - **A comment claiming a choice between two orderings that coincide is unobservable**, and a test for
   it would pass on either implementation — sorting `prefix + s` is the same order as sorting `s` for
   a constant prefix. Record it rather than assert it, and pin the comment's *real* content (that it

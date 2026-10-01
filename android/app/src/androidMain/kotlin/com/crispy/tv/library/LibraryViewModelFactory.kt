@@ -12,6 +12,8 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
 import kotlinx.coroutines.Dispatchers
+import okio.FileSystem
+import okio.Path.Companion.toPath
 
 /**
  * The `libraryViewModelFactory` half of [LibraryViewModel]'s move to `commonMain`.
@@ -52,7 +54,20 @@ fun libraryViewModelFactory(context: Context): ViewModelProvider.Factory {
                             PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         ),
                     outbox = appContext.appGraph().userMutationOutbox,
-                    libraryCache = LibraryDiskCacheStore(appContext),
+                    libraryCache = LibraryDiskCacheStore(
+                        fileSystem = FileSystem.SYSTEM,
+                        // **`.absolutePath` first, and that is not a style choice.**
+                        // `java.io.File.toPath()` and `okio.String.toPath()` both
+                        // exist, and a `File` receiver picks the JDK's — which
+                        // answers `java.nio.file.Path` and fails the parameter with
+                        // `actual type is 'java.nio.file.Path!', but 'okio.Path' was
+                        // expected`. **It is the same shadowing as okio's `use`: a
+                        // name that exists in two libraries, resolved by whichever
+                        // one the receiver's platform type names.** Routing through
+                        // the `String` makes the okio overload the only candidate.
+                        cacheRoot = appContext.filesDir.absolutePath.toPath(),
+                        ioDispatcher = Dispatchers.IO,
+                    ),
                     watchSyncFactory = { accessToken, profileId, onEffect ->
                         OkHttpWatchSyncSource(
                             httpClient = AppHttp.okHttp(appContext),

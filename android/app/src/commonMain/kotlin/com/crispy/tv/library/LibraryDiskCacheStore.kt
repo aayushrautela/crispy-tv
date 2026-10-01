@@ -1,9 +1,8 @@
 package com.crispy.tv.library
 
-import android.content.Context
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.images.ResponsiveImageSet
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -15,26 +14,49 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import java.io.File
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import okio.ByteString.Companion.encodeUtf8
+import okio.FileSystem
+import okio.Path
+import okio.buffer
+import okio.use
 
 /**
  * Disk cache for the first page of each library section (history, watchlist,
  * ratings) per profile. No time-based expiry: a cached entry is valid until it
  * is explicitly invalidated (server signal, generation advance, or local
  * optimistic write). Deeper pages are always served from the network.
+ *
+ * **This class was `androidMain` for four reasons and every one of them was a
+ * collaborator rather than a wall**, which is a shape worth naming because it is
+ * the opposite of the `org.json` story three landings ago: the JSON went first and
+ * left the file behind, and what was left were a `Context` for `filesDir`, a
+ * `java.io.File`, a `java.nio.charset.StandardCharsets`, a
+ * `java.security.MessageDigest` and a `Dispatchers.IO`. Four of those five are now
+ * constructor parameters on types that exist on every target, and the fifth
+ * ([ioDispatcher]) is a parameter for the same reason it always is: `Dispatchers.IO`
+ * is `public` on the JVM and `internal` on Kotlin/Native, and a *defaulted*
+ * dispatcher would compile everywhere while putting blocking file IO on a
+ * CPU-sized pool.
+ *
+ * **The cache did not move because the JSON was ported. It moved because the
+ * class was never reading or writing JSON to get its file name — it was hashing
+ * one.** `MessageDigest` is the only pin that had no `kotlinx` answer, and the
+ * answer turned out to be okio, which is already on this module's `commonMain`
+ * classpath through `coil3`. See [libraryCacheFileName] for the one thing that had
+ * to be *measured* rather than assumed, which is that a different SHA-256
+ * implementation has to produce the identical filename or every cached section on
+ * every installed device is orphaned by the upgrade.
  */
-class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
-    private val cacheDirectory = appContext.filesDir.resolve(CACHE_DIRECTORY_NAME).also { directory ->
-        if (!directory.exists()) {
-            directory.mkdirs()
-        }
-    }
+class LibraryDiskCacheStore(
+    fileSystem: FileSystem,
+    cacheRoot: Path,
+    private val ioDispatcher: CoroutineDispatcher,
+) : LibraryDiskCache {
+    private val fileSystem = fileSystem
+    private val cacheDirectory = cacheRoot.resolve(CACHE_DIRECTORY_NAME)
 
-    override suspend fun read(profileId: String, sectionId: String): LibraryCachedPage? = withContext(Dispatchers.IO) {
-        val file = cacheFile(profileId, sectionId)
-        val raw = runCatching { file.readText(StandardCharsets.UTF_8) }.getOrNull() ?: return@withContext null
+    override suspend fun read(profileId: String, sectionId: String): LibraryCachedPage? = withContext(ioDispatcher) {
+        val raw = runCatching { readText(cacheFile(profileId, sectionId)) }.getOrNull() ?: return@withContext null
         val json = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return@withContext null
         val items = parseItems(json.optJsonArray("items"))
         // `has("items")` asks whether the KEY is there, which is not the same
@@ -57,7 +79,7 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
         sectionId: String,
         page: LibrarySectionPageUi,
         appliedGenerationMs: Long?,
-    ) = withContext(Dispatchers.IO) {
+    ) = withContext(ioDispatcher) {
         // A chained `JSONObject().put(...).put(...)` becomes ONE
         // `buildJsonObject { }` block, and the chain's `.apply { ... }` becomes a
         // plain `if` inside it: there is no receiver left to apply to.
@@ -91,37 +113,64 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
                     put("applied_gen_ms", appliedGenerationMs)
                 }
             }.toString()
-        val file = cacheFile(profileId, sectionId)
         runCatching {
-            file.parentFile?.mkdirs()
-            file.writeText(json, StandardCharsets.UTF_8)
+            // The constructor used to `mkdirs()` this directory as a side effect of
+            // being constructed. **That side effect was never what made `read`
+            // work** — a missing file already answered `null` through the
+            // `runCatching` above — so dropping it changes nothing a caller can
+            // observe, and the one place that needs the directory to exist is the
+            // one place that writes. `createDirectories` throws where `mkdirs()`
+            // returned a boolean, which is why it sits inside the `runCatching`
+            // rather than beside it.
+            fileSystem.createDirectories(cacheDirectory)
+            fileSystem.sink(cacheFile(profileId, sectionId)).buffer().use { it.writeUtf8(json) }
+            // `use` answers its block's value, so without this the `runCatching`
+            // would be `Result<BufferedSink>` and the port's `Result<Unit>` would
+            // not compile. **That is the compiler catching a real narrowing in the
+            // making**: the port KDoc says the `Result` is load-bearing because the
+            // caller can see it, so a `Result` carrying a sink handle instead is
+            // not a cosmetic difference.
+            Unit
         }
     }
 
     /**
      * Not on [LibraryDiskCache]: the screen calls this, the paging source does not.
      */
-    override suspend fun invalidate(profileId: String, sectionId: String) = withContext(Dispatchers.IO) {
-        runCatching { cacheFile(profileId, sectionId).delete() }
-    }
-
-    private fun cacheFile(profileId: String, sectionId: String): File {
-        return cacheDirectory.resolve("${cacheKey(profileId, sectionId).sha256()}.json")
-    }
-
-    private fun cacheKey(profileId: String, sectionId: String): String {
-        return "library:${profileId.trim()}:${sectionId.trim()}"
-    }
-
-    private fun String.sha256(): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(StandardCharsets.UTF_8))
-        return buildString(digest.size * 2) {
-            digest.forEach { byte ->
-                append(((byte.toInt() ushr 4) and 0x0F).toString(16))
-                append((byte.toInt() and 0x0F).toString(16))
+    override suspend fun invalidate(profileId: String, sectionId: String) = withContext(ioDispatcher) {
+        // **`okio`'s `delete` answers `Unit`, and `java.io.File.delete()` answered
+        // `Boolean`.** That is not a detail: this port returns `Result<Boolean>`
+        // and its KDoc is explicit that the Boolean is load-bearing because a
+        // caller can see it. So the answer is reconstructed rather than dropped:
+        // absent means `false`, present-and-removed means `true`.
+        //
+        // **The presence check is a separate `metadataOrNull` because okio folds
+        // the two behaviours into one argument** -- `mustExist = true` throws for
+        // an absent file, `false` silently succeeds -- and neither is the old
+        // answer. Throwing would turn "nothing to invalidate" into a failure
+        // `Result` a caller has to special-case, and silently succeeding would
+        // report a removal that did not happen.
+        //
+        // One difference is accepted rather than reproduced: `File.delete()`
+        // answered `false` for a *failed* deletion, where okio throws, so a
+        // genuinely failed unlink is now a `Result.failure` instead of
+        // `Result.success(false)`. The port has a failure case to carry it and a
+        // caller that inspected the Boolean can still see both.
+        runCatching {
+            val file = cacheFile(profileId, sectionId)
+            if (fileSystem.metadataOrNull(file) == null) {
+                false
+            } else {
+                fileSystem.delete(file, mustExist = false)
+                true
             }
         }
     }
+
+    private fun cacheFile(profileId: String, sectionId: String): Path =
+        cacheDirectory.resolve(libraryCacheFileName(profileId, sectionId))
+
+    private fun readText(file: Path): String = fileSystem.source(file).buffer().use { it.readUtf8() }
 
     private fun parseItems(array: JsonArray?): List<CatalogItem> {
         val safe = array ?: return emptyList()
@@ -214,4 +263,31 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
     private companion object {
         private const val CACHE_DIRECTORY_NAME = "library_section_cache"
     }
+}
+
+/**
+ * The cache file's name for one `(profile, section)` pair: the SHA-256 of
+ * `library:<profile>:<section>`, hex, plus a `.json` suffix.
+ *
+ * **This is a stored-format contract, not an implementation detail, and it is the
+ * reason the digest had to be measured rather than swapped.** The name is the only
+ * thing connecting a cache entry on disk to the lookup that will find it, so a
+ * hash implementation that is merely *equivalent* orphans every cached section on
+ * every installed device the moment the app updates. The old code spelled the
+ * digest out by hand -- `MessageDigest.getInstance("SHA-256")` plus a loop
+ * appending `(b ushr 4 and 0x0F).toString(16)` and `(b and 0x0F).toString(16)`
+ * -- and this is okio's `ByteString.sha256().hex()`. **The two were compared on
+ * seven inputs, including the empty key, a non-ASCII key, a key carrying a `/`,
+ * and a key of nothing but spaces, and every one of the seven hex strings is
+ * byte-identical.** `LibraryDiskCacheFileNameTest` carries those seven, so a
+ * future okio that changes `hex`'s case or its zero padding fails here instead of
+ * failing on a user's device as a silently emptied cache.
+ *
+ * Declared top-level and `internal` rather than kept as a `private` member for the
+ * usual reason: **a decision no test can call is a decision no test can cover**,
+ * and this is the one decision in the file whose failure mode is invisible.
+ */
+internal fun libraryCacheFileName(profileId: String, sectionId: String): String {
+    val key = "library:${profileId.trim()}:${sectionId.trim()}"
+    return "${key.encodeUtf8().sha256().hex()}.json"
 }

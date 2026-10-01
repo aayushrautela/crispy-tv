@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **125** | **71** | **45** |
+| **`:app`** | **126** | **70** | **47** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,16 +152,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **125** | **71** |
-| **total** | **221** | **88** |
+| **`:app`** | **126** | **70** |
+| **total** | **222** | **87** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 125 of 196, i.e. **64%**, and
-the 71 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 126 of 196, i.e. **64%**, and
+the 70 that remain are behind the walls listed in the table above.
 
 **The percentage is the figure that outlived one correction and died on the next,
 which is the whole argument for not quoting a ratio.** It was `106 of 186`, became

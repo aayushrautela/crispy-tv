@@ -3,12 +3,19 @@ package com.crispy.tv.library
 /**
  * The disk cache for the first page of each library section.
  *
- * A type-level port, like `BackendApi` and `StreamResolver` beside it. It is not a
- * transport abstraction and does not pretend to be: the implementation
- * `LibraryDiskCacheStore` writes JSON with `org.json` and hashes file names with
- * `MessageDigest`, and both are Android platform or JVM APIs that a KMP
- * `commonMain` does not have. So the cache cannot travel, and the read and write
- * pair it offers can.
+ * A type-level port, like `BackendApi` and `StreamResolver` beside it.
+ *
+ * **It was declared with a paragraph explaining why the implementation could not
+ * travel, and that paragraph was the right answer to the question that existed at
+ * the time and is now false.** The store wrote JSON with `org.json` and hashed
+ * file names with `MessageDigest`, both of which a KMP `commonMain` does not have,
+ * so the read/write pair was a port and the cache behind it was a wall. The JSON
+ * was ported to `kotlinx.serialization` three landings ago, `MessageDigest` turned
+ * out to be dischargeable through okio's `ByteString.sha256().hex()` once okio
+ * arrived on this module's classpath via `coil3`, and `LibraryDiskCacheStore` is
+ * now `commonMain` too. **The port is what made that possible rather than what
+ * blocked it**: it is the reason the store's read, write and invalidate could be
+ * exercised without a filesystem once one existed.
  *
  * Declared with exactly the members its callers use. It originally carried two --
  * `read` and `write`, the pair [LibraryPagingSource] calls -- and deliberately left
