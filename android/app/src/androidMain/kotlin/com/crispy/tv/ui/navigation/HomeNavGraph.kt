@@ -6,6 +6,9 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
@@ -13,6 +16,8 @@ import com.crispy.tv.home.CalendarEpisodeItem
 import com.crispy.tv.home.CalendarRoute
 import com.crispy.tv.home.CalendarSeriesItem
 import com.crispy.tv.home.HomeRoute
+import com.crispy.tv.home.homeSelectorViewModelFactory
+import com.crispy.tv.home.homeViewModelFactory
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.player.CanonicalContinueWatchingItem
@@ -20,7 +25,30 @@ import com.crispy.tv.player.CanonicalContinueWatchingItem
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) { entry ->
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            // `HomeRoute` takes its two factories and its profile loader as slots, so
+            // this is where the `Context` is read now. Nothing here *names*
+            // `android.content.Context`: `NavHostController.context` is an Android
+            // property reached through the expression, which is exactly the
+            // capability this file has by being `androidMain` at all.
+            //
+            // The `remember` keys are load-bearing, not tidiness.
+            // `activeProfileLoader`'s own KDoc records that its return value is a
+            // `produceState` key, so a fresh lambda on every recomposition would
+            // restart the profile load each time -- the same identity the deleted
+            // comment was protecting when it read `LocalContext.current` here.
+            val appContext = navController.context.applicationContext
             HomeRoute(
+                viewModelFactory = remember(appContext) { homeViewModelFactory(appContext) },
+                selectorViewModelFactory = remember(appContext) { homeSelectorViewModelFactory(appContext) },
+                loadProfile = remember(appContext) { activeProfileLoader(appContext) },
+                // The `< 600` threshold lived in `HomeStreamSelector` while it also read
+                // `LocalConfiguration` itself. `LocalConfiguration` is Android-only --
+                // `ui-android`'s `AndroidCompositionLocals_androidKt` -- so a
+                // `commonMain` composable cannot name it and no static scan can see the
+                // dependency at all. **So the value crosses and the decision stays here**,
+                // which is the one place in this chain where a platform value is
+                // available: this file already reads `navController.context`.
+                isCompact = LocalConfiguration.current.screenWidthDp < 600,
                 onHeroClick = { hero, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(

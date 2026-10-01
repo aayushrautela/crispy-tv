@@ -27,11 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.accounts.ActiveProfileInfo
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
@@ -63,18 +63,36 @@ internal fun HomeRoute(
     onOpenPlayer: (PlaybackIdentity, Long, String?, String?, String?) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
+    /**
+     * The two viewmodel factories and the profile loader used to be built here, from
+     * `LocalContext.current`.
+     *
+     * A note in this file argued that was cheaper than threading a slot through each
+     * public signature, on the grounds that "these screens are androidMain and already
+     * hold a Context". Measured, it cost **one parameter on one signature and one
+     * argument at one call site** -- and the sole caller, `HomeNavGraph.kt`, is itself
+     * `androidMain` and already holds a `Context`. The note also assumed these screens
+     * had to be `androidMain`, which is the assumption being tested.
+     *
+     * **No-default, because every other slot on this signature has no default** and a
+     * defaulted capability is one a call site can silently omit. The factories keep
+     * taking a `Context` and stay in `androidMain`: a `Context` used for *wiring*
+     * belongs in the factory, so it is the call sites that move, not the factories.
+     */
+    viewModelFactory: ViewModelProvider.Factory,
+    selectorViewModelFactory: ViewModelProvider.Factory,
+    loadProfile: suspend () -> ActiveProfileInfo?,
+    /**
+     * `HomeStreamSelector` used to read `LocalConfiguration.current.screenWidthDp`
+     * and apply the `< 600` threshold itself. That local is Android-only, and a
+     * `commonMain` composable cannot name it, so the **value** crosses instead and
+     * the threshold stays where the platform value is available -- the one
+     * `androidMain` file in the chain. See [HomeStreamSelector] for the other side.
+     */
+    isCompact: Boolean,
 ) {
-    val appContext = LocalContext.current.applicationContext
-    val viewModel: HomeViewModel = viewModel(
-        factory = remember(appContext) {
-            homeViewModelFactory(appContext)
-        },
-    )
-    val selectorViewModel: HomeSelectorViewModel = viewModel(
-        factory = remember(appContext) {
-            homeSelectorViewModelFactory(appContext)
-        },
-    )
+    val viewModel: HomeViewModel = viewModel(factory = viewModelFactory)
+    val selectorViewModel: HomeSelectorViewModel = viewModel(factory = selectorViewModelFactory)
 
     LaunchedEffect(selectorViewModel) {
         selectorViewModel.playStream.collect { selection ->
@@ -122,13 +140,6 @@ internal fun HomeRoute(
     val layoutState = uiState.layoutState
     val wideRailSections = uiState.wideRailSections
     val catalogSections = uiState.catalogSections
-    // Hoisted out of the app bar's `actions` slot, and out of `remember` too: neither
-    // that lambda nor `remember`'s calculation is a @Composable scope, so
-    // `LocalContext.current` has to be read here in the composable body. These screens are
-    // androidMain and already hold a Context, so building the loader here is cheaper than
-    // threading a slot through each public signature.
-    val profileContext = LocalContext.current
-    val loadProfile = remember(profileContext) { activeProfileLoader(profileContext.applicationContext) }
 
     CrispyScreen(
         topBar = {
@@ -248,7 +259,7 @@ ProfileIconButton(
         }
     }
 
-    HomeStreamSelector(viewModel = selectorViewModel)
+    HomeStreamSelector(viewModel = selectorViewModel, isCompact = isCompact)
 }
 
 @Composable
