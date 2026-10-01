@@ -478,6 +478,29 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   corollary is that you get no compiler signal for it, so check it with
   `diff <(git show HEAD:<file>) <current>` rather than by the number of call sites you expected
   to edit.
+- **Generalised: it was not one member. 36 of the double's 51 members returned `Nothing`, so
+  `open` bought almost nothing.** Every one was rewritten to the interface's declared return
+  type, which is scriptable off `BackendApi.kt` but has a consequence worth stating: **`Nothing`
+  needed no imports, and the real types do.** The rewrite surfaced 18 unresolved names, and
+  finding each one's package by `grep -rl … | head -1` picked the **wrong** `ProfileSettings` --
+  there are two, `com.crispy.tv.backend` and `com.crispy.tv.domain.account`, and the interface has
+  no import for it, which is how you tell that its type is same-package. **Two declarations share
+  a simple name; the package that has to win is the one the *interface* imports, not the one the
+  first grep hit.**
+- **A `null` and a `throw` are different answers, and `runCatching { }.getOrNull()` collapses
+  them silently.** `SeasonEpisodesLoader` asks for a session; the original reported "Failed to
+  load episodes." when that lookup *threw* and "Sign in to load episodes." when it returned null.
+  The transcription that came first used `getOrNull()` and would have told a signed-in user with
+  a flaky network to sign in again — no compile error, no test failure, just a worse product.
+  Keep `isFailure` and `getOrNull()` as **two** questions wherever the original answered them
+  separately.
+- **A cache with other readers must be shared, not moved in.** `seasonEpisodesCache` is read by
+  five places in the view model other than the fetch it was extracted from; a map owned by the
+  loader would have been a second cache, and the screen would have consulted the first. The first
+  draft's KDoc asserted the opposite — "it belongs to this fetch, not the screen, so it moved
+  with it" — and five measured readers disproved it. **A cache is a thing you share**, and the
+  readers are worth counting before a KDoc reasons about ownership.
+
 ### 3. Tests
 
 - **`build/test-results/<task>/` is not cleared when the compile fails, so it reports the
@@ -559,6 +582,12 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   as a production bug and is entirely the assertion's argument order. `:androidApp` tests use the
   JUnit order (message first), `commonTest` suites use `kotlin.test` (message last), both correct.
   When a failure message quotes your own label text as the *actual*, the assertion is misordered.
+- **`assertEquals` cannot infer its type parameter when one side is `List<Subtype>` and the other
+  `MutableList<Supertype>`,** and the error is `Type inference failed` — which names neither the
+  assertion nor the two lists. A one-line `private fun outcomes(vararg v: SeasonEpisodesOutcome):
+  List<SeasonEpisodesOutcome> = v.toList()` makes the expected side explicit and reads better than
+  spelling the type argument at four call sites.
+
 ### 4. Coroutines in tests
 
 - **A manual clock with a per-read `stepMs` is the only way to make a method's two readings of
@@ -699,6 +728,13 @@ Every rule in this section is stated in each driver's docstring, because a drive
   trustworthy and the *evidence* is what you lose, so **print the task's own failure lines once
   before trusting the regex that reads them.**
 
+- **Truncate the driver's log per entry, not once per run.** Appending across entries makes
+  every entry report *all* earlier failures as its evidence, so a name this entry expects that
+  happened to fail under an earlier mutation is scored as a catch. The five accumulated lists
+  looked like stronger evidence than the honest five minimal ones — a longer failure list is not
+  a more specific one. **Check that a caught entry's failure list is close to its `expect` set**;
+  a superset means the log is shared.
+
 ### 6. Editing safely
 
 - **Never rewrite source with a regex.** It cannot see inside comments or string literals; a
@@ -734,6 +770,12 @@ Every rule in this section is stated in each driver's docstring, because a drive
   patch destroyed a 368-line file and the exception named the patch, not the file. Build a
   `results` dict of every new content **first**, and only then open any file for writing; that
   ordering also means an assertion failure on the seventh file leaves the first six untouched.
+
+- **A count you assert while patching is a claim about the code, and the code is the only
+  thing that settles it.** A patch asserting the episode guard occurs "4 times" aborted with
+  `AssertionError: 5` and wrote nothing — the guard was five-armed, and the "four times, three
+  with the same message" figure in the KDoc and in the plan was wrong for the same reason. The
+  assertion did its job; the number was the error.
 
 ## Compose resources (Phase 4 Step 1)
 

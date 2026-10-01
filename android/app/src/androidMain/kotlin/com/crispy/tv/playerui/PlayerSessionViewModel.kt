@@ -13,7 +13,6 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.addons.mapping.toMediaVideo
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.addons.lookup.PlayerStreamLookupTarget
@@ -197,6 +196,47 @@ class PlayerSessionViewModel(
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /**
+     * Loads the episode list for the selected season. It lives in `commonMain` because every
+     * type it touches is already shared -- `MediaDetails`/`MediaVideo` in `:android:addons`,
+     * `AccountApi`/`BackendApi` in `:android:backend`, `PlaybackIdentity` in `:android:player`.
+     *
+     * `seasonEpisodesCache` is **shared, not handed over**: this view model has five other
+     * readers of that map, and a cache the loader owned would have been a second cache the
+     * screen never consults. That duplication was the thing the previous version's KDoc
+     * claimed did not exist.
+     */
+    private val seasonEpisodesLoader = SeasonEpisodesLoader(
+        accountApi = supabase,
+        backendApi = backendClient,
+        scope = viewModelScope,
+        ioDispatcher = Dispatchers.IO,
+        cache = seasonEpisodesCache,
+        details = { _uiState.value.details },
+        identity = { activeIdentity },
+        selectedSeason = { _uiState.value.selectedSeason },
+        onOutcome = { outcome ->
+            _uiState.update { current ->
+                when (outcome) {
+                    is SeasonEpisodesOutcome.Loading -> current.copy(
+                        episodesIsLoading = true,
+                        episodesStatusMessage = "",
+                        seasonEpisodes = emptyList(),
+                    )
+                    is SeasonEpisodesOutcome.Loaded -> current.copy(
+                        seasonEpisodes = outcome.videos,
+                        episodesIsLoading = false,
+                        episodesStatusMessage = outcome.statusMessage,
+                    )
+                    is SeasonEpisodesOutcome.Failed -> current.copy(
+                        episodesIsLoading = false,
+                        episodesStatusMessage = outcome.message,
+                    )
+                }
+            }
+        },
+    )
 
     /**
      * Owns the `playback_started` / `playback_progress` / `playback_stopped` reports and the
@@ -860,113 +900,7 @@ class PlayerSessionViewModel(
     ) {
         val details = _uiState.value.details ?: return
         if (details.itemType.equals("movie", ignoreCase = true)) return
-        val cached = if (!force) seasonEpisodesCache[season] else null
-        if (cached != null) {
-            _uiState.update {
-                it.copy(
-                    seasonEpisodes = cached,
-                    episodesIsLoading = false,
-                    episodesStatusMessage = "",
-                )
-            }
-            return
-        }
-
-        _uiState.update {
-            it.copy(
-                episodesIsLoading = true,
-                episodesStatusMessage = "",
-                seasonEpisodes = emptyList(),
-            )
-        }
-
-        viewModelScope.launch {
-            val session =
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        supabase.ensureValidSession()
-                    }
-                }.getOrElse {
-                    _uiState.update { current ->
-                        if (current.selectedSeason != season) {
-                            current
-                        } else {
-                            current.copy(
-                                episodesIsLoading = false,
-                                episodesStatusMessage = "Failed to load episodes.",
-                            )
-                        }
-                    }
-                    return@launch
-                }
-
-            if (session == null) {
-                _uiState.update { current ->
-                    if (current.selectedSeason != season) {
-                        current
-                    } else {
-                        current.copy(
-                            episodesIsLoading = false,
-                            episodesStatusMessage = "Sign in to load episodes.",
-                        )
-                    }
-                }
-                return@launch
-            }
-
-            val response =
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        val seriesItemId = activeIdentity?.seriesItemId?.trim()?.takeIf { it.isNotBlank() }
-                            ?: details.itemId?.trim()?.takeIf { it.isNotBlank() }
-                            ?: return@withContext null
-                        backendClient.getSeriesEpisodes(
-                            accessToken = session.accessToken,
-                            seriesItemId = seriesItemId,
-                            season = season,
-                        )
-                    }
-                }.getOrElse {
-                    _uiState.update { current ->
-                        if (current.selectedSeason != season) {
-                            current
-                        } else {
-                            current.copy(
-                                episodesIsLoading = false,
-                                episodesStatusMessage = "Failed to load episodes.",
-                            )
-                        }
-                    }
-                    return@launch
-                } ?: run {
-                    _uiState.update { current ->
-                        if (current.selectedSeason != season) {
-                            current
-                        } else {
-                            current.copy(
-                                episodesIsLoading = false,
-                                episodesStatusMessage = "Failed to load episodes.",
-                            )
-                        }
-                    }
-                    return@launch
-                }
-
-            val videos = response.items.mapNotNull { it.toMediaVideo() }
-
-            seasonEpisodesCache[season] = videos
-            _uiState.update { current ->
-                if (current.selectedSeason != season) {
-                    current
-                } else {
-                    current.copy(
-                        seasonEpisodes = videos,
-                        episodesIsLoading = false,
-                        episodesStatusMessage = if (videos.isEmpty()) "No episodes found." else "",
-                    )
-                }
-            }
-        }
+        seasonEpisodesLoader.load(season, force)
     }
 
     private fun switchPlayback(

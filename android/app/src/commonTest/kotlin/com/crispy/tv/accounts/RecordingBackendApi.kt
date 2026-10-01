@@ -1,24 +1,42 @@
 package com.crispy.tv.accounts
 
 import kotlinx.coroutines.CompletableDeferred
+import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.backend.AccountSettings
+import com.crispy.tv.backend.AddonDto
+import com.crispy.tv.backend.Avatar
 import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BrowseTitlesResponse
+import com.crispy.tv.backend.CalendarResponse
 import com.crispy.tv.backend.ClientMediaCardQueryResult
 import com.crispy.tv.backend.ImportJob
-import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ImportJobsResponse
+import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ItemLookupInput
 import com.crispy.tv.backend.MeResponse
+import com.crispy.tv.backend.MetadataPersonDetail
+import com.crispy.tv.backend.MetadataSeriesEpisodesResponse
+import com.crispy.tv.backend.MetadataTitleDetailResponse
 import com.crispy.tv.backend.MetadataTitleExtrasResponse
-import com.crispy.tv.backend.AccountSettings
+import com.crispy.tv.backend.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.PlaybackEventInput
-import com.crispy.tv.backend.WatchMutationInput
+import com.crispy.tv.backend.PlaybackResolveResponse
+import com.crispy.tv.backend.Profile
+import com.crispy.tv.backend.ProfileSettings
+import com.crispy.tv.backend.ProfileHomeResponse
 import com.crispy.tv.backend.ProviderAccountsResponse
 import com.crispy.tv.backend.ProviderState
 import com.crispy.tv.backend.SearchResultsResponse
 import com.crispy.tv.backend.SearchSuggestionsResponse
 import com.crispy.tv.backend.StartImportResult
+import com.crispy.tv.backend.UpNextResponse
 import com.crispy.tv.backend.UpdateProfileInput
+import com.crispy.tv.backend.WatchActionResponse
+import com.crispy.tv.backend.WatchGenerationsResponse
+import com.crispy.tv.backend.WatchMutationInput
+import com.crispy.tv.backend.WatchStateEnvelope
+import com.crispy.tv.backend.WatchStateResponse
+import com.crispy.tv.backend.WatchStatesEnvelope
 
 /**
  * A [BackendApi] that records what it was asked and throws for everything else.
@@ -129,30 +147,30 @@ open class RecordingBackendApi : BackendApi {
         isKids: Boolean,
         avatarKey: String?,
         interfaceLanguage: String?
-    ): Nothing = unused("createProfile")
+    ): Profile = unused("createProfile")
     override suspend fun bootstrapAccount(
         accessToken: String,
         name: String,
         interfaceLanguage: String,
         avatarUrl: String,
         region: String?
-    ): Nothing = unused("bootstrapAccount")
-    override suspend fun listImportJobs(accessToken: String, profileId: String): Nothing = unused("listImportJobs")
+    ): Profile = unused("bootstrapAccount")
+    override suspend fun listImportJobs(accessToken: String, profileId: String): ImportJobsResponse = unused("listImportJobs")
     override suspend fun getProfileSettings(
         accessToken: String,
         profileId: String
-    ): Nothing = unused("getProfileSettings")
+    ): ProfileSettings = unused("getProfileSettings")
     override suspend fun patchProfileSettings(
         accessToken: String,
         profileId: String,
         settings: Map<String, String>
-    ): Nothing = unused("patchProfileSettings")
-    override suspend fun listProfiles(accessToken: String): Nothing = unused("listProfiles")
+    ): ProfileSettings = unused("patchProfileSettings")
+    override suspend fun listProfiles(accessToken: String): List<Profile> = unused("listProfiles")
     override suspend fun updateProfile(
         accessToken: String,
         profileId: String,
         input: UpdateProfileInput
-    ): Nothing = unused("updateProfile")
+    ): Profile = unused("updateProfile")
     override suspend fun getAccountSettings(accessToken: String): AccountSettings {
         getAccountSettingsCalls += accessToken
         return accountSettings ?: unused("getAccountSettings")
@@ -160,22 +178,22 @@ open class RecordingBackendApi : BackendApi {
     override suspend fun patchAccountSettings(
         accessToken: String,
         settings: Map<String, String>
-    ): Nothing = unused("patchAccountSettings")
-    override suspend fun deleteAccount(accessToken: String): Nothing = unused("deleteAccount")
-    override suspend fun listAddons(accessToken: String): Nothing = unused("listAddons")
+    ): AccountSettings = unused("patchAccountSettings")
+    override suspend fun deleteAccount(accessToken: String): Boolean = unused("deleteAccount")
+    override suspend fun listAddons(accessToken: String): List<AddonDto> = unused("listAddons")
     override suspend fun installAddon(
         accessToken: String,
         profileId: String,
         manifestUrl: String,
         type: String,
         payload: Map<String, String>
-    ): Nothing = unused("installAddon")
+    ): AddonDto = unused("installAddon")
     override suspend fun uninstallAddon(
         accessToken: String,
         profileId: String,
         addonId: String
-    ): Nothing = unused("uninstallAddon")
-    override suspend fun getAvatars(): Nothing = unused("getAvatars")
+    ): Boolean = unused("uninstallAddon")
+    override suspend fun getAvatars(): List<Avatar> = unused("getAvatars")
     override suspend fun searchTitles(
         accessToken: String,
         query: String,
@@ -237,11 +255,11 @@ open class RecordingBackendApi : BackendApi {
         profileId: String,
         itemId: String,
         locale: String?
-    ): Nothing = unused("getAiInsights")
+    ): AiInsightsResult = unused("getAiInsights")
     override suspend fun getMetadataItemDetail(
         accessToken: String,
         itemId: String
-    ): Nothing = unused("getMetadataItemDetail")
+    ): MetadataTitleDetailResponse = unused("getMetadataItemDetail")
     override suspend fun getMetadataItemExtras(
         accessToken: String,
         itemId: String
@@ -250,17 +268,17 @@ open class RecordingBackendApi : BackendApi {
         accessToken: String,
         seriesItemId: String,
         season: Int?
-    ): Nothing = unused("getSeriesEpisodes")
+    ): MetadataSeriesEpisodesResponse = unused("getSeriesEpisodes")
     override suspend fun getMetadataItemRatings(
         accessToken: String,
         profileId: String,
         itemId: String
-    ): Nothing = unused("getMetadataItemRatings")
+    ): MetadataTitleRatingsResponse = unused("getMetadataItemRatings")
     override suspend fun getMetadataPersonDetail(
         accessToken: String,
         personId: String,
         language: String?
-    ): Nothing = unused("getMetadataPersonDetail")
+    ): MetadataPersonDetail = unused("getMetadataPersonDetail")
     // --- search -------------------------------------------------------------------------
     // Widened for `SearchViewModelTest`. The four search members each answer from
     // their own queue rather than one shared list, because the viewmodel reaches
@@ -356,33 +374,33 @@ open class RecordingBackendApi : BackendApi {
         return browseTitlesResponses.getOrNull(browseTitlesCalls.size - 1)
             ?: error("browseTitles was not stubbed for call ${browseTitlesCalls.size}")
     }
-    override suspend fun getHome(accessToken: String, profileId: String): Nothing = unused("getHome")
-    override suspend fun getCalendar(accessToken: String, profileId: String): Nothing = unused("getCalendar")
+    override suspend fun getHome(accessToken: String, profileId: String): ProfileHomeResponse? = unused("getHome")
+    override suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse = unused("getCalendar")
     override suspend fun getCalendarThisWeek(
         accessToken: String,
         profileId: String
-    ): Nothing = unused("getCalendarThisWeek")
-    override suspend fun getUpNext(accessToken: String, profileId: String, limit: Int): Nothing = unused("getUpNext")
+    ): CalendarResponse = unused("getCalendarThisWeek")
+    override suspend fun getUpNext(accessToken: String, profileId: String, limit: Int): UpNextResponse = unused("getUpNext")
     override suspend fun resolvePlayback(
         accessToken: String,
         input: ItemLookupInput
-    ): Nothing = unused("resolvePlayback")
+    ): PlaybackResolveResponse = unused("resolvePlayback")
     override suspend fun sendWatchEvent(
         accessToken: String,
         profileId: String,
         input: PlaybackEventInput
-    ): Nothing = unused("sendWatchEvent")
+    ): WatchActionResponse = unused("sendWatchEvent")
     override suspend fun listContinueWatching(
         accessToken: String,
         profileId: String,
         limit: Int,
         cursor: String?
-    ): Nothing = unused("listContinueWatching")
+    ): ClientMediaCardQueryResult = unused("listContinueWatching")
     override suspend fun dismissContinueWatching(
         accessToken: String,
         profileId: String,
         itemId: String
-    ): Nothing = unused("dismissContinueWatching")
+    ): WatchActionResponse = unused("dismissContinueWatching")
     val listWatchHistoryCalls = mutableListOf<LibrarySectionCall>()
     val listWatchlistCalls = mutableListOf<LibrarySectionCall>()
     val listRatingsCalls = mutableListOf<LibrarySectionCall>()
@@ -452,44 +470,44 @@ open class RecordingBackendApi : BackendApi {
     override suspend fun getWatchGenerations(
         accessToken: String,
         profileId: String
-    ): Nothing = unused("getWatchGenerations")
+    ): WatchGenerationsResponse = unused("getWatchGenerations")
     override suspend fun getWatchState(
         accessToken: String,
         profileId: String,
         itemId: String
-    ): Nothing = unused("getWatchState")
+    ): WatchStateEnvelope = unused("getWatchState")
     override suspend fun getWatchStates(
         accessToken: String,
         profileId: String,
         itemIds: List<String>
-    ): Nothing = unused("getWatchStates")
+    ): WatchStatesEnvelope = unused("getWatchStates")
     override suspend fun getWatchStateMap(
         accessToken: String,
         profileId: String,
         itemIds: List<String>
-    ): Nothing = unused("getWatchStateMap")
+    ): Map<String, WatchStateResponse> = unused("getWatchStateMap")
     override suspend fun markWatched(
         accessToken: String,
         profileId: String,
         input: WatchMutationInput
-    ): Nothing = unused("markWatched")
+    ): WatchActionResponse = unused("markWatched")
     override suspend fun unmarkWatched(
         accessToken: String,
         profileId: String,
         input: WatchMutationInput
-    ): Nothing = unused("unmarkWatched")
+    ): WatchActionResponse = unused("unmarkWatched")
     override suspend fun putWatchlist(
         accessToken: String,
         profileId: String,
         itemId: String,
         occurredAt: String?,
         payload: Map<String, Any?>
-    ): Nothing = unused("putWatchlist")
+    ): WatchActionResponse = unused("putWatchlist")
     override suspend fun deleteWatchlist(
         accessToken: String,
         profileId: String,
         itemId: String
-    ): Nothing = unused("deleteWatchlist")
+    ): WatchActionResponse = unused("deleteWatchlist")
     override suspend fun setLiked(
         accessToken: String,
         profileId: String,
@@ -497,12 +515,12 @@ open class RecordingBackendApi : BackendApi {
         liked: Boolean,
         occurredAt: String?,
         payload: Map<String, Any?>
-    ): Nothing = unused("setLiked")
+    ): WatchActionResponse = unused("setLiked")
     override suspend fun deleteRating(
         accessToken: String,
         profileId: String,
         itemId: String
-    ): Nothing = unused("deleteRating")
+    ): WatchActionResponse = unused("deleteRating")
     private fun unused(name: String): Nothing = throw AssertionError("$name is not stubbed")
 }
 

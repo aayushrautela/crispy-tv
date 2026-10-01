@@ -11,8 +11,13 @@ import com.crispy.tv.accounts.Session
  * The counter is the point of this double rather than a convenience: the
  * "nothing to plan means nothing is asked" case can only be pinned by observing
  * that [ensureValidSessionCalls] is still zero after the call returns.
+ *
+ * `open` so a test that needs a *throwing* [AccountApi.ensureValidSession] can override the one
+ * member rather than writing a second double in its own file: a null session is the "not signed
+ * in" answer, and no amount of constructing this double with a different session produces the
+ * "backend is down" one.
  */
-internal class FakeAccountApi(
+internal open class FakeAccountApi(
     private val session: Session? = null,
 ) : AccountApi {
     var ensureValidSessionCalls = 0
