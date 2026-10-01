@@ -74,12 +74,42 @@ kotlin {
             api(project(":android:platform-core"))
 
             api(libs.coroutines.core)
+
+            // **The node type, and it is decided rather than open.**
+            // `CrispyBackendJsonExtensions.kt` and `CrispyBackendParsers.kt` are
+            // in `commonMain` because `org.json` was their *only* pin -- not one
+            // of the 118 accessor call sites in `CrispyBackendParsers.kt` needed
+            // an edit to keep working, because `androidMain` already sees
+            // `commonMain`. See the KDoc on `optStringOrEmpty` for the one
+            // behaviour change the port carries and why it is a fix.
+            //
+            // It was already in `libs.versions.toml` with zero consumers, so
+            // this is a declaration rather than a version resolution.
+            // **`api`, not `implementation`, and one cross-module caller decides
+            // it.** `parseAiInsightsSlides` is the one `public` parser, and its
+            // parameter is a `JsonArray?`. An `implementation` dependency keeps
+            // the type off a consumer's compile classpath, so `:app` cannot even
+            // *name* the argument it already passes -- the error was
+            // `Cannot access class 'kotlinx.serialization.json.JsonArray'`, which
+            // names no module and says nothing about a missing dependency.
+            api(libs.serialization.json)
+
+            // **The dependency moved down with the files that need it.**
+            // `CrispyBackendClient` and its three API files reached `:network`
+            // from `androidMain`, which was fine while they were `org.json`
+            // adapters sitting in `androidMain`. They are in `commonMain` now,
+            // and a `commonMain` file cannot see a dependency declared only in
+            // `androidMain.dependencies` -- the symptom is 149 errors that all
+            // read `Unresolved reference 'postJson'`, none of which mention
+            // `:network`. `CrispyHttpClient`, `HttpRequest` and `HttpMethod`
+            // are in `:network`'s own `commonMain`, so the same module serves
+            // every target from here.
+            implementation(project(":android:network"))
         }
 
         androidMain.dependencies {
             // The Android half of platform-core's contracts, for `SecureTokenStore`.
             api(project(":android:platform-android"))
-            implementation(project(":android:network"))
 
             implementation(libs.coroutines.android)
         }

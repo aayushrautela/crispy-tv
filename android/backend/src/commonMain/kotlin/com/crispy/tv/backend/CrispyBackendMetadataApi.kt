@@ -3,8 +3,10 @@ package com.crispy.tv.backend
 import com.crispy.tv.ai.AiInsightsResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 internal suspend fun CrispyBackendClient.searchTitlesApi(
     accessToken: String,
@@ -70,7 +72,7 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
     locale: String? = null,
 ): SearchResultsResponse {
     checkConfigured()
-    val payload = JSONObject().apply {
+    val payload = buildJsonObject {
         put("query", query.trim())
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
@@ -136,7 +138,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
     locale: String? = null,
 ): AiInsightsResult {
     checkConfigured()
-    val payload = JSONObject().apply {
+    val payload = buildJsonObject {
         put("itemId", itemId.trim())
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
@@ -147,7 +149,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
         callTimeoutMs = aiCallTimeoutMs,
     )
     val json = requireSuccess(response)
-    return AiInsightsResult(slides = parseAiInsightsSlides(json.optJSONArray("slides")))
+    return AiInsightsResult(slides = parseAiInsightsSlides(json.optJsonArray("slides")))
 }
 
 internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
@@ -163,13 +165,13 @@ internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
     val json = requireSuccess(response)
     return withContext(Dispatchers.Default) {
         MetadataTitleDetailResponse(
-            item = parseClientMediaCard(json.optJSONObject("Item") ?: throw IllegalStateException("Backend item detail is missing Item.")),
-            nextEpisode = json.optJSONObject("NextEpisode")?.let(::parseClientMediaCard),
-            videos = parseMetadataVideoViews(json.optJSONArray("Videos")),
-            cast = parseMetadataPersonRefViews(json.optJSONArray("Cast")),
-            directors = parseMetadataPersonRefViews(json.optJSONArray("Directors")),
-            creators = parseMetadataPersonRefViews(json.optJSONArray("Creators")),
-            production = parseMetadataProductionInfoView(json.optJSONObject("Production")),
+            item = parseClientMediaCard(json.optJsonObject("Item") ?: throw IllegalStateException("Backend item detail is missing Item.")),
+            nextEpisode = json.optJsonObject("NextEpisode")?.let(::parseClientMediaCard),
+            videos = parseMetadataVideoViews(json.optJsonArray("Videos")),
+            cast = parseMetadataPersonRefViews(json.optJsonArray("Cast")),
+            directors = parseMetadataPersonRefViews(json.optJsonArray("Directors")),
+            creators = parseMetadataPersonRefViews(json.optJsonArray("Creators")),
+            production = parseMetadataProductionInfoView(json.optJsonObject("Production")),
         )
     }
 }
@@ -187,26 +189,26 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
     val json = requireSuccess(response)
     return withContext(Dispatchers.Default) {
         MetadataTitleExtrasResponse(
-            seasons = parseClientMediaCards(json.optJSONArray("Seasons")),
-            reviews = parseMetadataReviewViews(json.optJSONArray("Reviews")),
-            lists = parseMetadataExtrasLists(json.optJSONArray("Lists")),
+            seasons = parseClientMediaCards(json.optJsonArray("Seasons")),
+            reviews = parseMetadataReviewViews(json.optJsonArray("Reviews")),
+            lists = parseMetadataExtrasLists(json.optJsonArray("Lists")),
         )
     }
 }
 
-internal fun CrispyBackendClient.parseMetadataExtrasLists(array: JSONArray?): List<MetadataExtrasList> {
-    val safeArray = array ?: JSONArray()
+internal fun CrispyBackendClient.parseMetadataExtrasLists(array: JsonArray?): List<MetadataExtrasList> {
+    val safeArray = array ?: JsonArray(emptyList())
     return buildList {
-        for (index in 0 until safeArray.length()) {
-            val list = safeArray.optJSONObject(index) ?: continue
-            val key = list.optString("key").trim()
-            val title = list.optString("title").trim()
+        for (index in 0 until safeArray.size) {
+            val list = safeArray.getOrNull(index) as? JsonObject ?: continue
+            val key = list.optStringOrEmpty("key").trim()
+            val title = list.optStringOrEmpty("title").trim()
             if (key.isBlank() || title.isBlank()) continue
             add(
                 MetadataExtrasList(
                     key = key,
                     title = title,
-                    items = parseClientMediaCards(list.optJSONArray("items")),
+                    items = parseClientMediaCards(list.optJsonArray("items")),
                 )
             )
         }
@@ -229,11 +231,11 @@ internal suspend fun CrispyBackendClient.getSeriesEpisodesApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    val itemsArray = json.optJSONArray("Items")
+    val itemsArray = json.optJsonArray("Items")
     val items = mutableListOf<ClientMediaCard>()
     if (itemsArray != null) {
-        for (i in 0 until itemsArray.length()) {
-            val itemJson = itemsArray.optJSONObject(i) ?: continue
+        for (i in 0 until itemsArray.size) {
+            val itemJson = itemsArray.getOrNull(i) as? JsonObject ?: continue
             items += parseClientMediaCard(itemJson)
         }
     }
@@ -254,7 +256,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemRatingsApi(
     val json = requireSuccess(response)
     return withContext(Dispatchers.Default) {
         MetadataTitleRatingsResponse(
-            ratings = parseMetadataTitleRatings(json.optJSONObject("Ratings")),
+            ratings = parseMetadataTitleRatings(json.optJsonObject("Ratings")),
         )
     }
 }
@@ -274,8 +276,8 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
     )
     val json = requireSuccess(response)
     return PlaybackResolveResponse(
-        item = parseClientMediaCard(json.optJSONObject("Item") ?: throw IllegalStateException("Backend playback resolve is missing Item.")),
-        show = json.optJSONObject("Show")?.let(::parseClientMediaCard),
-        season = json.optJSONObject("Season")?.let(::parseClientMediaCard),
+        item = parseClientMediaCard(json.optJsonObject("Item") ?: throw IllegalStateException("Backend playback resolve is missing Item.")),
+        show = json.optJsonObject("Show")?.let(::parseClientMediaCard),
+        season = json.optJsonObject("Season")?.let(::parseClientMediaCard),
     )
 }

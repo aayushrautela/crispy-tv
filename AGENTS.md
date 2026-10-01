@@ -185,7 +185,7 @@ where that gets answered.
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
-| `:android:player`, `:network`, `:addons`, `:home`, `:backend`, `:watchhistory`, `:platform-core` | KMP | `:backend`'s `commonMain` is a pure interface layer and its whole implementation is `androidMain` + OkHttp + `org.json` |
+| `:android:player`, `:network`, `:addons`, `:home`, `:backend`, `:watchhistory`, `:platform-core` | KMP | **`:backend` used to be the mirror of `:network`** — `commonMain` a pure interface layer, the whole implementation `androidMain` + OkHttp + `org.json` — **and is now 15 `commonMain` files / 3,581 lines with 2 `androidMain` files**: `SecureTokenStore` (Keystore) and `SupabaseAccountClient`. Its `androidHostTest` is gone; all 33 of its cases run from `commonTest` |
 | `:android:platform-desktop` | `kotlin.jvm` | the desktop side of all six ports. Exists because `desktopApp` is a real caller |
 | `:android:desktopApp` | `kotlin.jvm` | the desktop entry point and the **seam proof** (plan §3) |
 | `:android:tv` | `com.android.application` | Android TV placeholder; stays on the Android source set forever |
@@ -309,6 +309,17 @@ Separately: **the library that ships is not the library a JVM test can stand in 
 number is `Double` versus `BigDecimal`, so Robolectric here is for `org.json` itself and **not** for a
 `Context`.
 
+**`:backend` then paid that cost, and it took all five files plus the client, not the two that were
+first named.** `CrispyBackendJsonExtensions.kt` (13 policies) and `CrispyBackendParsers.kt` (45 parsers)
+moved to `commonMain` **after** `CrispyBackendClient.kt` and its three API files did** — and the order was
+forced, not chosen: 39 of the parsers are `internal fun CrispyBackendClient.parseX(...)`, so the moment
+the parsers compiled in `commonMain` the compiler produced 35 identical
+`Unresolved reference 'CrispyBackendClient'` errors. **A file whose receiver is pinned cannot be freed by
+changing its arguments, so the wall is whatever pins the receiver** — here `org.json` in eight places
+inside the client's own two envelope methods, and nothing else. **The real cost of that wall was not the
+811 lines of parsers but the 45 read sites the client's return type switched underneath**, and
+`CrispyBackendClient` was a *receiver* long after it was an *implementation*.
+
 **`:app`'s `androidMain` is a knot, not a list of independent files, and the table of what holds what
 lives in `android/app/build.gradle.kts`** — read it before planning any move. **A replacement for a JVM
 library call goes in the file that already replaces that library, not next to the caller** — look for
@@ -356,6 +367,16 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   not to relax the one that cannot.** A `linuxX64` block with a comment saying why it is absent beats
   no comment — `android/app/build.gradle.kts` carries one under a heading that reads
   `## No linuxX64 here`, **and a grep for a target declaration matches its own refutation.**
+- **A gate that does not compile the source set you changed certifies nothing, and it returns
+  `BUILD SUCCESSFUL`.** `:backend:compileKotlinDesktop` compiles `commonMain` plus `desktop`; it does not
+  compile `androidMain` at all. It reported `EXIT=0`, 0 `e:` lines, twice, while `CrispyBackendClient`,
+  the three API files and 646 lines of parsers sat broken in `androidMain` — **and the second time it was
+  run deliberately, as the check after a fix.** The task that holds them is
+  **`:android:<module>:compileAndroidMain`** (`:backend:tasks --all` names it;
+  `compileAndroidHostTest` compiles both halves, which is why the test task is the safer single
+  command). **A green compile of the wrong source set is worse than a red one, because it is read as
+  evidence** — and it was only caught by noticing that the *fix* I had just made was in a file that task
+  does not see. **Before trusting a compile, check which source sets it names.**
 - **The explanation for one module's gap does not generalise, and assuming it does hides the more
   useful cause.** `:addons` had no test source set because five of its files are `Context`/OkHttp
   adapters and a test directory for one file in an Android-shaped module reads as wrong. **`:player`
@@ -654,6 +675,27 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   draft's KDoc asserted the opposite — "it belongs to this fetch, not the screen, so it moved
   with it" — and five measured readers disproved it. **A cache is a thing you share**, and the
   readers are worth counting before a KDoc reasons about ownership.
+- **A mechanical port changes behaviour in *both* directions, and each direction is invisible
+  until it fails — so port a type by asking what its old members permitted, not what its new ones
+  accept.** Three failures in the `:backend` JSON port, all on `org.json` -> `JsonElement`, and the
+  three are the three shapes of the mistake: **`org.json` was lenient where the new type is strict**
+  (`jsonPrimitive` *throws* on a container, where `optString` returned its JSON text, so a naive
+  `this[key]?.jsonPrimitive?.contentOrNull` turns a readable value into a crash); **`org.json` was
+  mutable where the new type is not** (`json[key] = value` does not compile, because `JSONObject`'s
+  whole API was `put` and `JsonObject` has no members at all); and **`JsonPrimitive` has no
+  `Any?` constructor**, so `else -> JsonPrimitive(this)` needed a `when` keeping `is Boolean` and
+  `is Number` intact — stringifying both would have been a *second* silent change stacked on the
+  node type itself. **And `else -> this` is the arm that survives a port least often, because it was
+  right about the old type and wrong about the new one.** In `toKotlinValue`, `else -> this` was
+  correct for `org.json`, where a primitive *already was* a `Boolean`/`String`/`Number`, and it would
+  have handed out raw `JsonElement`s from `toAnyMap` for the new type — where a primitive is **one
+  class holding a literal**, so "pass it through unchanged" no longer means anything.
+  **The coercion direction decides the fix: a lenient accessor feeding a strict parser is a
+  truncation, not a parse.** `org.json`'s `Number.toInt()` *truncated*; `JsonPrimitive.intOrNull`
+  *parses*, so `optIntOrNull("fraction")` over `{"fraction":42.9}` went `42` -> `null`. Fixing it
+  by narrowing to `intOrNull` would have been the port; fixing it by reproducing AOSP's widths
+  (`Int`, then `Long`, then `Double`) is the port *plus* the behaviour, and **only the second one is
+  behaviour-preserving.**
 
 ### 3. Tests
 

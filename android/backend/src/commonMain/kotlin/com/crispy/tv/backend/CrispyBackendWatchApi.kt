@@ -2,8 +2,11 @@ package com.crispy.tv.backend
 
 import com.crispy.tv.network.HttpMethod
 import com.crispy.tv.network.HttpRequest
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 internal suspend fun CrispyBackendClient.getHomeApi(
     accessToken: String,
@@ -16,13 +19,13 @@ internal suspend fun CrispyBackendClient.getHomeApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    val parsedProfileId = json.optString("profileId").trim()
+    val parsedProfileId = json.optStringOrEmpty("profileId").trim()
     if (parsedProfileId.isBlank()) return null
     return ProfileHomeResponse(
         profileId = parsedProfileId,
         generatedAt = json.optNullableString("generatedAt"),
         expiresAt = json.optNullableString("expiresAt"),
-        sections = parseProfileHomeSections(json.optJSONArray("sections")),
+        sections = parseProfileHomeSections(json.optJsonArray("sections")),
     )
 }
 
@@ -35,11 +38,11 @@ internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, pro
     )
     val json = requireSuccess(response)
     return CalendarResponse(
-        profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim(),
+        profileId = json.optStringOrEmpty("profileId").trim(),
+        source = json.optStringOrEmpty("source").trim(),
         kind = json.optNullableString("kind"),
         generatedAt = json.optNullableString("generatedAt"),
-        items = parseCalendarItems(json.optJSONArray("items")),
+        items = parseCalendarItems(json.optJsonArray("items")),
     )
 }
 
@@ -52,11 +55,11 @@ internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: Str
     )
     val json = requireSuccess(response)
     return CalendarResponse(
-        profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim(),
+        profileId = json.optStringOrEmpty("profileId").trim(),
+        source = json.optStringOrEmpty("source").trim(),
         kind = json.optNullableString("kind"),
         generatedAt = json.optNullableString("generatedAt"),
-        items = parseCalendarItems(json.optJSONArray("items")),
+        items = parseCalendarItems(json.optJsonArray("items")),
     )
 }
 
@@ -73,23 +76,23 @@ internal suspend fun CrispyBackendClient.getUpNextApi(
     )
     val json = requireSuccess(response)
     return UpNextResponse(
-        profileId = json.optString("profileId").trim(),
+        profileId = json.optStringOrEmpty("profileId").trim(),
         source = json.optNullableString("source"),
         kind = json.optNullableString("kind"),
         generatedAt = json.optNullableString("generatedAt"),
-        items = parseUpNextItems(json.optJSONArray("items")),
+        items = parseUpNextItems(json.optJsonArray("items")),
     )
 }
 
-internal fun CrispyBackendClient.parseUpNextItems(array: JSONArray?): List<UpNextItem> {
-    val safe = array ?: JSONArray()
+internal fun CrispyBackendClient.parseUpNextItems(array: JsonArray?): List<UpNextItem> {
+    val safe = array ?: JsonArray(emptyList())
     return buildList {
-        for (i in 0 until safe.length()) {
-            val item = safe.optJSONObject(i) ?: continue
+        for (i in 0 until safe.size) {
+            val item = safe.getOrNull(i) as? JsonObject ?: continue
             add(
                 UpNextItem(
-                    show = item.optJSONObject("show")?.let(::parseClientMediaCard),
-                    nextEpisode = item.optJSONObject("nextEpisode")?.let(::parseClientMediaCard),
+                    show = item.optJsonObject("show")?.let(::parseClientMediaCard),
+                    nextEpisode = item.optJsonObject("nextEpisode")?.let(::parseClientMediaCard),
                     nextEpisodeAirDate = item.optNullableString("nextEpisodeAirDate"),
                     lastInteractedAt = item.optNullableString("lastInteractedAt"),
                     reason = item.optNullableString("reason"),
@@ -105,7 +108,7 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
     input: PlaybackEventInput,
 ): WatchActionResponse {
     checkConfigured()
-    val payload = JSONObject().apply {
+    val payload = buildJsonObject {
         put("clientEventId", input.clientEventId.trim())
         put("eventType", input.eventType.trim())
         put("itemId", input.itemId.trim())
@@ -229,18 +232,16 @@ internal suspend fun CrispyBackendClient.getWatchStatesApi(
     itemIds: List<String>,
 ): WatchStatesEnvelope {
     checkConfigured()
-    val payload = JSONObject().put(
-        "items",
-        JSONArray().apply {
-            itemIds.forEach { itemId ->
-                put(
-                    JSONObject().apply {
-                        put("itemId", itemId.trim())
-                    }
-                )
-            }
-        },
-    ).toString()
+    val payload = buildJsonObject {
+        put(
+            "items",
+            buildJsonArray {
+                itemIds.forEach { itemId ->
+                    add(buildJsonObject { put("itemId", itemId.trim()) })
+                }
+            },
+        )
+    }.toString()
     val response = httpClient.postJson(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/states",
         jsonBody = payload,
@@ -275,7 +276,7 @@ internal suspend fun CrispyBackendClient.putWatchlistApi(
     payload: Map<String, Any?> = emptyMap(),
 ): WatchActionResponse {
     checkConfigured()
-    val requestBody = JSONObject().apply {
+    val requestBody = buildJsonObject {
         if (!occurredAt.isNullOrBlank()) put("occurredAt", occurredAt.trim())
         if (payload.isNotEmpty()) put("payload", payload.toJsonObject())
     }.toString()
@@ -314,7 +315,7 @@ internal suspend fun CrispyBackendClient.setLikedApi(
     payload: Map<String, Any?> = emptyMap(),
 ): WatchActionResponse {
     checkConfigured()
-    val requestBody = JSONObject().apply {
+    val requestBody = buildJsonObject {
         put("liked", liked)
         if (!occurredAt.isNullOrBlank()) put("occurredAt", occurredAt.trim())
         if (payload.isNotEmpty()) put("payload", payload.toJsonObject())
@@ -377,7 +378,7 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
     input: WatchMutationInput,
 ): WatchActionResponse {
     checkConfigured()
-    val payload = JSONObject().apply {
+    val payload = buildJsonObject {
         put("itemId", input.itemId.trim())
         if (!input.occurredAt.isNullOrBlank()) put("occurredAt", input.occurredAt.trim())
         if (input.rating != null) put("rating", input.rating)

@@ -3,6 +3,9 @@ package com.crispy.tv.ai
 import android.content.Context
 import android.content.SharedPreferences
 import com.crispy.tv.backend.parseAiInsightsSlides
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -22,9 +25,16 @@ class AiInsightsCacheStore(context: Context) {
         val normalizedItemId = itemId.trim()
         if (normalizedItemId.isBlank()) return null
         val raw = prefs.getString(keyFor(normalizedItemId, locale), null) ?: return null
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        // **Only the reader converts.** The bytes on disk are JSON whichever
+        // parser reads them, so `save` below still builds with `org.json` and
+        // writes a string, and this line is the whole boundary. The cast is
+        // explicit rather than a helper because `optJsonArray` is `internal` to
+        // `:backend`, and a cross-module `public` accessor would be the second
+        // coupling this port just removed.
+        val json = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
+            ?: return null
 
-        val slides = parseAiInsightsSlides(json.optJSONArray("slides"))
+        val slides = parseAiInsightsSlides(json["slides"] as? JsonArray)
             .filter { it.key != AiInsightSlideKey.UNKNOWN }
         if (slides.isEmpty()) return null
         return AiInsightsResult(slides = slides)

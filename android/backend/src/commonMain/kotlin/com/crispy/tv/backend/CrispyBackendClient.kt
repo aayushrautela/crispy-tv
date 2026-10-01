@@ -3,7 +3,11 @@ package com.crispy.tv.backend
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class RemoteTrailerDto(
     val url: String,
@@ -13,10 +17,17 @@ data class RemoteTrailerDto(
 /**
  * Talks to the Crispy backend.
  *
- * This class is `androidMain` because it speaks OkHttp and `org.json`. The types it
- * exchanges are not: they are pure data and live in `commonMain`, in
- * `BackendTypes.kt`, so that `commonMain` code on every target can name them
- * without depending on this transport.
+ * **Both reasons this class was `androidMain` are gone, and it has not moved yet.**
+ * OkHttp went when the transport became the `CrispyHttpClient` port, and
+ * `org.json` went when [requireSuccess] started answering `JsonObject`. What
+ * still holds it in `androidMain` is `CrispyBackendParsers.kt`'s 39
+ * `internal fun CrispyBackendClient.parseX(...)` extensions — **a file whose
+ * receiver is pinned cannot be freed by changing its arguments**, so the parsers
+ * moved first to being node-neutral and the client is what remains.
+ *
+ * The types it exchanges are not pinned at all: they are pure data and live in
+ * `commonMain`, in `BackendTypes.kt`, so that `commonMain` code on every target
+ * can name them without depending on this transport.
  */
 class CrispyBackendClient(
     internal val httpClient: CrispyHttpClient,
@@ -447,7 +458,7 @@ class CrispyBackendClient(
             authHeaders(accessToken) + ("X-Profile-ID" to profileId.trim())
         }
 
-    internal fun requireSuccess(response: CrispyHttpResponse): JSONObject {
+    internal fun requireSuccess(response: CrispyHttpResponse): JsonObject {
         return if (response.code in 200..299) {
             extractDataEnvelope(response.body)
         } else {
@@ -455,14 +466,26 @@ class CrispyBackendClient(
         }
     }
 
-    private fun extractDataEnvelope(body: String): JSONObject {
+    private fun extractDataEnvelope(body: String): JsonObject {
         if (body.isBlank()) {
             throw IllegalStateException("Empty response body")
         }
-        val json = JSONObject(body)
-        return json.optJSONObject("data")
+        val json = parseJsonOrNull(body)
+            ?: throw IllegalArgumentException("Malformed response body")
+        return json.optJsonObject("data")
             ?: throw IllegalStateException("Response missing 'data' envelope")
     }
+
+    /**
+     * `Json.parseToJsonElement` throws `SerializationException`, not
+     * `org.json`'s `JSONException`, so the one place that deliberately tolerated a
+     * malformed body now catches the other type. **The exception a caller sees
+     * for a malformed body changed name**, which is why [extractDataEnvelope]
+     * above converts it to an `IllegalArgumentException` rather than letting a
+     * serialization-library type escape a transport seam.
+     */
+    private fun parseJsonOrNull(body: String): JsonObject? =
+        runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
 
     private fun parseErrorEnvelope(code: Int, body: String): CrispyBackendException {
         val trimmed = body.trim()
@@ -472,19 +495,19 @@ class CrispyBackendClient(
                 category = null, retryable = false, requestId = null, details = null,
             )
         }
-        val json = runCatching { JSONObject(trimmed) }.getOrNull()
-        val error = json?.optJSONObject("error")
+        val json = parseJsonOrNull(trimmed)
+        val error = json?.optJsonObject("error")
         return CrispyBackendException(
             httpCode = code,
-            code = error?.optString("code")?.trim()?.ifBlank { null },
-            message = error?.optString("message")?.trim()
-                ?: json?.optString("message")?.trim()
+            code = error?.optStringOrEmpty("code")?.trim()?.ifBlank { null },
+            message = error?.optStringOrEmpty("message")?.trim()
+                ?: json?.optStringOrEmpty("message")?.trim()
                 ?: "HTTP $code",
-            category = error?.optString("category")?.trim()?.ifBlank { null },
-            retryable = error?.optBoolean("retryable", false) ?: false,
-            requestId = error?.optString("requestId")?.trim()?.ifBlank { null }
-                ?: json?.optString("requestId")?.trim()?.ifBlank { null },
-            details = error?.optJSONObject("details")?.toString()?.ifBlank { null },
+            category = error?.optStringOrEmpty("category")?.trim()?.ifBlank { null },
+            retryable = error?.jsonPrimitiveOrNull("retryable")?.booleanOrNull ?: false,
+            requestId = error?.optStringOrEmpty("requestId")?.trim()?.ifBlank { null }
+                ?: json?.optStringOrEmpty("requestId")?.trim()?.ifBlank { null },
+            details = error?.optJsonObject("details")?.toString()?.ifBlank { null },
         )
     }
 
