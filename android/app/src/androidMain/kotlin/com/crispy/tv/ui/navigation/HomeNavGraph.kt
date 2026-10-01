@@ -16,6 +16,7 @@ import com.crispy.tv.home.CalendarEpisodeItem
 import com.crispy.tv.home.CalendarRoute
 import com.crispy.tv.home.CalendarSeriesItem
 import com.crispy.tv.home.HomeRoute
+import com.crispy.tv.home.calendarViewModelFactory
 import com.crispy.tv.home.homeSelectorViewModelFactory
 import com.crispy.tv.home.homeViewModelFactory
 import com.crispy.tv.details.RuntimeDetailsEntry
@@ -122,6 +123,13 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
 
     composable(AppRoutes.CalendarRoute) {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            // `CalendarRoute` is in `commonMain` and its only platform value was a
+            // `Context` read to reach the factory, so the read moved here with the
+            // factory. Same shape as the `HomeRoute` block above, and the
+            // `remember` is the one `CalendarScreen` used to own, kept so this is a
+            // port rather than a behaviour change: without it the service graph is
+            // rebuilt on every recomposition.
+            val appContext = navController.context.applicationContext
             CalendarRoute(
                 onBack = { navController.popBackStack() },
                 onEpisodeClick = { item, sharedElementKey ->
@@ -137,6 +145,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         )
                     )
                 },
+                viewModelFactory = remember(appContext) { calendarViewModelFactory(appContext) },
             )
         }
     }

@@ -21,10 +21,8 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,9 +31,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.backend.BackendContextResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -45,7 +40,7 @@ import com.crispy.tv.ui.resources.ic_arrow_back_filled
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,15 +51,37 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 
 @Immutable
-private data class CalendarUiState(
+internal data class CalendarUiState(
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val statusMessage: String = "",
     val sections: List<CalendarSection> = emptyList(),
 )
 
-private class CalendarViewModel(
+/**
+ * The calendar's state holder, in `commonMain` with its collaborators as values.
+ *
+ * **`ioDispatcher` and `clock` are required and have no defaults.** `Dispatchers.IO`
+ * is `public` on the JVM and `internal` on Kotlin/Native, so it cannot be named
+ * here at all, and a defaulted `Dispatchers.Default` would compile on every target
+ * and silently put a blocking service call on a CPU-sized pool. The wall clock is
+ * the same argument: `System.currentTimeMillis()` needs no import to be invisible
+ * to an import scan, and a defaulted one is the platform deciding this screen's
+ * data instead of its caller. **A green desktop compile is not evidence about
+ * either line** — every local gate compiles `Dispatchers.IO` as `public` — so
+ * `apple.yml` on a macOS runner is the only thing that can see a mistake here.
+ *
+ * Its `companion object` used to hold `factory(context: Context)`, which built the
+ * three `androidMain` providers. That is now the top-level `androidMain`
+ * `calendarViewModelFactory(context)` in `CalendarScreenFactory.kt`, and **the class
+ * is `internal` rather than `private` because that factory lives in another file** —
+ * a `private` member cannot be named by anything outside its own file, including the
+ * factory that exists to construct it.
+ */
+internal class CalendarViewModel(
     private val calendarService: CalendarService,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val clock: () -> Long,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
@@ -87,7 +104,7 @@ private class CalendarViewModel(
         }
         refreshJob =
             viewModelScope.launch {
-                val snapshot = withContext(Dispatchers.IO) { calendarService.loadCalendar(System.currentTimeMillis()) }
+                val snapshot = withContext(ioDispatcher) { calendarService.loadCalendar(clock()) }
                 _uiState.value =
                     CalendarUiState(
                         isInitialLoading = false,
@@ -98,34 +115,35 @@ private class CalendarViewModel(
             }
     }
 
-    companion object {
-        fun factory(context: android.content.Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return CalendarViewModel(
-                        calendarService = CalendarService(
-                            backendClient = BackendServicesProvider.backendClient(appContext),
-                            backendContextResolver = BackendContextResolverProvider.get(appContext),
-                            logger = AndroidAppLogger(appContext),
-                        )
-                    ) as T
-                }
-            }
-        }
-    }
 }
 
+/**
+ * In `commonMain`, and the caller owns every platform value it needs.
+ *
+ * `viewModelFactory` is a **required, no-default** slot and it carries the
+ * **product**, not a lambda producing it: this composable hands it straight to
+ * `viewModel(factory = …)`, so the value is passed on rather than stored, and a
+ * slot its caller must `remember` is the product type. The contrast is
+ * `ProfileMenuRoute`'s `loadProfile`, which had to stay
+ * `suspend () -> ActiveProfileInfo?` because it is a `produceState` key and its
+ * identity is load-bearing — *so read what the consumer DOES with the value before
+ * typing a slot.*
+ *
+ * There is deliberately no `Context` parameter and no `remember` here. Both used to
+ * exist, and the `Context`'s **only** use was to reach the factory, so removing the
+ * factory removed the read with it. A pin that dies when its sole consumer moves
+ * is the cheapest kind to discharge, and it is not visible as a pin at all while
+ * both halves sit in the same file.
+ */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun CalendarRoute(
     onBack: () -> Unit,
     onEpisodeClick: (CalendarEpisodeItem, String?) -> Unit,
     onSeriesClick: (CalendarSeriesItem, String?) -> Unit,
+    viewModelFactory: ViewModelProvider.Factory,
 ) {
-    val context = LocalContext.current.applicationContext
-    val viewModel: CalendarViewModel = viewModel(factory = remember(context) { CalendarViewModel.factory(context) })
+    val viewModel: CalendarViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val horizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()

@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 122 `commonMain` / 73 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 123 `commonMain` / 73 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -575,6 +575,14 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `git ls-files <path> | grep -c <pattern>` settles it in under a second, and **a count two documents
   share is twice as likely to be believed and no more likely to be right.** The general form: **an
   omission nobody mentioned reads as a decision nobody made.**
+  **And a count PREDICTED from the change is a count that has to include the change's own second
+  half.** `CalendarScreen.kt` moved `androidMain` → `commonMain` and the landing predicted 123/72 —
+  **but it also created `CalendarScreenFactory.kt` in `androidMain`, so `androidMain` is
+  net-zero and the measured answer is 123/73.** A landing that both moves a file and extracts a
+  factory does not reduce the source set it extracted into. **A "move" and a "create" are two
+  facts about two different sets, and quoting only the first is the same class of error as
+  quoting a count off the working tree instead of out of `HEAD`** — one number was measured and
+  one was extrapolated, and they are formatted identically.
   **A checksum that prints `True` is a claim, not a check** — and a bash associative array whose
   keys contain spaces breaks in a way that satisfies the check exactly when the counting is most
   broken: `printf '%s\n' "${!bucket[@]}" | sort` word-splits every key, so the *reporting* loop
@@ -722,6 +730,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   it contradicting the diff), and **a value crossing as itself is worth checking for a round
   trip**: `AppGraph` held a BCP-47 tag, rebuilt a `Locale` from it, and the repository called
   `toLanguageTag()` on the result — two conversions carrying no information between them.
+  **And the split is an *extraction*, not a move, and a `private` class is what forces it.**
+  `CalendarScreen.kt` (321) took the same shape: `CalendarViewModel` held a value
+  (`CalendarService`) and its `companion object` held `factory(context: Context)`. The factory
+  became a sibling `androidMain` file — **and the class had to be widened from `private` to
+  `internal` to make that possible, because a `private` member cannot be named by anything
+  outside its own file, including the factory that exists to construct it.** So the factory is a
+  new top-level `calendarViewModelFactory(context)`, and *the cheapest pins to discharge are the
+  ones that die with their sole consumer:* the `Context` read in `CalendarRoute` existed only to
+  reach the factory, so it disappeared without a slot of its own, and `remember` went with it
+  because that was its only use in the file. **A pin that vanishes when the thing that read it
+  moves is not visible as a pin at all while both halves sit in the same file** — which is the
+  reason the per-file import scan found four pins here and the `commonMain` side needed two slots.
 - **No-default slots for anything a call site must not forget.** A defaulted capability lets a call
   site silently hide a row the build ships.
 - **When a platform composition local is unreachable, the answer is usually a value the caller
