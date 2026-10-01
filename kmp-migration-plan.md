@@ -897,7 +897,36 @@ that needed no import and therefore no purity-gate visibility, `SubtitleReposito
 import alongside the Compose Multiplatform one.
 
 **The new shared function is `formatIso8601MonthDay` in `:core-domain`'s `domain/watch`**, beside
-`formatIso8601LongDate` and over the same `MONTH_LABELS` table, with 9 cases in `FormatIso8601MonthDayTest`.
+`formatIso8601LongDate` and over the same `MONTH_LABELS` table, with 11 cases in
+`FormatIso8601MonthDayTest`. Its output was **measured against the `java.time` expression it replaced
+on a real JDK** — all twelve months, the leap day, three invalid dates, and `0000-03-07` — and that
+measurement is in the KDoc rather than only in this file.
+
+Two things that measurement settled, neither of which was obvious before it ran:
+
+- **The three invalid dates threw** `DateTimeParseException`, a `RuntimeException`, so the caller's
+  `catch (_: Exception) { null }` had been turning them into `null` all along. That is why the
+  replacement's `?: return null` gives the same answer, for a reason no reader of either file could
+  have derived.
+- **`0000-03-07` renders `Mar 7` in both implementations — not because the year is right, but because
+  no year is printed.** `formatIso8601LongDate` prints one and must shift it to `0001`. So the
+  year-of-era trap this file's own KDoc warns about is *invisible* in the month-day form, and that
+  invisibility is the only reason printing no year is safe. Now an assertion rather than a comment.
+
+A first draft of the new KDoc claimed the sibling `iso8601MonthLabel` "never looks at the day", read
+off a comment about one caller passing an instant. **The test failed on its first run** — the claim
+was about truncation, and `parseIso8601MonthNumber` calls `isValidDate` seven lines further down. The
+two functions are strict about an impossible day *identically*; only truncation differs. Recorded
+because the mistake is the general one: **a KDoc sentence about one caller is not a statement about
+the function**, and the failing assertion is what caught it.
+
+`scripts/mutate_ios_fixes.py` has **4 entries, all caught**, and it deliberately does *not* cover the
+other four defect classes. Those were defects *because* they do not compile for Kotlin/Native, and
+every mutation of them compiles on the JVM and changes no answer, because callers already pass the
+argument explicitly. **Sixteen `expect_survive` entries would have looked like coverage while
+observing nothing**; the driver instead states in its docstring that `apple.yml`'s
+`:android:app:compileKotlinIosArm64` is their gate, and that run is the one deciding whether the other
+four classes are fixed.
 
 ### Phase 6 — iOS + Liquid Glass *(2–3 wks)*
 

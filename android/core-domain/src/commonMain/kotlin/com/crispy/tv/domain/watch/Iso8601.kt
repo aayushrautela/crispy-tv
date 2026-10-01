@@ -201,10 +201,67 @@ fun formatIso8601LongDate(value: String): String? {
  * does not compile for a Kotlin/Native target, and cannot be seen by an import scan
  * when it is written fully qualified.
  *
+ * **The output is identical to the `java.time` expression it replaced, and that was
+ * measured rather than argued.** The replaced code took `date.month.name.take(3)`,
+ * lowercased it, capitalised the first letter, and appended the unpadded
+ * `date.dayOfMonth` over a `releaseDate.take(10)` prefix. Running that exact
+ * expression on the JDK produced:
+ *
+ * ```
+ * 01 Jan  Jan 7      07 Jul  Jul 7
+ * 02 Feb  Feb 7      08 Aug  Aug 7
+ * 03 Mar  Mar 7      09 Sep  Sep 7
+ * 04 Apr  Apr 7      10 Oct  Oct 7
+ * 05 May  May 7      11 Nov  Nov 7
+ * 06 Jun  Jun 7      12 Dec  Dec 7
+ * --- edges ---
+ * 2024-01-01 -> Jan 1        2024-02-29 -> Feb 29
+ * 2024-12-31 -> Dec 31        2024-02-30 -> throws
+ * 0000-03-07 -> Mar 7         2024-13-01 -> throws
+ * 0000-01-01 -> Jan 1         2024-01-32 -> throws
+ * ```
+ *
+ * Three of those edges are the reason this is worth writing down rather than
+ * assuming. **`0000-03-07` renders `Mar 7` here but `Mar 7, 0001` in
+ * [formatIso8601LongDate]**, because that function prints a year of era and this one
+ * prints no year at all -- the year-of-era trap this file's KDoc warns about is
+ * invisible in this function and that is the only reason it is safe to print no
+ * year. The three failures threw `DateTimeParseException`, a `RuntimeException`, so
+ * the caller's `catch (_: Exception) { null }` turned them into `null` -- the same
+ * answer the `?: return null` here gives, for a reason no reader of either file
+ * could have derived. And `2024-02-29` confirms the leap day is accepted.
+ *
  * A value this cannot read is `null` rather than rendered, exactly as
  * [formatIso8601LongDate] does. It does **not** truncate: callers that hold a
  * longer ISO value are expected to pass the first ten characters, which is the
  * arrangement `formatIso8601LongDate` documents for itself.
+ *
+ * ## Why this is not [iso8601MonthLabel] plus a day
+ *
+ * That is the obvious way to build it, and it was tempting because
+ * [iso8601MonthLabel] already exists for the same purpose: it is the portable
+ * replacement for the very `month.name.take(3)` expression this function also
+ * replaced, and it is used by `:home`'s `HomeSnapshotModels`. **The two are not
+ * interchangeable, and the one thing that differs is worth stating precisely,
+ * because the obvious guess about it is wrong.**
+ *
+ * They are **equally strict about the date itself.** Both validate the month, both
+ * validate the day against `isValidDate`, and both reject `2024-02-30`. A first
+ * draft of this KDoc claimed otherwise — that [iso8601MonthLabel] "never looks at
+ * the day" — on the strength of a neighbouring comment about one caller passing an
+ * instant, and a test asserting that claim failed on its first run. The comment
+ * says what it says: `parseIso8601MonthNumber` reads the day and validates it.
+ *
+ * The one difference is **truncation.** [iso8601MonthLabel] treats its length check
+ * as a lower bound and reads a date off the first ten characters, so
+ * `iso8601MonthLabel("2024-03-14T00:00:00Z")` is `"Mar"`. This function requires a
+ * date and nothing more, so the same input is `null` and the caller truncates. The
+ * old `java.time` expression this replaced had the caller truncate for it, so
+ * keeping the strict contract moves the `take(10)` to where it already was.
+ * `theTwoMonthFunctionsDisagreeOnlyAboutAnInstantOnTheEnd` pins both halves,
+ * because the strict half is the half a reader is most likely to doubt.
+ *
+ * They share [MONTH_LABELS], which is the part that is a contract.
  */
 fun formatIso8601MonthDay(value: String): String? {
     val epochDay = parseIso8601DateToEpochDay(value) ?: return null
