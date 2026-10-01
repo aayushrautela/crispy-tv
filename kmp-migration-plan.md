@@ -87,12 +87,12 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `platform-core` | 7 | 0 | 1 |
 | `sharedUI` | 5 | 0 | 1 |
 | `player` | 6 | 0 | 2 |
-| `addons` | 10 | 5 | 1 |
+| `addons` | 10 | 6 | 1 |
 | `backend` | 17 | 1 | 5 |
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **113** | **80** | **41** |
+| **`:app`** | **115** | **78** | **43** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -140,27 +140,27 @@ pinned until the receiver moved.**
 | `platform-core` | 7 | 0 |
 | `sharedUI` | 5 | 0 |
 | `player` | 6 | 0 |
-| `addons` | 10 | 5 |
+| `addons` | 10 | 6 |
 | `backend` | 17 | 1 |
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **113** | **80** |
-| **total** | **208** | **96** |
+| **`:app`** | **115** | **78** |
+| **total** | **210** | **95** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 113 of 193, i.e. **59%**, and
+than by anything structural. `:app` is 115 of 193, i.e. **60%**, and
 the 82 that remain are behind the walls listed in the table above.
 
 **The percentage is the figure that outlived one correction and died on the next,
 which is the whole argument for not quoting a ratio.** It was `106 of 186`, became
-`110 of 193` and round-tripped through the *same* 57%, and two files later it is
-`113 of 193` = **59%**. Nothing about the module changed in either of those two steps
-that the percentage could see — one file in each, and both moves freed real files.
+`110 of 193` and round-tripped through the *same* 57%, and 5 files later it is
+`115 of 193` = **60%**. Nothing about the module changed in any of those steps that the
+percentage could see — a file or two each time, and every move freed real files.
 *A ratio is the worst kind of count to quote, because it can stay constant while
 every number in it is being corrected — and then move when nothing it describes has.*
 **Two steps is the sample that makes the point: it survived a 4-file correction and
