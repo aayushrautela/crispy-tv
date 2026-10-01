@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **118** | **77** | **43** |
+| **`:app`** | **120** | **75** | **43** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,22 +152,24 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **118** | **77** |
-| **total** | **213** | **94** |
+| **`:app`** | **120** | **75** |
+| **total** | **215** | **92** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 118 of 195, i.e. **61%**, and
-the 77 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 120 of 195, i.e. **62%**, and
+the 75 that remain are behind the walls listed in the table above.
 
 **The percentage is the figure that outlived one correction and died on the next,
 which is the whole argument for not quoting a ratio.** It was `106 of 186`, became
 `110 of 193` and round-tripped through the *same* 57%, sat at `117 of 195` = **60%**
-through two landings in which real files moved, and is `118 of 195` = **61%** after one
-more — **a single 16-line file, the whole denominator unchanged, moved it a point.**
+through two landings in which real files moved, went to `118 of 195` = **61%** on a single
+16-line file with the whole denominator unchanged, and is `120 of 195` = **62%** after the
+encoder landing — **so a point can be bought by a 16-line file, by a 123-line comparison
+suite, or by two files moving 189 lines between them, and the ratio cannot tell which.**
 Nothing about the module changed in any of those steps that the percentage could see — a
 file or two each time, and every move freed real files.
 *A ratio is the worst kind of count to quote, because it can stay constant while
@@ -176,7 +178,7 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 77 that remain: **none are movable, and the partition says what pins each**
+### The 75 that remain: **none are movable, and the partition says what pins each**
 
 **This section used to claim a taxonomy, then carried a census, then carried a wrong
 census, and the reason the third one was wrong is the most useful thing in it.** Every
@@ -349,11 +351,17 @@ What moved `:app` was mostly **not** UI work. It was removing the things that we
   `Context`-taking `androidMain` factory, which is a pin that arrives through a *call*
   and is therefore invisible to every import scan. The blocker moved from the artifact
   to the factories it is given, which is a bigger landing in the other direction.
-- `AppRoutes` split cleanly: its 49 route constants and 3 route patterns are portable and
-  are in `commonMain`; the 4 builders percent-encode with `android.net.Uri.encode` and are
-  `androidMain` extensions on `AppRoutes`, so all 19 call sites are unchanged. See
-  `AppRoutesBuilders.kt` for why substituting `core-domain`'s encoder there would have been
-  a silent deep-link behaviour change.
+- `AppRoutes` split cleanly **and then closed**: its 49 route constants and 3 route patterns are
+  portable and are in `commonMain`, and the 4 builders are now **`commonMain` members too**. They
+  were `androidMain` extensions percent-encoding with `android.net.Uri.encode`, and the blocker
+  was that no portable encoder matched it byte for byte. **`encodeUriComponent` now does** — the
+  same byte-wise `%XX` mechanism with `Uri.encode`'s allow-list, differing from `core-domain`'s
+  catalog encoder on exactly `! ~ ' ( )`, and **verified against the real platform method** by
+  `UriEncodeAgreesTest` over printable ASCII, the control range, multi-byte input and a
+  route-shaped string. They were extensions precisely so that **all 22 call sites — already
+  written `AppRoutes.xRoute(...)` — would not change**, and **none did**. Substituting
+  `core-domain`'s *existing* encoder instead would still have been the silent deep-link behaviour
+  change its KDoc warned about, because `~` is the character the two encoders disagree on.
 
 **What the plan above still gets wrong, corrected against the tree:**
 

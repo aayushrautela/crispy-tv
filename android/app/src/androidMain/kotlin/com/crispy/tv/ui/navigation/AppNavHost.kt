@@ -8,10 +8,14 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import coil3.compose.LocalPlatformContext
+import com.crispy.tv.accounts.activeProfileLoader
+import com.crispy.tv.search.searchViewModelFactory
 
 private const val TopLevelNavigationDurationMillis = 200
 private const val TopLevelNavigationOffsetDivisor = 8
@@ -36,6 +40,24 @@ fun AppNavHost(
     onSignedOut: () -> Unit = {},
 ) {
     CrispySharedTransitionLayout {
+        // `addSearchNavGraph` is in `commonMain` now, so the two values it used
+        // to build for itself are built here instead. They are read at *this*
+        // level rather than inside `NavHost`'s builder lambda, because that
+        // lambda is not a composable scope and a `remember` inside it would not
+        // be one either. This is the same shape as `isWideScreen` and
+        // `isCompact` crossing as data: the caller already has the value, so the
+        // shared file receives the product rather than the factory.
+        //
+        // **The `remember`s are here for that reason and not merely nearby.** The
+        // first attempt put them at the `addSearchNavGraph` call, inside the
+        // builder lambda, and the compiler said `@Composable invocations can
+        // only happen from the context of a @Composable function` at both lines.
+        // So the slot carries the *remembered* value, not a lambda producing it:
+        // `remember` belongs to the caller, and the caller is a composable.
+        val platformContext = LocalPlatformContext.current
+        val appContext = remember(platformContext) { platformContext.applicationContext }
+        val searchFactory = remember(appContext) { searchViewModelFactory(appContext) }
+        val profileLoader = remember(appContext) { activeProfileLoader(appContext) }
         NavHost(
             navController = navController,
             startDestination = TopLevelDestination.Home.route,
@@ -98,7 +120,11 @@ fun AppNavHost(
             },
         ) {
             addHomeNavGraph(navController)
-            addSearchNavGraph(navController)
+            addSearchNavGraph(
+                navController = navController,
+                searchViewModelFactory = searchFactory,
+                loadProfile = profileLoader,
+            )
             addDiscoverNavGraph(navController)
             addLibraryNavGraph(navController)
             addSettingsNavGraph(navController)

@@ -141,6 +141,33 @@ kotlin {
                 implementation(libs.serialization.json)
             }
         }
+
+        // `withHostTest {}` above created the `androidHostTest` source set and its
+        // `testAndroidHostTest` task, but nothing had ever been declared there, so
+        // the task ran zero tests and the gate in AGENTS.md reported a pass over an
+        // empty compilation. **A task that compiles no test is a green build log
+        // and no evidence** -- the same failure as a stubs variant satisfying a
+        // dependency declaration without satisfying a compile.
+        //
+        // It has to be `getByName(...)` and not `androidHostTest.dependencies {}`,
+        // and it has to be **inside this `sourceSets { }` block**: written inside
+        // `withHostTest {}` it fails to compile with a receiver type mismatch,
+        // because the receiver there is the Android library extension rather than
+        // a `NamedDomainObjectCollection`. `:app`'s block is the working
+        // reference, and its own comment says the same thing.
+        //
+        // Robolectric is here for exactly one class: `android.net.Uri`. The
+        // allow-list of `encodeUriComponent` can only be settled against the real
+        // platform implementation, and **the platform artifact cannot tell us what
+        // it does** -- `javap -c` on `android.jar` returns `ldc // String Stub!` for
+        // `Uri.encode`, because the SDK ships a stub jar with no method bodies. The
+        // real implementation is in Robolectric's `android-all` under `~/.m2`.
+        // No `androidx.test.core` and no `Context`: `Uri.encode` is a static pure
+        // function over a String, which is the case where Robolectric is
+        // trustworthy, so this block is deliberately one line.
+        getByName("androidHostTest").dependencies {
+            implementation(libs.robolectric)
+        }
     }
 }
 

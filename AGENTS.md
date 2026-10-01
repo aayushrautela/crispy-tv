@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 118 `commonMain` / 77 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 120 `commonMain` / 75 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -199,15 +199,25 @@ is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
 `staticCompositionLocalOf<SharedTransitionScope?> { null }`. The single provider used to be two lines
 inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
 and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
-cannot obtain a provider that provides nothing. The seven `*NavGraph.kt` files are still in
-`androidMain`, **and the reason recorded here for years was wrong twice**: it said they stay because
-`androidx.navigation` has no KMP artifact, which was true of Google's artifact and stopped being
-true when `:app` swapped to `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01`
-(measured across five `.module` links, and **compiled** — the fork keeps the
-`androidx.navigation.compose` package, so not one import changed, and the classpath gap is closed).
-What actually holds them now is that **each graph calls a `Context`-taking `androidMain` factory,
-and `AppNavHost` names every graph by name, so the layer is mutually referencing and moves as a
-unit or not at all.** A pin that arrives through a *call* is invisible to every import scan.
+cannot obtain a provider that provides nothing. **`SearchNavGraph.kt` is now in `commonMain`** and
+the other six graphs are still in `androidMain`, **and the reason recorded here for years was wrong
+twice before it was right once**. It said they stay because `androidx.navigation` has no KMP
+artifact — true of Google's artifact, and false once `:app` swapped to
+`org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` (measured across five
+`.module` links, and **compiled**; the fork keeps the `androidx.navigation.compose` package, so not
+one import changed). What actually holds the remaining six is that **each one calls a
+`Context`-taking `androidMain` factory, and `AppNavHost` names every graph by name, so the layer is
+mutually referencing and moves as a unit or not at all** — with one exception that proves the rule:
+`SearchNavGraph` reached `commonMain` once **two pins below its imports** were discharged, and a
+pin that arrives through a *call* is invisible to every import scan. The two were
+`coil3.compose.LocalPlatformContext.current.applicationContext` and the two factory functions
+themselves; the graph now takes `searchViewModelFactory: ViewModelProvider.Factory` and
+`loadProfile: suspend () -> ActiveProfileInfo?` as **no-default slots carrying the product, not a
+lambda producing it** — *a slot its caller must `remember` is the product type*, since the caller is
+a composable. And the fourth pin was neither an import nor a call in the graph: it was the four
+**route builders** in `androidMain`, reachable with no import because they are extensions on
+`AppRoutes`. *A file in a package can be pinned by a sibling in the same package, and no scan of any
+kind will say so.*
 
 **An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two
 halves belong in opposite source sets.** `:app` has **zero** `expect`/`actual`, so introducing one for
