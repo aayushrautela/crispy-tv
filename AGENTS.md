@@ -420,6 +420,28 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   held the refutation and the summary read past it to call `Locale` "the *sole* pin", which was
   true and was the wrong question. **Read the whole import list of a file you are about to claim
   you understand, and treat every second pin as the one that decides.**
+  **And when a whole family is being re-scanned token by token, the tokens are usually no
+  longer the wall — so measure the wall itself.** Four consecutive landings picked the next
+  `:app` file by scanning for `System.currentTimeMillis`, `java.util.Locale` and
+  `java.util.UUID`, and each found a real instance and each found it was **not** the pin:
+  a defaulted `clock` behind `LocalContext` and `paging-compose`, a screen reading the wall
+  clock behind `android.content.Intent`, a `Locale` argument behind `android.util.Log`. The
+  per-token census of all 77 files then answered the question none of the four was asking
+  — *what does this file import from a platform-only artifact?* — and the answer is that
+  **3 of 77 are movable, and the partition says which**: 40 behind `android.jar` alone, 17
+  player, 9 navigation, 3 `paging-compose`, 2 behind an `R` reference and already correct,
+  2 behind `java.io.File`, 1 a service locator with 7 `androidMain` reader files, and
+  **exactly 3 behind `LocalContext`/`LocalConfiguration` and nothing else** — which are the
+  three the remedy below applies to. **So classify a family by its blocker before choosing
+  a file in it, or each landing finds a different token and each finds it was not the pin** —
+  and when the census is near-zero, *recording the partition is worth an order of magnitude
+  more than a landing*, because the finding is what stops the work being re-attempted. The
+  two Compose locals are the one part of that wall with a remedy in this repository: `coil3`
+  declares `LocalPlatformContext`, so hand the `Context` down as data.
+  **The specific rule must be tested before the coarse one, or the coarse bucket absorbs
+  the finding** — putting `^import android\.` first reported 62/4/2/1/1/7 with the
+  navigation files hidden inside it, and the bucket that looks like a discovery is an
+  artefact of the ordering.
 - **A private decision is an untestable decision, and a private member is worse than a private
   function** — `private` is a property of the class, not of the file, so a `private` member cannot be
   named by a test in its own module either. Name it in production (`:tv`'s `CrispyTvDarkColors` was
@@ -498,6 +520,13 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `git ls-files <path> | grep -c <pattern>` settles it in under a second, and **a count two documents
   share is twice as likely to be believed and no more likely to be right.** The general form: **an
   omission nobody mentioned reads as a decision nobody made.**
+  **A checksum that prints `True` is a claim, not a check** — and a bash associative array whose
+  keys contain spaces breaks in a way that satisfies the check exactly when the counting is most
+  broken: `printf '%s\n' "${!bucket[@]}" | sort` word-splits every key, so the *reporting* loop
+  iterates words while the *counting* loop is untouched, and `sum(counts.values())` over a
+  `Counter` that never incremented is `0` — which compares equal to the total you expected, and
+  prints `True` above six rows of zeros. **Do a partition tally in a language with a real dict,
+  and make the check assert that the buckets are non-empty before it asserts they sum.**
 - **A target declaration is a claim, and a target no CI job builds cannot fail — so it asserts nothing
   about whether the code is platform-free.** Ten modules declared `iosArm64`; `apple.yml` compiled two,
   and eight carried a target nothing ever built. `scripts/verify_apple_targets.py` now fails when a

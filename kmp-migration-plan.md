@@ -169,14 +169,55 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 77 that remain, in four families, and three of them no static scan can see
+### The 77 that remain: **3 are movable, and the partition says which 3**
 
-`:app`'s remaining `androidMain` files were re-audited from both directions. A first
-pass named 21 files with zero framework imports, and a better one named 14, and the
-final one found **exactly one** movable file among them. The five it rejected are
-worth more than the one it accepted, because **three of the four pin families are
-invisible to every static measurement** — no import scan, no reverse `com.crispy.tv`
-audit, and no jar-grep:
+**This section used to claim a taxonomy and now carries a census, because the
+taxonomy was not the answer and the census is.** Every one of `:app`'s 77
+`androidMain` files was classified by *what it imports from a platform-only
+artifact* — comment lines stripped, first matching rule wins, and **the six
+buckets sum to 77**:
+
+| n | what pins it | can code work move it? |
+|---|---|---|
+| **40** | `android.jar` itself, and nothing else | no — it is the platform |
+| **17** | the player and introskip (`playerui/`, `introskip/`) | no — a plain `com.android.library` publishing no JVM variant, **permanent by standing decision** |
+| **9** | `androidx.navigation.compose` | no KMP artifact exists — **a dependency decision** |
+| **3** | `androidx.paging.compose` | no KMP artifact exists — **a dependency decision** (`:35` in `LibraryRoute.kt`) |
+| **3** | **`LocalContext` / `LocalConfiguration` and nothing else** | **yes — and the remedy is already applied elsewhere in this repository, below**: `CalendarScreen.kt` (321), `DetailsRoute.kt` (120), `PersonDetailsRoute.kt` (537) |
+| **2** | an `R` reference and nothing else | no, and **already correct**: both KDocs record that the pure half is in `commonMain` behind a no-default composable slot |
+| **2** | `java.io.File` — `AppGraph.kt` and `optimistic/FileBackedPendingMutationStore.kt` | okio or `kotlin.io.path` — **a dependency decision**, and the store's own KDoc already says exactly this |
+| **1** | `distribution/AppDistribution.kt` — the `androidMain` sibling `PlaybackDependencies` | no — a service locator with **7 `androidMain` reader files**, correct by its own KDoc |
+
+**17 + 9 + 3 + 3 + 2 + 2 + 1 + 40 = 77, with nothing unmatched and every bucket
+non-empty.** Both properties are asserted because an earlier bash version of this tally
+reported six rows of zeros under a `True` checksum — the rule is in AGENTS.md.
+
+**Exactly three files are movable by code work, and they are the composition-local
+three.** The JVM-API token work in `:app` is otherwise finished:
+`System.currentTimeMillis`, `java.util.Locale` and `java.util.UUID` have all been removed
+or reclassified across four consecutive landings, and **none of them is what stands
+between `:app` and `commonMain` any more.** What remains is `android.jar`, three
+Android-only `androidx` families, the player, and the composition roots — which are
+*correctly* Android-side, because a `Context` used for wiring belongs in the factory.
+**So all of that remainder is a dependency decision rather than a code one**, which is the
+same class of finding as the navigation wall below, now measured across a whole module
+instead of argued file by file.
+
+**The remedy for the two Compose locals is already in this codebase and already
+applied.** `coil3`'s `commonMain` declares `LocalPlatformContext`, and the recorded
+rule is that *when a platform composition local is unreachable, the answer is usually a
+value the caller already has* — `isWideScreen`, `isCompact` and `pluginsUiSupported` all
+crossed as data from a value already in scope. So `LocalContext` becomes a `Context`
+handed down as data and `LocalConfiguration` becomes a dimension handed down, exactly the
+way `isWideScreen` did. **The three files that need it are already the three that were
+made to look portable:** `DetailsRoute.kt` and `PersonDetailsRoute.kt` each had a
+`Locale` use deleted this cycle while staying put behind exactly this local, and
+`CalendarScreen.kt` has been carrying `Dispatchers.IO` and `System.currentTimeMillis`
+for a `Context` it only uses for wiring.
+
+**The four pin *mechanisms* behind those buckets**, because three of them are invisible
+to every static measurement — no import scan, no reverse `com.crispy.tv` audit, and no
+jar-grep:
 
 1. **A plain `com.android.library` cannot be consumed from a KMP `commonMain` at all.**
    `NativePlaybackState`, `NativePlaybackEngine`, `NativePlaybackSnapshot`,
