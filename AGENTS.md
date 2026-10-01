@@ -545,6 +545,23 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   a platform capability as the reason a file cannot move, re-run that claim against the resolved
   artifact before planning the file, and correct every copy in the same commit: a corrected premise
   with two surviving copies is worse than the original, because the next reader finds both.**
+  **And one of those copies can be the GATE itself — so a coordinate swap's blast radius is every
+  token list that mentions the old one, not only the prose.** `f1c5b4ff` swapped `:app` onto
+  `org.jetbrains.androidx.navigation` and corrected **7 doc claims**, and missed
+  `scripts/check_common_purity.py`, whose `FORBIDDEN_PREFIXES` still forbade `androidx.navigation`.
+  `54f0189c` then went **red on BOTH workflows** on a build that compiles and tests clean locally,
+  because both run that gate. *A stale document misleads a reader; a stale gate fails the build, and
+  `check_common_purity.py` was the first step after `validate_workflows`.* **So after any swap, grep
+  the scripts, not just the docs** — and note the gate had **already had this fix applied twice**,
+  to `androidx.paging` and `androidx.lifecycle`, each with a long comment naming the measurement and
+  a re-add trigger, so the third case was a copy nobody made rather than a situation nobody met.
+  The fix is the file's **own** pattern (remove the prefix, add the measured comment, give the
+  re-add trigger) and **not an allowlist entry for the offending file** — a safety gate that fires
+  on correct code gets switched off, so keep its notion of "correct" in step with the code. **Re-prove
+  a gate you have changed by violating its premise and confirming it still fires**: injecting
+  `androidx.room` and `androidx.media3` imports into a `commonMain` file each returned exit 1, the
+  restore returned 0, and the file was byte-identical afterwards. *Removing a token is not the same
+  evidence as the gate still working, and only the second one is a measurement.*
 - **A count written about a set that later grows is stale silently, and re-measuring it is one
   command.** Three undercounts, each making work look smaller than it is, and each corrected twice
   over (a plan said 28 shared-transition files, then "10 across 6", and the measurement was **27**).

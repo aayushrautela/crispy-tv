@@ -41,7 +41,6 @@ FORBIDDEN_PREFIXES = (
     "androidx.core",
     "androidx.fragment",
     "androidx.media3",
-    "androidx.navigation",
     "androidx.room",
     "androidx.work",
     "dalvik.",
@@ -84,6 +83,42 @@ FORBIDDEN_PREFIXES = (
 # its commonMain fails `compileKotlinDesktop` in check-local.sh, and `apple.yml`
 # covers the iOS half. Re-add the prefix if `lifecycle-viewmodel` ever stops
 # publishing the non-Android targets.
+
+# `androidx.navigation` is forbidden in the list above and now is not, and this
+# is the third removal of a prefix that was right when written -- but it differs
+# from the paging and lifecycle cases in the direction the name now points. Those
+# two span two artifacts with opposite reachability, so the name stopped being a
+# signal in EITHER direction. Here the name is a signal in the POSITIVE one: the
+# `commonMain` classpath resolves `org.jetbrains.androidx.navigation:
+# navigation-compose:2.10.0-beta01`, a JetBrains fork that KEEPS the
+# `androidx.navigation.compose` package name (13 `*.knm` declaration files under
+# `commonMain/default/linkdata/package_androidx.navigation.compose/`), which is
+# why not one import changed when the coordinate was swapped. Read from five
+# `.module` links: the fork publishes androidJvm, desktop(jvm), iosArm64 and
+# iosSimulatorArm64, and it relocates (`-published` on every variant) onto
+# Google's now-KMP `navigation-runtime:2.10.0`, which publishes androidJvm,
+# desktop, iosArm64, iosSimulatorArm64 and linuxX64. That last artifact is the
+# one that matters for the only commonMain navigation file, because
+# `NavGraphBuilder` and `NavHostController` are declared in `navigation-runtime`
+# and not in `navigation-compose` -- so know which module owns the symbol before
+# concluding a coordinate is KMP.
+#
+# The caveat here is a COORDINATE and not a package, which is the half the two
+# blocks above cannot state. This removal holds only while the ONLY navigation on
+# any `commonMain` classpath is the JetBrains fork. `:android:tv` still resolves
+# Google's Android-only `androidx.navigation:navigation-compose:2.9.8` and is
+# correct to, because a plain `com.android.application` has no `commonMain`; if
+# that artifact is ever placed on a `commonMain` classpath the name becomes a
+# signal in the negative direction again and the prefix must come back. The
+# compiler remains the real check on the same argument the other blocks make:
+# `:app` declares desktop and both iOS targets, so an Android-only navigation type
+# in its `commonMain` fails `compileKotlinDesktop` in check-local.sh, and
+# `apple.yml` compiles the iOS half.
+#
+# Re-add the prefix if `org.jetbrains.androidx.navigation:navigation-compose`
+# ever stops publishing the non-Android targets, if it ever stops keeping the
+# `androidx.navigation.compose` package name, or if Google's Android-only
+# navigation artifact is ever placed on a `commonMain` classpath.
 
 # `java.*` was previously allowlisted in six :core-domain files while every
 # declared target was JVM. Those files are clear, so the exemption is gone: a
