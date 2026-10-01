@@ -78,6 +78,17 @@ kotlin {
             // file could not be moved while `:backend` was reachable only from
             // `androidMain`. `normalizedCatalogMediaType` alone blocked 8 `:app` files.
             implementation(project(":android:backend"))
+
+            // For `JsonAccessors.kt`, which was declared in `androidMain` for
+            // exactly as long as its three consumers were -- and no longer is.
+            // **A file's dependency belongs in the source set the file is in, not
+            // where it used to be**: that file named not one `android.*` type, so
+            // the source set it sat in was the only thing pinning it, and pinning
+            // the dependency to a source set that no longer holds the file claims
+            // a portability nothing can see. Moving it here is what makes the
+            // eleven accessors reachable from `commonMain` *and* testable from
+            // `commonTest`, which is the whole value -- see the KDoc there.
+            implementation(libs.serialization.json)
         }
 
         commonTest.dependencies {
@@ -86,15 +97,6 @@ kotlin {
 
         androidMain.dependencies {
 
-            // A node-type dependency declared in `androidMain` because that is
-            // where `JsonAccessors.kt` lives: **a file's dependency belongs in the
-            // source set the file is in, not where it used to be.** The three
-            // consumers are `androidMain` for reasons this port does not touch --
-            // `SharedPreferences`, `java.io.File` and construction wiring -- and a
-            // KMP module cannot publish a JVM variant for an `androidMain`-only
-            // class, so `commonMain.dependencies` would resolve nothing for them
-            // and would only be claiming a portability that is not there yet.
-            implementation(libs.serialization.json)
             implementation(project(":android:network"))
             implementation(project(":android:backend"))
 
