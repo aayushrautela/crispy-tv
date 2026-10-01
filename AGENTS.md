@@ -393,6 +393,42 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   that one module was asked and deliberately left alone. Its three `androidMain` files are
   blocked by `org.json`, by reaching `:backend`/`:player`, and by OkHttp respectively, as its
   own build-file KDoc records.
+- **A document's own heading, prose class, or type names are not evidence about the code — and a
+  second numbered plan for one repository is a defect even when every sentence in it is correct.**
+  `architecture.md` was rewritten for the ported codebase and both halves of that bullet came from
+  reading the whole 594-line file rather than its four known-stale lines.
+  **Seven of the type names it used did not exist and never had**: `WatchProvider`, `Resource`,
+  `Freshness`, `ScreenState`, `PendingMutation`, `LibraryRepository`, `ProviderConnectionRepository`,
+  `PlaybackRepository`, `SettingsRepository`. One command settled it —
+  `git ls-files '*.kt' | xargs grep -l "\b$t\b"` per name — and **`DataSource` was the sharp one:
+  its six hits are every one of them `androidx.media3.datasource.DataSource` inside `:native-engine`,
+  so the name a document proposes is already taken in this repository by a Media3 type.** A reader
+  who had implemented the proposal would have hit a collision rather than a fresh type.
+  **The prose class is the part nobody would have guessed.** `## Target Use Cases` carries an
+  explicit disclaimer — *"The important part is not the exact names"* — so its six invented
+  interface names are obviously illustrative. **`## Fetch And Cache Policy` is the same *kind* of
+  section and carries no such disclaimer**, so a reader takes its `Resource<T>`/`DataSource`/
+  `Freshness`/`ScreenState` as descriptive. So the two things a stale document does are: name types
+  that do not exist, and let a reader's own inference about register decide whether that matters.
+  When auditing prose, read the surrounding sentences, not the identifiers.
+  **The competing plan is the structural half.** `architecture.md` carried a seven-phase
+  `## Migration Plan` whose phase numbers meant something completely different from the tracked
+  `kmp-migration-plan.md`'s — same repository, same word "Phase", disjoint meaning, so a reader who
+  had read one misread every phase number in the other. The fix was a **scope split, not a
+  deletion**: retitle it *Migration Plan (product and backend)* and point at the tracked plan for the
+  port. **Two numbered plans for one repository is worse than one plan even when both are correct**,
+  because the collision is only visible to a reader holding both, which is the reader most likely to
+  be misled.
+- **A refactor list is a set of claims about the code, so re-measure it; a list where most entries
+  are finished is worse than no list.** `## What To Refactor First In This Repo` held nine numbered
+  items, and the heading says *In This Repo*, so each one is checkable — and three had already been
+  done: the provider enum is gone, the durable profile-scoped mutation queue exists
+  (`UserMutationOutbox` in `:app` `commonMain` with a sealed `MutationStatus` in `core-domain` and a
+  `commonTest` suite), and `SessionRepository`/`CatalogRepository`/`UserMediaRepository` exist
+  together in `android/app/src/commonMain/kotlin/com/crispy/tv/domain/repository/`. A list that
+  reads as outstanding work it is not. **The fix is to split it into what is still true and what is
+  done, keeping the numbering**, so a reader can see item 6 is half-done rather than guessing from
+  the fact that its first half has an implementation.
 - **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an
   import*. Subtracting every type declared in every module's `commonMain` from the capitalised
   identifiers a file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare

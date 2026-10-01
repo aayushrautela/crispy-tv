@@ -1,7 +1,7 @@
 # Crispy Client Architecture
 
 ## Status
-This document defines the target architecture for the Android and iOS clients.
+This document defines the target architecture for the Crispy clients: the Android app, the Android TV app, the iOS and tvOS apps, and the desktop app (Windows, macOS, Linux). All four ship from one Kotlin Multiplatform codebase, and the rules below are the rules every one of them is held to.
 
 The core decision is simple:
 
@@ -293,6 +293,15 @@ interface SavePlaybackProgress {
 The important part is not the exact names. The important part is that viewmodels stop depending on large multi-purpose services.
 
 ## Fetch And Cache Policy
+**This section is a proposal, not a description of the code.** The types below — `Resource<T>`,
+`DataSource`, `Freshness`, `ScreenState` — do not exist in this repository; they are a shape worth
+arguing for, and the argument is unaffected by the port. Two things a reader should know before
+adopting the names as written: `DataSource` is **already taken** in this repository by
+`androidx.media3.datasource.DataSource`, used inside the player engine, so an enum of that name
+would collide; and unlike `## Target Use Cases` above, this section carries no disclaimer that the
+names are not the point, which is why the disclaimer is stated here instead. Nothing in the app
+currently depends on these types existing.
+
 Every repository read should use an explicit fetch policy.
 
 Recommended policies:
@@ -395,7 +404,22 @@ Rules:
 - Offline-capable mutations are stored in a profile-scoped on-device database.
 - The mutation queue survives process death and app restarts.
 - The queue is replayed automatically when connectivity returns.
-- Mutations move through explicit states such as `PENDING`, `IN_FLIGHT`, `RETRY_SCHEDULED`, `FAILED_REQUIRES_ACTION`, and `CONFIRMED`.
+- Mutations move through a sealed `MutationStatus` in `core-domain`, and the real lifecycle has
+  **four** states, not the five this section used to list:
+  - `Pending` — queued, or waiting for its next attempt. Retry is *not* a separate state; it is a
+    `Pending` carrying `nextAttemptAtMs` and an `attempt` count.
+  - `Inflight` — transient and never persisted. On reload it is coerced back to `Pending`, so a
+    write interrupted by process death is retried rather than lost.
+  - `Failed(reason, retryable)` — the terminal state a permanent failure reaches, and whether it is
+    retryable is part of the state rather than a separate classification.
+  - `Conflict(serverValue)` — the backend resolved a conflict and returned its value. This is how
+    a client learns the outcome of the conflict policy described in `## Conflict Resolution`; the
+    previous list had no word for it, and without it that section could not be implemented.
+
+  There is no `CONFIRMED` state, because a successfully synced mutation is **removed entirely from
+  the store**. Confirmation is deletion, not a retained terminal status — a distinction worth
+  keeping in view, because a retained confirmed record is a different retention policy and a
+  different privacy story.
 - Watchlist, watched, and rating changes may be optimistic immediately.
 - Provider connect or disconnect should not pretend to succeed before the backend confirms it.
 - Playback progress is local-first and aggressively buffered, then flushed to the backend.
@@ -443,7 +467,7 @@ Rules:
 - The backend produces canonical continue watching and watched state.
 - The client may use local progress as a temporary fallback only when backend state is unavailable.
 - When backend state arrives, it replaces the fallback snapshot.
-- Completion thresholds and reconciliation rules should be centralized in one place, not spread across screens.
+- Completion thresholds and reconciliation rules are centralized in one place, not spread across screens. This is `PlaybackProgressReporter`, in `:app` `commonMain`, so it is the same code on every target rather than one screen's private logic.
 
 This avoids the current problem where local completion and backend completion can both mark items watched in different paths.
 
@@ -466,7 +490,7 @@ Backend rules:
 - If the product wants Trakt or Simkl sync, the backend performs that work after or alongside the canonical Crispy write.
 - Provider outages or delayed sync must not change client data ownership. The Crispy backend remains authoritative even if downstream sync is temporarily unhealthy.
 
-This means types like `WatchProvider` should become passive display metadata or disappear from most client-facing APIs.
+This means provider identity belongs in passive display metadata, not in a client-owned type. The rule is unchanged and it has been carried out: there is no provider enum in the client today. What the backend returns is normalized attribution — `providerLabel`, `providerStatus`, `origin` — and those are fields on domain models, so a screen can label a row without ever branching on which provider produced it.
 
 ## Shared Contracts
 `contracts/SPEC.md` remains important, but its role is specific.
@@ -489,55 +513,103 @@ Examples of logic that should move to backend-owned contracts or API responses:
 - continue watching truth
 - provider auth truth
 
-## Recommended Package Direction
-The exact folder names can vary, but the dependency shape should look like this.
+## Recommended Module Direction
+The exact module names can vary, but the dependency shape should look like this — and in this repository it now does, which is why the shape is given as a module graph rather than a package tree. A package tree is a naming convention that any module can violate silently; a module edge is enforced by the build.
 
 ```text
-android/app/src/main/java/com/crispy/tv/
-  app/
-    AppGraph.kt
-  feature/
-    home/
-    details/
-    library/
-    search/
-    settings/
-    player/
-  domain/
-    model/
-    usecase/
-    repository/
-  data/
-    remote/
-      backend/
-    local/
-      cache/
-      database/
-      prefs/
-    repository/
-    mapper/
-  infra/
-    network/
-    auth/
-    logging/
+shared, and reachable from every target
+  core-domain        deterministic rules, no IO, no platform types, mirrored by ios/ContractRunner
+  platform-core      the six port interfaces: SecretStore, KeyValueStore, AppLogger, TimeSource,
+                     DistributionCapabilities, MonotonicClock, plus SecretFormat
+  sharedUI           the design system and the design assets (composeResources)
+  addons             addon-facing ports and pure lookup rules
+  backend            BackendApi / AccountApi ports and the wire types behind them
+  home               home feature data
+  player             player-facing interfaces
+  network            trailer classification and extraction
+  watchhistory       watch sync surface
+  app                the shared UI and presentation layer: 110 files in commonMain, 81 in androidMain
+
+per-platform, one implementation each
+  platform-android   Android's side of the six ports
+  platform-desktop   desktop's side of the six ports, and the only SecretStore
+  desktopApp         the desktop entry point and the seam proof
+  androidApp         the Android entry point; owns the store / sideload flavour axis
+  tv                 the Android TV entry point
+  ios/               the CrispyUI framework and the Swift shells over it
+
+pinned to androidMain, deliberately and permanently
+  native-engine, platform-android, plugins, torrent-engine, ui-assets, youtube-extractor
 ```
 
-Keep `android/core-domain` for platform-independent rules that are shared with Swift contract runners.
+Two of the older rules are load-bearing and are kept verbatim in substance:
 
-In this shape, `domain/repository` defines interfaces and `data/repository` contains their implementations.
+- Keep `core-domain` for platform-independent rules that are shared with Swift contract runners. This
+  is the module the contract suite is compiled into, and the reason the rules can be asserted on
+  Android, desktop and both Apple targets from one fixture set.
+- `platform-core` holds only interfaces, and each platform implements them. That is what lets one
+  `:app` `commonMain` run on all four targets without an `expect`/`actual` seam anywhere: the app
+  takes a `KeyValueStore`, and Android, desktop and (once Phase 6 lands) Apple each supply one.
+
+Within `:app`, the two directories that answer the old tree's question concretely are:
+
+```text
+android/app/src/commonMain/kotlin/com/crispy/tv/domain/repository/
+  SessionRepository, CatalogRepository, UserMediaRepository    interfaces, in shared code
+android/app/src/androidMain/kotlin/com/crispy/tv/app/AppGraph.kt
+  the composition root
+```
+
+So the old shape's "domain/repository defines interfaces and data/repository contains their
+implementations" survives as a real split, expressed as a `commonMain` interface and an
+`androidMain` implementation rather than as two sibling packages.
 
 ## What To Refactor First In This Repo
-1. Break up `BackendWatchHistoryService`.
-2. Replace `WatchProvider?` and nullable-source semantics with explicit domain use cases.
-3. Move backend and cache orchestration out of viewmodels like `DetailsViewModel` and `PlayerSessionViewModel`.
-4. Add a durable profile-scoped mutation queue for offline-capable backend writes.
-5. Collapse duplicate source enums into one domain model, with backend DTO mapping at the edge.
-6. Replace local watch-history truth with backend-backed `UserMediaRepository` plus a dedicated `PlaybackRepository` for transient progress.
-7. Split backend-normalized library and provider connection concerns out of the watch-history service shape.
-8. Remove client-owned provider branching from library and continue-watching flows.
-9. Reduce `PlaybackDependencies` to a composition root instead of a global mutable service locator.
+Every item here was written as a claim about this repository, so every item has been re-measured rather than assumed. The list is split into what is still true and what has since been done, because a refactor list where most entries are finished is worse than no list — it reads as work outstanding and it is not.
 
-## Migration Plan
+### Still true
+
+1. Break up `BackendWatchHistoryService`. It still exists and still carries the service.
+2. Overloaded `null` in client-facing source semantics. (`WatchProvider?` is gone, so that half of the
+   original item is resolved — see below — and what remains is the `null`-means-different-things
+   rule, which is still unenforced.)
+3. Move backend and cache orchestration out of `DetailsViewModel` and `PlayerSessionViewModel`.
+   Partly done: three decision clusters are now in `:app` `commonMain` (`DetailsMetadataLoader`,
+   `SeasonEpisodesLoader`, `PlaybackProgressReporter`), and `PlayerSessionViewModel` is 1,202 lines
+   from 1,411. The remainder of each screen's orchestration is still in the screen.
+5. Collapse duplicate source enums into one domain model, with backend DTO mapping at the edge.
+   Unmeasured, and therefore still open.
+6. `UserMediaRepository` exists, in shared code. The other half of this item — a dedicated
+   `PlaybackRepository` for transient progress — does not exist, and playback progress is instead
+   owned by `PlaybackProgressReporter`. Progress reporting is centralised; progress *storage* is
+   not yet separated from user-media truth.
+7. Split backend-normalized library and provider connection concerns out of the watch-history
+   service shape. Still true, and it is the same work as item 1.
+8. Remove client-owned provider branching from library and continue-watching flows. Unmeasured,
+   and therefore still open.
+9. Reduce `PlaybackDependencies` to a composition root instead of a global mutable service locator.
+   It still exists.
+
+### Done since this list was written
+
+- Provider identity left the client API surface. `WatchProvider?` no longer exists anywhere, and
+  provider attribution is backend-supplied fields on domain models.
+- A durable, profile-scoped mutation queue. `UserMutationOutbox` is in `:app` `commonMain`, its
+  `MutationStatus` and `UserMutation` hierarchy is a sealed model in `core-domain`, and it is
+  covered by a `commonTest` suite. Note that its real lifecycle is *four* states —
+  `Pending`, `Inflight`, `Failed(reason, retryable)`, `Conflict(serverValue)` — and not the five
+  sketched in `## Offline And Retry Behavior`; see that section.
+- Stable repository interfaces. `SessionRepository`, `CatalogRepository` and `UserMediaRepository`
+  exist together in `android/app/src/commonMain/kotlin/com/crispy/tv/domain/repository/`. The three
+  the original list also named — `LibraryRepository`, `ProviderConnectionRepository`,
+  `PlaybackRepository` — do not exist, so that list is not finished, only partly implemented.
+
+## Migration Plan (product and backend)
+This is the product-and-backend migration, and it is a different piece of work from the
+multiplatform port. The two share this repository and, historically, a numbering space, which made
+Phase 4 of one and Phase 4 of the other indistinguishable. **The port's phases live in
+`kmp-migration-plan.md`, which is the tracked plan; the phases below are the ones below.**
+
 ### Phase 1: Define stable repository interfaces
 - Introduce `SessionRepository`, `CatalogRepository`, `UserMediaRepository`, `LibraryRepository`, `ProviderConnectionRepository`, and `PlaybackRepository`.
 - Keep existing implementations behind those interfaces.
@@ -591,4 +663,4 @@ The architecture is in the intended state when all of the following are true:
 - viewmodels no longer assemble remote plus local plus provider reconciliation rules themselves
 - Trakt and Simkl are implementation details of the backend, not client architecture concepts
 - the clients never call provider APIs or store provider credentials
-- Android and iOS follow the same data ownership rules
+- Every client follows the same data ownership rules
