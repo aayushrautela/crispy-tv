@@ -9,6 +9,7 @@ import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ImportJobsResponse
 import com.crispy.tv.backend.ItemLookupInput
 import com.crispy.tv.backend.MeResponse
+import com.crispy.tv.backend.MetadataTitleExtrasResponse
 import com.crispy.tv.backend.AccountSettings
 import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.WatchMutationInput
@@ -32,8 +33,18 @@ import com.crispy.tv.backend.UpdateProfileInput
  * says immediately which call a test forgot to stub. Widening this file is the
  * intended cost of adding a consumer: the alternative is a narrow double in
  * the same module, which silently rots the moment a member changes.
+ *
+ * ## `open`, for the same reason
+ *
+ * A consumer in this module that needs exactly one member answered has two options.
+ * One is a second file listing all 52, which is a copy that rots. The other is a
+ * narrow port of its own, which is worse: it never learns a new member arrived, and
+ * the interface it mirrors keeps growing while the port stands still. So this class
+ * is `open` and such a consumer overrides the one member it needs and inherits the
+ * `AssertionError`-naming behaviour for the rest -- one word here, and a new
+ * consumer of a 52-member interface is a two-line class instead of a 300-line one.
  */
-internal class RecordingBackendApi : BackendApi {
+open class RecordingBackendApi : BackendApi {
     val listImportConnectionsCalls = mutableListOf<Pair<String, String>>()
     val disconnectCalls = mutableListOf<Triple<String, String, ImportProvider>>()
     val startImportCalls = mutableListOf<StartImportCall>()
@@ -234,7 +245,7 @@ internal class RecordingBackendApi : BackendApi {
     override suspend fun getMetadataItemExtras(
         accessToken: String,
         itemId: String
-    ): Nothing = unused("getMetadataItemExtras")
+    ): MetadataTitleExtrasResponse = unused("getMetadataItemExtras")
     override suspend fun getSeriesEpisodes(
         accessToken: String,
         seriesItemId: String,

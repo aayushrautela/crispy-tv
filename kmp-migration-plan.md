@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **106 of 186 `:app` files moved** |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **108 of 189 `:app` files moved** |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -84,8 +84,8 @@ is not waiting on Phase 4.
 | `home` | 13 | 4 |
 | `network` | 2 | 4 |
 | `watchhistory` | 2 | 3 |
-| **`:app`** | **107** | **81** |
-| **total** | **189** | **105** |
+| **`:app`** | **108** | **81** |
+| **total** | **190** | **105** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,

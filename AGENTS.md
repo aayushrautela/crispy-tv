@@ -403,6 +403,25 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 ### 2. Ports, seams and slots
 
+- **`Dispatchers.IO` does not exist in `commonMain`.** It is declared in the JVM and Native
+  source sets, so a `commonMain` file sees only `Dispatchers.Default` and `Dispatchers.Main`.
+  A `commonMain` class doing blocking work therefore needs a **no-default** `ioDispatcher`
+  slot rather than a defaulted one: defaulting to `Dispatchers.Default` compiles on every
+  target and silently puts blocking I/O on a CPU-sized pool. Measured when
+  `DetailsMetadataLoader` moved to `commonMain`; the view model passes `Dispatchers.IO`.
+- **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
+  interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
+  member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can
+  widen `Nothing`, so making the class `open` was not enough. Declare the **interface's**
+  return type and keep the throw (`): MetadataTitleExtrasResponse = unused("...")`). The throw
+  is what the double is for; the wrong return type is what blocked reuse.
+- **Make the exhaustive double `open` rather than writing a second exhaustive one.** A `:app`
+  consumer that needs one of the 52 `BackendApi` members answered would otherwise either
+  duplicate 52 members (a copy that rots) or add a narrow port (worse: it never learns a new
+  member arrived). `open` + a one-member subclass in the consumer's own test file is the third
+  option, and it costs the base class one word. This is the narrow-double rule turned inside
+  out: the exhaustive double stays exhaustive, and the *specialisation* is a subclass.
+
 - **A port's members are the union of every caller's.** Measuring one caller gave four of
   `PlayerGestureController`'s five; the fifth, `restoreBrightness()`, is called from another file and
   is a one-shot latch the screen depends on. Building the interface from the file you happened to
@@ -531,6 +550,16 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   When a failure message quotes your own label text as the *actual*, the assertion is misordered.
 ### 4. Coroutines in tests
 
+- **`advanceUntilIdle()` drives the scope the test body runs in, and `backgroundScope` is
+  neither that scope nor a durable one.** A `commonTest` loader taking an **explicit**
+  `CoroutineScope` got 14 of 19 tests failing with no error -- the synchronous half ran, the
+  coroutine body never did, `ensureValidSessionCalls` was 0. The scope had been handed
+  `backgroundScope`, which `advanceUntilIdle()` does not drive the way it drives the test
+  body, and which is torn down when the test finishes -- correct for a long-lived watcher,
+  wrong for a unit under test. Pass the `TestScope` itself. Note this is a *different* failure
+  from the `Dispatchers.setMain` one above: there the coroutine is parked on a real
+  dispatcher, here it is queued on a scope nobody drains.
+
 - A class that builds its own `CoroutineScope` on a real dispatcher is untestable until the scope is
   injected, and `Dispatchers.setMain` is not the answer — the working combination is
   `CoroutineScope(UnconfinedTestDispatcher())` with no `advanceUntilIdle`. Give the injected scope a
@@ -553,6 +582,16 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 ### 5. Mutation drivers
 
 Every rule in this section is stated in each driver's docstring, because a driver is run unattended.
+
+- **A narrowing mutation over a key two fields populate identically is not a mutation.** The
+  first entry for `DetailsMetadataLoader`'s recommendation filter was
+  `distinctBy { "${it.type}:${it.id}" }` -> `distinctBy { it.id }`, on the theory that dropping
+  `type` widens the key. Reading `CatalogMappings.toCatalogItem` first showed it sets
+  `id = normalizedItemId` **and** `itemId = normalizedItemId` -- the same value -- so the
+  narrowed key is provably identical and the entry could only ever report a **false positive
+  about the suite**. The rule that generalises the existing "does it change an answer, and
+  does it compile?": *read the value, not the name*. A key's name says which fields it
+  mentions; only the code says which fields it reads, and two of them can be the same value.
 
 - **`Pattern.finditer(s, re.M)` does not set a flag, and it does not raise.** On a *compiled*
   pattern the second argument is `pos`, so the integer `8` is read as a start offset; `^` can then

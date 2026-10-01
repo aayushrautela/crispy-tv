@@ -13,7 +13,6 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.addons.mapping.seasonNumbers
 import com.crispy.tv.addons.mapping.toMediaVideo
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
@@ -23,6 +22,7 @@ import com.crispy.tv.addons.lookup.buildPlayerSubtitle
 import com.crispy.tv.addons.lookup.findEpisodeForLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.lookup.resolveStreamLookupTargetFromIdentity
+import com.crispy.tv.details.DetailsMetadataLoader
 import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.streams.SelectorCoordinator
@@ -44,7 +44,6 @@ import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
-import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.TorrentResolver
@@ -166,7 +165,6 @@ class PlayerSessionViewModel(
 
     private val rawPlaybackId = buildPlaybackRawId(identity = identity)
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
-    private var titleExtrasFetched = false
     private var activePlaybackSource = PlaybackSource(url = "")
     private var activeIdentity: PlaybackIdentity? = identity
     private var activeSubtitle: String? = null
@@ -203,6 +201,33 @@ class PlayerSessionViewModel(
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /**
+     * The details page's two extras fetches, moved out of this class.
+     *
+     * Neither is a player concern, and every type they touch was already in a
+     * `commonMain`; what kept them here was `PlayerUiState`, which the loader cannot
+     * see. The four write slots below are that seam. `Dispatchers.IO` is passed in
+     * because it does not exist in `commonMain`.
+     */
+    private val detailsMetadataLoader =
+        DetailsMetadataLoader(
+            accountApi = supabase,
+            backendApi = backendClient,
+            scope = viewModelScope,
+            ioDispatcher = Dispatchers.IO,
+            onSeasons = { numbers ->
+                _uiState.update { current ->
+                    if (current.seasons.size == numbers.size && current.seasons.containsAll(numbers)) current
+                    else current.copy(seasons = numbers)
+                }
+            },
+            onMoreLoading = { loading -> _uiState.update { it.copy(moreIsLoading = loading) } },
+            onRecommended = { items ->
+                _uiState.update { it.copy(moreIsLoading = false, recommendedItems = items) }
+            },
+            currentDetails = { _uiState.value.details },
+        )
 
     // High-frequency playback position lives in its own flow so a 500ms tick never
     // invalidates the whole PlayerUiState tree; only seekbar/time-pill leaves read it.
@@ -767,9 +792,9 @@ class PlayerSessionViewModel(
         }
 
         if (isSeries) {
-            fetchSeasonsForDetails(details.itemId)
+            detailsMetadataLoader.fetchSeasons(details.itemId)
         } else {
-            fetchTitleExtras(details.itemId)
+            detailsMetadataLoader.fetchTitleExtras(details.itemId)
         }
 
         val seasonToLoad = _uiState.value.selectedSeason
@@ -813,75 +838,6 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun fetchSeasonsForDetails(itemId: String?) {
-        val id = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return
-        viewModelScope.launch {
-            val session = runCatching { withContext(Dispatchers.IO) { supabase.ensureValidSession() } }.getOrNull() ?: return@launch
-            val token = session.accessToken
-            val extras =
-                runCatching {
-                    withContext(Dispatchers.IO) { backendClient.getMetadataItemExtras(accessToken = token, itemId = id) }
-                }.getOrNull() ?: return@launch
-            val numbers = extras.seasonNumbers()
-            if (numbers.isEmpty()) return@launch
-            _uiState.update { current ->
-                if (current.seasons.size == numbers.size && current.seasons.containsAll(numbers)) current
-                else current.copy(seasons = numbers)
-            }
-        }
-    }
-
-    private fun fetchTitleExtras(itemId: String?) {
-        val id = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return
-        if (titleExtrasFetched) return
-        titleExtrasFetched = true
-        _uiState.update {
-            it.copy(moreIsLoading = true)
-        }
-        viewModelScope.launch {
-            val session = runCatching { withContext(Dispatchers.IO) { supabase.ensureValidSession() } }.getOrNull()
-            val extras =
-                if (session == null) {
-                    null
-                } else {
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            backendClient.getMetadataItemExtras(accessToken = session.accessToken, itemId = id)
-                        }
-                    }.getOrNull()
-                }
-            if (extras == null) {
-                _uiState.update { it.copy(moreIsLoading = false) }
-                return@launch
-            }
-
-            val currentKeys =
-                buildSet {
-                    add(id)
-                    detailsIdKeys()?.let(::addAll)
-                }
-            val recommended =
-                extras.lists
-                    .flatMap { it.items }
-                    .mapNotNull { it.toCatalogItem() }
-                    .filter { it.itemId !in currentKeys }
-                    .distinctBy { "${it.type}:${it.id}" }
-            _uiState.update {
-                it.copy(
-                    moreIsLoading = false,
-                    recommendedItems = recommended,
-                )
-            }
-        }
-    }
-
-    private fun detailsIdKeys(): Set<String>? {
-        val details = _uiState.value.details ?: return null
-        return buildSet {
-            details.itemId?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-            details.id.trim().takeIf { it.isNotBlank() }?.let(::add)
-        }
-    }
 
     private fun loadEpisodesForSeason(
         season: Int,
