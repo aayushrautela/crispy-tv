@@ -67,4 +67,54 @@ object SecretFormat {
      * [SecretStore.decrypt] and checks for null.
      */
     fun isEncrypted(value: String): Boolean = value.startsWith(PREFIX)
+
+    /**
+     * The two halves of an encoded secret, still base64.
+     *
+     * Base64 stays a platform concern: `android.util.Base64` on Android,
+     * `java.util.Base64` on the JVM, `NSData` on Apple. So what is shared is the
+     * *shape* of a stored value, not the encoding of its fields -- which is why
+     * these are `String`s. [encode] joins them and [decode] splits them, and
+     * neither function touches base64, so both can live here.
+     */
+    data class EncodedSecret(val ivBase64: String, val ciphertextBase64: String)
+
+    /**
+     * Join the two halves into a stored value.
+     *
+     * Takes strings rather than byte arrays for the reason given on
+     * [EncodedSecret]: the caller has already encoded them, and this function
+     * knows nothing about the encoding. That also means it cannot validate them,
+     * which is correct -- the caller is the only party that knows what a valid IV
+     * or ciphertext looks like, and a format that rejected its own input would
+     * make [SecretStore.encrypt] unable to report a bad IV as a crypto failure.
+     */
+    fun encode(ivBase64: String, ciphertextBase64: String): String =
+        PREFIX + ivBase64 + IV_SEPARATOR + ciphertextBase64
+
+    /**
+     * Split a stored value back into its halves, or `null` if it is not this format.
+     *
+     * Two rules here are decisions rather than consequences, and both were
+     * duplicated in every implementation before they lived in one place:
+     *
+     * **A missing prefix is still read.** A value without it is split as though it
+     * had one, because a store that shipped before the prefix existed holds values
+     * without it and must keep being able to read them. Rejecting an unprefixed
+     * value would lock those users out of their own sessions on upgrade.
+     *
+     * **The wrong number of fields is `null`, not a guess.** One field is a
+     * missing half; three is a base64 blob that grew an extra field, or a value
+     * from a future format. Both are "cannot read", and the contract for that is
+     * `null` -- [SecretStore.decrypt]'s own return type, and the same answer a
+     * caller gets from a failed authentication tag. The check is sufficient
+     * because base64's standard alphabet contains no `:`, which is what
+     * [IV_SEPARATOR]'s own note says.
+     */
+    fun decode(stored: String): EncodedSecret? {
+        val payload = if (isEncrypted(stored)) stored.removePrefix(PREFIX) else stored
+        val parts = payload.split(IV_SEPARATOR)
+        if (parts.size != 2) return null
+        return EncodedSecret(ivBase64 = parts[0], ciphertextBase64 = parts[1])
+    }
 }

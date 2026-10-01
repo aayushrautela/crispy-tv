@@ -89,6 +89,15 @@ kotlin {
         namespace = "com.crispy.tv.platform"
         compileSdk = 37
         minSdk = 26
+
+        // This module had no test source set at all, which is why `SecretFormat`
+        // -- the encrypted-secret contract that the Android store, the desktop
+        // store and any future Apple one all implement -- was pinned by neither.
+        // Without this block a `commonTest` directory exists, nothing compiles or
+        // runs it on Android, and AGP only *warns*. See the same finding on
+        // `:android:addons`, where five Android-shaped files meant nobody created
+        // a test source set for the module at all.
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -120,6 +129,10 @@ kotlin {
             // infers the dependency, which is why `srcDir(taskProvider)` is the
             // idiom everywhere else in this build.
             kotlin.srcDir(generateAppConfig)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
     }
 }

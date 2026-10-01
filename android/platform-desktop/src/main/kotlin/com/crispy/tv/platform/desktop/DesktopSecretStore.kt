@@ -125,21 +125,17 @@ class DesktopSecretStore(
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey(), GCMParameterSpec(SecretFormat.GCM_TAG_LENGTH_BITS, iv))
         val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
-        return SecretFormat.PREFIX +
-            Base64.getEncoder().encodeToString(iv) + SecretFormat.IV_SEPARATOR +
-            Base64.getEncoder().encodeToString(ciphertext)
+        return SecretFormat.encode(
+            ivBase64 = Base64.getEncoder().encodeToString(iv),
+            ciphertextBase64 = Base64.getEncoder().encodeToString(ciphertext),
+        )
     }
 
     override fun decrypt(stored: String): String? {
-        val payload = if (isEncrypted(stored)) stored.removePrefix(SecretFormat.PREFIX) else stored
-        val parts = payload.split(SecretFormat.IV_SEPARATOR)
-        // Exactly two parts, or it is not this format. A missing field, an extra
-        // one, or a base64 blob that happened to contain a separator are all
-        // "cannot read", and the contract for that is null rather than a guess.
-        if (parts.size != 2) return null
+        val encoded = SecretFormat.decode(stored) ?: return null
         return runCatching {
-            val iv = Base64.getDecoder().decode(parts[0])
-            val ciphertext = Base64.getDecoder().decode(parts[1])
+            val iv = Base64.getDecoder().decode(encoded.ivBase64)
+            val ciphertext = Base64.getDecoder().decode(encoded.ciphertextBase64)
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(SecretFormat.GCM_TAG_LENGTH_BITS, iv))
             String(cipher.doFinal(ciphertext), Charsets.UTF_8)

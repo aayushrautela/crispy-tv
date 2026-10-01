@@ -185,7 +185,27 @@ remembering:** `SecureTokenStore`'s `PREFIX`/`IV_SEPARATOR`/`GCM_TAG_LENGTH_BITS
 that file's body — a coupling with no compiler in it, where a change on one side produces
 values the other silently cannot read (`decrypt` returns `null`, which looks like a
 corrupt read rather than a format mismatch). They are now `SecretFormat` in
-`:platform-core`'s `commonMain`, beside the interface, and both sides reference it.
+:platform-core`'s `commonMain`, beside the interface, and both sides reference it.
+
+**Sharing the constants turned out not to be the same as sharing the format, and the
+difference was the part nobody writes:** both stores referenced the three constants and
+still joined and split the value themselves, identically and by eye, so two stores agreed
+on the shape by promise rather than by call. `SecretFormat.encode(ivBase64,
+ciphertextBase64)` and `SecretFormat.decode(stored)` now live there too — taking **`String`s**
+rather than byte arrays, because base64 is a platform concern (`android.util.Base64`,
+`java.util.Base64`, `NSData`) and neither function touches it. Four rules are pinned by 8
+cases that run on desktop JVM, Android host and both iOS targets: an **unprefixed** value is
+still read (a store that shipped before the prefix existed holds values without it); the
+**wrong number of fields is `null`**, not a guess; `isEncrypted` is a **prefix test**, so a
+plaintext token that happens to start with `enc_v1:` is reported as encrypted and the prefix
+is consumed before the halves are read — the format's one sharp edge; and the format **does
+not validate its own fields**, because only the caller knows what a valid IV looks like.
+**No suite on either side could have caught the divergence:** `SecureTokenStore` reaches
+`AndroidKeyStore` in its constructor and cannot be constructed on a JVM, and
+`:platform-desktop`'s suite exercises the store rather than the format. `:platform-core` had
+**no test source set at all** across all five of its targets and now has `withHostTest {}`
+and a `commonTest` — found by the sweep recorded in `AGENTS.md` §1, which found four modules
+with the same shape.
 
 **One measurement that is easy to get backwards, recorded because it was nearly got
 wrong:** `:desktopApp` being a plain `kotlin.jvm` module consuming a KMP library's `jvm`

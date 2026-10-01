@@ -68,19 +68,18 @@ class SecureTokenStore(private val context: Context) : SecretStore {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val iv = cipher.iv
         val ciphertext = cipher.doFinal(plaintext.toByteArray(StandardCharsets.UTF_8))
-        return SecretFormat.PREFIX +
-            Base64.encodeToString(iv, Base64.NO_WRAP) + SecretFormat.IV_SEPARATOR +
-            Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+        return SecretFormat.encode(
+            Base64.encodeToString(iv, Base64.NO_WRAP),
+            Base64.encodeToString(ciphertext, Base64.NO_WRAP),
+        )
     }
 
     override fun isEncrypted(value: String): Boolean = SecretFormat.isEncrypted(value)
 
     override fun decrypt(stored: String): String? = runCatching {
-        val payload = if (isEncrypted(stored)) stored.removePrefix(SecretFormat.PREFIX) else stored
-        val parts = payload.split(SecretFormat.IV_SEPARATOR)
-        if (parts.size != 2) return@runCatching null
-        val iv = Base64.decode(parts[0], Base64.NO_WRAP)
-        val ciphertext = Base64.decode(parts[1], Base64.NO_WRAP)
+        val encoded = SecretFormat.decode(stored) ?: return@runCatching null
+        val iv = Base64.decode(encoded.ivBase64, Base64.NO_WRAP)
+        val ciphertext = Base64.decode(encoded.ciphertextBase64, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(SecretFormat.GCM_TAG_LENGTH_BITS, iv))
         String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)

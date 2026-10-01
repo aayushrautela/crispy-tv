@@ -333,6 +333,12 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **first** — it is one command, and it finds an entire untested surface that no per-file audit
   will surface. `:addons` now has `withHostTest {}` and a `commonTest`, and its 28 cases run on
   desktop JVM *and* Android host.
+  **Sweeping that one command across every module finds four more of the same shape:**
+  `:platform-core` (7 files), `:player` (6), `:network` (2) and `:watchhistory` (2) —
+  **17 files of `commonMain` with no test source set at all.** `:platform-core` is the
+  sharp one, because it holds the six port interfaces *and* `SecretFormat`, the
+  encrypted-secret contract both platform stores implement. So this is a whole-repo
+  sweep rather than a per-file audit, and it costs one loop over the module list.
 - **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an
   import*. Subtracting every type declared in every module's `commonMain` from the capitalised
   identifiers a file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare
@@ -418,6 +424,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 ### 2. Ports, seams and slots
 
+- **Shared constants are not the shared format, and the difference is the part nobody
+  writes.** `SecretFormat` carried `PREFIX`, `IV_SEPARATOR` and `GCM_TAG_LENGTH_BITS` in
+  `:platform-core`'s `commonMain` and both stores referenced them — and both stores still
+  *joined and split* the value themselves, identically and by eye. Two stores agreeing on
+  the shape was therefore a promise in prose rather than a call to one function. The fix is
+  `SecretFormat.encode(ivBase64, ciphertextBase64)` and `SecretFormat.decode(stored)`, and the
+  reason they take **`String`s rather than byte arrays** is the part worth keeping: base64 is
+  a platform concern (`android.util.Base64`, `java.util.Base64`, `NSData`), so what is shared
+  is the *shape*, and neither function touches base64 at all — which is what lets them live in
+  `commonMain`.
+  **And nothing could have caught it**, which is the sharper half. `SecureTokenStore` reaches
+  `AndroidKeyStore` in its constructor and cannot be constructed on a JVM at all, and
+  `:platform-desktop`'s suite exercises the store rather than the format — so *neither side*
+  had a test that ran the shared code directly. A rule both implementations depend on and
+  neither tests needs its own suite; it does not come free with the constant.
 - **`Dispatchers.IO` does not exist in `commonMain`.** It is declared in the JVM and Native
   source sets, so a `commonMain` file sees only `Dispatchers.Default` and `Dispatchers.Main`.
   A `commonMain` class doing blocking work therefore needs a **no-default** `ioDispatcher`
