@@ -250,6 +250,31 @@ internal fun JsonObject.jsonPrimitiveOrNull(key: String): JsonPrimitive? =
     (this[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }
 
 /**
+ * `optLong(key, default)`.
+ *
+ * **This reproduces `org.json` rather than adopting `longOrNull`, and the
+ * difference is why it exists.** AOSP's `optLong` answers `Long.parseLong` for
+ * a *String* -- strict, no exponent and no fraction -- and a truncating cast for
+ * a *Number*. `JsonPrimitive.longOrNull` parses either, so a port using it would
+ * answer `null` for `"1e3"` where the old code answered the default. A lenient
+ * accessor feeding a strict parser is a truncation, not a parse, and those two
+ * directions are not the same change.
+ *
+ * **`contentOrNull` alone cannot do this**: it answers `"1234"` for the number
+ * `1234` and for the quoted string `"1234"` alike. Only `isString` separates
+ * them.
+ */
+internal fun JsonObject.optLongOrDefault(key: String, default: Long): Long {
+    val primitive = jsonPrimitiveOrNull(key) ?: return default
+    val content = primitive.contentOrNull?.trim() ?: return default
+    return if (primitive.isString) {
+        content.toLongOrNull() ?: default
+    } else {
+        content.toDoubleOrNull()?.toLong() ?: default
+    }
+}
+
+/**
  * **Why the numeric policies call [toKotlinScalar] instead of `intOrNull`.**
  *
  * `JsonPrimitive.intOrNull` PARSES a literal: it answers `null` for `"42.9"`.

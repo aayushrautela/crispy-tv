@@ -27,7 +27,7 @@ import javax.crypto.spec.GCMParameterSpec
  * If the secure store cannot be opened (e.g. Keystore unavailable after an OS upgrade) we fail
  * closed: the error is surfaced rather than silently falling back to plaintext storage.
  */
-class SecureTokenStore(private val context: Context) : SecretStore {
+class SecureTokenStore(private val context: Context) : SecretStore, AccountSessionStore {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
@@ -88,9 +88,9 @@ class SecureTokenStore(private val context: Context) : SecretStore {
     private val _session = MutableStateFlow(loadFromDisk())
     val session: StateFlow<Session?> = _session.asStateFlow()
 
-    fun current(): Session? = _session.value
+    override fun current(): Session? = _session.value
 
-    suspend fun save(session: Session) {
+    override suspend fun save(session: Session) {
         val json = JSONObject()
             .put("access_token", session.accessToken)
             .put("refresh_token", session.refreshToken)
@@ -103,7 +103,7 @@ class SecureTokenStore(private val context: Context) : SecretStore {
         _session.value = session
     }
 
-    suspend fun clear() {
+    override suspend fun clear() {
         runCatching { prefs.edit().clear().apply() }
         _session.value = null
     }

@@ -854,9 +854,40 @@ chains were measured; neither is an estimate.
 **Correction, 2026-10-02. `:backend`'s half of that prediction shipped, and it
 was the wrong half of it.** The 811 lines were not churn: the wall below them was
 ported first, exactly as this section's own order said, and then they moved.
-`:backend` is now **15 `commonMain` files / 3,581 lines with 2 `androidMain`
-files**, all 33 of its cases in `commonTest` with no Robolectric, and the two
-survivors are `SecureTokenStore` (Android Keystore) and `SupabaseAccountClient`.
+`:backend` is now **17 `commonMain` files / 3,989 lines with exactly 1 `androidMain`
+file**, all 33 of its cases in `commonTest` with no Robolectric, and the single
+survivor is `SecureTokenStore` (Android Keystore).
+
+**`SupabaseAccountClient` is the other half of this correction, and it is the half that
+was recorded as untried.** It was written up as "`org.json` alone, so not yet, not
+permanent" — and **`org.json` was neither its largest pin nor the one that had to go
+first.** Three things held it, and only one of them was the node type:
+
+| pin | measured | freed by |
+|---|---|---|
+| `appContext: Context` | **1 occurrence — its own declaration, never read** | deleted the
+  parameter. *A parameter whose only occurrence is its declaration is not a dependency on
+  its type; the type is what made the file look pinned.* |
+| `tokenStore: SecureTokenStore` | a constructor parameter | **`AccountSessionStore`** —
+  3 members, `suspend` on two of them because that is what the implementation has |
+| `System.currentTimeMillis()` | **2 sites** (:168, :245) | **`nowMs: () -> Long`, required
+  and with no default** — because a default would have been
+  `System.currentTimeMillis()`, and a default would have compiled on every target this
+  repo builds while silently keeping the pin it was added to remove |
+
+**The clock is the part worth keeping.** `:platform-core`'s `MonotonicClock` is right
+there, already used by `:app` and `:watchhistory`, and it is **the wrong clock rather
+than a competing one**: `shouldRefresh` compares against the server's epoch-second
+`expires_at`, so a monotonic source produces a correct *duration* and a nonsense
+*instant*. **"Reuse the existing utility" and "the existing utility answers a different
+question" are different findings, and the second is why the first does not apply** — which
+is why there is no second clock interface in `:backend`.
+
+**So this block's own sentence is now earned twice.** A pin measured on one axis ("a file
+still imports `org.json`") is a claim about an *import*. Across this migration, three
+files named as JSON-pinned were each pinned by something that census cannot see: **a
+receiver** (`CrispyBackendClient`, 39 parsers), **a constructor parameter**
+(`SupabaseAccountClient`'s token store), and **a clock that needs no import**.
 **What the prediction got right was the order and the mechanism, and what it got
 wrong was the adjective**: "the node type was never their pin" was correct, and
 "permanent" assumed that because a pin is not the node type it is also not
@@ -967,9 +998,12 @@ actually unblocks once the transitive blockers are counted:
    `commonMain` interface in `:network` with `OkHttpCrispyHttpClient` as its
    `androidMain` implementation. **`CrispyBackendClient` is now `commonMain`**, and
    the ranked figure of 17 files it unlocked is the real one.
-   **`SupabaseAccountClient` remains `androidMain` on its own `org.json`**, which is
-   a second instance of the same rule and has not been re-measured — so it is
-   "not yet", not "permanent".
+   **`SupabaseAccountClient` shipped too, and not on the `org.json` axis that was
+   recorded for it.** Its pins were a dead `appContext: Context` parameter (count 1), a
+   `SecureTokenStore` constructor parameter, and two `System.currentTimeMillis()` calls
+   that need no import and so are invisible to the forbidden-token scan. Freed by
+   `AccountSessionStore` and a required `nowMs: () -> Long`. **`:backend` now has one
+   `androidMain` file**, and it is the one that cannot move.
 3. **The `coil3` 13** — port to the multiplatform API.
 4. **`androidx.navigation-compose` is externally Android-only** (its only non-Android
    variant is `jvmStubs`). The nav graph cannot be shared without replacing it; that is

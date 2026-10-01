@@ -58,11 +58,11 @@ object TvServices {
             accountClient?.let { return it }
             val appContext = context.applicationContext
             val created = SupabaseAccountClient(
-                appContext = appContext,
                 httpClient = AppHttp.client(appContext),
                 supabaseUrl = BuildConfig.SUPABASE_URL,
                 supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                 tokenStore = secureTokenStore(appContext),
+                    nowMs = { System.currentTimeMillis() },
             )
             accountClient = created
             return created

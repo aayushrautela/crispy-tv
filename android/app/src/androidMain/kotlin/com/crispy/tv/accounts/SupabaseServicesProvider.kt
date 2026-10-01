@@ -46,11 +46,11 @@ object SupabaseServicesProvider {
             val appContext = context.applicationContext
             val created =
                 SupabaseAccountClient(
-                    appContext = appContext,
                     httpClient = AppHttp.client(appContext),
                     supabaseUrl = AppConfig.SUPABASE_URL,
                     supabasePublishableKey = AppConfig.SUPABASE_PUBLISHABLE_KEY,
                     tokenStore = secureTokenStore(appContext),
+                    nowMs = { System.currentTimeMillis() },
                 )
             supabaseAccountClient = created
             return created
