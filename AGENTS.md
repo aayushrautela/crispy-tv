@@ -156,248 +156,137 @@ bash .github/scripts/fetch-torrserver-binaries.sh
 
 ## Project Layout
 
-Gradle modules (common targets):
-- `:android:androidApp`: the Android entry point (`com.android.application`) — manifest, `res/` that only the application needs, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden-screenshot tests
-- `:android:app`: the shared UI and presentation layer, a Kotlin Multiplatform library. Its `commonMain` now holds the design-agnostic UI (routes, `ui/components`, `ui/navigation`, `ui/edge_to_edge`, `ui/utils`, the seek/gesture feedback surfaces) and `androidMain` holds the rest; `commonMain` is a strict subset of the Android build, so the phone app and the desktop app compile the same files. Its `androidHostTest` source set (see *Composition-root tests* below) is where the composition root is pinned.
-  - **`CrispySharedTransitionLayout` is the shared host, and it is in `commonMain` because the
-    mechanism is not navigation.** 14 `commonMain` files participate in a shared-element
-    transition by reading `LocalSharedTransitionScope` (a `staticCompositionLocalOf<SharedTransitionScope?> { null }`
-    in `ui/navigation/LocalSharedTransitionScopes.kt`, also in `commonMain`). Until recently the
-    only provider was two lines inside `AppNavHost.kt`, so on any non-Android target all 14 read
-    `null` and rendered with **no transition and no error**. `CrispySharedTransitionLayout`
-    supplies the scope from `androidx.compose.animation.SharedTransitionLayout` -- Compose
-    Multiplatform, on every target -- and is called by `AppNavHost` and by `desktopApp`. Its
-    `content` slot has **no default**, so a caller cannot obtain a provider that provides
-    nothing. `AppNavHost.kt` is still `androidMain` and still four lines shorter: it is genuinely
-    `NavHost`-bound, and **the seven `*NavGraph.kt` files remain Phase 5's problem** because they
-    declare `NavGraphBuilder` graphs and `androidx.navigation` has no KMP artifact at all.
-- `:android:sharedUI`: the design system **and the design assets** (Phase 4 Step 1) — `composeResources`, the theme tokens, the brand composables
-- `:android:ui-assets`: Android-only assets that cannot be `composeResources` — launcher mipmaps, the splash colour and its two drawables, the nine provider-logo SVGs
-- `:android:youtube-extractor`: sideload-only YouTube stream extraction (NewPipeExtractor)
-- `:android:tv`: Android TV placeholder app (must compile)
-- `:android:core-domain`: pure domain rules (no Android types/IO), **and** the contract suite in `commonTest` (see below)
-- `:android:player`, `:android:network`, `:android:watchhistory`, `:android:native-engine`: Android libraries
-- `:android:torrent-engine`: sideload-only torrent engine. `:android:native-engine` holds the MPV/Media3 player and nothing else optional.
+**A `commonMain` file is worth nothing until a non-Android target consumes it**, so a file count is
+not progress on its own: ask what runs it. The `apple.yml` and `:android:desktopApp` entries below are
+where that gets answered.
 
-Golden screenshots (`:android:androidApp:testStoreDebugUnitTest`):
-- Robolectric + Roborazzi, running on a plain JVM. No emulator, no KVM, no `androidTest` device. This is the only rendering coverage in the repository.
-- **Verify is the default**; re-record with `./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true`. Goldens are committed under `android/androidApp/src/test/screenshots/`, so a missing golden fails the build.
-- The tests live in `:androidApp`, not `:app`, and that is not arbitrary: they need `isIncludeAndroidResources = true` to inflate the real app theme, which only an application module has. They still render composables that live in `:app`.
-- The Roborazzi Gradle plugin is deliberately NOT applied: 1.43.1 fails against AGP 9.3 with `Extension of type 'TestedExtension' does not exist`. Record/verify is driven by the `-Proborazzi.*` properties in `android/androidApp/build.gradle.kts` instead.
-- Screenshot tests must set `application = ScreenshotTestApplication::class`. Robolectric otherwise boots `CrispyApplication`, whose `onCreate` reaches an `AndroidKeyStore` that cannot exist on a JVM.
-- Freeze the Compose clock (`mainClock.autoAdvance = false`) or animated content never matches.
-- **Host prerequisite:** a *failing* screenshot needs a host font, because Roborazzi labels the diff with Java2D. On a host with no font stack the failure reports `Fontconfig head is null` instead of the real difference. It still fails the build, but the diff is unreadable. `test-fonts/` at the repository root bundles Roboto and a generated fontconfig, which covers hosts that have libfontconfig but no fonts; a host with **no** `libfontconfig.so.1` at all needs the library supplied some other way, and root is not required: `dnf download --resolve --alldeps mesa-libGL libX11 fontconfig` then extract each rpm with `rpm2cpio | cpio -idm` into a scratch directory and point `LD_LIBRARY_PATH` at it. That is how the bare Fedora container this was last verified on runs both rendering suites. Three traps in that sequence, all of which produce a failure that looks like a code regression and is not:
-  - `dnf download` fetches **both** `i686` and `x86_64` packages, and merging them puts a 32-bit `libfontconfig.so.1` on the path. Skiko then dies with `UnsatisfiedLinkError: libfontconfig.so.1: wrong ELF class: ELFCLASS32`, surfacing as `ExceptionInInitializerError` from `SkiaGraphicsContext` and then as four `NoClassDefFoundError: RenderNodeContext` — which reads as "the desktop seam proof is broken" and is not. Extract only `*x86_64*.rpm` and check the ELF class before trusting the result.
-  - `cpio -idm` applies the payload's directory modes, so a single shared target directory makes the *second* rpm fail on a read-only directory — stage each one separately and merge. A `cp -a` that fails this way is silent under `2>/dev/null`, so verify the three critical libraries are actually present afterwards rather than assuming the loop worked.
-  - `rm -rf` on the previous merge fails on the same read-only directories, leaving stale libraries behind. Build a fresh directory and check the merged output for 32-bit artefacts.
+| Module | Kind | Notes |
+|---|---|---|
+| `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
+| `:android:app` | KMP + Compose | shared UI and presentation. 110 `commonMain` / 81 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
+| `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
+| `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
+| `:android:player`, `:network`, `:addons`, `:home`, `:backend`, `:watchhistory`, `:platform-core` | KMP | `:backend`'s `commonMain` is a pure interface layer and its whole implementation is `androidMain` + OkHttp + `org.json` |
+| `:android:platform-desktop` | `kotlin.jvm` | the desktop side of all six ports. Exists because `desktopApp` is a real caller |
+| `:android:desktopApp` | `kotlin.jvm` | the desktop entry point and the **seam proof** (plan §3) |
+| `:android:tv` | `com.android.application` | Android TV placeholder; stays on the Android source set forever |
+| `:android:youtube-extractor`, `:android:torrent-engine` | sideload-only | optional engines, excluded **structurally** from the store build |
+| `:android:native-engine` | `com.android.library` | the MPV/Media3 player and nothing else optional |
+| `:android:plugins` | plain Android lib | QuickJS bridge, `store` source set unread on purpose |
+| `android/torrent-engine`, `android/plugins`, `android/tv` | plain Android | **a plain `com.android.library` cannot be consumed from a KMP `commonMain` at all** |
 
-Composition-root tests (`:android:app:testAndroidHostTest`):
-- `:app` is a KMP library, so this is its **only** test compilation. It exists because of `withHostTest {}` in `android { }`; without that block `:app` has no way to be tested at all. `desktopTest` sees only `commonMain` + `appUi`, and everything this covers — `AppDistribution`, `PlaybackDependencies`, `BackendServicesProvider`, `SupabaseServicesProvider` — is in `androidMain`. Do not reach for the aggregate `check` task to find the name; `testAndroidHostTest` is it.
-- **The source set is not on the `sourceSets` container.** `androidHostTest.dependencies { }` does not resolve; only `getByName("androidHostTest").dependencies { }` does. The task names (`testAndroidHostTest`, `compileAndroidHostTest`, `assembleAndroidHostTest`) exist regardless.
-- Robolectric is here **for a `Context` and nothing else**. No view is inflated and no resource is read, so `@Config(manifest = Config.NONE)` is enough and `isIncludeAndroidResources` is unnecessary — which is exactly why these can live in `:app` while the goldens must stay in `:androidApp`. Robolectric is the repo's existing dependency, not a new one.
-- **Pin `sdk = [35]` on every one of these classes.** With `Config.NONE` there is no manifest, so Robolectric cannot read `targetSdk` and silently falls back to **SDK 21**. That is below the app's `minSdk` of 26, so a class added after API 21 (`AudioFocusRequest`, API 26) is absent from `android-all`, the classloader falls through to AGP's mockable `android.jar`, and the failure reads `Method setAudioAttributes in android.media.AudioFocusRequest$Builder not mocked` — a message that names a real app class and blames nothing about Robolectric.
-- **The Robolectric sandbox classloader is shared across every test class with the same `@Config` in one worker JVM.** It is not per class, and this is the opposite of what the isolation argument usually claims. Any test about a process-wide singleton therefore sees every other class's mutations: a test instance is rebuilt per method, so an object a test installs has to live in a `companion object` or a second method is comparing against a different object than the one installed; and a lazily cached instance populated by another class makes an assertion pass without the code under test having run. `:app`'s `AppDistributionTest` reads `torrentResolverFactory` rather than `getTorrentResolver` for that reason, and the comment says so.
-- JUnit's `@FixMethodOrder(MethodSorters.NAME_ASCENDING)` is what makes an ordered singleton lifecycle readable; the alternative is a reset hook on production code that exists only for tests.
-- **`SecureTokenStore` is untestable on a JVM**, so everything that reaches it is untestable: `SupabaseServicesProvider.secureTokenStore` and `accountClient` directly, and `homeCatalogService` indirectly through `BackendContextResolverProvider.get`. The failure is `KeyStoreException: AndroidKeyStore not found` raised in a constructor, before any assertion. A fake keystore would prove nothing about the real one, so leave them out rather than mocking around it.
+**`CrispySharedTransitionLayout` is the shared host, and it is in `commonMain` because the mechanism
+is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
+`staticCompositionLocalOf<SharedTransitionScope?> { null }`. The single provider used to be two lines
+inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
+and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
+cannot obtain a provider that provides nothing. The seven `*NavGraph.kt` files stay in `androidMain`
+because `androidx.navigation` has no KMP artifact at all.
 
-Common-domain tests (`commonTest`; `:android:backend:desktopTest`, `:android:app:desktopTest`):
-- A `commonTest` in a module that had **no test source set at all** is the cheapest possible guard for a file that just moved to `commonMain`, and it is deliberately *not* an `androidHostTest`: a test that only ran on Android would not notice the file reaching for a JVM API again. Same reasoning as the `linuxX64` gate, applied to tests.
-- **`commonTest` and `androidHostTest` are complementary halves of one module, and one step of CI is not enough to cover both.** `commonTest` cannot see androidMain; `androidHostTest` cannot see what commonMain alone compiles. `:app` runs both (`desktopTest` and `testAndroidHostTest`) and they cover disjoint files — the settings repositories and the composition root respectively.
-- **`commonTest` without `withHostTest {}` runs on no Android target, and AGP only *warns*.** The message is `The 'commonTest' source directory exists, but android host tests are not enabled`, which reads like a build-file nit and is actually the tests not running where the module ships. `:backend` had exactly this. `:backend`, `:app` and `:core-domain` now all declare both blocks; a fourth `commonTest` must add `withHostTest {}` in the same change.
-- `BackendContextResolverTest` drives `CachingBackendContextResolver` through `AccountApi` / `BackendApi` fakes rather than through its provider, precisely because the provider reaches the keystore.
-- `SyncProviderRepositoryTest` and `PendingProviderAuthStoreTest` (`:app`'s `commonTest`) cover the two moved account declarations that have behaviour of their own. `ProfileRepository` and `AccountSettingsRepository` are deliberately untested: they are delegation, and a test of delegation re-asserts the compiler.
-- `UnusedBackendApi` implements all 52 members and throws. **It exists to be broken by the compiler**: adding a `BackendApi` member fails to compile here until a fake decides what that member means. Prefer this to a mock framework that would silently absorb a new member as a no-op.
-- **Prove a new suite is not vacuous before trusting it, and treat "no test failed" as a finding rather than a pass.** Six deliberate breakages caught five. The sixth is the interesting one: deleting **only the fast-path cache read outside the `Mutex`** changed nothing observable, because the in-mutex check re-reads the same cache and the store is untouched either way. Both checks have to go before the caching assertions fail. A single-check test cannot see a redundant check being removed.
-- **A test that samples the cases instead of enumerating them tests the sample.** The settings suite's first "a setter that changes nothing writes nothing" case covered five of twelve identical setters, and deleting the guard from the other seven failed nothing. All twelve are called now. Ask whether a test proves the *rule* or an *instance* of it, and prefer the loop over the hand-picked list.
-- **A class that builds its own `CoroutineScope` on a real dispatcher is untestable until the scope is injected, and `Dispatchers.setMain` is not the answer.** `SubtitleRepository` built `CoroutineScope(SupervisorJob() + Dispatchers.IO)` internally; `setMain` replaces `Dispatchers.Main` and the class never used it. Four strategies were measured before one worked: `setMain` + `advanceUntilIdle` (8 of 9 tests failed, the launch never ran), `runTest`'s `backgroundScope` (identical 8 failures — it is not on the scheduler `advanceUntilIdle` drives), an explicit `TestScope(StandardTestDispatcher(scheduler))` (identical 8 failures — `TestScope` appears to build its own scheduler rather than adopt the one passed to the dispatcher), and finally **`CoroutineScope(UnconfinedTestDispatcher())` with no `advanceUntilIdle` at all**, which works because unconfined runs the body eagerly on the calling thread. Give the injected scope a **default** of the old expression so production call sites are untouched — that is the difference between a testability change and a refactor.
-- **A patch whose anchor assertion failed did not apply, and the test run after it measured the previous file.** The third dispatcher attempt was not a fourth strategy failing: the python patch had failed its own exactly-once assertion because `scope.advanceUntilIdle()` occurred 14 times, 9 call sites plus 5 inside the KDoc. **When a patch fails, do not re-run the tests as if it had applied**, and when N different strategies produce byte-identical output, suspect the file did not change before suspecting the strategies.
-- **A renamed type reaches plain-Android modules that will never migrate.** `android/tv` is a `com.android.application` that stays on the Android source set forever, but it constructs `StreamResolver` itself, so renaming the class to `CachingStreamResolver` needed an import edit there too. Grep for the *type name* across every module before renaming anything a shared module constructs.
-- **A test failure and a compilation failure look identical if you only read the exit code** — and the test results on disk are the *previous* run's, so the wrong evidence gets reported. Always run `compileTestKotlinDesktop` first and read the XML only if that succeeded. This bit me once mid-session and produced a confidently wrong mutation result.
-- **A `commonMain` class that three repositories depend on must be an interface, or those repositories cannot be tested at all.** `BackendContextResolver` was a final class in `commonMain`; a KMP class is final by default, so `SyncProviderRepository` and its two siblings were *unconstructible* in a test — not hard to test, impossible. The fix is `interface BackendContextResolver` plus `CachingBackendContextResolver`, which is the same `BackendApi`/`AccountApi` discipline applied to the project's own seam instead of to a transport. Ask of any `commonMain` class a caller takes as a constructor parameter: *can a test hand this caller something?*
-- **An exhaustive test double is a property of the module that owns the interface, not of every module that needs one.** `UnusedBackendApi` (52 members, throws) lives in `:backend`'s `commonTest` and is wired into `check-local.sh`, so a new `BackendApi` member is caught there. `:app`'s `RecordingBackendApi` is 52 members too, and it has to be: a *partial* double in a different module would let a new member arrive unexamined there. A narrow double is only acceptable when the exhaustive one already exists and is gated — the cost is a second 300-line file that must be regenerated when the interface changes, and a narrow one silently rots.
-- **`kotlin.test` takes the assertion message *last*; `org.junit.Assert` takes it first.** The repo's `:androidApp` tests use the JUnit order and the `commonTest` suites use the `kotlin.test` order, and both are correct. Getting it wrong does not compile, so this is a compiler error rather than a trap.
-- **`kotlin.concurrent.atomics` is not in this toolchain's standard library, so the tidy
-  single-slot answer is unavailable — measure the primitive before designing around it.**
-  `AtomicReference` is the obvious replacement for a `synchronized` pair in `commonMain`, and
-  importing `kotlin.concurrent.atomics.AtomicReference` fails with `Unresolved reference
-  'concurrent'`. The available answer was `kotlinx.coroutines.sync.Mutex`, which **suspends**, so
-  adopting it turned a synchronous cache-hit fast path into a scheduled one. That is a behaviour
-  change on a caller's hot path and it is not free: it was accepted, and written down at the
-  lock, because the alternative was a dependency heavier than one dispatch. **The first question
-  for a locking change in shared code is not "which primitive" but "which primitives exist in
-  this stdlib" — a correct design can be unimplementable, and the compile error is cheaper to
-  find than the design is to justify.** (`kotlin.concurrent.atomics` is available behind a
-  language flag in newer toolchains; it is not here, and assuming a name is not measuring it.)
-- **Before concluding an AndroidX dependency is a blocker, read its `.module` on Google Maven — the answer is split down the middle far more often than not.** `androidx.paging:paging-common:3.5.1` publishes a genuine KMP artifact (android, desktop, iosArm64, iosSimulatorArm64, macosArm64, linuxX64, linuxArm64, js, wasmJs, mingwX64, tvOS, watchOS), so `PagingSource`, `PagingState`, `LoadParams` and `LoadResult` all resolve in `commonMain` — while `paging-runtime` and `paging-compose` (`Pager`, `PagingConfig`, `cachedIn`, `LazyPagingItems`) are the Android-only half and stay in `androidMain`. `androidx.navigation:navigation-compose:2.9.8` is the opposite: its only `available-at` files are `-android-`, `-jvmstubs-` and `-linuxx64stubs-`, and **the two `*Stubs*` variants are dokkadoc stub artifacts, not compilable KMP targets** — reading them as a yes is a false positive in the opposite direction from the usual one. **Maven Central 404s for every AndroidX coordinate**, so fetch `https://dl.google.com/dl/android/maven2/…/<artifact>.module`. When half a library is KMP, declare the KMP half in `commonMain.dependencies` **after** its consumer exists: a `commonMain` dependency with no `commonMain` consumer is speculative, and the repo's principles say not to ship that.
-- **The number of roots tells you the size of the next batch before you start it.** Of the three `PagingSource`s, `BrowsePagingSource` had a single root (`BackendBrowseRepository`) and moved once the repository stopped constructing its own ports. `CatalogPagingSource` has a single root too — `HomeCatalogService`, in `:home`'s `androidMain`, pinned by `org.json` — and `org.json` in `commonMain` is settled and permanent, so neither it nor its consumer can move; that is a measured dead end, not an unstarted batch. `LibraryPagingSource` has five roots (`CrispyBackendClient`, `LibraryDiskCacheStore`, two section constants, and the cache's `read`/`write`) and is a whole batch of its own.
-- `CalendarServiceTest` (34 cases) and `UpNextServiceTest` (16) cover `:home`'s two moved services. **Write a bucket-boundary case as two cases either side of the exact instant, and write every date as its ISO form with the epoch in a comment** — the boundary *is* the assertion, and a `Clock` fixture makes it readable where a raw `1_767_830_400_000L` does not.
-- **A guard that is redundant is not "uncovered behaviour", it is no behaviour at all, and no test can ever see it removed.** This has now happened twice, and the second time it was a real finding about the code rather than a gap in the suite. `CalendarService` caches a fresh snapshot under `if (!freshSnapshot.isError)`, but the only path that returns `isError = true` is the no-context case — and there the `backendContext?.let { … }` performing the write is already a no-op. Replacing the guard with `if (true)` failed every test. The earlier instance was the fast-path cache read outside the `Mutex` in `CachingBackendContextResolver`. When a mutation survives, ask *what the guard is protecting* before writing a test for it. Here the answer is "nothing today" — the guard is a cheap assertion of the invariant that an error snapshot is never cached, and it is kept on that basis rather than deleted; a future error path that *is* reachable with a context would make it load-bearing again, and the suite would then have a gap. Record the reasoning where the guard is, so the next person does not read the mutation result as a bug. **A third instance, and the clearest:** `formatLongDate` trims first and then asks `if (raw.isBlank())`, so replacing that with `isEmpty()` is unobservable — after a `trim()` the two predicates cannot differ. The `isBlank()` is kept because it states the rule the KDoc claims ("a blank value is null") and stays correct if the trim is ever removed, but the mutation result is a fact about `String.trim`, not about the code. **A fourth instance, and the only one found by a test that was wrong before it found the guard.** `SubtitleRepository.serveFromCache` reassigns `_addonSubtitles` from the cache on a hit. The cache is a **single slot** and only `onSuccess` writes it, on the line before the publish, with the same list — and a failure writes neither — so a hit's cached list is by construction the list already on screen, and **no test can see the assignment removed.** I spent two attempts trying to construct one: the first asserted a fetch count that was off by one because a third title *displaces* the single slot, and the second published different subtitles, which by the same argument is impossible. The guard is kept, with the reasoning written at the guard. When a mutation survives twice, the cheap test is the one asserting the *architecture* (one writer, one slot) rather than a third arrangement of the inputs.
-- **A mutation that a suite does not catch is a claim about the code, and it should be checked by hand.** Two of the fifteen `:home` mutations reported `COMPILE FAILED -- not evidence` when the patch itself was malformed (a stray `sections.` prefix, then an inverted replace), and one failed to compile because `view.nextEpisode` is not smart-cast. A broken patch and a real compile error look identical from outside the driver.
+**An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two
+halves belong in opposite source sets.** `:app` has **zero** `expect`/`actual`, so introducing one for
+a single `when` on a resource id is against the grain. `DetailsCastSection.kt` (241 lines) split into
+216 in `commonMain` and 25 in an `androidMain` badge, reached through a composable-slot parameter with
+**no default**, so a call site cannot forget it.
 
-Kotlin Multiplatform modules (in progress; see `check-local.sh`):
-- `:android:platform-core`: platform-portability interfaces (`SecretStore`, `KeyValueStore`,
-  `AppLogger`, `TimeSource`, `DistributionCapabilities`, `MonotonicClock`) plus **`SecretFormat`**.
-  Its `commonMain` stays platform-free — all seven files have zero `android.`/`java.` imports.
-- **`:android:platform-desktop`: the desktop side of all six interfaces, and `:platform-android`
-  is deliberately *not* being converted.** Measured: five modules already depend on
-  `:platform-android` (`:android:app`, `:android:tv`, and `:android:watchhistory`,
-  `:android:backend`, `:android:home` by `api`), and all four KMP consumers already take it from
-  an `androidMain` source set, so converting it would churn four modules to move code with no
-  reason to move. `:platform-desktop` is a plain `kotlin.jvm` module instead — every implementation
-  is a JVM call, so there is nothing portable to put in a `commonMain` — and it holds
-  `DesktopTimeSource`, `DesktopMonotonicClock`, `DesktopAppLogger`, `FileKeyValueStore`,
-  `DesktopSecretStore`, `DesktopDistributionCapabilities` and `DesktopPaths`, with 40 tests. Four
-  things in it are worth not re-deriving:
-  - **`FileKeyValueStore` is one file per store name, never a key prefix inside one file.** That is
-    the `SharedPreferencesKeyValueStore` rule, and it exists because a prefix has to be re-applied
-    on every read and write, and one missed prefix is a silent leak between stores. It also makes
-    the store hold no in-memory cache, which is why a write through one instance is visible to the
-    next read through another — the property `FileKeyValueStoreTest` pins and a caching store
-    would break.
-  - **`sanitize` must reject a name that is only dots.** `.` is legal *within* a name
-    (`settings.v2`), but a name of `..` sanitises to `..`, and `File(root, "..")` resolves to the
-    root's **parent** — a traversal out of the store directory. This was found by a test asserting
-    the file lands directly inside the root, after a first version asserted the sanitised *name*
-    contained no `..` and passed on the buggy code (`auth_.._tokens` is a perfectly safe filename;
-    it is a whole path component of `..` that is not).
-  - **`Properties.load` does not throw on a line that merely looks wrong.** `=not a key` parses
-    fine as an empty key. The only documented rejection is a malformed `\u` escape, so a fixture
-    meant to prove "unreadable file reads as empty" has to use one of those or it passes for the
-    wrong reason.
-  - **`DesktopSecretStore` is not a keystore, and says so in its KDoc.** The key is a file next to
-    the data. It buys "not readable as plaintext by whatever opens the settings file" and
-    format compatibility with the Android store; it does **not** buy protection from an attacker
-    with filesystem access, which is what `AndroidKeyStore` buys. `keyFile` is a constructor
-    parameter precisely so an OS keychain is a wiring change rather than a contract change.
-- **`org.json` in a `commonMain` file is settled, and not for the reason the old note gave.** It
-  is not a dependency of this project at all — it is a class of the Android platform, supplied by
-  `android.jar`, and it appears in exactly one build file (`testImplementation` in `:android:plugins`).
-  There is no version to bump and no artifact to swap, so a KMP module simply does not have it.
-  Replacing it means adding `kotlinx.serialization`, which is a behaviour change on a parsing
-  boundary rather than plumbing. **Consequence: a file that parses or writes JSON stays in
-  `androidMain`, permanently** — and this sentence used to name the wrong five files, in three
-  ways, all three found by measuring rather than reading.
-  - **27 tracked files `import org.json`**, not five. (52 *mention* it; the other 25 only in KDoc,
-    including five already in a `commonMain`.) The surface is 261 `JSONObject`, 246 `.optString(`,
-    106 `JSONArray`, 96 `.optJSONObject(`, 75 `.optJSONArray(`, 27 `.optBoolean(`, 21 `.optLong(`,
-    14 `.optInt(`, 6 `.optDouble(`, 2 `JSONException`.
-  - **For the four `:app` files it named, JSON is *not* the pin.** `AiInsightsCacheStore` (86) and
-    `SharedPreferencesSearchHistoryStore` (106) are `Context`/`SharedPreferences`;
-    `ProfileDataShadowStore` (73) is `Context`; `FileBackedPendingMutationStore` (172) is
-    `java.io.File`. **Deleting `org.json` moves those four zero files** — they are platform
-    storage adapters, and a storage adapter stays on the platform.
-  - **And it named none of the four where JSON *is* the sole remaining pin**:
-    `CrispyBackendJsonExtensions.kt` (165), `CrispyBackendParsers.kt` (646),
-    `CachingHomeCatalogService.kt` (493), `WatchProgressStore.kt` (405) — **1,709 lines**, all four
-    with **zero** tests anywhere in the repository. A module with no test source set is a
-    question, not a defect, and this is the same shape: the absence of tests is a fact about the
-    build file, so characterisation has to come *before* the move.
-  - **The load-bearing decision is the node type, not the accessor policy.** **42 of
-    `CrispyBackendParsers.kt`'s 45 top-level functions name an `org.json` node in the signature**,
-    overwhelmingly `internal fun CrispyBackendClient.parseX(json: JSONObject)` — extensions on a
-    client that is itself OkHttp-pinned. So `:backend` is bound twice over, and neutralising the
-    accessors alone moves zero parsers. 13 of the 15 functions in the 165-line extensions file are
-    pinned by *signature* too. **The candidates are `kotlinx.serialization`'s `JsonElement` —
-    already in `gradle/libs.versions.toml` as `serializationJson = "1.11.0"` with *zero* consumers
-    repo-wide — and a `:core-domain` node of our own**, and the repo has half-built the latter's
-    shape (`toAnyMap`/`toAnyList`/`toKotlinValue` → `Map<String,Any?>`/`List<Any?>`). **An untyped
-    `Any?` tree cannot carry it: `JSONObject.NULL` and an absent key are different events**, and
-    `optNullableString` depends on exactly that. So this stays a recorded decision, not a refactor.
-  - **The same policies are declared three times at three visibility levels, and the two `:app`
-    copies are not the same function.** `:backend`'s `toStringMap` is the one `public` declaration
-    in its file (nullable receiver, trims, drops blanks, `linkedMapOf`);
-    `ProfileDataShadowStore:50` has a `private` copy on a **non-null** receiver doing none of those
-    and returning `mutableMapOf`; `LibraryDiskCacheStore:99/:104` has `private` copies of
-    `optNullableString` and `optBooleanOrNull`. **`:home` imports the `:backend` copy and `:app`
-    cannot, because `:app` is another module — so the policy is reachable from one module and
-    unreachable from the other, decided by an `internal` keyword nobody revisited.** That is the
-    `:tv`-duplicate-`CrispySpinner` shape a third time. Two of the differences are semantic:
-    `:backend`'s `optBooleanOrNull` returns `null` for a present-but-unparseable value while
-    `:app`'s delegates to `optBoolean`, which cannot return null — **so a function named
-    `OrNull` returns `false`** — and `toJsonObject` sorts its keys in `:app` and not in `:backend`
-    (different receiver types, so they are not overloads). **All of it is now pinned from both
-    sides**, in `:backend`'s `JsonAccessorPolicyHostTest` and `:app`'s
-    `LibraryDiskCacheJsonAccessorsTest` and `ProfileDataShadowJsonAccessorsTest` (6 cases each), so
-    consolidating them is a recorded decision rather than an accident. **Reaching the `:app` copies
-    needed no call-site edit at all**, which is the sharpest form of the shadowing rule in this
-    file: the four were `private` *members* of their classes, so **no test in any module could
-    name them** — `private` is a property of the class, not of the file — and lifting each to a
-    top-level `internal` function **in the same package** left every existing call site resolving
-    to the new declaration. `git diff --numstat` reads `0 10` and `0 20`: deletions only, zero
-    insertions, at both of the stores. That is why the move is a lift and not a rewrite, and it is
-    the second instance here of *a private decision is an untestable decision* after `:tv`'s
-    `CrispyTvDarkColors`.
-- **`:app`'s `androidMain` is a knot, not a list of independent files, and the table of what holds
-  what lives in `android/app/build.gradle.kts`** — read it before planning any move. The
-  `:app` + `:home` + `:addons` package overlap is why an import audit can call a file clean and be
-  wrong; the *Rules* section below is the distilled method for getting past it.
-  - **A replacement for a JVM library call goes in the file that already replaces that library, not next to the caller.** `formatLongDate` was a `LocalDate` + `DateTimeFormatter` call sitting at the bottom of an `androidMain` details screen, blocking a 264-line file. `Iso8601.kt` in `:core-domain` had *already* replaced `java.time` — it carries the month labels, the civil-date arithmetic and the parse functions. The new `formatIso8601LongDate` went there, and only the fallback policy (blank is null, unparseable is shown untrimmed) stayed in `:app`, because what to do with an unparseable value is a presentation decision rather than a property of a date. Look for the existing replacement before writing a second one in the same repo.
-  - **Measure the JVM's real output before replacing a JVM call, and copy the measurement into the test.** `DateTimeFormatter`'s `yyyy` is a *year of era*, so `0000-01-01` formats as `Jan 1, 0001`, not `Jan 1, 0000`; a year past four digits gains a `+` sign. The first is reachable and is pinned by `FormatIso8601LongDateTest`. Six minutes running the real expression would have caught it; reasoning about what a year field "should" do would not have.
-  - **A measurement can confirm a replacement and still leave its *reason* unstated, and the reason is usually the more valuable half.** `formatIso8601MonthDay` replaced `date.month.name.take(3).lowercase()` plus an unpadded day in `HomeCalendarComponents`. Running that expression on a real JDK confirmed byte-identical output for all twelve months and every edge case — but three of those results were not already written down anywhere. The three invalid dates **threw `DateTimeParseException`**, a `RuntimeException`, so the caller's `catch (_: Exception) { null }` had been turning them into `null`, which is why the replacement's `?: return null` gives the same answer for a reason no reader of either file could derive. And `0000-03-07` rendered `Mar 7` in *both* implementations — not because the year is right, but because **no year is printed**, while `formatIso8601LongDate` prints one and must shift it to `0001`. So the year-of-era trap is invisible in the month-day form, and that invisibility is the *only* reason printing no year is safe. That is a reason, not a coincidence, so it is now an assertion (`theSameValueCarriesADifferentYearThroughTheLongFormAndThatIsWhyThisOnePrintsNone`) comparing the two functions on one value, rather than a comment a reader has to already know the trap to find. **After a measurement, ask what it made true that nothing said before** — an identical-output result can still be hiding a causal claim.
-  - **A JVM-only probe of a Kotlin expression needs the Kotlin-only parts emulated, and the compile error names them.** The first `java.time` probe failed to compile with `cannot find symbol ... method replaceFirstChar(Character:[…])`, because `replaceFirstChar` is Kotlin stdlib and the probe was Java. Emulating it as `substring(0,1).toUpperCase() + substring(1)` is the whole fix. Worth remembering in the other direction too: a probe in the *wrong* language is not a broken measurement, it is a compile error naming the one method you have to reimplement.
-  - **A KDoc sentence about one caller is not a statement about the function, and reading it as one is the most expensive way to be wrong about code you are looking at directly.** I wrote a KDoc claiming `iso8601MonthLabel` "never looks at the day", inferred from a comment in `parseIso8601MonthNumber` that says *the one caller passes a release date that may carry an instant after the date*. That sentence is about **truncation**, not about validation — and seven lines below it, the same function calls `isValidDate` and its own comment names `"2024-02-31"` as the case it exists to reject. The claim was about a function I had just read end to end, which is what makes it a good example: **being in the file is not the same as having read it, and a comment explaining *why* one caller behaves unusually is a comment about that caller.** The test asserting it failed on its first run with `expected:<Feb> but was:<null>`, and the correction is now pinned by `theTwoMonthFunctionsDisagreeOnlyAboutAnInstantOnTheEnd`, which asserts the half a reader is most likely to doubt — that both functions reject `2024-02-30` *identically* — rather than only the half the claim was built on. **When you write a claim about a sibling's behaviour, assert it, and expect the first run to correct it**; a claim drawn from a neighbouring comment is a hypothesis wearing a conclusion's clothes.
-  - **Two functions can read the same ten digits, and a test of one says nothing about the other.** `parseIso8601DateToEpochDay` and `parseIso8601MonthNumber` both validate a `yyyy-mm-dd` prefix, and both needed the same separator fix. A mutation of the second passed every test of the first, because the first is not on the formatter's path. When a mutation survives, check *which function the test reaches* before concluding the guard is untestable — and widen the XML scan, since a filter naming only the new test class reported "no test failed" while the new assertion sat in a different class and had already failed.
-- **An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two halves belong in opposite source sets.** `:app` has **zero** `expect`/`actual` (`grep -rln 'expect fun\|actual fun' android/app/src` returns nothing), and the Material3 note above celebrates that a seam was never needed there — so introducing one for a single private `when` on a resource id was against the grain. `DetailsCastSection.kt` (241 lines) imported `com.crispy.tv.ui.assets.R` for exactly two `R.raw` ids. The split: 216 lines stayed in `commonMain`, 25 went to a new androidMain `ReviewProviderBadge.kt`, and the badge reaches the card through a composable-slot parameter `reviewProviderBadge: @Composable (String) -> Unit` with **no default**, so a call site cannot forget it — the same choice `ImageSettingsRepository(onQualityChanged:)` made, and now the second instance of that rule.
-- **Push the pure half of a split toward `commonMain` and the platform half toward `androidMain`, even when the platform half is the smaller one — because otherwise the pure half is untestable.** `reviewProviderLogoRes` originally matched the *name* and returned the *id* in one function. A Robolectric test for it failed 4 of 6 cases with `NoClassDefFoundError: com/crispy/tv/ui/assets/R$raw`, because that generated class is not on a JVM test classpath — the test could never reach the name matching, which is the part that has behaviour. Splitting the matching into commonMain `ReviewProvider` + `reviewProviderOrNull()`, and leaving the androidMain function to translate the enum to an id, moved a real suite into `commonTest` where it runs on every target. **A function that both decides and looks up a platform resource is untestable for the decision**, and the error is a `NoClassDefFoundError` that names a generated class and says nothing about the logic.
-- `linuxX64` on the pure-Kotlin KMP modules is a **compile-only verification target**, never shipped and never run. It is the one Kotlin/Native target that builds on a Linux host, so `compileKotlinLinuxX64` in `check-local.sh` enforces the same "no JVM API" rule as the Apple targets in seconds instead of waiting for macOS CI. The import-based purity gate cannot see this class of bug: `"".format(y)` is `kotlin.*`, so it passes the import scan and then fails only when an Apple target compiles. Prefer the native compile gate for anything touching `commonMain`.
-- **The golden screenshots now cover the image layer, and the two cases are not redundant because `crispyImageRequest` returns early *before* it reads `LocalPlatformContext` when the URL is blank.** Until `LandscapeCardScreenshotTest` was added, the only goldens were `BrandAndGenreIconsScreenshotTest` and `PlayerLoadingCurtainScreenshotTest` — brand marks, genre icons and a player curtain. None of them rendered a card, a hero or an artwork frame, so the ten files that moved through `CrispyImage` passed the golden gate because the gate never looked at them. A card with no artwork still would not, because the blank-URL early return is above the line the move changed; only `withLoadedArtwork` exercises it. **The goldens prove the pixels arrived, not just that the code compiled:** the recorded `landscape_card_loaded.png` contains 10,500 sampled pixels of the committed fixture's quadrants and `landscape_card_fallback.png` contains none, which is a stronger claim than a green run.
-- **Robolectric's `ImageDecoder` shadow serves a `data:` image model and fails a `file://` one, and the failure names a real framework class without saying what is wrong.** The card golden originally pointed `artworkUrl` at the committed fixture as a `file://` URI, which Coil fetches fine on a device. Under Robolectric the request failed with `android.graphics.ImageDecoder$DecodeException: Only supported on Android`, the card never fired `onSuccess`, and the golden hung on its `waitUntil`. Four measurements isolated it: Coil's `commonMain` does register `FileUriFetcher` (confirmed by `javap` on the cached `coil-core-jvm-3.5.0.jar`, which lists exactly `BitmapFetcher`, `ByteArrayFetcher`, `DataUriFetcher`, `FileUriFetcher`, and there is no `META-INF/services`); the *same bytes* as a `data:` URI decode to 240x135; `BitmapFactory.decodeFile` reads the fixture; and `ImageDecoder.createSource(ByteBuffer.wrap(bytes))` reads it too. So the tempting conclusion — "Robolectric cannot decode images" — is false, and the real distinction is the source shape Coil hands the decoder. `CoilDataUriScreenshotTest` pins the contrast in both directions, including the message to read if the `file://` arm ever starts succeeding. Three dead ends not worth repeating: `ImageDecoder.createSource(Uri.fromFile(f))` does not compile (use the `ByteBuffer` overload), and `coil3.compose.SingletonAsyncImage` does not exist in 3.5.0 despite appearing in Coil's own `commonMain` sources.
-- **A golden that waits on a signal the component itself emits is not a flaky golden; a golden that waits on a duration is.** `withLoadedArtwork` waits on `SharedImageMemoryKeys.getCardKey(...) != null`, which `LandscapeCard` writes from `AsyncImage`'s `onSuccess`, so a slow host cannot make it time out spuriously. `SharedImageMemoryKeys` has `put` and `get` and **no removal API**, which is why the test has no cleanup: the first version had a `finally` that re-set the key under a `?.let`, which was a no-op dressed as tidiness. A test needing a *clean* map would have to add an API rather than work around its absence.
-- `:android:home`: the home feature module — a KMP library declaring `iosArm64`/`iosSimulatorArm64`, so on Linux **`compileKotlinLinuxX64` is the only check its Apple targets get** and it is in `check-local.sh` for that reason. It is where the composition root's home data lives, and two facts about it are easy to get wrong:
-  - **It shares the package `com.crispy.tv.home` with `:app`, so a type declared in its `androidMain` is reachable from `:app` with no import at all.** This is the purest form of the trap that makes an import-only migration audit report confidently-empty answers. `CalendarEpisodeItem` is declared in `:home/src/androidMain` and was used from `:app/src/androidMain` with nothing in the import list to show for it.
-  - **`CalendarService`'s cache is per-profile and written only on a non-error fetch.** `cachedCalendarSnapshot` carries the `profileId` it was written for, `loadCalendar` reads it only on a `takeIf { it.profileId == context.profileId }` match, and a fetch that throws returns the cached snapshot rather than overwriting it. The two non-obvious consequences: a cache written for one profile is never handed to another, and a failed read never replaces a good snapshot. Both are pinned by `CalendarServiceTest`; the `isError` guard on the write is deliberately redundant (see the redundant-guard finding above) and says so where it is.
-- `:android:desktopApp`: the desktop entry point and the **seam proof** (plan §3) — one JVM module for Windows, macOS and Linux. Renders `:android:sharedUI`'s design system over `:android:core-domain`'s real `planContinueWatching`, seeded from a real contract fixture. **It now depends on `:android:app` and renders `ContinueWatchingRail` from `:app`'s `commonMain`**, which makes it the first non-Android target to consume `:app` code, and `ContinueWatchingRailTest` the first test in the repository that compiles `:app` for a non-Android target. Three things that landing established, each measured rather than assumed. **A plain `kotlin.jvm` module consuming a KMP library's `jvm` variant is a compile, not a documented guarantee** — it works, and the dependency is worth writing down as a measurement. **A `commonMain` composable that gains a caller outside its module has to be `public`, and the rest stay `internal`:** `:app`'s screen composables are internal because their callers are in-module, and widening all of them is API surface nobody asked for, so widen only the one a second target actually calls. **A module can carry a premise that a dependency invalidates:** the desktop rail's `CARD_CORNER_RADIUS` duplicated `CardStyle.CardCornerRadiusDp` with a KDoc saying it could not be imported because that constant lives in `:app`'s `androidMain` "which the desktop target cannot see" — the constant was in `commonMain` all along, and the duplicate was dead the moment the dependency existed. **It now also constructs all six `:platform-core` ports** via `DesktopEnvironment`, and the window's size is read from and written to the injected `KeyValueStore` — so the seam is exercised on a real round trip rather than merely declared. **It renders a second `:app` screen, `ImageSettingsScreen`, over a real user setting**, which is the first *stateful* surface on the desktop: a quality chosen in the window is in the file on disk and still chosen on the next launch. Three things that second screen settled. **A `commonMain` composable's reachability is decided by its repository's visibility, not its own:** `ImageSettingsScreen` was already `public` and wall-free, and was still unreachable because `KeyValueStoreImageSettingsRepository` was `internal` — a public composable over an internal repository is as unreachable as an internal composable, and it *reads* as reachable, which is what makes it a trap. Widen the repository when the screen needs it; it had one production caller, so the change was one word. **The two implementations of a port meeting is a distinct thing from either one being correct,** and nothing tested it: every test of the `:app` repository runs in `commonTest` against a fake, and every test of `FileKeyValueStore` runs in `:platform-desktop` against a hand-written caller, so a store that satisfied its contract and a repository that satisfied its could still fail to interoperate — which is the whole claim of a port. `DesktopImageSettingsTest` (8 cases) is the suite that closes that, and it asserts the setting is on **disk** rather than that the code handed the value back. **A screen count is not a product, and a placeholder affordance is a placeholder:** the window switches between its two screens with a `remember`ed enum and a `BasicText` label, because `:app` has no navigation seam to grow a shell into — `androidx.navigation` is not on the `commonMain` classpath at all. The shell is the next thing and belongs in `:app`'s `appUi`, not in the entry point. Two rules that came with it. **Construct the `MonotonicClock` once and share it:** it is an origin plus a reading, so a caller that made its own would compare an elapsed time against a different origin and get a large or negative interval. **Persist a window size on close, not from a `SideEffect` on the size:** a `SideEffect` keyed on the width rewrites the settings file on every frame of a drag, and each write is a full read-modify-write of the file. It is a semantic-assertion test, not a golden: a Skia raster varies by Skia version and font availability, and the Android Roborazzi gate is already the rendering gate. **Host prerequisites:** Skia needs `libGL.so.1`, `libX11.so.6` and `libfontconfig.so.1`, and needs at least one font. The font is bundled in `test-fonts/` (repository root, shared with `:android:androidApp`) and reached through a generated `fonts.conf`. Without those the test reports a Skiko native-load error or `IllegalStateException: Could not load font` — neither says anything about the seam. CI's `ubuntu-latest` has all of them.
-- `:android:sharedUI`: KMP + Compose Multiplatform `1.11.1`, targeting Android + `desktop` JVM + `iosArm64` + `iosSimulatorArm64`, and producing the `CrispyUI` iOS framework. Holds the design system in `commonMain`. Three rules that are expensive to relearn:
-  - **`android { }` is current; `androidLibrary { }` is deprecated** as of Kotlin `2.4.10`, which says so outright: *"'androidLibrary' block is deprecated. Please use 'android' instead."* Earlier guidance — the JetBrains migration guide, and earlier revisions of this file — said the opposite and described a real failure with `android { }`. That failure is gone; JetBrains converged the two blocks. Write `android { }` on new code. `:sharedUI` still uses `androidLibrary { }` and compiles, with a deprecation warning.
-  - **CMP 1.11.x ships `androidx.compose.*`, not `org.jetbrains.compose.*`.** Verified by unzipping the resolved AARs: 790 `androidx/compose` classes in `runtime-android`, 1336 in `ui-android`, and **zero** `org/jetbrains/compose` in any of them. The `org.jetbrains.compose.*` coordinates are thin aliases. So moving a Compose file from `:app` to `:sharedUI` changes the **artifact coordinates in `build.gradle.kts`**, never the imports in the file, and `import org.jetbrains.compose.*` does not compile anywhere.
-  - **No `linuxX64` on Compose modules.** CMP publishes no linuxX64 artifacts — its targets are Android, iOS and Desktop (JVM) only — so declaring it makes every `compose.*` dependency fail to resolve. `jvm("desktop")` is the local purity gate for Compose modules instead. This is why the `linuxX64` rule above is scoped to pure-Kotlin modules.
-  - **`CrispyPalette` is the token layer both surfaces read, and `:tv` maps two roles onto it.**
-    `:sharedUI` and `:tv` both keep their own `Theme.kt` — different Material3 libraries, so
-    neither is deletable — but both build their `darkColorScheme` from the one `object
-    CrispyPalette` in `:sharedUI`'s `commonMain`. `:tv` needs **no new dependency**: it already
-    had `implementation(project(":android:sharedUI"))` at `android/tv/build.gradle.kts:150`. Its
-    only special case is `border = CrispyPalette.outline, borderVariant =
-    CrispyPalette.outlineVariant`, because `androidx.tv.material3` names those roles `border`
-    where `androidx.compose.material3` names them `outline`. **Those two mapping lines are
-    written out rather than derived, and a missing one is a silent colour change, not a compile
-    error** — which is why the values behind them are pinned in `commonTest`. `:sharedUI` also
-    gained `withHostTest {}` and its **first test file** in this landing; without the block a
-    `commonTest` source directory exists but nothing compiles or runs it on Android and AGP only
-    warns.
-  - **`:tv`'s mapping is now pinned by `:android:tv`'s first test, and the reason it was recorded
-    as untestable was false.** This bullet used to end at "the values behind them are pinned in
-    `commonTest`", which pinned `CrispyPalette` and left `:tv`'s half of the mapping — the part
-    that can actually be wrong — asserting nothing, for a stated reason that was never checked.
-    **`:tv` is a plain `com.android.application`, and that is not the obstacle it was taken to
-    be**: `CrispyTvDarkColors` is a top-level `val` calling `darkColorScheme(...)`, which builds
-    a `ColorScheme` data class out of `androidx.compose.ui.graphics.Color` — an inline value
-    class over `ULong`, pure Kotlin, no `Context`, no resource, no view. **A plain JVM unit test
-    in `:android:tv/src/test` reaches it, and `:tv` has had no `src/test` at all**; the real
-    obstacle was the `private` modifier, which is why the landing widened it to `internal`
-    (the repo's own rule: *a decision no test can call is a decision no test can cover*). Ten
-    cases, `testDebugUnitTest`, JUnit only and deliberately **not** Robolectric. **So "`:tv` is a
-    plain application module" was a claim about the module type standing in for a fact about the
-    code, and the second time that shape has cost this repository work the first time had already
-    caught it** (the `LocalWindowInfo` rule in §1). Before recording a surface as untestable,
-    find the declaration and look at what it actually *is*.
-  - **`:tv` maps 29 of the palette's 37 roles, and its own KDoc under-counted the gap.** The
-    unmapped eight are the seven `surfaceContainer*`/`surfaceDim`/`surfaceBright` roles the KDoc
-    named **plus `spinner`**, which is not a Material3 role at all. The old wording "under-counted
-    the gap by one and left the `spinner` omission looking deliberate when it was only never
-    considered" — which is the general hazard: **an omission nobody mentioned reads as a decision
-    nobody made.** The other number in that KDoc, "all twenty-seven roles", is the count of
-    *mapped* roles and reads as the palette's size; it is 37. Both figures are now asserted, and
-    `theMappedAndUnmappedRolesPartitionTheWholePalette` fails if the two sides stop summing to
-    `paletteRoles.size`.
-  - `LocalConfiguration` is Android-only even under CMP — it lives in `AndroidCompositionLocals_androidKt` inside the `ui-android` AAR, so a grep of the class lists cannot see it either. **This line once recommended `LocalWindowInfo.current.containerDpSize` as the replacement, and `LocalWindowInfo` does not exist in any resolved Compose artifact at any version.** There is no portable composition local for the window size here: the answer is that the caller already holds the value. A screen that needs to know whether it is wide takes a no-default `isWideScreen: Boolean` and the caller passes it — see *Rules* §1.
-  - **Material3 Expressive is available on every target, and is used on every target. Settled — do not re-litigate, and do not "fix" it by dropping it.** The whole blocker was one line in a build file. This repo recorded, in three places, that Phase 4 "has to drop or replace Material3 Expressive" because `androidx.compose.material3:1.5.0-alpha26` publishes no `material3-desktop` artifact. That was inferred from a coordinate mismatch and was **wrong**, and acting on it would have deleted a shipping design feature to work around a version pin.
-    The fix is to declare **`org.jetbrains.compose.material3:material3`** (`libs.compose.material3`) instead of either the androidx coordinate or the `compose.material3` alias. That coordinate is a thin alias that delegates per target, verified by resolving the graph: on Android it becomes `androidx.compose.material3:material3-android:1.5.0-alpha27` — genuine AndroidX, one alpha *forward* of what the app shipped — and on desktop/iOS it becomes `org.jetbrains.compose.material3:material3-desktop:1.13.0-alpha01`, the real fork carrying `LoadingIndicator`, `MaterialShapes` and `WavyProgressIndicator`. So there is exactly one material3 on any classpath, the `androidx.compose.material3` package and imports are identical everywhere, and **no `expect`/`actual` seam is needed**. The 12 Expressive call sites are untouched.
-    **The `compose.material3` alias cannot be used, and this is the part that is easy to get wrong.** It deliberately tracks the latest *stable* Material3, which is 1.4.0 and has no Expressive at all — CMP decoupled Material3 versioning in 1.9.0 precisely so a project can opt forward. Gradle now deprecates it too. Always take material3 from `libs.compose.material3`.
-    **Version choice: forward, never backward.** `composeMaterial3 = 1.13.0-alpha01` is the only published JetBrains material3 at or ahead of the AndroidX alpha the app was on. The nearby `1.12.0-alpha03` would have been a **downgrade on two axes** — AndroidX material3 to `1.5.0-alpha22` *and* the whole Compose stack to `1.12.0-beta01`, which is *older* than the `1.12.0` stable it replaces (publication order is alpha01..alpha03, beta01, beta02, rc01, 1.12.0). Do not take it. The accepted cost is that the Compose stack leaves stable for `1.13.0-alpha02`; `composeAndroidx` is pinned to match it and must be bumped together with `composeMaterial3`, never alone.
-    Verified rather than assumed: the goldens were re-run after the bump, and `PlayerLoadingCurtainScreenshotTest` — which renders an Expressive `LoadingIndicator` — is **byte-identical** across `1.5.0-alpha26 → 1.5.0-alpha27`, with no golden re-recorded.
-    Two related traps. **The number of files carrying `@OptIn(ExperimentalMaterial3ExpressiveApi::class)` is not the number of files using Expressive, and the gap closes as files move.** This line once read "14 files annotate but only 6 touch an Expressive symbol — the other 8 annotate while using only ordinary Material3 such as `MaterialTheme`, so their annotation is vestigial and can be deleted as those files move." That was true when written and is now history: the 8 vestigial annotations were deleted as those files moved, and the current measurement is **6 files annotating and 6 using** (`LoadingIndicator` in `AuthScreens`, `DiscoverScreen`, `LibraryRoute`, `LibraryScreen`, `PlayerLoadingCurtain`; `MaterialShapes` in `AiInsightsStoryOverlay`). Keep doing the check rather than trusting either number: `grep -rl 'ExperimentalMaterial3ExpressiveApi'` finds annotators, not usages, and an annotation with no Expressive symbol behind it is dead weight that a green build will not flag. And **never read an AAR's size to decide whether a version has a feature**: `androidx.compose.material3:material3` is a ~4.7 KB stub holding only a manifest and a licence at every version, with the real code in the `material3-android` sub-module. Read the per-target artifact, or the `*.module` metadata, or just resolve the dependency graph.
-  - **`platform(libs.androidx.compose.bom)` does not exist on a KMP source set.** `KotlinDependencyHandler` has no `platform()`, so a KMP library cannot apply a BOM and must pin versions itself. A plain Android module like `:androidApp` can, and does.
-  - Pin CMP `1.11.1` to Kotlin `2.4.10`; bump them together or not at all.
+**Golden screenshots (`:androidApp:testStoreDebugUnitTest`)** — Robolectric + Roborazzi on a plain JVM;
+the only rendering coverage in the repository. **Verify is the default**; re-record with
+`-Proborazzi.record=true`. They live in `:androidApp`, not `:app`, because they need
+`isIncludeAndroidResources`. The Roborazzi plugin is deliberately **not** applied: 1.43.1 fails
+against AGP 9.3. Screenshot tests must set `application = ScreenshotTestApplication::class`, or
+Robolectric boots `CrispyApplication` and reaches an `AndroidKeyStore` that cannot exist on a JVM, and
+`mainClock.autoAdvance` must be frozen or animated content never matches. **A golden that waits on a
+signal the component itself emits is not a flaky golden; a golden that waits on a duration is.** Host
+prerequisites: Skia needs `libGL`, `libX11` and `libfontconfig`, and at least one font — `test-fonts/`
+at the repository root plus a generated `fonts.conf` covers hosts that have the libraries but no fonts,
+and a *failing* golden without one reports `Fontconfig head is null` instead of the real difference.
+
+**Composition-root tests (`:app:testAndroidHostTest`)** — `:app`'s **only** test compilation, created by
+`withHostTest {}`. **`androidHostTest.dependencies { }` does not resolve; only
+`getByName("androidHostTest").dependencies { }` does.** Robolectric is here for a `Context` and nothing
+else. **Pin `sdk = [35]` on every one of these classes**: with `Config.NONE` there is no manifest, so
+Robolectric falls back to **SDK 21**, below `minSdk`, and the failure reads `Method … not mocked` —
+naming a real app class and blaming nothing. **The sandbox classloader is shared across every test class
+with the same `@Config` in one worker JVM**, so a test about a process-wide singleton needs a
+`companion object` and `@FixMethodOrder`, not an instance field. `SecureTokenStore` is untestable on a
+JVM, so everything reaching it is untestable — leave those out rather than mocking around them.
+
+**`commonTest` without `withHostTest {}` runs on no Android target, and AGP only *warns*** (the
+message is `The 'commonTest' source directory exists, but android host tests are not enabled`) — so a
+fourth `commonTest` must add the block in the same change. **`commonTest` and `androidHostTest` are
+complementary halves of one module and one step of CI is not enough to cover both.** **Which source set
+a test belongs in follows the source set of the code under test** — an `androidMain` class cannot be
+tested from `commonTest` at all. `commonTest` is not published, so nothing in one module's is visible
+from another's. **An exhaustive test double is a property of the module that owns the interface**:
+`UnusedBackendApi` (52 members, throws) lives in `:backend`'s `commonTest` and is wired into
+`check-local.sh`, so a new `BackendApi` member fails to compile there; a narrow double in another module
+rots silently. The test-writing rules themselves are in §3, not repeated here.
+
+**`:android:platform-core`** is platform-free `commonMain`: the six port interfaces plus **`SecretFormat`**,
+the encrypted-secret contract both platform stores implement. **Shared constants are not the shared
+format** — `SecretFormat` now owns `encode`/`decode` rather than each store joining and splitting the
+value by eye, and takes `String`s because base64 is a platform concern. **A rule both implementations
+depend on and neither tests needs its own suite; it does not come free with the constant.**
+
+**`:android:platform-desktop`** — a plain `kotlin.jvm` module, not KMP, because every implementation is
+a JVM call. Four things in it are expensive to relearn: **`FileKeyValueStore` is one file per store
+name, never a key prefix inside one file** (a prefix has to be re-applied on every read and write, and
+one missed prefix is a silent leak between stores — which is also why it holds no in-memory cache, so a
+write through one instance is visible to the next read through another); **`sanitize` must reject a
+name that is only dots**, because `..` sanitises to `..` and `File(root, "..")` resolves to the root's
+*parent*; **`Properties.load` does not throw on a line that merely looks wrong** (`=not a key` parses as
+an empty key — only a malformed `\u` escape is rejected, so a fixture meant to prove "unreadable file reads as
+empty" must use one); and **`DesktopSecretStore` is not a keystore and says so** — the key is a file
+next to the data, so `keyFile` is a constructor parameter precisely so an OS keychain is a wiring change
+rather than a contract change.
+
+**`org.json` in a `commonMain` file is settled, and not for the reason the old note gave.** It is not a
+dependency of this project at all — it is a class of the Android platform supplied by `android.jar`,
+appearing in exactly one build file (`testImplementation` in `:android:plugins`). So **a file that
+parses or writes JSON stays in `androidMain`** — in `:app` that is `SearchHistoryStore`,
+`AiInsightsCacheStore`, `ProfileDataShadowStore` and `PendingMutationStore`, and in `:watchhistory` it
+was the single thing keeping `WatchProgressStore` out of `commonMain`. **But the sentence that said so
+was wrong in three ways, all found by measuring:** 27 tracked files `import org.json`, not five; for the
+four `:app` files it named, JSON is *not* the pin (they are `Context`/`SharedPreferences`/`File`, so
+deleting JSON moves them zero files); and it named **none** of the four where JSON *is* the sole pin.
+**The load-bearing decision there is the node type, not the accessor policy** — 42 of
+`CrispyBackendParsers.kt`'s 45 top-level functions name an `org.json` node in the *signature*, so
+neutralising the accessors alone moves zero of them. The candidates are `kotlinx.serialization`'s
+`JsonElement` (already in `libs.versions.toml` as `serializationJson = "1.11.0"`, **zero consumers
+repo-wide**) and a `:core-domain` type of our own, and an untyped `Any?` tree cannot carry it because
+`JSONObject.NULL` and an absent key are different events. **That is a recorded product decision, not a
+refactor.** Separately: **the library that ships is not the library a JVM test can stand in for** —
+`optString` of a `JSONObject.NULL` is `"null"` on AOSP and `""` on the Maven artifact, and a fractional
+number is `Double` versus `BigDecimal`, so Robolectric here is for `org.json` itself and **not** for a
+`Context`.
+
+**`:app`'s `androidMain` is a knot, not a list of independent files, and the table of what holds what
+lives in `android/app/build.gradle.kts`** — read it before planning any move. **A replacement for a JVM
+library call goes in the file that already replaces that library, not next to the caller** — look for
+the existing replacement before writing a second one in the same repo. **Push the pure half of a split
+toward `commonMain` and the platform half toward `androidMain`, even when the platform half is the
+smaller one** — otherwise the pure half is untestable. A **large file holding a small pure thing no test
+can reach is an *extraction*, not a move**: deciding which is the measurement.
+
+**`:android:home`** shares the package `com.crispy.tv.home` with `:app`, so a type declared in its
+`androidMain` is reachable from `:app` **with no import at all** — the purest form of the trap that
+makes an import-only audit report confidently-empty answers. `linuxX64` is its only Apple-target check
+on Linux. Its `CalendarService` cache is **per-profile and written only on a non-error fetch**, so a
+cache written for one profile is never handed to another and a failed read never replaces a good
+snapshot; the `isError` guard on the write is deliberately redundant and says so where it is.
+
+**`:android:sharedUI`** — CMP `1.11.1` pinned to Kotlin `2.4.10`; bump them together or not at all. **Do
+not re-litigate Material3 Expressive, and do not "fix" it by dropping it** — it is available on every
+target; the blocker was one build-file line, and taking the `compose.material3` alias instead would
+have deleted a shipping design feature to work around a version pin. Other facts: `android { }` is
+current and `androidLibrary { }` is deprecated; **CMP 1.11.x ships `androidx.compose.*`, not
+`org.jetbrains.compose.*`**, so moving a file changes *coordinates*, never imports; **`platform(...)`
+does not exist on a KMP source set**, so a KMP library pins versions itself; and **no `linuxX64` on
+Compose modules** — its local purity gate is `jvm("desktop")`. `CrispyPalette` is the token layer both
+surfaces read, and **`:tv` maps two roles onto it under different names** (`border`/`borderVariant` vs
+`outline`/`outlineVariant`) with the same two hex values written out twice — **a missing mapping is a
+silent colour change, not a compile error**, which is why the values are pinned in `commonTest`.
 
 ## Rules
 
@@ -407,321 +296,157 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 ### 1. Audit before you plan
 
-- **A module's untested `commonMain` is usually untested because its `androidMain` files meant
-  nobody ever added a test source set — so the absence of tests is a fact about the module's
-  build file, not about any individual file.** `:android:addons` compiles for Android, desktop
-  JVM, `linuxX64` and both iOS targets, and had **no test source set at all** across all five.
-  Five of its files are `Context`/OkHttp/`org.json` Android adapters, and that is exactly why
-  nobody created `commonTest`: it would have been a directory with one test in it, in a module
-  that reads as Android-shaped. The consequence was that **`StreamLookupSupport.kt` carried 171
-  lines of nine pure functions** — lookup-id parsing, subtitle building, episode matching,
-  provider merging — with **zero tests anywhere in the repository**, while `:app`'s
-  `androidMain` files had 445. Nothing about those 171 lines says they were undertested; the
-  only place the answer was written down was the module's *plugin block*. So when you conclude
-  "this pure file is covered" or "this module is thin", check `git ls-files <module>/src/commonTest`
-  **first** — it is one command, and it finds an entire untested surface that no per-file audit
-  will surface. `:addons` now has `withHostTest {}` and a `commonTest`, and its 28 cases run on
-  desktop JVM *and* Android host.
-  **The corollary bit hardest: `:app` is the one module with no Native compile gate, and it is
-  the one module that was broken.** Every pure-Kotlin KMP module here declares `linuxX64` as a
-  compile-only target, and exactly those modules are clean of JVM API. `:app` is a Compose module,
-  Compose Multiplatform publishes no `linuxX64` artifacts, and so `:app` could not have the gate
-  that catches exactly the bug class it contained. Five classes of JVM API sat in its `commonMain`
-  and **three of them needed no import** — `System.currentTimeMillis()`, a fully-qualified
-  `java.time.LocalDate`, and `synchronized` — so `scripts/check_common_purity.py` was blind to them
-  too. Only a real Native compile found them, which is `apple.yml`'s `:app:compileKotlinIosArm64`.
-  **A gate that cannot reach a module is not a weak gate, it is no gate, and the module it cannot
-  reach is the one to worry about.** The second half of the lesson is what to do about it: a
-  `linuxX64` block with a comment saying why it is absent is better than no comment, because
-  `android/app/build.gradle.kts` does carry one — under a heading that reads `## No linuxX64 here`.
-  **Sweeping that one command across every module finds four more of the same shape:**
-  `:platform-core` (7 files), `:player` (6), `:network` (2) and `:watchhistory` (2) —
-  **17 files of `commonMain` with no test source set at all.** `:platform-core` is the
-  sharp one, because it holds the six port interfaces *and* `SecretFormat`, the
-  encrypted-secret contract both platform stores implement. So this is a whole-repo
-  sweep rather than a per-file audit, and it costs one loop over the module list.
-- **The `:addons` explanation does not generalise, and assuming it does hides the more useful
-  cause.** The bullet above says a module went untested because its `androidMain` files made a
-  `commonTest` look silly — and `:android:player` is the counter-example that identifies the
-  real mechanism. All six of its files are `commonMain` and its `androidMain` is **empty**, so
-  there is no Android-shaped sibling and nothing about the module looks untestable. Its own
-  build-file KDoc says it is "the first Phase 2 module to become multiplatform, and the one
-  that establishes the recipe the other five follow" — **and the recipe it established did not
-  include a test source set**, which is how five later modules inherited the gap. So when a
-  module has no tests, read its KDoc before theorising: a module that describes itself as the
-  template has told you the other five are copies. 389 lines of `:player` ran on four targets
-  asserted by none of them, and it is now 51 cases on desktop JVM *and* Android host.
-- **The two ends of that sweep are opposites, and the opposite end is the one that hides a
-  decision.** `:android:player` had an empty `androidMain` and nothing looked untestable;
-  `:android:network` is the mirror — **all four of its `androidMain` files are OkHttp/`Context`
-  adapters that no `commonMain` can ever reach** (OkHttp publishes no Kotlin/Native artifact),
-  so the module reads as Android-only, and its `commonMain` is 27 lines of pure string
-  handling whose four-alternative hand-rolled regex is exactly the kind of thing that rots
-  silently. `:network` is now 27 cases. **A module that looks untestable is not a module
-  with nothing to test** — read the `commonMain` file list and its line counts before
+- **A module's untested `commonMain` is usually untested because nobody created a test source set —
+  so check `git ls-files <module>/src/commonTest` first, before concluding anything about a file.**
+  The corollary: **`:app` is the one module with no Native compile gate, and it is the one module that
+  was broken.** Every pure-Kotlin KMP module declares `linuxX64` as a compile-only gate and exactly
+  those are clean of JVM API; `:app` is a Compose module, CMP publishes no `linuxX64` artifacts, so it
+  could not have the gate that catches the bug class it contained. Five classes of JVM API sat in its
+  `commonMain` and **three needed no import** (`System.currentTimeMillis()`, a fully-qualified
+  `java.time.LocalDate`, `synchronized`), so `check_common_purity.py` was blind too. **A gate that
+  cannot reach a module is not a weak gate, it is no gate, and the fix is to find a gate that can,
+  not to relax the one that cannot.** A `linuxX64` block with a comment saying why it is absent beats
+  no comment — `android/app/build.gradle.kts` carries one under a heading that reads
+  `## No linuxX64 here`, **and a grep for a target declaration matches its own refutation.**
+- **The explanation for one module's gap does not generalise, and assuming it does hides the more
+  useful cause.** `:addons` had no test source set because five of its files are `Context`/OkHttp
+  adapters and a test directory for one file in an Android-shaped module reads as wrong. **`:player`
+  is the counter-example that identifies the real mechanism:** all six of its files are `commonMain`
+  with an **empty** `androidMain`, so nothing about it looked untestable — and its own build-file KDoc
+  calls it the template the other five modules follow, **and the template omitted a test source set.**
+  So when a module has no tests, read its KDoc before theorising: a module that describes itself as the
+  template has told you the others are copies.
+- **The two ends of that sweep are opposites, and the opposite end is the one that hides a decision.**
+  `:player` had an empty `androidMain`; `:network` is the mirror — **all four of its `androidMain`
+  files are OkHttp/`Context` adapters no `commonMain` can reach**, so the module reads as Android-only
+  while its `commonMain` is 27 lines of pure string handling. **A module that looks untestable is not
+  a module with nothing to test** — read the `commonMain` file list and line counts before
   concluding anything from the `androidMain` shape.
-- **A module with no test source set is a question, not a defect — and the question has to be
-  the *module*, not the source set a sweep happened to look in.** `:android:watchhistory` was
-  recorded here as "a measured non-finding": its `commonMain` is `WatchHistoryConfig.kt` — one
-  field defaulting to `"dev"` — plus `sync/WatchSyncSource.kt`, a three-method interface with
-  empty bodies, so a `commonTest` there "re-asserts the compiler". **That was a correct claim
-  about `commonMain` and the wrong scope**, and it hid the real answer for a long time: the
-  module had **no test source set of any kind** — no `withHostTest {}`, no `commonTest`, no
-  `androidHostTest` — and the unmeasured content was 405 lines of `androidMain`
-  (`progress/WatchProgressStore.kt`), not the two-file `commonMain`. **A "measured non-finding"
-  is a claim about a scope, and the scope was inherited from the sweep rather than chosen by
-  the question.**
-  The file's own build-file KDoc said all three `androidMain` files were blocked — by `org.json`,
-  by reaching `:backend`/`:player`, by OkHttp — and that is what made the module read as
-  Android-shaped. **Reading the file settles it faster than the KDoc does:**
-  `WatchProgressStore.kt` imports `com.crispy.tv.platform.{AppLogger, KeyValueStore,
-  MonotonicClock, TimeSource}`, coroutines, `org.json` and `kotlin.math` — **not one
-  `android.*` import**, no `Context`, no `SharedPreferences`, no `java.io.File`, no OkHttp, no
-  Compose. It already took the four `:platform-core` ports as constructor parameters, so it
-  was **designed portable and only the JSON parsing blocked it**, and `org.json` is the *sole*
-  remaining pin.
-  It now has both test source sets, 18 cases, and four of its pure functions in `commonMain`
-  as `WatchProgressKeys.kt`. **The lift cost `git diff --numstat` of `0 43` — deletions only,
-  zero insertions** — because a same-package top-level declaration is what every existing
-  call site was already resolving to. **The two key-prefix constants had to move with the
-  functions, and leaving them behind would have been worse than a compile error:** they were
-  `private companion` members, which a top-level function cannot see, and **a companion member
-  shadows a same-named top-level declaration inside the class body** — so `WatchProgressStore`
-  would have kept filtering with its own copy while the lifted functions wrote with the new
-  one, two strings that must agree with nothing making them agree. `getAllWatchProgress`
-  filters with `startsWith(WATCH_PROGRESS_KEY_PREFIX)` and
-  `removeAllWatchProgressForContent` rebuilds keys with `getWatchProgressPrefKey`, so the
-  prefix is a **writer/reader contract**, and `strippingTheProgressPrefixYieldsExactlyTheWpKey`
-  now asserts it over a 3×5×5 loop. The suite is in `commonTest`, not `androidHostTest`,
-  precisely because the declarations moved to `commonMain` — so it needs no Robolectric and no
-  `org.json`, and it runs on **both** `desktopTest` and `testAndroidHostTest`.
-  **Three of its eighteen fixtures were wrong on the first run and the code was right in all
-  three**, which is the fixture version of *a caught mutation is not evidence about the case you
-  would have named*: `tt1:s01e02-special` was written as a fixture for the verbatim strategy and
-  the **token** strategy claimed it first, so the case actually pinned the order between them;
-  `":5"` splits to `["", "5"]`, so the season slot is blank, every strategy misses, and the
-  fallback yields `tt1::5` — I had dropped a colon; and threading a reduced remove id back into
-  `buildWpKeyString` produced `movie:tt1:tt1:2:5`, because the reduced value is **already**
-  `type:id`-shaped and is not an episode id.
-- **A dead private member is a product question, and so is an owned scope with no owner to hand
-  it from.** Both surfaced in the same file and neither was "fixed". **`normalizedImdbIdOrNull`
-  (17 lines of real imdb-id validation) has exactly one hit in the repository: its own
-  declaration** — every other private member has ≥2, and `buildWpKeyString` has 10. Deleting it
-  is a product call (was a caller removed?) and it is recorded instead. And
-  **`WatchProgressStore`'s scope parameter is defaulted to
-  `CoroutineScope(SupervisorJob() + Dispatchers.Default)` and the default is live**: its one
-  construction site, `BackendWatchHistoryService.kt:51`, passes only the other four arguments.
-  **The recorded fix for this antipattern does not apply here**, because
-  `BackendWatchHistoryService` owns no scope either — no `CoroutineScope`, no `SupervisorJob`,
-  no `cancel`, no `onDestroy` — so injecting the caller's scope **would move the antipattern up
-  a level rather than remove it**. That is a design question about where a long-lived
-  background service's scope comes from, and it is written down rather than guessed at.
-- **A composite key built by string concatenation is a parser, and the parser is wrong on exactly
-  the inputs the format cannot represent.** `WatchProgressStore.removeAllWatchProgressForContent`
-  reconstructs each episode id with `key.split(':')` and `subList(2, size)`, which assumes the key
-  is `type:id[:episodeId]` — that is, **that the id contributes exactly one part.**
-  `buildWpKeyString` does not enforce that, so a provider-qualified id produces more parts and the
-  reconstruction drops the leading ones. Measured on `"series:provider:show:season:1:2"`:
-  `subList(2, 6)` rejoins to `"show:season:1:2"`, so the removal addresses
-  `"series:provider:show:season:show:season:1:2"`, **which does not exist.** Both halves are
-  asserted — the progress survives **and** a tombstone is left at the bogus key, and that tombstone
-  is what would later block a legitimate write. **Recorded, not fixed:** the key format cannot carry
-  a colon-bearing id unambiguously *at all*, so the choice is between changing the format (which
-  orphans every already-stored key, and this is a user-visible resume position) and declaring
-  colon-bearing ids unsupported on this path. **A format that cannot round-trip is a product
-  decision to migrate or to constrain, not a parsing bug to patch** — and the suite found it only
-  because the fixture was written to provoke it. **A separator in a composite key is a claim that
-  the field cannot contain it, and nothing here states that claim anywhere.**
-  Three of that suite's other four first-run failures were mine, and all three the same mistake:
-  **`getAllWatchProgress` returns a map keyed by `type:id`, not by the content id, and nothing in
-  `WatchProgressStore` says so** — `removeAllWatchProgressForContent` relies on it (it filters on
-  `prefix = "$type:$id"`), so a caller reading the map has to know it or it will look up a content id
-  and find nothing. I wrote the expectation from the **parameter names** rather than from the key
-  format. **A key format is not visible in a signature.**
-- **A comment claiming a choice between two orderings that coincide is unobservable, and a test for
-  it would be a test that passes on either implementation.** `getAllWatchProgress`'s comment says
-  the returned order is by the *full prefixed key* rather than the stripped one. **Every key shares
-  one constant prefix and one separator, and sorting `prefix + s` is the same order as sorting `s`**,
-  so the two are not alternatives. Recorded in the test's KDoc rather than asserted; the comment's
-  real content — *sorting at all*, because `keys()` carries no order guarantee and the old code
-  iterated `prefs.all`, a `HashMap` — is pinned by a case that writes in one order and asserts
-  another. **Seventeen redundant guards so far, and this one is a comment rather than a guard: a
-  statement of intent with no state to change is the same finding wearing prose.**
-- **An `androidMain` class cannot be tested from `commonTest` at all, so "put it in `commonTest`
-  because `commonTest` is the one that runs everywhere" is backwards for it.** `WatchProgressStore`
-  lives in `androidMain` (its sole pin is `org.json`), and `org.json` is absent from every other
-  target's classpath — so its 26 cases are in `:android:watchhistory:androidHostTest` under
-  Robolectric, while the four pure functions lifted to `commonMain` in the previous landing are in
-  `commonTest` and run on **both** tasks. **Which source set a test belongs in follows the source
-  set of the code under test, and that is a fact to read rather than a preference to express.**
-  Robolectric here is for `org.json` itself and **not** for a `Context`, because the two
-  implementations disagree — see the `e27619cb` measurements. Every scope is injected as
-  `CoroutineScope(UnconfinedTestDispatcher())`, so nothing sleeps out a debounce.
+- **A module with no test source set is a question, and the question has to be the _module_, not the
+  source set a sweep happened to look in.** `:watchhistory` was recorded as "a measured non-finding"
+  because its `commonMain` is two files re-asserting the compiler. **That was a correct claim about
+  `commonMain` and the wrong scope**: the module had no test source set of any kind, and the
+  unmeasured content was 405 lines of `androidMain` whose sole pin is `org.json` and which imports
+  **not one `android.*` type** — it was designed portable. **A "measured non-finding" is a claim
+  about a scope, and the scope is often inherited from the sweep rather than chosen by the question.**
+- **Which source set a test belongs in follows the source set of the code under test, and that is a
+  fact to read rather than a preference to express.** An `androidMain` class cannot be tested from
+  `commonTest` at all, so "put it in `commonTest` because `commonTest` runs everywhere" is backwards
+  for it — and where the pin is `org.json`, that means `androidHostTest` under Robolectric, which is
+  there for `org.json` itself and **not** for a `Context`, because the two implementations disagree.
+- **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an import*.
+  Subtracting every type declared in every module's `commonMain` from the capitalised identifiers a
+  file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare overlapping
+  `com.crispy.tv.*` packages, so a declaration in another module's `androidMain` is reachable with
+  **no import at all**, which the forward scan cannot see. And **a file with zero forbidden imports
+  can still be unpinnable, because the blocker can be a _type_**: `grep -rn "class X"` its distinctive
+  types and read the owning module's `plugins { }` block. A plain `com.android.library` publishes no
+  JVM variant, so no KMP `commonMain` can name its types however clean the code looks.
+- **A private decision is an untestable decision, and a private member is worse than a private
+  function** — `private` is a property of the class, not of the file, so a `private` member cannot be
+  named by a test in its own module either. Name it in production (`:tv`'s `CrispyTvDarkColors` was
+  widened to `internal` for exactly this), and prefer **lifting to a top-level `internal` in the same
+  package**: a same-package declaration leaves every existing call site resolving to it, so
+  `git diff --numstat` reads deletions-only (`0 43` on `WatchProgressStore`, `0 10` and `0 20` on the
+  two `:app` stores). **Watch the direction where a companion member shadows a new same-named
+  top-level declaration** — the class keeps reading its own copy, so two strings that must agree have
+  nothing making them agree.
+- **A dead private member is a product question, and so is an owned scope with no owner to hand it
+  from.** `normalizedImdbIdOrNull` is 17 lines of real imdb-id validation with **exactly one hit in
+  the repository: its own declaration** — while `buildWpKeyString` has ten. Deleting it is a product
+  call, so it is recorded. And the antipattern fix "pass the caller's scope" **can move the problem up
+  a level rather than remove it**: `WatchProgressStore`'s default scope is live, but
+  `BackendWatchHistoryService` owns no scope either, so injecting the caller's would just relocate it.
+- **A composite key built by string concatenation is a parser, and the parser is wrong on exactly the
+  inputs the format cannot represent.** `removeAllWatchProgressForContent` splits the stored key and
+  takes `subList(2, size)`, which assumes **the id contributes exactly one part**; a
+  provider-qualified id does not, so the removal addresses a key that does not exist, and leaves a
+  tombstone there that would later block a legitimate write. **A separator in a composite key is a
+  claim that the field cannot contain it, and nothing states that claim anywhere.** A format that
+  cannot round-trip is a product decision to migrate or to constrain, not a bug to patch — changing
+  it orphans every stored key, and here that is a user-visible resume position. Note also that
+  **a key format is not visible in a signature**: three of that suite's first-run failures were me
+  writing expectations from the parameter names rather than the format.
+- **A comment claiming a choice between two orderings that coincide is unobservable**, and a test for
+  it would pass on either implementation — sorting `prefix + s` is the same order as sorting `s` for
+  a constant prefix. Record it rather than assert it, and pin the comment's *real* content (that it
+  sorts at all, because the underlying collection carries no order guarantee). **A statement of intent
+  with no state to change is a redundant guard wearing prose.**
 - **A document's own heading, prose class, or type names are not evidence about the code — and a
   second numbered plan for one repository is a defect even when every sentence in it is correct.**
-  `architecture.md` was rewritten for the ported codebase and both halves of that bullet came from
-  reading the whole 594-line file rather than its four known-stale lines.
-  **Seven of the type names it used did not exist and never had**: `WatchProvider`, `Resource`,
-  `Freshness`, `ScreenState`, `PendingMutation`, `LibraryRepository`, `ProviderConnectionRepository`,
-  `PlaybackRepository`, `SettingsRepository`. One command settled it —
-  `git ls-files '*.kt' | xargs grep -l "\b$t\b"` per name — and **`DataSource` was the sharp one:
-  its six hits are every one of them `androidx.media3.datasource.DataSource` inside `:native-engine`,
-  so the name a document proposes is already taken in this repository by a Media3 type.** A reader
-  who had implemented the proposal would have hit a collision rather than a fresh type.
-  **The prose class is the part nobody would have guessed.** `## Target Use Cases` carries an
-  explicit disclaimer — *"The important part is not the exact names"* — so its six invented
-  interface names are obviously illustrative. **`## Fetch And Cache Policy` is the same *kind* of
-  section and carries no such disclaimer**, so a reader takes its `Resource<T>`/`DataSource`/
-  `Freshness`/`ScreenState` as descriptive. So the two things a stale document does are: name types
-  that do not exist, and let a reader's own inference about register decide whether that matters.
-  When auditing prose, read the surrounding sentences, not the identifiers.
-  **The competing plan is the structural half.** `architecture.md` carried a seven-phase
-  `## Migration Plan` whose phase numbers meant something completely different from the tracked
-  `kmp-migration-plan.md`'s — same repository, same word "Phase", disjoint meaning, so a reader who
-  had read one misread every phase number in the other. The fix was a **scope split, not a
-  deletion**: retitle it *Migration Plan (product and backend)* and point at the tracked plan for the
-  port. **Two numbered plans for one repository is worse than one plan even when both are correct**,
-  because the collision is only visible to a reader holding both, which is the reader most likely to
-  be misled.
-- **A refactor list is a set of claims about the code, so re-measure it; a list where most entries
-  are finished is worse than no list.** `## What To Refactor First In This Repo` held nine numbered
-  items, and the heading says *In This Repo*, so each one is checkable — and three had already been
-  done: the provider enum is gone, the durable profile-scoped mutation queue exists
-  (`UserMutationOutbox` in `:app` `commonMain` with a sealed `MutationStatus` in `core-domain` and a
-  `commonTest` suite), and `SessionRepository`/`CatalogRepository`/`UserMediaRepository` exist
-  together in `android/app/src/commonMain/kotlin/com/crispy/tv/domain/repository/`. A list that
-  reads as outstanding work it is not. **The fix is to split it into what is still true and what is
-  done, keeping the numbering**, so a reader can see item 6 is half-done rather than guessing from
-  the fact that its first half has an implementation.
-- **Run the import audit in both directions.** A forbidden-token scan answers *pinned by an
-  import*. Subtracting every type declared in every module's `commonMain` from the capitalised
-  identifiers a file uses answers *pinned by a sibling* — `:app`, `:home` and `:addons` all declare
-  overlapping `com.crispy.tv.*` packages, so a declaration in another module's `androidMain` is
-  reachable from here with no import at all, which the forward scan cannot see. Seven instances;
-  the reverse scan is what found six movable files / 1,199 lines out of 25 candidates.
-- **A file with zero forbidden imports can still be unpinnable, because the blocker can be a
-  *type*.** `grep -rn "class X"` its distinctive types and read the owning module's `plugins { }`
-  block. `:android:native-engine` and `:android:ui-assets` are plain `com.android.library`, so no
-  KMP `commonMain` can name their types whatever the code looks like. One command settles it.
-- **Resolve a large error cascade by distinct unresolved *names*,** mapping each back to its
-  declaring file — not by line. 17 errors reduced to two roots; 200 reduce to a handful.
-- **Re-test a premise this file or a build file states as settled.** Nine have been wrong so far,
-  and the pattern is always the same: a name that sounds plausible was never tried. `LocalWindowInfo`
-  **does not exist** in any resolved Compose artifact; `LocalConfiguration` is Android-only and
-  lives in `ui-android`'s `AndroidCompositionLocals_androidKt` so a jar-grep cannot see it; `coil3`'s
-  own `commonMain` already declares `LocalPlatformContext`; `lifecycle-viewmodel`,
-  `lifecycle-viewmodel-compose` and MaterialKolor are genuine KMP artifacts. **Measure the artifact
-  you are about to declare, never the family** — `paging-common` is KMP while `paging-compose` and
-  `paging-runtime` are not, in the same family, in the same module.
+  `architecture.md` used **seven type names that never existed**, and `DataSource`'s only hits are
+  Media3's inside `:native-engine`, so a reader implementing the proposal would hit a collision. The
+  prose class is the part nobody guesses: `## Target Use Cases` carries an explicit disclaimer that
+  its names are not the point, so its six invented interfaces are obviously illustrative, while
+  `## Fetch And Cache Policy` is the same kind of section with no disclaimer — **so the register of
+  the surrounding prose is part of the audit.** It also carried a seven-phase `## Migration Plan`
+  whose numbers meant something entirely different from the tracked plan's; the fix was a **scope
+  split, not a deletion**, because **two numbered plans for one repository is worse than one plan even
+  when both are correct** — the collision is only visible to a reader holding both.
+- **A refactor list is a set of claims about the code, so re-measure it; a list where most entries are
+  finished is worse than no list.** Three of nine `## What To Refactor First In This Repo` items were
+  already done. **Split it into what is still true and what is done, keeping the numbering**, so item 6
+  reads as half-done rather than the reader guessing from its first half.
+- **Re-test a premise this file or a build file states as settled.** `LocalWindowInfo` **does not
+  exist** in any resolved Compose artifact; `LocalConfiguration` is Android-only and lives in
+  `ui-android`'s `AndroidCompositionLocals_androidKt`, so a jar-grep cannot see it either; `coil3`'s
+  `commonMain` already declares `LocalPlatformContext`. **Measure the artifact you are about to
+  declare, never the family** — `paging-common` is KMP while `paging-compose` and `paging-runtime` are
+  Android-only, in the same family, in the same module. And **a KDoc sentence about one caller is not
+  a statement about the function** — a comment explaining *why* one caller behaves unusually is a
+  comment about that caller, and being in the file is not the same as having read it.
 - **A count written about a set that later grows is stale silently, and re-measuring it is one
-  command -- so re-measure it.** Three separate undercounts, each in a document rather than in
-  code, and each one making a piece of work look smaller than it is. `CrispyTvDarkColorsMappingTest`'s
-  KDoc said `:tv` leaves "seven" palette roles unmapped; it is **eight** (the `spinner` role was
-  never a Material3 role at all, so it was never in the sentence). `CrispySharedTransitionLayout`'s
-  KDoc said "The five `*NavGraph.kt` files stay in `androidMain`"; it is **seven** -- `AuthNavGraph`,
-  `PlayerNavGraph` and `SettingsNavGraph` were all added after the sentence was written, and
-  `AGENTS.md` repeated the same stale number, so two documents agreed with each other and both
-  disagreed with the tree. And the `:player` suite's own case count was recorded as 51 when it is
-  52. The general form: **an omission nobody mentioned reads as a decision nobody made**, and the
-  place it is most dangerous is a count a reader would use to *scope* something --
-  `git ls-files <path> | grep -c <pattern>` settles it in under a second, and a count that two
-  documents share is twice as likely to be believed and no more likely to be right.
-- **A target declaration is a claim, and a target no CI job builds cannot fail -- so it asserts
-  nothing about whether the code is platform-free.** Ten modules declared
-  `iosArm64`/`iosSimulatorArm64`. `apple.yml` compiled **two** of them (`:core-domain`,
-  `:platform-core`) through an explicit task list, and **eight carried a target that no workflow
-  on any runner ever compiled.** It turned up while asking a different question -- whether a
-  `platform-apple` module would have a consumer -- which is the third time in this repository that
-  the useful answer came from measuring a *neighbouring* claim rather than the one in front of you.
-  `apple.yml` now compiles **all ten**, and `scripts/verify_apple_targets.py` (run by
-  `check-local.sh` and by `apple.yml`) fails when a module declares a target the workflow does not
-  build. The converse is deliberately unchecked, because **removing a target is a product decision
-  and a script has no business making one.** `scripts/verify_kmp_outputs.py` is the same idea pointed
-  at class files; the general form is that **an assertion nothing executes is not a weak assertion,
-  it is no assertion.** And the gate needed proving before it could be trusted: its first version
-  built `compileKotliniosArm64` where the task is `compileKotlinIosArm64`, so it reported all twenty
-  tasks missing on a workflow that invoked every one -- the repo's own "a gate that fires on correct
-  code gets switched off" trap, reached by the most direct route available.
-- **The Apple client is not this codebase, and `kmp-migration-plan.md`'s Phase 6 is correct while a
-  build file's KDoc is not.** `:platform-android`'s KDoc promised the Apple port implementations
-  "in Phase 6, each against the same `platform-core` interfaces". Measured: `grep -rl <port> ios
-  --include=*.swift` returns **zero hits for all six ports**; `:sharedUI` has **no** `platform-core`
-  dependency; `ios/CrispyKit` is a **19-file Swift reimplementation of the whole data layer** (its
-  own HTTP client, its own Supabase auth, its own session store, its own JSON, its own seven view
-  models); and `ios/project.yml` links only `CrispyKit` and `ContractRunner` -- **`CrispyUI` is built
-  by nothing and imported by nothing.** So **zero lines of Kotlin execute in the shipping iOS/tvOS
-  app**, and a `platform-apple` module would have no consumer: it could only be "verified" by adding
-  it to the `apple.yml` list being edited in order to verify it, which is circular, and it is the
-  speculative-dependency shape the repo's own rules forbid. The desktop equivalent landed
-  (`platform-desktop`) **because `desktopApp` is a real caller**; the Apple gap is a product
-  decision, not a technical block. Note what went wrong in my own reasoning, because it is the
-  generalisable part: **I read that KDoc promise as the plan's next phase, and neither the KDoc nor
-  the plan said what I assumed.** The plan's actual Phase 6 is "Wire `CrispyKit` to the `CrispyUI`
-  framework" and reconcile the six Swift files that duplicate shared code -- a different and
-  already-written answer. **A promise in one module's KDoc is not a plan, and a plan is not a
-  promise; read the plan.**
+  command.** Three undercounts, each making work look smaller than it is, and each corrected twice
+  over (a plan said 28 shared-transition files, then "10 across 6", and the measurement was **27**).
+  `git ls-files <path> | grep -c <pattern>` settles it in under a second, and **a count two documents
+  share is twice as likely to be believed and no more likely to be right.** The general form: **an
+  omission nobody mentioned reads as a decision nobody made.**
+- **A target declaration is a claim, and a target no CI job builds cannot fail — so it asserts nothing
+  about whether the code is platform-free.** Ten modules declared `iosArm64`; `apple.yml` compiled two,
+  and eight carried a target nothing ever built. `scripts/verify_apple_targets.py` now fails when a
+  module declares a target the workflow does not build, and the converse is deliberately unchecked
+  because **removing a target is a product decision and a script has no business making one.**
+  **An assertion nothing executes is not a weak assertion, it is no assertion** — and the gate needed
+  proving before it could be trusted (its first version built `compileKotliniosArm64` where the task is
+  `compileKotlinIosArm64` and reported all twenty tasks missing on a workflow that invoked every one).
+- **The Apple client is not this codebase, and a promise in a module's KDoc is not a plan.**
+  `:platform-android`'s KDoc promised Apple port implementations "in Phase 6"; measured, there are
+  **zero** Swift hits for all six ports, `ios/CrispyKit` is a 19-file Swift reimplementation of the
+  whole data layer, and `CrispyUI` is built by nothing and imported by nothing. So **zero lines of
+  Kotlin execute in the shipping iOS/tvOS app**, and a `platform-apple` module would have no consumer:
+  it could only be "verified" by adding it to the very list being edited to verify it, which is
+  circular. **The desktop module landed because `desktopApp` is a real caller; the Apple gap is a
+  product decision, not a technical block.**
 - **Measure the JVM's real output before replacing a JVM call, and copy the measurement into the
-  test.** A `DateTimeFormatter`'s `yyyy` is a year of *era*; `Math.round(0.999f * 100f)` is 100;
-  `mi` renders `Māori` with a macron; `fre` is French and `ger` is German. Six minutes running the
-  real expression beats reasoning about what a field "should" do.
-- **`dependencyInsight` on a configuration a dependency is not declared in** returns "no
-  dependencies matching" in seconds, before a compile that would produce the same answer as an
-  error inside an unrelated file.
-- **Diff every moved file against its original in `HEAD`.** `diff <(git show HEAD:<src>) <dest>` is
-  the cheapest check in the workflow and the only one that proves a *non-executed* line survived.
-  Four of the six moves in one batch were byte-identical, which is the strongest form of the answer.
-- **Two libraries naming one role differently is a mapping, not a divergence — and it is
-  invisible until you put the two files side by side.** `:tv`'s `androidx.tv.material3`
-  calls the border roles `border`/`borderVariant`; `:sharedUI`'s `androidx.compose.material3`
-  calls the same roles `outline`/`outlineVariant`. Both sides held the *same two hex
-  values* (`0xFF333333`, `0xFF262626`) written out twice. Read as two schemes side by side
-  this looks exactly like a deliberate TV palette divergence that must be preserved, and it
-  is in fact a pure de-duplication worth zero pixels. `:tv`'s own `DetailPalette.kt` already
-  mapped the roles by hand at its last four lines — read it *before* deciding a divergence
-  is a product decision, because it is independent proof when it is not.
-- **A duplicated `public` constant can be dead, and the same name in a different package is
-  what hides it.** `:tv` re-declared `CrispySpinner = Color(0xFFF56E3C)` under the *same
-  name* as `:sharedUI`'s, both `public`, in different packages — so no compiler error, no
-  lint, and no import audit flagged it. `git grep` showed all **11** call sites importing
-  `:sharedUI`'s and **zero** referencing `:tv`'s. This is the §1.1 same-package trap from
-  the other direction: there, a type is reachable with no import; here, an identical
-  declaration is reachable with no diff.
-
-- **"This is bound to navigation" is a statement about the file, not about the mechanism, and
-  reading the provider settles it in one grep.** `kmp-migration-plan.md` filed the shared-element
-  transitions under Phase 4 with the reason "`androidx.navigation` is not on the `commonMain`
-  classpath", and that reason was **false as stated**: across the whole repository there are
-  exactly **three** distinct imports of shared-transition machinery -- six sites of
-  `com.crispy.tv.ui.navigation.LocalSharedTransitionScope`, **one** of
-  `androidx.compose.animation.SharedTransitionScope` and **one** of
-  `androidx.compose.animation.SharedTransitionLayout`. **Zero** of the 27 participating files
-  import `androidx.navigation` for the transition itself. `androidx.compose.animation` is Compose
-  Multiplatform and present on Android, desktop JVM and both iOS targets. *Navigation is what
-  navigates; the thing that transitions is Compose.* The single provider was two lines inside
-  `AppNavHost.kt` -- in a package called `ui/navigation`, which is exactly why it read as
-  navigation-bound -- and **neither of those two lines named navigation.** The dependency is in the
-  file, not in the lines that matter.
-- **The count was wrong twice, and the second error was the informative one.** The plan said 28,
-  then "10, not 28, across 6 files". Measured over tracked sources: **27 files, 14 in `:app`
-  `commonMain` and 13 in `androidMain`** -- `commonMain`: `details/DetailsBody.kt`,
-  `details/DetailsCastSection.kt`, `home/{HomeCalendarComponents,HomeCatalogComponents,
-  HomeHeroCarousel,HomeTop10Components,HomeWideRailComponents}.kt`, `library/LibraryScreen.kt`,
-  `search/SearchScreen.kt`, `ui/components/{LandscapeCard,PersonCircleCard,SharedCardBackdrop}.kt`,
-  `ui/navigation/{AppRoutes,LocalSharedTransitionScopes}.kt`; `androidMain`:
-  `catalog/CatalogScreen.kt`, `details/{DetailsHero,DetailsRoute,DetailsScreen}.kt`,
-  `discover/DiscoverScreen.kt`, `home/CalendarScreen.kt`, `person/PersonDetailsRoute.kt`,
-  `ui/navigation/{AppNavHost,AppRoutesBuilders,DiscoverNavGraph,HomeNavGraph,LibraryNavGraph,
-  SearchNavGraph}.kt`. **Each correction made the job look cheaper and the truth was the opposite**,
-  because what grew was the count of *shared* participants, and the framing that paid off was
-  *the participants, the scope and the mechanism are all already shared; only the host was Android*.
-- **A missing provider is a silent null, so "the code is already shared" is not evidence that
-  anything runs.** All 14 `commonMain` participants read `LocalSharedTransitionScope`, whose default
-  is `null` -- so off Android every one of them rendered with **no transition and no error
-  anywhere**, and the goldens did not see it because the golden suite does not render those
-  screens. A participant written against a `null`-defaulting local is correct and *inert*. When a
-  landing supplies a host, assert the value is non-null **under the host and null without it** --
-  the second assertion is what makes the first mean "the host supplied it" rather than "the local
-  defaults to it", and it pins the fallback the participants rely on.
+  test.** `DateTimeFormatter`'s `yyyy` is a *year of era*, so `0000-01-01` formats as `Jan 1, 0001`; a
+  replacement's output matching byte for byte is not the end of the question — an identical-output
+  result can still hide a causal claim (the month-day form matches *because* it prints no year, which
+  is the only reason that is safe). **After a measurement, ask what it made true that nothing said
+  before.**
+- **Smaller commands that save a compile.** `dependencyInsight` on a configuration a dependency is not
+  declared in answers in seconds. **Diff every moved file against its original in `HEAD`** —
+  `diff <(git show HEAD:<src>) <dest>` is the only check that proves a non-executed line survived, and
+  byte-identical is the strongest form of the answer. **Resolve a large error cascade by distinct
+  unresolved _names_**, mapped back to their declaring file, not by line.
+- **Two libraries naming one role differently is a mapping, not a divergence — and it is invisible
+  until you put the two files side by side.** `:tv`'s `androidx.tv.material3` calls the border roles
+  `border`/`borderVariant` where `:sharedUI`'s calls them `outline`/`outlineVariant`, and both sides
+  held the same two hex values written out twice. Read as two schemes this looks exactly like a
+  deliberate TV palette divergence that must be preserved. **Read the receiving side's own hand-written
+  mapping before deciding a divergence is a product decision** — it is independent proof when it is
+  not. The same rule covers **a duplicated `public` constant that is dead because the same name in a
+  different package hides it** (`:tv`'s second `CrispySpinner`, 11 call sites on the other one, zero
+  on its own): *an identical declaration reachable with no diff.*
+- **"This is bound to navigation" is a statement about the file, not about the mechanism.** Across the
+  repository there are three distinct imports of shared-transition machinery and **zero** of the
+  participating files import `androidx.navigation` for the transition itself — the provider was two
+  lines inside a file in a package called `ui/navigation`, which is exactly why it read as
+  navigation-bound, and **neither of those two lines named navigation.** *The dependency is in the
+  file, not in the lines that matter.* And **a missing provider is a silent null**: all 14
+  `commonMain` participants read a `staticCompositionLocalOf { null }`, so off Android every one of
+  them rendered with no transition and no error. **When a landing supplies a host, assert the value is
+  non-null under it and null without it** — the second assertion is what makes the first mean "the
+  host supplied it" rather than "the local defaults to it".
 
 ### 2. Ports, seams and slots
 
@@ -1018,268 +743,111 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 ### 5. Mutation drivers
 
-Every rule in this section is stated in each driver's docstring, because a driver is run unattended.
+Every rule here is also stated in each driver's docstring, because a driver runs unattended.
 
-- **Read the replacement, not the entry's `name` and `why`.** A mutation entry's prose can
-  describe a mutation its `old`/`new` does not implement, and the result is a **SURVIVED**
-  verdict that reads identically to a genuine suite gap. One entry was named and documented as
-  removing *both* the start branch's timestamp assignment *and* its `return`, and its patch
-  removed only the assignment — the anchor existed, `check_anchors()` printed `occurs 1x`,
-  and it survived. The rule below says to read every replacement as code; this is the second
-  instance of the same thing inside my own driver. **The tell is a comment reasoning
-  carefully about an outcome its code cannot produce** — read `old`/`new` side by side with
-  `name` before believing either.
-- **An empty failure list is not a survivor — a survivor is the absence of a failure *after
-  positive evidence that the task ran*.** A driver's first run reported `0 caught` with
-  `DRIVER_EXIT=0` for all four entries because `subprocess.run(env={"JAVA_TOOL_OPTIONS": ...})`
-  **replaces** the environment rather than merging it, stripping `PATH` and `JAVA_HOME`, so
-  `./gradlew` never started; the log was 24 lines of `ERROR: JAVA_HOME is not set`. Use
-  `env = {**os.environ, ...}` and give the driver a `NO EVIDENCE` verdict requiring
-  `"BUILD SUCCESSFUL"` or `"BUILD FAILED"` in the output. **When a driver reports every entry
-  surviving at once, suspect the driver before the code** — the same family as the `-q` rule
-  below and the `finditer(s, re.M)` rule: the verdict survives and the evidence is lost.
-
-- **A narrowing mutation over a key two fields populate identically is not a mutation.** The
-  first entry for `DetailsMetadataLoader`'s recommendation filter was
-  `distinctBy { "${it.type}:${it.id}" }` -> `distinctBy { it.id }`, on the theory that dropping
-  `type` widens the key. Reading `CatalogMappings.toCatalogItem` first showed it sets
-  `id = normalizedItemId` **and** `itemId = normalizedItemId` -- the same value -- so the
-  narrowed key is provably identical and the entry could only ever report a **false positive
-  about the suite**. The rule that generalises the existing "does it change an answer, and
-  does it compile?": *read the value, not the name*. A key's name says which fields it
-  mentions; only the code says which fields it reads, and two of them can be the same value.
-
-- **`Pattern.finditer(s, re.M)` does not set a flag, and it does not raise.** On a *compiled*
-  pattern the second argument is `pos`, so the integer `8` is read as a start offset; `^` can then
-  never match again and the scan returns an empty list. A mutation driver that reads failure names
-  this way reports **"no test failed" for a suite that failed by name** — the verdict looks
-  trustworthy and the evidence is silently empty, which is the worst of the two failure modes.
-  Compile with the flag (`re.compile(pattern, re.M)`) and scan with one argument. The tell is a
-  driver that returns *no* evidence for mutations a hand-run catches immediately: run one by hand
-  and print the task's own output before believing any regex over it.
-- **Take the capture-group index from the pattern in front of you, not from another driver.**
-  `AGENTS.md` records the correct index as 3 for a `FAILED`-line pattern; this driver's pattern has
-  two groups (both bracket groups are non-capturing), so index 3 raised `IndexError: no such
-  group` on the first run. A rule quoted from a sibling file is a claim about that file.
-- **Never pass `-q`.** It suppresses Gradle's per-test `FAILED` lines, so every entry reports "build
-  failed" instead of a name: the *verdict* survives and the *evidence* does not, and a run reporting
-  no test names is indistinguishable from one whose mutations did not compile.
-- **A test-filtered task only observes the source sets it compiles.** `:android:app:desktopTest`
-  builds the desktop target, so a mutation in `androidMain` cannot fail under it *no matter what it
-  does* — including `abstract` on a class that then fails to compile at its only construction site.
-  `:app`'s other compilation, `:android:app:testAndroidHostTest`, compiles `androidMain` as well.
-  **"This cannot be observed" is only ever a claim about the task you ran, so the fix is a different
-  task, not a deleted entry.**
-- **A branch inside a `@Composable` body is the one thing that really cannot be observed**, and it is
-  a different answer from "wrong task": it needs a rendering harness, and the goldens in
-  `:android:androidApp` do not render every screen. Ask whether the branch needs the composition,
-  not whether a test exists. The decision worth testing there is the *caller's*.
-- **A port's implementation is the file most worth covering**, because it is the one a `commonTest`
-  suite cannot reach at all — and an implementation behind a port created in the *same* landing is
-  exactly where the gap bites.
-- **Read every replacement as code before writing the entry: does it change an answer, and does it
-  compile?** Nine bad-patch shapes have been caught, and all nine look like competent edits — a
-  default *parameter*; a default value on a **data-class constructor property** (the most
-  deceptive, because the diff looks like a behaviour change); `?: return null` in an expression body;
-  a `?: ""` arm on an `if/else` expression body; a repeated declaration prefix; `x?.y?.z().w()`
-  (a `?.` chain covers only the *immediately following* call); a rewrite that is *identical* to the
-  original because the value already was (`raw.length` → `code.trim().length` when `raw` **is**
-  `code.trim()`); renaming `runCatching` to `run`, which is not a Kotlin function; and appending a
-  comment or `+ 0L`. `COMPILE FAILED` is not evidence.
-- **Run a `check_anchors()` pre-flight before the first write.** Four entries once reported
-  `anchor occurs 0x` because three functions wrapped a `?:` onto a second line and the anchors were
-  written single-line. Cost one run, instead of four entries reported as "no test failed" against
-  code that was never altered. Print `SKIP … anchor occurs Nx` and never count it as a pass; on a 0×,
-  grep the file — **zero occurrences means the code is gone, some occurrences means your anchor is
-  wrong.**
-- **Restore in a `finally` with a printed `restored:` line**, end with
-  `if __name__ == "__main__": main()` (a driver executes on import otherwise), and print the tally
-  `of len(selected)` so a narrowed `RECHECK` run cannot be mistaken for a full one.
-- **Derive a set of *names* by subtracting *names*, and a suite that pins values must say which
-  values it cannot tell apart.** `CrispyTvDarkColorsMappingTest` found both halves of this on its
-  first run. It computed the unmapped palette roles as `allPaletteRoles - mappedRoles.values.toSet()`
-  — a subtraction by **value**, because the map happened to be keyed by palette role and valued by
-  colour. **Ten of `CrispyPalette`'s 37 roles carry the identical value `0xFFFFFFFF`**, and
-  `surfaceContainer` shares `0xFF1F1F1F` with the mapped `surface`, so a value-based difference
-  **deleted the very roles the assertion was about and passed for the wrong reason.** *A value
-  hiding a name is the same shape as `:tv`'s dead `CrispySpinner` duplicate — an identical
-  declaration reachable with no diff.* Subtract by the key, never the value, whenever the key is
-  the thing you mean. And the second half: because so many roles share a value, **no value
-  assertion can tell them apart**, so the suite names the interchangeable set explicitly
-  (`theTenRolesThatShareWhiteAreNamedRatherThanAssumed`) instead of letting a green run imply each
-  role is wired to the right palette entry.
-- **A test's own non-vacuity gate is where a suite learns its limit, and the limit belongs in the
-  assertion, not in a comment.** `noMappedRoleCoincidesWithTheTvLibrarysOwnDefault` asserts that no
-  mapped role carries the value `androidx.tv.material3` would have defaulted to — without it, a
-  suite that forgot to pass a role at all would be green, because the constructed object would hold
-  the default. It failed on the first run and found its own limit: **`scrim` is the one mapped role
-  whose value equals the library's own default** (`0xFF000000`, and the TV library defaults to
-  opaque black), so **no assertion can tell a mapped `scrim` from a dropped one.** It was rewritten
-  to assert the collision set is *exactly* `setOf("scrim")`, so a second collision fails instead of
-  being absorbed into the list — **the difference between documenting a limit and ignoring one.** The
-  suite pins 28 of 29 roles' wiring and its own gate says which one it cannot, which is a better
-  claim than a green suite that implies 29. **When a test cannot cover one case, assert the set of
-  uncovered cases**, so the count is checked and a reader is not left to assume.
+- **A survivor is the absence of a failure _after positive evidence the task ran_; an empty failure
+  list is not one.** `subprocess.run(env=…)` **replaces** the environment, stripping `PATH` and
+  `JAVA_HOME`, so `./gradlew` never starts. Use `env = {**os.environ, ...}` and give the driver a
+  `NO EVIDENCE` verdict requiring `BUILD SUCCESSFUL`/`BUILD FAILED` in the output. **When a driver
+  reports every entry surviving at once, suspect the driver before the code.**
+- **Read an entry's `old`/`new` as code, not its `name`/`why`.** Prose can describe a mutation the
+  patch does not implement, and the verdict then reads exactly like a genuine gap. The tell is *a
+  comment reasoning carefully about an outcome its code cannot produce.*
+- **Read every replacement as code: does it change an answer, and does it compile?** Nine shapes that
+  all look like competent edits — a default *parameter*; a default on a **data-class constructor
+  property** (the most deceptive, the diff reads as a behaviour change); `?: return null` in an
+  expression body; a `?: ""` arm on an `if/else` expression body; a repeated declaration prefix;
+  `x?.y?.z().w()` (a `?.` chain covers only the next call); a rewrite *identical* to the original
+  because the value already was; renaming `runCatching` to `run`; appending a comment or `+ 0L`.
+  **A narrowing over a key two fields populate identically is not a mutation at all** — read the
+  value, not the name, or the entry can only report a false positive. `COMPILE FAILED` is not
+  evidence.
+- **Print the task's own failure lines once before trusting the regex that reads them.**
+  `desktopTest` prints `Class[desktop] > method FAILED`, the host task prints `Class > method FAILED`.
+  **Never pass `-q`** — it suppresses those lines, so the verdict survives and the evidence does
+  not. Truncate the driver's log **per entry**; a superset of the `expect` set means the log is
+  shared.
+- **Never pass a method name to `--tests` — it names a class.** A filter matching nothing fails as
+  `BUILD FAILED` with no `e:` and no `FAILED` line, which a name-reading driver scores SURVIVED. So
+  "many survivors, no compile errors" is a driver verdict before it is a suite verdict.
+- **Pass `--no-build-cache`, and guard on `> Task … (FROM-CACHE|UP-TO-DATE)` as text.** A
+  `FROM-CACHE` task never compiles the mutated source and reports `BUILD SUCCESSFUL in 1s` — **a
+  one-second green from a task you just perturbed is not a result.**
+- **Read the driver's `(failures seen: …)` line before writing any code.** It is the cheapest
+  evidence in the workflow, and a stale `expect` list looks exactly like a genuine survivor and is
+  invisible in the tally. **A caught mutation is evidence that _some_ test caught it, not that the
+  one you would have pointed at did** — a case whose name claims a rule its body does not check is
+  a hole shaped like coverage, and a name narrower than its body is the same defect.
+- **A test-filtered task only observes the source sets it compiles.** `:app:desktopTest` cannot see
+  an `androidMain` mutation however extreme; `testAndroidHostTest` compiles both. *"This cannot be
+  observed" is only ever a claim about the task you ran* — the fix is a different task, not a
+  deleted entry. **A branch inside a `@Composable` body is the one thing that really cannot be
+  observed**: it needs a rendering harness, and the goldens do not render every screen. The
+  decision worth testing there is the caller's.
+- **A guard can be masked by a neighbouring condition, and masking is indistinguishable from
+  absence.** Write down what each world would answer; if the strings are equal, the case is
+  decoration. The discriminator is the input that **reaches the guard you meant and fails only
+  there** — a purely numeric `"5:7"` for an arity check masked by a numeric check; an uppercase
+  host carrying a _lowercase_ `v=` for an `ignoreCase` gate.
 - **A surviving mutation is a claim about the code, so check it by hand.** Read the callee. If the
-  guard is genuinely unreachable, keep it and write the measurement **at the guard** — fourteen so
-  far, in three files, the last two of them *pairs in one file*, which is the tell. If it is
-  reachable, the test was missing. **Fifteen now**, in four files. **Sixteen**, in five.
-  The sixteenth is `PlaybackProgressReporter.syncWatchHistory`'s trailing `return` in the
-  start branch, and it is the first one where **the guard and the assignment above it both
-  answer the same question and neither is visible in the other's KDoc** — deleting the
-  `return` alone changes no answer, because the fall-through below is ended twice over, once
-  by `hasReportedPlaybackStart` being set and once by the delta being 0. Deleting *both* is
-  caught, and the test that catches it had to be written first: a poll with the clock already
-  past `PROGRESS_SYNC_INTERVAL_MS`, so the interval guard is not what ends the fall-through.
-  **Two lines that look redundant and together cover one rule is the shape to watch for
-  here** — ask which of them a reader would delete if the other were gone.
-- **The `[desktop]` suffix on a Gradle `FAILED` line is not always there, so a regex that requires
-  it silently extracts no evidence.** `desktopTest` prints `Class[desktop] > method FAILED`; the
-  host task prints `Class > method FAILED` with no bracket. Six androidMain entries were caught
-  correctly and credited to nothing — every one read as a bare `build failed` — until a single
-  hand-run showed the format. The `-q` rule is the same failure one level up: the *verdict* stays
-  trustworthy and the *evidence* is what you lose, so **print the task's own failure lines once
-  before trusting the regex that reads them.**
-
-- **Truncate the driver's log per entry, not once per run.** Appending across entries makes
-  every entry report *all* earlier failures as its evidence, so a name this entry expects that
-  happened to fail under an earlier mutation is scored as a catch. The five accumulated lists
-  looked like stronger evidence than the honest five minimal ones — a longer failure list is not
-  a more specific one. **Check that a caught entry's failure list is close to its `expect` set**;
-  a superset means the log is shared.
-- **`--tests` names a *class*, and a filter that matches nothing fails the task in a shape a
-  mutation driver reads as a survivor.** `scripts/mutate_player.py` passed
-  `--tests com.crispy.tv.player.<methodName>` to narrow each entry. Gradle resolves the filter
-  as a class pattern, matches no class, and fails with "No tests found for given includes" — a
-  `BUILD FAILED` carrying **no `e:` line and no per-test `FAILED` line**. A driver deciding
-  `CAUGHT`/`SURVIVED` by reading failure names then scored **19 of 23 entries SURVIVED** with
-  `no_evidence=0` and `compile_failed=0`, which reads as a suite in trouble. **The tell was that
-  all four caught entries were the only four with *two* expected failures** — the four the
-  unfiltered path happened to cover; when N of your entries share a code path and only the
-  others report, the difference in the path is the bug. The suite was correct: a hand-run of
-  the first entry failed exactly as the suite claims, in the documented
-  `Class[desktop] > method FAILED` shape. **Never pass a method name to `--tests`, and treat
-  "many survivors, no compile errors" as a driver verdict before it is a suite verdict** — this
-  is the `NO EVIDENCE` rule's blind spot, because a filter that matches nothing *does* produce
-  evidence, it just produces the wrong kind. **The next bullet is the same trap with one entry
-  instead of twenty-three, and it survived this fix because a tally of 22 caught and 1 survived
-  looks reasonable rather than alarming** — which is the real lesson: a driver verdict is not
-  evidence of anything until you have read a failure name.
-- **Two more ways a driver invents a survivor, and one of them is a *stale `expect` list* — which
-  looks exactly like a genuine survivor and is invisible in the tally.** Entry 21 of
-  `scripts/mutate_player.py` (`CoreDomainMetadataLabResolver`'s `addonLookupId`) survived four
-  consecutive runs, and the causes were **three different things, one per run**:
-  1. **A real suite gap** — nothing asserted that line at all, because the one nearby test drove
-     `DefaultMetadataLabResolver` instead. Fixed by adding the case.
-  2. **A `FROM-CACHE` test task.** Without `--no-build-cache`, Gradle served
-     `:android:player:desktopTest` **`FROM-CACHE`** and left `compileKotlinDesktop`
-     `UP-TO-DATE`, so the mutated source was **never compiled**; the task reported
-     `BUILD SUCCESSFUL in 1s` and the driver wrote a confident verdict about code it had not
-     built. The `NO EVIDENCE` rule cannot catch this — the task *did* report a verdict — so the
-     guard has to be a text match on `> Task :…:desktopTest (FROM-CACHE|UP-TO-DATE)`. **A
-     one-second green from a task you just perturbed is not a result.**
-  3. **A stale `expect` list, after the suite was already correct.** The fix in (1) added a
-     better test, but the entry still named the *old* one, so the driver's substring test found
-     no hit and reported `SURVIVED` — while printing the failing test's name in plain sight on
-     the `(failures seen: […])` line. **When an entry names the case you just replaced, or a
-     hand-run shows the suite catching something the driver calls a survivor, the driver's
-     expectation is what is stale.** Read the `(failures seen: …)` line before writing any
-     code: it is the cheapest evidence in the whole workflow, and a `SURVIVED` verdict printed
-     directly above a correct failure name is a self-evident bug. Generalising all three: *the
-     verdict was sound every time and the evidence was about a different run* — which is the
-     same shape as the log-truncation rule above, and the reason "no test failed" is a finding
-     to investigate rather than a result to record.
-- **A surviving mutation is not the only way a case can fail to be the one doing the work — a
-  *caught* one can too, and the tell is that the failure list does not contain the case you
-  would have named.** `scripts/mutate_network.py` entry 13 drops `?` from the pattern's
-  `[?&]v=`, leaving `&v=`, and the driver reported `SURVIVED` for
-  `theQueryParameterFormIsReadWithOrWithoutTheAmpersand`. The `(failures seen: […])` line
-  printed **three other cases** and not that one — and reading them showed the named case's
-  body asserted **only the `&` form**, while its *name* claimed both. The mutation was caught;
-  the case that names the rule simply did not write the rule down. This is the mirror of the
-  stale-`expect` bullet above and the same lesson from the other direction: **a caught
-  mutation is evidence that *some* test caught it, not that the test you would have pointed at
-  is the one that did.** So the `expect` set and the `(failures seen: […])` list are two
-  different claims, and when they disagree the right move is to open the test the mutation
-  actually broke and ask whether its name overstates its body. Overstated names are a defect
-  in their own right — a reader trusts the name and skips the body.
-- **A guard can be *masked* by a neighbouring condition, and masking is indistinguishable from
-  absence until you write the input that reaches the guard and fails only there.**
-  `extractYouTubeVideoId`'s `contains("youtu", ignoreCase = true)` gate looks redundant. It is
-  not: drop `ignoreCase = true` and the mutation survives — because the *obvious* fixture, an
-  uppercase `YOUTU.BE/dQw4w9WgXcQ`, passes the gate, then fails the lowercase-only
-  `youtu\.be/` alternative, then falls through to the `?: trimmed` fallback, and **that is the
-  same string a case-sensitive gate would have returned anyway**. Both worlds answer alike, so
-  the case is decoration. The fixture that separates them is an uppercase host carrying a
-  **lowercase** `v=` or `/embed/` — `https://YOUTU.com/watch?v=abcdefghijk` returns
-  `"abcdefghijk"` with the guard and the whole URL without it. **The sixteen "redundant guard"
-  findings in this file are all claims that a guard has no effect; this is the other side of
-  that, and it is worse to miss, because the mutation result looks like agreement.** When a
-  guard's own fixture returns a value that a *fallback* could also produce, the guard is
-  untested rather than redundant — write down what each world would answer, and if the strings
-  are equal the case is decoration. The `parseLookupId` arity/numeric pair below is the same
-  shape, and the discriminator there was a purely numeric `"5:7"`; here it is a lower-case
-  alternative reached through an upper-case gate.
-- **A test whose name states a rule its body does not check is a hole shaped like coverage.**
-  `theQueryParameterFormIsReadWithOrWithoutTheAmpersand` covered only the `&` form, so the
-  `?` half of the character class was unasserted *by the case that names it* — the other
-  cases caught the mutation, so nothing was red, and the name was the only thing wrong. This
-  is the generalisation of the "a test that samples the cases instead of enumerating them
-  tests the sample" rule from the other end: there the body was narrower than the intent,
-  here the *name* is wider than the body. **When a name says "with and without", "either",
-  or "every", the body has to enumerate both halves** — and a mutation caught by some *other*
-  case is not evidence that this one does its job.
-- **A survivor can mean the *case* was caught by the wrong one of two conditions defending the
-  same rule — and then the guard was fine and the test was not.** `parseLookupId`'s arity
-  check (`parts.size >= 3`) and its numeric check (`toIntOrNull()` and `> 0`) both defend
-  "a season/episode pair is only read from a three-part id". Loosening the arity to `>= 2`
-  left the case **unobservable**: my input `"tt1234:5"` makes `parts[lastIndex-1]` = `"tt1234"`,
-  whose `toIntOrNull()` is null, so the *numeric* guard caught it and the answer did not move.
-  The discriminator is the input that **reaches the guard you meant and fails only there** —
-  a purely numeric pair, `"5:7"`, which with the arity loosened claims season 5, episode 7 and
-  an **empty** base id. This is the redundant-guard finding seen from the other side: those
-  sixteen say a guard has no effect, and this says **a guard can have an effect that a
-  neighbouring condition is masking**, which is indistinguishable from "no effect" from the
-  outside. When a survivor turns out to be defended by a sibling condition, write the second
-  case before deciding the guard is or is not real — and say in the test's comment *why the
-  case exists*, because nothing about it looks load-bearing.
-
-- **A claim about one line, justified by a measurement of a *different* line, survives a mutation
-  run and then refutes a true claim — and the rule above is what catches it.** I asserted that
-  AOSP's `optString` of a JSON null is `"null"` where the reference gives `""`, and that
-  `CrispyBackendJsonExtensions`'s `it.equals("null", ignoreCase = true)` branch exists *because*
-  of it. Deleting the branch failed only a fixture holding `{"nullText":"null"}` — a **string** —
-  while `theStringNullBranchIsCarriedByThePlatformsOwnRenderingOfAJsonNull`, the case written to
-  carry the claim, **passed**: it asserted `json.get("nullish").toString()`, the **sentinel's own**
-  `toString`, not `optString`. I read that as a refutation and rewrote the KDoc to record the
-  divergence as false. Rewriting the case to assert `optString` directly then **failed**
-  `expected:<[]> but was:<[null]>`, so the original measurement was right all along. **Why the
-  mutation could not see it is the body:** `optNullableString` is
-  `if (!json.has(key) || json.isNull(key)) return null` **then** `optString(key)`, so **a JSON null
-  never reaches `optString`** — the guard one line above is what rejects it, and the `equals`
-  branch is carried by a genuine string value reading `"null"`, which the guard does not catch
-  (`has = true`, `isNull = false`). **Three lines, two of which look redundant, and a test written
-  to observe the divergence is defeated by the middle one.** The rule this leans on is the one
-  above — a caught mutation is evidence that *some* test caught it, not that the one you would
-  have pointed at did the catching — **and here it did a job it was not written for: it corrected
-  a false claim rather than a stale `expect` list, which is the more valuable of the two, because
-  a stale list costs a re-run and a false claim costs a KDoc that tells the next reader the guard
-  is redundant.**
+  guard is genuinely unreachable, keep it and write the measurement **at the guard**. **Two lines
+  that look redundant and together cover one rule is the shape to watch for** — ask which one a
+  reader would delete if the other were gone.
+- **A set of names is derived by subtracting names, never values.** Ten of `CrispyPalette`'s 37
+  roles share `0xFFFFFFFF`, so a value-based difference deleted the very roles the assertion was
+  about and passed for the wrong reason. Because so many share a value, **no value assertion can
+  tell them apart** — the suite must name the interchangeable set, and a test that cannot cover one
+  case asserts the set of uncovered cases (`:tv`'s `scrim` equals the library's own default, so a
+  mapped `scrim` and a dropped one are indistinguishable).
+- **A port's implementation is the file most worth covering** — it is what a `commonTest` suite
+  cannot reach at all, especially an implementation behind a port created in the same landing.
+- **A mutation entry list is a design decision, and padding it with `expect_survive` states the
+  opposite of the truth.** A defect whose only symptom is *not compiling for a platform* has no
+  local observation path, so the driver says so in prose and names the remote gate.
+- **Mechanics.** Run a `check_anchors()` pre-flight and print `SKIP … anchor occurs Nx` — never
+  count it as a pass; on a 0×, grep the file, because zero occurrences means the code is gone and
+  some means your anchor is wrong. Restore in a `finally` with a printed `restored:` line, end with
+  `if __name__ == "__main__": main()`, and print `of len(selected)` so a narrowed `RECHECK` run
+  cannot be mistaken for a full one. `Pattern.finditer(s, re.M)` does not set a flag and does not
+  raise — on a *compiled* pattern the second argument is `pos`, so `^` can never match again and the
+  scan returns empty, which reports "no test failed" for a suite that failed by name; use
+  `re.compile(p, re.M)` and scan with one argument. **Take a capture-group index from the pattern
+  in front of you**, not from a sibling driver.
 
 ### 6. Editing safely
 
-- **Never rewrite source with a regex.** It cannot see inside comments or string literals; a
+- **Never rewrite source with a regex.** It cannot see inside comments or string literals, and a
   "sound" cleanup rule once self-matched on its own package and deleted 140 live imports. For a
-  mechanical change, let the compiler find the sites, or parse properly — the character-scanner lexer
-  in `scripts/verify_kmp_outputs.py` is the model.
-- **A python patch must assert each anchor exactly once,** and **read the region back** after a
-  positional or structural patch: a count assertion does not check the brackets around what it
-  replaced, and only `diff` sees a four-space shift.
+  mechanical change, let the compiler find the sites, or parse properly — the character-scanner
+  lexer in `scripts/verify_kmp_outputs.py` is the model.
+- **A python patch must compute every new content before it opens any file for writing, assert each
+  anchor exactly once, and read the region back afterwards.** Three failures, each of which
+  destroyed something or hid it:
+  - **`open(path, "w")` truncates before the argument is evaluated**, so a rewrite that computes its
+    content *inside* the `write()` call raises on a bad anchor **after** the file is already empty.
+    A `results` dict of every new content, written only at the end, also means an assertion failure
+    on the seventh file leaves the first six untouched.
+  - **Replacements must be applied cumulatively.** Computing two replacements from the same original
+    and writing both loses the first — and every `occurs 1x` assertion still passes.
+  - **A count assertion does not check the brackets around what it replaced**, and only `diff` sees
+    a four-space shift.
+- **Structural line-range edits must precede string replacements earlier in the same file.** A
+  replacement changes the line count and moves the range out from under the edit.
+- **An anchor copied from a tool's rendered output can differ in one character** — the source had
+  an em-dash `—` where I typed `--`, giving `occurs 0x`.
+- **A count you assert while patching is a claim about the code, and the code is the only thing
+  that settles it.** A patch asserting a guard occurs "4 times" aborted with `AssertionError: 5` and
+  wrote nothing — the guard was five-armed, and the "four times" figure in the KDoc was wrong for
+  the same reason. The assertion did its job; the number was the error.
+- **A file's first line is not its `package` line.** A `@file:OptIn` or `@file:JvmName` may come
+  first, so a patch rewriting the region above the package declaration eats the package statement
+  and leaves the import pasted onto it. **The signature is one distinct unresolved name
+  (`CrispyPalettepackage`) inside a 328-error cascade**; find the mangled name before reading the
+  cascade, and locate the package line by regex rather than by indexing line 0.
 - **Inserting a declaration between an annotation and its target silently re-targets the
   annotation**, and the main compile will not catch it — a `@Composable` function returning `String?`
-  is legal. It surfaces in the *test* compilation as "must be marked @Composable" on the test method
-  plus an error at every call site. **When every error is that, the annotation is misplaced, not the
-  calls.** Verify by counting pairs against the original.
+  is legal. It surfaces in the *test* compilation as "must be marked @Composable" plus an error at
+  every call site. **When every error is that, the annotation is misplaced, not the calls.**
 - **Extracting a decision out of a `val` can destroy a smart cast the branch depended on.** The fix
   is a safe call that is behaviourally identical, and the compiler is right to complain.
 - **A "no forbidden token remains" guard must be scoped to code, not prose** — you will write about
@@ -1287,26 +855,9 @@ Every rule in this section is stated in each driver's docstring, because a drive
 - **`git mv` preserves mtime**, so Gradle's incremental Kotlin compile can skip a moved file and
   report success with no class produced. Compile a moved file once with `--rerun-tasks`.
 - **After any revert, check `git status --short` for ` D` in the index** and compile *both* source
-  sets; a revert that only compiles the source set you moved *from* proves nothing, and the index
-  half is the part people forget.
-- **A file's first line is not its `package` line.** A `@file:OptIn(...)` or `@file:JvmName`
-  annotation may come first, so a patch that rewrites the region above the package declaration
-  eats the package statement and leaves the import pasted onto it — `import com.crispy.tv.ui.theme.CrispyPalettepackage com.crispy.tv.playerui`.
-  **The signature is one distinct unresolved name, `CrispyPalettepackage`, inside a 328-error
-  cascade**; find that mangled name before reading the cascade, and locate the package line with
-  `len(re.findall(r"^package com\.crispy\.tv\.\S+$", s, re.M)) == 1` rather than indexing line 0.
-- **`open(path, "w")` truncates before the argument is evaluated.** A single-expression rewrite
-  that computes its new content *inside* the `write()` call can raise — on a bad anchor, a
-  `ValueError: substring not found` — **after** the file has already been emptied. One such
-  patch destroyed a 368-line file and the exception named the patch, not the file. Build a
-  `results` dict of every new content **first**, and only then open any file for writing; that
-  ordering also means an assertion failure on the seventh file leaves the first six untouched.
-
-- **A count you assert while patching is a claim about the code, and the code is the only
-  thing that settles it.** A patch asserting the episode guard occurs "4 times" aborted with
-  `AssertionError: 5` and wrote nothing — the guard was five-armed, and the "four times, three
-  with the same message" figure in the KDoc and in the plan was wrong for the same reason. The
-  assertion did its job; the number was the error.
+  sets. A revert that only compiles the source set you moved *from* proves nothing, and a partial
+  revert looks exactly like a completed one. `git restore --staged --worktree <path>` is the
+  reliable restore; the index is the part people forget.
 
 ## Compose resources (Phase 4 Step 1)
 
