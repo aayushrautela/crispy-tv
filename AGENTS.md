@@ -614,6 +614,17 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   no import for it, which is how you tell that its type is same-package. **Two declarations share
   a simple name; the package that has to win is the one the *interface* imports, not the one the
   first grep hit.**
+- **A caller that already collapses every failure into one answer does not need a port to
+  distinguish them; a caller that answers two different ways does.** This is the same rule as the
+  bullet below, applied to a port's *shape*. Three call sites held `toHttpUrlOrNull()` when
+  `CrispyHttpClient` became a `commonMain` interface: two of them wrapped the call in
+  `runCatching { }.getOrNull()`, so a malformed url and a failed request were already the same
+  answer and they kept the throwing member unchanged. **Only the third needed anything** — it maps
+  an unusable url to one sealed case and a thrown request to another, *where the first is not
+  retryable and the second is*, so a port whose every member throws would have made a malformed
+  url retryable. **So the port gained exactly one member with exactly one caller**, and the
+  decision came from reading each caller's body rather than from the three sites sharing a name.
+  **`null` means "this was never a request"; a throw still means "the request failed".**
 - **A `null` and a `throw` are different answers, and `runCatching { }.getOrNull()` collapses
   them silently.** `SeasonEpisodesLoader` asks for a session; the original reported "Failed to
   load episodes." when that lookup *threw* and "Sign in to load episodes." when it returned null.
@@ -646,6 +657,20 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 
 ### 3. Tests
 
+- **A count that says a symbol is still used is evidence to keep its import, not permission to
+  delete it.** Counting `Headers` in one file while excluding import lines returned `1`; the `1`
+  *was* a live `headers = Headers.headersOf("Accept", "application/json")` in a function, and
+  removing the import produced `Unresolved reference 'Headers'`. **The count is a list of what to
+  go and read, not a list of what is dead** — and a compile is what settles it, not the grep.
+- **Clear every module you will read, and read no wider than the tasks you ran — a `rm -rf` list
+  shorter than the read glob turns a green suite into three phantom failures.** A seven-task run
+  reported `1712 tests, 3 failures` with a real-looking signature (base64 halves transposed,
+  `aXY` against `Y2lwaGVydGV4dA=`), in a module this change had not touched
+  (`git status --porcelain -- android/platform-core/ | wc -l` -> `0`, and the format's `encode`
+  and `decode` verified correct on disk). **The `rm` covered five modules and omitted the sixth;
+  the read glob was wider than the tasks invoked.** The re-run of that module's own task was
+  `tests=8 failures=0`. *A failure list that does not move when the code under it changed means
+  you are reading the previous run — and here the code under it was never changed at all.*
 - **`build/test-results/<task>/` is not cleared when the compile fails, so it reports the
   previous run.** A `desktopTest` invocation reported `EXIT=1` with 444 tests and the
   *identical* two failures while the log's real content was
@@ -842,7 +867,12 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   shared.
 - **Never pass a method name to `--tests` — it names a class.** A filter matching nothing fails as
   `BUILD FAILED` with no `e:` and no `FAILED` line, which a name-reading driver scores SURVIVED. So
-  "many survivors, no compile errors" is a driver verdict before it is a suite verdict.
+  "many survivors, no compile errors" is a driver verdict before it is a suite verdict. **The
+  companion half is to make sure the task *owns* the class**, because the symptom is
+  indistinguishable from a compile failure: `com.crispy.tv.platform.SecretFormatTest` is
+  `platform-core/src/commonTest`, and filtering for it on `:core-domain:desktopTest` returned
+  `EXIT=1` with **zero `e:` lines and zero tests found** — the same `EXIT=1`-with-no-`e:`
+  signature as task selection.
 - **Pass `--no-build-cache`, and guard on `> Task … (FROM-CACHE|UP-TO-DATE)` as text.** A
   `FROM-CACHE` task never compiles the mutated source and reports `BUILD SUCCESSFUL in 1s` — **a
   one-second green from a task you just perturbed is not a result.**

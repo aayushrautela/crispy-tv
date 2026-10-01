@@ -2,8 +2,6 @@ package com.crispy.tv.network
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import com.crispy.tv.network.CrispyHttpClient
-import com.crispy.tv.network.CrispyOkHttpFactory
 import okhttp3.OkHttpClient
 
 object AppHttp {
@@ -40,7 +38,7 @@ object AppHttp {
         httpClient?.let { return it }
         synchronized(this) {
             httpClient?.let { return it }
-            val created = CrispyHttpClient(okHttp(context))
+            val created = OkHttpCrispyHttpClient(okHttp(context))
             httpClient = created
             return created
         }
@@ -70,7 +68,7 @@ object AppHttp {
         aiHttpClient?.let { return it }
         synchronized(this) {
             aiHttpClient?.let { return it }
-            val created = CrispyHttpClient(aiOkHttp(context))
+            val created = OkHttpCrispyHttpClient(aiOkHttp(context))
             aiHttpClient = created
             return created
         }

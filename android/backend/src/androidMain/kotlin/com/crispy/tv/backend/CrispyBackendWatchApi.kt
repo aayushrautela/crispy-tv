@@ -1,8 +1,7 @@
 package com.crispy.tv.backend
 
-import okhttp3.Request
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.crispy.tv.network.HttpMethod
+import com.crispy.tv.network.HttpRequest
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -12,7 +11,7 @@ internal suspend fun CrispyBackendClient.getHomeApi(
 ): ProfileHomeResponse? {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/home".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/home",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -30,7 +29,7 @@ internal suspend fun CrispyBackendClient.getHomeApi(
 internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, profileId: String): CalendarResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/calendar".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/calendar",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -47,7 +46,7 @@ internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, pro
 internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: String, profileId: String): CalendarResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/calendar/this-week".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/calendar/this-week",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -68,7 +67,7 @@ internal suspend fun CrispyBackendClient.getUpNextApi(
 ): UpNextResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/episodic-follow".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/episodic-follow",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -118,7 +117,7 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
         put("payload", input.payload.toJsonObject())
     }.toString()
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/events".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/events",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -144,7 +143,7 @@ internal suspend fun CrispyBackendClient.dismissContinueWatchingApi(
 ): WatchActionResponse {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/continue-watching/${itemId.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/continue-watching/${itemId.trim()}",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -190,7 +189,7 @@ internal suspend fun CrispyBackendClient.getWatchGenerationsApi(
 ): WatchGenerationsResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/generations".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/generations",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -212,10 +211,11 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
     checkConfigured()
     val normalizedItemId = itemId.trim()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/state".toHttpUrl().newBuilder()
-            .addQueryParameter("itemId", normalizedItemId)
-            .addQueryParameter("extended", "true")
-            .build(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/state",
+        query = listOf(
+            "itemId" to normalizedItemId,
+            "extended" to "true",
+        ),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -242,7 +242,7 @@ internal suspend fun CrispyBackendClient.getWatchStatesApi(
         },
     ).toString()
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/states".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/states",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -280,11 +280,12 @@ internal suspend fun CrispyBackendClient.putWatchlistApi(
         if (payload.isNotEmpty()) put("payload", payload.toJsonObject())
     }.toString()
     val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${itemId.trim()}".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .put(requestBody.toRequestBody(jsonMediaType))
-            .build(),
+        request = HttpRequest(
+            method = HttpMethod.PUT,
+            url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${itemId.trim()}",
+            headers = authHeaders(accessToken),
+            body = requestBody,
+        ),
         callTimeoutMs = callTimeoutMs,
     )
     return parseWatchActionResponse(requireSuccess(response))
@@ -297,7 +298,7 @@ internal suspend fun CrispyBackendClient.deleteWatchlistApi(
 ): WatchActionResponse {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${itemId.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${itemId.trim()}",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -319,11 +320,12 @@ internal suspend fun CrispyBackendClient.setLikedApi(
         if (payload.isNotEmpty()) put("payload", payload.toJsonObject())
     }.toString()
     val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${itemId.trim()}".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .put(requestBody.toRequestBody(jsonMediaType))
-            .build(),
+        request = HttpRequest(
+            method = HttpMethod.PUT,
+            url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${itemId.trim()}",
+            headers = authHeaders(accessToken),
+            body = requestBody,
+        ),
         callTimeoutMs = callTimeoutMs,
     )
     return parseWatchActionResponse(requireSuccess(response))
@@ -336,7 +338,7 @@ internal suspend fun CrispyBackendClient.deleteRatingApi(
 ): WatchActionResponse {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${itemId.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${itemId.trim()}",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -352,16 +354,15 @@ private suspend fun CrispyBackendClient.listClientMediaCardQueryResultApi(
 ): ClientMediaCardQueryResult {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
-            .addQueryParameter("extended", "true")
-            .apply {
-                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
-                if (nextCursor != null) {
-                    addQueryParameter("cursor", nextCursor)
-                }
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path",
+        query = buildList {
+            add("limit" to limit.coerceAtLeast(1).toString())
+            add("extended" to "true")
+            val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
+            if (nextCursor != null) {
+                add("cursor" to nextCursor)
             }
-            .build(),
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -385,7 +386,7 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
         put("payload", input.payload.toJsonObject())
     }.toString()
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,

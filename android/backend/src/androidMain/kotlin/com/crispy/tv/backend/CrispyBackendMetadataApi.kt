@@ -3,7 +3,6 @@ package com.crispy.tv.backend
 import com.crispy.tv.ai.AiInsightsResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,12 +12,12 @@ internal suspend fun CrispyBackendClient.searchTitlesApi(
     limit: Int = 20,
 ): SearchResultsResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
-        .addQueryParameter("query", query.trim())
-        .addQueryParameter("limit", limit.toString())
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/search/titles",
+        query = buildList {
+            add("query" to query.trim())
+            add("limit" to limit.toString())
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -32,12 +31,12 @@ internal suspend fun CrispyBackendClient.searchSuggestionsApi(
     limit: Int = 8,
 ): SearchSuggestionsResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/search/suggestions".toHttpUrl().newBuilder()
-        .addQueryParameter("query", query.trim())
-        .addQueryParameter("limit", limit.toString())
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/search/suggestions",
+        query = buildList {
+            add("query" to query.trim())
+            add("limit" to limit.toString())
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -51,12 +50,12 @@ internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(
     limit: Int = 20,
 ): SearchResultsResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
-        .addQueryParameter("genre", genre.trim())
-        .addQueryParameter("limit", limit.toString())
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/search/titles",
+        query = buildList {
+            add("genre" to genre.trim())
+            add("limit" to limit.toString())
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -76,7 +75,7 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
     val response = aiHttpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/search".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/search",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = aiCallTimeoutMs,
@@ -95,15 +94,14 @@ internal suspend fun CrispyBackendClient.browseTitlesApi(
     checkConfigured()
     // The route schema rejects unknown query params, so the page size is a
     // server-side decision and must not be sent from here.
-    val urlBuilder = "$baseUrl/v1/browse/titles".toHttpUrl().newBuilder()
-        .apply {
-            addQueryParameter("type", type.trim())
-            genre?.trim()?.takeIf { it.isNotBlank() }?.let { addQueryParameter("genre", it) }
-            addQueryParameter("sort", sort.trim())
-            addQueryParameter("page", page.toString())
-        }
     val response = httpClient.get(
-        url = urlBuilder.build(),
+        url = "$baseUrl/v1/browse/titles",
+        query = buildList {
+            add("type" to type.trim())
+            genre?.trim()?.takeIf { it.isNotBlank() }?.let { add("genre" to it) }
+            add("sort" to sort.trim())
+            add("page" to page.toString())
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -117,15 +115,13 @@ internal suspend fun CrispyBackendClient.getMetadataPersonDetailApi(
     language: String? = null,
 ): MetadataPersonDetail {
     checkConfigured()
-    val url = "$baseUrl/v1/metadata/people/${personId.trim()}".toHttpUrl().newBuilder()
-        .apply {
-            if (!language.isNullOrBlank()) {
-                addQueryParameter("language", language)
-            }
-        }
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/metadata/people/${personId.trim()}",
+        query = buildList {
+            if (!language.isNullOrBlank()) {
+                add("language" to language)
+            }
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -145,7 +141,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
     val response = aiHttpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/insights".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/insights",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = aiCallTimeoutMs,
@@ -160,7 +156,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
 ): MetadataTitleDetailResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/items/${itemId.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/items/${itemId.trim()}",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -184,7 +180,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
 ): MetadataTitleExtrasResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/items/${itemId.trim()}/extras".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/items/${itemId.trim()}/extras",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -228,7 +224,7 @@ internal suspend fun CrispyBackendClient.getSeriesEpisodesApi(
         if (season != null) append("?season=$season")
     }
     val response = httpClient.get(
-        url = url.toHttpUrl(),
+        url = url,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -251,7 +247,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemRatingsApi(
 ): MetadataTitleRatingsResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/items/${itemId.trim()}/ratings".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/items/${itemId.trim()}/ratings",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -268,13 +264,11 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
     input: ItemLookupInput,
 ): PlaybackResolveResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/playback/resolve".toHttpUrl().newBuilder()
-        .apply {
-            if (!input.itemId.isNullOrBlank()) addQueryParameter("itemId", input.itemId.trim())
-        }
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/playback/resolve",
+        query = buildList {
+            if (!input.itemId.isNullOrBlank()) add("itemId" to input.itemId.trim())
+        },
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )

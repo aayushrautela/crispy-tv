@@ -862,9 +862,22 @@ places, and **it never touches `OkHttpClient`**; it talks through
 declared `data class CrispyHttpResponse(val url: HttpUrl, val code: Int, val
 headers: Headers, val body: String)`, so **the response type names OkHttp in its
 constructor.** Closing this means a different response type (`url: String`,
-`headers: Map<String, String>`) rippling through ~100 call sites that read
-`response.url`, `response.header(…)` and `response.code` — a transport
-migration, not a node-type migration. *`CrispyBackendClient`'s own KDoc already
+`headers: Map<String, String>`) — and **the figure that used to stand here was a
+guess with no command behind it, wrong in its reasoning as well as its
+arithmetic.** It read *"rippling through ~100 call sites that read
+`response.url`, `response.header(…)` and `response.code`"*. Measured: **53**, and
+**two of those three fields have zero readers.** `CrispyHttpResponse.header(name)`
+has **0** callers — all ten unqualified `.header(` hits are OkHttp builder and
+accessor calls (`request.header(…)`, `Headers.Builder.header`, `SsrfGuard`), none on
+this response type. `url` has **0** readers — the only hit is the assignment that
+populates it. Only `code` is actually read. So the port drops `url` and `headers`
+and `header(name)` outright rather than migrating them. **The 53 is
+`postJson` 15 + `get` 27 + `delete` 6 + `execute` 5**, all receiver-qualified;
+and it is corroborated by a count that started from a different direction —
+**58** repo-wide `.toHttpUrl()` lines, less 4 inside the new implementation and 1
+in `:watchhistory`'s own direct-OkHttp file — which is the completion check.
+It is still **a transport migration, not a node-type migration**, and that is the
+part of the old sentence that survives. *`CrispyBackendClient`'s own KDoc already
 said it is `androidMain` because it speaks OkHttp and `org.json`; the measurement
 refutes the `org.json` half and keeps the OkHttp half, so the sentence survives by
 accident rather than by being right.*

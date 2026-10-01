@@ -15,8 +15,6 @@ import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.addons.streams.asApiPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -497,12 +495,11 @@ private fun buildLookupId(contentId: String, season: Int?, episode: Int?): Strin
 }
 
 private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {
-    val httpUrl = url.toHttpUrlOrNull() ?: return null
     val response =
         runCatching {
             get(
-                url = httpUrl,
-                headers = Headers.Builder().add("Accept", "application/json").build()
+                url = url,
+                headers = mapOf("Accept" to "application/json"),
             )
         }.getOrNull() ?: return null
 

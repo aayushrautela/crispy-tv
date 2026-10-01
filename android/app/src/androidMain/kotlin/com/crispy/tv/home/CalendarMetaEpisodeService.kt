@@ -7,7 +7,6 @@ import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.addons.lookup.parseLookupId
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -302,8 +301,7 @@ internal data class MetaVideo(
 )
 
 private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {
-    val httpUrl = url.toHttpUrlOrNull() ?: return null
-    val response = runCatching { get(httpUrl) }.getOrNull() ?: return null
+    val response = runCatching { get(url = url) }.getOrNull() ?: return null
     if (response.code !in 200..299) return null
     return runCatching { JSONObject(response.body) }.getOrNull()
 }

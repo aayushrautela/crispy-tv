@@ -3,9 +3,6 @@ package com.crispy.tv.backend
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 
 data class RemoteTrailerDto(
@@ -423,21 +420,32 @@ class CrispyBackendClient(
         }
     }
 
-    internal fun authHeaders(accessToken: String): Headers {
-        return Headers.Builder()
-            .add("Authorization", "Bearer ${accessToken.trim()}")
-            .add("Content-Type", "application/json")
-            .add("Accept", "application/json")
-            .build()
-    }
+    /**
+     * A `Map<String, String>` rather than OkHttp's `Headers`, which is the whole
+     * reason this file can drop its last three `okhttp3` imports. **It is one
+     * function on purpose:** all 48 call sites pass `authHeaders(accessToken)`,
+     * so changing the return type here is what fixes every one of them, and
+     * changing it anywhere else would leave 48 sites still building a `Headers`
+     * that nothing accepts.
+     *
+     * `+` is the equivalent of the old `Headers.newBuilder().add(...)`: the
+     * one-argument overload never sets `X-Profile-ID`, so there is no key for
+     * `+` to overwrite, and a `Map` cannot hold the duplicate an
+     * `Headers.Builder` would have allowed.
+     */
+    internal fun authHeaders(accessToken: String): Map<String, String> =
+        mapOf(
+            "Authorization" to "Bearer ${accessToken.trim()}",
+            "Content-Type" to "application/json",
+            "Accept" to "application/json",
+        )
 
-    internal fun authHeaders(accessToken: String, profileId: String): Headers {
-        val builder = authHeaders(accessToken).newBuilder()
-        if (profileId.isNotBlank()) {
-            builder.add("X-Profile-ID", profileId.trim())
+    internal fun authHeaders(accessToken: String, profileId: String): Map<String, String> =
+        if (profileId.isBlank()) {
+            authHeaders(accessToken)
+        } else {
+            authHeaders(accessToken) + ("X-Profile-ID" to profileId.trim())
         }
-        return builder.build()
-    }
 
     internal fun requireSuccess(response: CrispyHttpResponse): JSONObject {
         return if (response.code in 200..299) {
@@ -486,12 +494,8 @@ class CrispyBackendClient(
     internal val aiCallTimeoutMs: Long
         get() = AI_CALL_TIMEOUT_MS
 
-    internal val jsonMediaType
-        get() = JSON_MEDIA_TYPE
-
     private companion object {
         private const val CALL_TIMEOUT_MS = 45_000L
         private const val AI_CALL_TIMEOUT_MS = 120_000L
-        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

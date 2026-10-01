@@ -6,8 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -309,8 +307,8 @@ class RemoteIntroSkipService(
         return runCatching {
             val response =
                 httpClient.get(
-                    url = url.toHttpUrl(),
-                    headers = Headers.headersOf("Accept", "application/json"),
+                    url = url,
+                    headers = mapOf("Accept" to "application/json"),
                     callTimeoutMs = timeoutMs.toLong(),
                 )
             HttpResponse(statusCode = response.code, body = response.body)

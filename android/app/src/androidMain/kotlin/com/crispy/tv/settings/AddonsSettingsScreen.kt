@@ -75,8 +75,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jetbrains.compose.resources.painterResource
 import org.json.JSONArray
 import org.json.JSONObject
@@ -948,8 +946,8 @@ private suspend fun httpGetJson(httpClient: CrispyHttpClient, url: String): JSON
     val response =
         runCatching {
             httpClient.get(
-                url = url.toHttpUrl(),
-                headers = Headers.headersOf("Accept", "application/json"),
+                url = url,
+                headers = mapOf("Accept" to "application/json"),
                 callTimeoutMs = 12_000L,
             )
         }.getOrNull() ?: return null

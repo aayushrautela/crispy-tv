@@ -1,16 +1,14 @@
 package com.crispy.tv.backend
 
-import okhttp3.Headers
-import okhttp3.Request
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.crispy.tv.network.HttpMethod
+import com.crispy.tv.network.HttpRequest
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal suspend fun CrispyBackendClient.getMeApi(accessToken: String): MeResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/me".toHttpUrl(),
+        url = "$baseUrl/v1/me",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -43,7 +41,7 @@ internal suspend fun CrispyBackendClient.createProfileApi(
         }
     }.toString()
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles".toHttpUrl(),
+        url = "$baseUrl/v1/profiles",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -68,7 +66,7 @@ internal suspend fun CrispyBackendClient.bootstrapAccountApi(
         .apply { if (!region.isNullOrBlank()) put("region", region.trim()) }
         .toString()
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/account/bootstrap".toHttpUrl(),
+        url = "$baseUrl/v1/account/bootstrap",
         jsonBody = payload,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -85,7 +83,7 @@ internal suspend fun CrispyBackendClient.listImportConnectionsApi(
 ): ProviderAccountsResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -98,7 +96,7 @@ internal suspend fun CrispyBackendClient.listImportConnectionsApi(
 internal suspend fun CrispyBackendClient.listImportJobsApi(accessToken: String, profileId: String): ImportJobsResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/imports".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/imports",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -118,7 +116,7 @@ internal suspend fun CrispyBackendClient.startImportApi(
 ): StartImportResult {
     checkConfigured()
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/imports/start".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/imports/start",
         jsonBody = JSONObject()
             .put("provider", provider.apiValue)
             .put("action", action)
@@ -145,7 +143,7 @@ internal suspend fun CrispyBackendClient.getProfileSettingsApi(
 ): ProfileSettings {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/settings".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/settings",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -165,11 +163,12 @@ internal suspend fun CrispyBackendClient.patchProfileSettingsApi(
         settings.forEach { (key, value) -> put(key, value) }
     }.toString()
     val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/profiles/${profileId.trim()}/settings".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .patch(payload.toRequestBody(jsonMediaType))
-            .build(),
+        request = HttpRequest(
+            method = HttpMethod.PATCH,
+            url = "$baseUrl/v1/profiles/${profileId.trim()}/settings",
+            headers = authHeaders(accessToken),
+            body = payload,
+        ),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
@@ -185,7 +184,7 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
 ): ProviderState {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections/${provider.apiValue}".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections/${provider.apiValue}",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -197,7 +196,7 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
 internal suspend fun CrispyBackendClient.listProfilesApi(accessToken: String): List<Profile> {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles".toHttpUrl(),
+        url = "$baseUrl/v1/profiles",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -218,11 +217,12 @@ internal suspend fun CrispyBackendClient.updateProfileApi(
         if (input.sortOrder != null) put("sortOrder", input.sortOrder)
     }.toString()
     val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/profiles/${profileId.trim()}".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .patch(payload.toRequestBody(jsonMediaType))
-            .build(),
+        request = HttpRequest(
+            method = HttpMethod.PATCH,
+            url = "$baseUrl/v1/profiles/${profileId.trim()}",
+            headers = authHeaders(accessToken),
+            body = payload,
+        ),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
@@ -233,7 +233,7 @@ internal suspend fun CrispyBackendClient.updateProfileApi(
 internal suspend fun CrispyBackendClient.getAccountSettingsApi(accessToken: String): AccountSettings {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/account/settings".toHttpUrl(),
+        url = "$baseUrl/v1/account/settings",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -250,11 +250,12 @@ internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
         settings.forEach { (key, value) -> put(key, value) }
     }.toString()
     val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/account/settings".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .patch(payload.toRequestBody(jsonMediaType))
-            .build(),
+        request = HttpRequest(
+            method = HttpMethod.PATCH,
+            url = "$baseUrl/v1/account/settings",
+            headers = authHeaders(accessToken),
+            body = payload,
+        ),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
@@ -264,7 +265,7 @@ internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
 internal suspend fun CrispyBackendClient.deleteAccountApi(accessToken: String): Boolean {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/account".toHttpUrl(),
+        url = "$baseUrl/v1/account",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -274,7 +275,7 @@ internal suspend fun CrispyBackendClient.deleteAccountApi(accessToken: String): 
 internal suspend fun CrispyBackendClient.listAddonsApi(accessToken: String): List<AddonDto> {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/account/addons".toHttpUrl(),
+        url = "$baseUrl/v1/account/addons",
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -299,7 +300,7 @@ internal suspend fun CrispyBackendClient.installAddonApi(
         jsonBody.put("payload", payloadJson)
     }
     val response = httpClient.postJson(
-        url = "$baseUrl/v1/account/addons".toHttpUrl(),
+        url = "$baseUrl/v1/account/addons",
         jsonBody = jsonBody.toString(),
         headers = authHeaders(accessToken, profileId),
         callTimeoutMs = callTimeoutMs,
@@ -316,7 +317,7 @@ internal suspend fun CrispyBackendClient.uninstallAddonApi(
 ): Boolean {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/account/addons/${addonId.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/account/addons/${addonId.trim()}",
         headers = authHeaders(accessToken, profileId),
         callTimeoutMs = callTimeoutMs,
     )
@@ -326,8 +327,8 @@ internal suspend fun CrispyBackendClient.uninstallAddonApi(
 internal suspend fun CrispyBackendClient.getAvatarsApi(): List<Avatar> {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/avatars".toHttpUrl(),
-        headers = Headers.headersOf("Accept", "application/json"),
+        url = "$baseUrl/v1/avatars",
+        headers = mapOf("Accept" to "application/json"),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)

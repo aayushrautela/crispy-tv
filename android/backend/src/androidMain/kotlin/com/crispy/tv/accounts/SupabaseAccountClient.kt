@@ -5,8 +5,6 @@ import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -67,7 +65,7 @@ class SupabaseAccountClient(
 
     override suspend fun signInWithEmail(email: String, password: String): Session {
         checkConfigured()
-        val url = "$baseUrl/auth/v1/token?grant_type=password".toHttpUrl()
+        val url = "$baseUrl/auth/v1/token?grant_type=password"
         val payload = JSONObject().put("email", email.trim()).put("password", password).toString()
         val response = httpClient.postJson(url, payload, baseHeaders(), callTimeoutMs = CALL_TIMEOUT_MS)
         val body = requireSuccess(response)
@@ -83,7 +81,7 @@ class SupabaseAccountClient(
         metadata: Map<String, String?>,
     ): SignUpResult {
         checkConfigured()
-        val url = "$baseUrl/auth/v1/signup".toHttpUrl()
+        val url = "$baseUrl/auth/v1/signup"
         val payload = JSONObject().put("email", email.trim()).put("password", password).apply {
             val data = JSONObject()
             metadata.forEach { (key, value) ->
@@ -117,7 +115,7 @@ class SupabaseAccountClient(
         val session = tokenStore.current()
         if (session != null && !session.accessToken.startsWith("cp_pat_")) {
             runCatching {
-                val url = "$baseUrl/auth/v1/logout".toHttpUrl()
+                val url = "$baseUrl/auth/v1/logout"
                 httpClient.postJson(
                     url,
                     JSONObject().put("scope", "global").toString(),
@@ -135,7 +133,7 @@ class SupabaseAccountClient(
     }
 
     private suspend fun refreshSession(refreshToken: String): RefreshResult {
-        val url = "$baseUrl/auth/v1/token?grant_type=refresh_token".toHttpUrl()
+        val url = "$baseUrl/auth/v1/token?grant_type=refresh_token"
         val payload = JSONObject().put("refresh_token", refreshToken).toString()
         val response =
             runCatching {
@@ -183,20 +181,15 @@ class SupabaseAccountClient(
         )
     }
 
-    private fun baseHeaders(): Headers {
-        return Headers.Builder()
-            .add("apikey", supabasePublishableKey)
-            .add("Content-Type", "application/json")
-            .add("Accept", "application/json")
-            .build()
-    }
+    private fun baseHeaders(): Map<String, String> =
+        mapOf(
+            "apikey" to supabasePublishableKey,
+            "Content-Type" to "application/json",
+            "Accept" to "application/json",
+        )
 
-    private fun authHeaders(token: String): Headers {
-        return Headers.Builder()
-            .addAll(baseHeaders())
-            .add("Authorization", "Bearer ${token.trim()}")
-            .build()
-    }
+    private fun authHeaders(token: String): Map<String, String> =
+        baseHeaders() + ("Authorization" to "Bearer ${token.trim()}")
 
     private fun requireSuccess(response: CrispyHttpResponse): String {
         if (response.code in 200..299) return response.body

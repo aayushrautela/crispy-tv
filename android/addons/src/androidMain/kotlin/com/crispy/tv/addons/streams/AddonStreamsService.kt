@@ -16,8 +16,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -585,17 +583,22 @@ class AddonStreamsService(
         url: String,
         requestPolicy: JsonRequestPolicy,
     ): JsonFetchResult {
-        val httpUrl = url.toHttpUrlOrNull() ?: return JsonFetchResult.InvalidUrl
+        // Two questions, two answers: `getOrNull` answers null only when the url
+        // is not a request at all, so the `?:` below is InvalidUrl, while a thrown
+        // request is caught by the `runCatching` and is RequestFailure. Letting
+        // that `runCatching` also catch the parse failure would make a malformed
+        // url retryable, which is why the port has a member rather than this
+        // function guessing.
         val response =
             runCatching {
-                get(
-                    url = httpUrl,
+                getOrNull(
+                    url = url,
                     headers = requestPolicy.headers,
                     callTimeoutMs = requestPolicy.callTimeoutMs,
                 )
             }.getOrElse {
                 return JsonFetchResult.RequestFailure
-            }
+            } ?: return JsonFetchResult.InvalidUrl
 
         if (response.code !in 200..299) {
             return JsonFetchResult.HttpFailure(
@@ -782,7 +785,7 @@ class AddonStreamsService(
         val callTimeoutMs: Long,
         val maxRetries: Int,
         val initialBackoffMs: Long,
-        val headers: Headers,
+        val headers: Map<String, String>,
     )
 
     private sealed interface JsonFetchResult {
@@ -833,11 +836,9 @@ class AddonStreamsService(
             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
 
         private val JSON_HEADERS =
-            Headers.headersOf(
-                "Accept",
-                "application/json",
-                "User-Agent",
-                STREAM_USER_AGENT,
+            mapOf(
+                "Accept" to "application/json",
+                "User-Agent" to STREAM_USER_AGENT,
             )
 
         private val MANIFEST_REQUEST_POLICY =

@@ -5,8 +5,6 @@ import android.os.Build
 import com.crispy.tv.accounts.Session
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.util.UUID
 
@@ -49,7 +47,7 @@ class DeviceLoginClient(
             .put("deviceName", deviceName())
         storedDeviceId()?.let { payload.put("deviceId", it) }
         val response = httpClient.postJson(
-            "$backendUrl/v1/auth/device/authorize".toHttpUrl(),
+            "$backendUrl/v1/auth/device/authorize",
             payload.toString(),
             jsonHeaders(),
             callTimeoutMs = CALL_TIMEOUT_MS,
@@ -75,7 +73,7 @@ class DeviceLoginClient(
     suspend fun poll(deviceCode: String): PollResult {
         checkConfigured()
         val response = httpClient.postJson(
-            "$backendUrl/v1/auth/device/token".toHttpUrl(),
+            "$backendUrl/v1/auth/device/token",
             JSONObject().put("deviceCode", deviceCode).toString(),
             jsonHeaders(),
             callTimeoutMs = CALL_TIMEOUT_MS,
@@ -130,12 +128,11 @@ class DeviceLoginClient(
         if (!isConfigured()) throw IllegalStateException("Backend URL is not configured.")
     }
 
-    private fun jsonHeaders(): Headers {
-        return Headers.Builder()
-            .add("Content-Type", "application/json")
-            .add("Accept", "application/json")
-            .build()
-    }
+    private fun jsonHeaders(): Map<String, String> =
+        mapOf(
+            "Content-Type" to "application/json",
+            "Accept" to "application/json",
+        )
 
     private fun requireData(response: CrispyHttpResponse): JSONObject {
         if (response.code !in 200..299) {
