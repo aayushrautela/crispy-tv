@@ -40,13 +40,25 @@ Two things worth knowing that a reader would otherwise have to rediscover:
   move either**: `:app`'s two JSON accessor files are pure, with zero `android` imports and one
   consumer each, and porting them moves zero files, because the consumers are
   `ProfileDataShadowStore` (pinned by `getSharedPreferences`) and `LibraryDiskCacheStore` (60+
-  `org.json` touchpoints plus `java.io.File` and `MessageDigest`).
-  **The node type was the visible pin, and the real pin was one layer down** — a transport's
-  response type in one case, a storage API in the other. `CrispyBackendClient` speaks OkHttp in
-  only three places and never touches `OkHttpClient` at all, so it reads as nearly free to port;
-  what pins it is `CrispyHttpResponse(val url: HttpUrl, …, val headers: Headers, …)`, which
-  names OkHttp in its own **constructor**, so closing it is a transport migration reaching ~100
-  call sites. **1,226 lines of behaviour-preserving churn with no consumer is the same defect as
+  `org.json` touchpoints plus `java.io.File` and `MessageDigest`). **Both of those pins are
+  gone — `LibraryDiskCacheStore` is `commonMain` now (okio plus `ByteString.sha256()`) — so this
+  sentence is a record of the pin, not a description of the wall, and a reader who takes it for
+  the latter goes to re-audit a wall that no longer exists.** The same is true one clause down.
+  `CrispyBackendClient` read as nearly free to port because it spoke OkHttp in only three places
+  and never touched `OkHttpClient` at all, and what pinned it was
+  `CrispyHttpResponse(val url: HttpUrl, …, val headers: Headers, …)` naming OkHttp in its own
+  **constructor** — **and that transport has since been ported too.**
+  `android/network/src/commonMain/…/CrispyHttpClient.kt` declares
+  `data class CrispyHttpResponse(val code: Int, val body: String)` and
+  `data class HttpRequest(val method, val url: String, val headers: Map<String, String>, val body: String?)`,
+  and **`git grep -l 'import okhttp3' -- '*/src/commonMain'` returns zero hits repo-wide.** So
+  **"port `CrispyBackendClient`" now has to be re-measured rather than read off this paragraph:**
+  okhttp 5.5.0's own `okhttp-5.5.0.module` publishes **8 variants — two metadata, `android`
+  (api/runtime/sources), `jvm` (api/runtime/sources) — and no Native, no JS, no linux**, so
+  `HttpUrl` is not an available answer *and* `OkHttpCrispyHttpClient` cannot move. The blocker
+  the receiver already names, 39 of `CrispyBackendParsers.kt`'s 45 functions being
+  `internal fun CrispyBackendClient.parseX(…)`, is the one thing here still worth re-counting,
+  and what it asks for is that the *receiver* become an `interface`.
   padding a mutation driver with `expect_survive` entries** — and it is worth an order of
   magnitude more to record the *negative result* than to spend the churn, because the finding is
   what stops the work being re-attempted.

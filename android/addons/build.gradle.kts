@@ -103,6 +103,23 @@ kotlin {
             implementation(libs.coroutines.test)
         }
 
+        // `UriProbeHostTest` measures `android.net.Uri`, which is a class of the
+        // Android platform rather than a dependency of this project -- so it cannot
+        // go in `commonTest`, which compiles for `linuxX64` and both Apple
+        // targets. It needs Robolectric for `android-all`, and **that jar is the
+        // shipping implementation here**: `android.net.Uri` is pure Java in
+        // AOSP's `libcore`, not native code, which is the opposite of `org.json`
+        // (two implementations that disagree -- see `:backend`'s
+        // `JsonAccessorPolicyHostTest`). The distinction is what decides whether
+        // a measurement can be trusted, so it is worth a dependency.
+        //
+        // `@Config(sdk = [35])` and nothing else: no view is inflated and no
+        // resource is read, so `isIncludeAndroidResources` is not needed and the
+        // manifest is not either.
+        getByName("androidHostTest").dependencies {
+            implementation(libs.robolectric)
+        }
+
         androidMain.dependencies {
 
             implementation(project(":android:network"))
