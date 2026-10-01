@@ -47,26 +47,6 @@ class ProfileDataShadowStore(
 
     private fun keyForProfile(profileId: String): String = "profile_data_shadow:$profileId"
 
-    private fun JSONObject.toStringMap(): Map<String, String> {
-        val iter = keys()
-        val result = mutableMapOf<String, String>()
-        while (iter.hasNext()) {
-            val key = iter.next()
-            val rawValue = opt(key)
-            if (rawValue == null || rawValue == JSONObject.NULL) continue
-            result[key] = rawValue.toString()
-        }
-        return result
-    }
-
-    private fun Map<String, String>.toJsonObject(): JSONObject {
-        val obj = JSONObject()
-        for (key in keys.sorted()) {
-            obj.put(key, getValue(key))
-        }
-        return obj
-    }
-
     private companion object {
         private const val PREFS_NAME = "profile_data_shadow"
     }

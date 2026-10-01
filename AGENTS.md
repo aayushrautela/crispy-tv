@@ -311,11 +311,22 @@ Kotlin Multiplatform modules (in progress; see `check-local.sh`):
     `optNullableString` and `optBooleanOrNull`. **`:home` imports the `:backend` copy and `:app`
     cannot, because `:app` is another module — so the policy is reachable from one module and
     unreachable from the other, decided by an `internal` keyword nobody revisited.** That is the
-    `:tv`-duplicate-`CrispySpinner` shape a third time. Two differences are semantic and
-    unflagged: `:backend`'s `optBooleanOrNull` returns `null` for a present-but-unparseable value
-    while `:app`'s delegates to `optBoolean`, which cannot return null — **so a function named
+    `:tv`-duplicate-`CrispySpinner` shape a third time. Two of the differences are semantic:
+    `:backend`'s `optBooleanOrNull` returns `null` for a present-but-unparseable value while
+    `:app`'s delegates to `optBoolean`, which cannot return null — **so a function named
     `OrNull` returns `false`** — and `toJsonObject` sorts its keys in `:app` and not in `:backend`
-    (different receiver types, so they are not overloads).
+    (different receiver types, so they are not overloads). **All of it is now pinned from both
+    sides**, in `:backend`'s `JsonAccessorPolicyHostTest` and `:app`'s
+    `LibraryDiskCacheJsonAccessorsTest` and `ProfileDataShadowJsonAccessorsTest` (6 cases each), so
+    consolidating them is a recorded decision rather than an accident. **Reaching the `:app` copies
+    needed no call-site edit at all**, which is the sharpest form of the shadowing rule in this
+    file: the four were `private` *members* of their classes, so **no test in any module could
+    name them** — `private` is a property of the class, not of the file — and lifting each to a
+    top-level `internal` function **in the same package** left every existing call site resolving
+    to the new declaration. `git diff --numstat` reads `0 10` and `0 20`: deletions only, zero
+    insertions, at both of the stores. That is why the move is a lift and not a rewrite, and it is
+    the second instance here of *a private decision is an untestable decision* after `:tv`'s
+    `CrispyTvDarkColors`.
 - **`:app`'s `androidMain` is a knot, not a list of independent files, and the table of what holds
   what lives in `android/app/build.gradle.kts`** — read it before planning any move. The
   `:app` + `:home` + `:addons` package overlap is why an import audit can call a file clean and be

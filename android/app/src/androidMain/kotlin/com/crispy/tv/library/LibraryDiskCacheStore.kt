@@ -96,16 +96,6 @@ class LibraryDiskCacheStore(appContext: Context) : LibraryDiskCache {
         }
     }
 
-    private fun JSONObject.optNullableString(key: String): String? {
-        if (!has(key) || isNull(key)) return null
-        return optString(key).trim().takeIf { it.isNotEmpty() }
-    }
-
-    private fun JSONObject.optBooleanOrNull(key: String): Boolean? {
-        if (!has(key) || isNull(key)) return null
-        return optBoolean(key)
-    }
-
     private fun parseItems(array: JSONArray?): List<CatalogItem> {
         val safe = array ?: return emptyList()
         return buildList {
