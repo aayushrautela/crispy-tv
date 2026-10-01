@@ -67,7 +67,13 @@ first, then subtracting every type declared in every module's `commonMain` — l
 **10 candidates and resolves 0 of them**. Every one is pinned by a measured wall:
 `androidx.navigation` (six nav-graph files, which §Phase 4 already says should stay put),
 `paging-compose` (`DiscoverScreen`, `library/LibraryRoute`), the composition root,
-`:android:native-engine` (the four `playerui` files), and `org.json`, which is permanent.
+:android:native-engine` (the four `playerui` files), and `org.json` — which was recorded
+here as permanent and **is not**: the node type is **decided**, `kotlinx.serialization.json.JsonElement`,
+and `WatchProgressStore.kt` was the first file it moved. That file was 405 lines of `androidMain`
+with **not one `android.*` import** — it already took the four `:platform-core` ports, so only the
+JSON parsing pinned it. It is now `commonMain`, and its 44 cases run on **both** `desktopTest` and
+`testAndroidHostTest` from `commonTest` with no Robolectric and no `org.json` on either classpath.
+**The JSON-only remainder is five files**, re-measured rather than decremented.
 So Phase 4's remaining file count is a misleading measure of the work left, and Phase 5
 is not waiting on Phase 4.
 
@@ -101,9 +107,12 @@ quietly. It now has 27 cases.
 and `sync/WatchSyncSource.kt`, a three-method interface with empty bodies. A suite there
 would re-assert the compiler, the same reasoning `AGENTS.md` records for
 `ProfileRepository` and `AccountSettingsRepository`. **A module with no test source set
-is a question, not a defect**, and this one was asked and answered; its three
-`androidMain` files are blocked by `org.json`, by reaching `:backend`/`:player`, and by
-OkHttp respectively, as its own build-file KDoc records.
+is a question, not a defect** — and the answer here was wrong, because the question was asked of
+`commonMain` when the module was the subject. The module had no test source set of any kind, and the
+unmeasured content was 405 lines of `androidMain`. It now has **both** test source sets and two
+`commonMain` classes. **Of its three `androidMain` files, one has moved to `commonMain` with the JSON
+node type changed**, one is `OkHttpWatchSyncSource.kt` and is blocked by OkHttp, and one is
+`BackendWatchHistoryService.kt`, the composition root for this module.
 
 | Module | `commonMain` | `androidMain` |
 |---|---|---|
@@ -828,7 +837,7 @@ title or artwork. Moving files has hit its floor. **Phase 5 is not waiting on Ph
 
 | Bucket | Files (at 120 remaining) | What it takes |
 |---|---|---|
-| Hard wall | **84** | `Context` (59), `java.*` (31), `androidx.navigation` (9), `androidx.media3` (6), `native-engine` (10), `org.json` (8), `okhttp3` (3), `materialkolor` (1) |
+| Hard wall | **84** | `Context` (59), `java.*` (31), `androidx.navigation` (9), `androidx.media3` (6), `native-engine` (10), `org.json` (5), `okhttp3` (3), `materialkolor` (1) |
 | `coil3` only | 13 | real work, not a blocker: coil3 is multiplatform, these need the same `Int` → resource porting the drawables already got |
 | No wall | 23 | but 0 of them are closable without upstream moves; the largest gate is **4 files** |
 

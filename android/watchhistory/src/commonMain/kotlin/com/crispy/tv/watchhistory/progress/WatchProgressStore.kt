@@ -12,8 +12,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import org.json.JSONException
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -98,18 +106,7 @@ class WatchProgressStore(
         }
     }
 
-    fun getWatchProgressTombstones(): Map<String, Long> {
-        val raw = store.getString(WP_TOMBSTONES_KEY, null) ?: return emptyMap()
-        val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
-        val result = LinkedHashMap<String, Long>(obj.length())
-        for (key in obj.keys()) {
-            val value = obj.optLong(key, Long.MIN_VALUE)
-            if (value != Long.MIN_VALUE) {
-                result[key] = value
-            }
-        }
-        return result
-    }
+    fun getWatchProgressTombstones(): Map<String, Long> = readLongMap(WP_TOMBSTONES_KEY)
 
     fun addContinueWatchingRemoved(id: String, type: String, removedAtEpochMs: Long? = null) {
         val removed = getContinueWatchingRemoved().toMutableMap()
@@ -124,18 +121,7 @@ class WatchProgressStore(
         }
     }
 
-    fun getContinueWatchingRemoved(): Map<String, Long> {
-        val raw = store.getString(CONTINUE_WATCHING_REMOVED_KEY, null) ?: return emptyMap()
-        val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
-        val result = LinkedHashMap<String, Long>(obj.length())
-        for (key in obj.keys()) {
-            val value = obj.optLong(key, Long.MIN_VALUE)
-            if (value != Long.MIN_VALUE) {
-                result[key] = value
-            }
-        }
-        return result
-    }
+    fun getContinueWatchingRemoved(): Map<String, Long> = readLongMap(CONTINUE_WATCHING_REMOVED_KEY)
 
     fun isContinueWatchingRemoved(id: String, type: String): Boolean {
         val removed = getContinueWatchingRemoved()
@@ -177,8 +163,8 @@ class WatchProgressStore(
     fun getWatchProgress(id: String, type: String, episodeId: String? = null): WatchProgress? {
         val raw = store.getString(getWatchProgressPrefKey(id = id, type = type, episodeId = episodeId), null) ?: return null
         return try {
-            WatchProgressJson.fromJson(JSONObject(raw))
-        } catch (e: JSONException) {
+            WatchProgressJson.fromJson(Json.parseToJsonElement(raw).jsonObject)
+        } catch (e: Exception) {
             logger.warn(LOG_TAG, "Failed to parse watch progress JSON", e)
             null
         }
@@ -211,7 +197,9 @@ class WatchProgressStore(
             // must be skipped exactly as the old `as? String ?: continue` did.
             val raw = runCatching { store.getString(key) }.getOrNull() ?: continue
             val stripped = key.removePrefix(WATCH_PROGRESS_KEY_PREFIX)
-            val parsed = runCatching { WatchProgressJson.fromJson(JSONObject(raw)) }.getOrNull() ?: continue
+            val parsed =
+                runCatching { WatchProgressJson.fromJson(Json.parseToJsonElement(raw).jsonObject) }
+                    .getOrNull() ?: continue
             result[stripped] = parsed
         }
 
@@ -261,20 +249,53 @@ class WatchProgressStore(
         }
     }
 
-    private fun writeTombstones(map: Map<String, Long>) {
-        val obj = JSONObject()
-        for ((k, v) in map) {
-            obj.put(k, v)
+    private fun writeTombstones(map: Map<String, Long>) = writeLongMap(WP_TOMBSTONES_KEY, map)
+
+    private fun writeContinueWatchingRemoved(map: Map<String, Long>) =
+        writeLongMap(CONTINUE_WATCHING_REMOVED_KEY, map)
+
+    /**
+     * The two readers above were byte-identical apart from the key constant, and
+     * so were the two writers, so `org.json` was paying for four copies of two
+     * bodies. The node type change is what made the extraction possible rather
+     * than gratuitous: a `JSONObject` is constructed inline in each copy, so the
+     * copies could not share a helper without the helper taking the node as a
+     * parameter, which would have put the parse in the caller four times over.
+     *
+     * **The reader no longer needs a sentinel, and that is the one behaviour
+     * change here worth reading.** The old reader used `optLong(key, MIN)` as its
+     * accept filter, so a stored `Long.MIN_VALUE` could not be told from a
+     * non-numeric entry and was dropped. `jsonPrimitive.longOrNull` is `null` for
+     * a non-number and the real value for `Long.MIN_VALUE`, which *is* a valid
+     * long, so the reader keeps it and drops only what it cannot read.
+     *
+     * **The masking did not vanish, it moved.** `setWatchProgress` still uses
+     * `Long.MIN_VALUE` as a sentinel — `max(exact ?: MIN, base ?: MIN).takeIf
+     * { it != MIN }` — and that code reads a `Map<String, Long>` rather than
+     * JSON, so the migration did not touch it. A genuine `Long.MIN_VALUE`
+     * tombstone is therefore now read and then treated by the gate as "no
+     * tombstone at all", so the write goes through. Benign, because timestamps
+     * are `nowMs()` and no caller can produce the value, and pinned by
+     * `WatchProgressStoreHostTest` so it stays a decision rather than an
+     * accident — **two sentinels on opposite sides of one value is the shape to
+     * watch for when a type change removes one of them.**
+     */
+    private fun readLongMap(key: String): Map<String, Long> {
+        val raw = store.getString(key, null) ?: return emptyMap()
+        val obj = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return emptyMap()
+        val result = LinkedHashMap<String, Long>(obj.size)
+        for ((entryKey, element) in obj) {
+            val value = element.jsonPrimitive.longOrNull
+            if (value != null) {
+                result[entryKey] = value
+            }
         }
-        store.putString(WP_TOMBSTONES_KEY, obj.toString())
+        return result
     }
 
-    private fun writeContinueWatchingRemoved(map: Map<String, Long>) {
-        val obj = JSONObject()
-        for ((k, v) in map) {
-            obj.put(k, v)
-        }
-        store.putString(CONTINUE_WATCHING_REMOVED_KEY, obj.toString())
+    private fun writeLongMap(key: String, map: Map<String, Long>) {
+        val obj = JsonObject(map.mapValues { (_, v) -> JsonPrimitive(v) })
+        store.putString(key, obj.toString())
     }
 
     private fun invalidateCache() {
@@ -306,26 +327,52 @@ class WatchProgressStore(
     }
 
     private object WatchProgressJson {
-        fun fromJson(obj: JSONObject): WatchProgress {
+        fun fromJson(obj: JsonObject): WatchProgress {
             return WatchProgress(
-                currentTimeSeconds = obj.optDouble("currentTime", 0.0),
-                durationSeconds = obj.optDouble("duration", 0.0),
-                lastUpdatedEpochMs = obj.optLong("lastUpdated", 0L),
-                remoteImdbId = obj.optString("remoteImdbId").trim().ifBlank { null },
-                addonId = obj.optString("addonId").trim().ifBlank { null },
+                currentTimeSeconds = obj.doubleOrZero("currentTime"),
+                durationSeconds = obj.doubleOrZero("duration"),
+                lastUpdatedEpochMs = obj.longOrZero("lastUpdated"),
+                remoteImdbId = obj.trimmedOrNull("remoteImdbId"),
+                addonId = obj.trimmedOrNull("addonId"),
             )
         }
+
+        private fun JsonObject.doubleOrZero(key: String): Double =
+            this[key]?.jsonPrimitive?.doubleOrNull ?: 0.0
+
+        private fun JsonObject.longOrZero(key: String): Long =
+            this[key]?.jsonPrimitive?.longOrNull ?: 0L
+
+        /**
+         * **This is where the migration is not mechanical, and the difference is
+         * deliberate.** `org.json`'s `optString` of a JSON null returns the four
+         * characters `"null"` on the platform (measured in `e27619cb`: the Maven
+         * artifact returns `""` and the AOSP one `"null"`), and `.trim().ifBlank
+         * { null }` does not blank that — so a stored JSON null used to round-trip
+         * as the string `"null"`, and `WatchProgressStoreHostTest` pinned it.
+         *
+         * Under `JsonElement` a JSON null is `JsonNull`, whose `contentOrNull` is
+         * `null`, so the value is now genuinely null. **That is the fix, not a
+         * regression:** the old answer was the platform's rendering of a null
+         * leaking through a string accessor, and a remote id of `"null"` reaching
+         * the backend is worse than a missing one. The test that pinned the old
+         * behaviour was changed to pin the new one, and the change is recorded
+         * here and in `AGENTS.md` rather than left to a test diff.
+         *
+         * A **non-string** primitive still goes through `contentOrNull` and is
+         * trimmed the same way, so a numeric `remoteImdbId` keeps its old
+         * stringification rather than silently becoming null.
+         */
+        private fun JsonObject.trimmedOrNull(key: String): String? =
+            this[key]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
     }
 
-    private fun WatchProgress.toJson(): JSONObject {
-        val obj = JSONObject()
-        obj.put("currentTime", currentTimeSeconds)
-        obj.put("duration", durationSeconds)
-        obj.put("lastUpdated", lastUpdatedEpochMs)
-        if (!remoteImdbId.isNullOrBlank()) obj.put("remoteImdbId", remoteImdbId)
-        if (!addonId.isNullOrBlank()) obj.put("addonId", addonId)
-
-        return obj
+    private fun WatchProgress.toJson(): JsonObject = buildJsonObject {
+        put("currentTime", currentTimeSeconds)
+        put("duration", durationSeconds)
+        put("lastUpdated", lastUpdatedEpochMs)
+        if (!remoteImdbId.isNullOrBlank()) put("remoteImdbId", remoteImdbId)
+        if (!addonId.isNullOrBlank()) put("addonId", addonId)
     }
 
     private fun normalizedImdbIdOrNull(raw: String?): String? {

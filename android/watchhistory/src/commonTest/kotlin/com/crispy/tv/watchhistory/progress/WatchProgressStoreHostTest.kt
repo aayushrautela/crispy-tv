@@ -2,9 +2,6 @@ package com.crispy.tv.watchhistory.progress
 
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -25,17 +22,24 @@ import kotlin.test.assertTrue
  * because `WatchProgressKeys.kt` moved to `commonMain`, which is the only reason
  * either source set could see them.
  *
- * ## Why Robolectric, and for what
+ * ## Why this is in `commonTest` and not in an `androidHostTest`
  *
- * Not for a `Context` — nothing here inflates a view or reads a resource. **For
- * `org.json` itself**, because there are two implementations of it and they
- * disagree. `android-all` carries AOSP's `libcore/json`; the Maven
- * `org.json:json` is a different one. A suite pinned against the reference
- * artifact would have described a library no device has. Measured, and recorded
- * in `:backend`'s `JsonAccessorPolicyHostTest`: `optString` of a
- * `JSONObject.NULL` is `"null"` on AOSP and `""` on the reference, and a
- * fractional number is `Double` on AOSP and `BigDecimal` on the reference.
- * **The first of those two is load-bearing for a case below.**
+ * It was an `androidHostTest` under Robolectric, and **two things changed**:
+ * `WatchProgressStore` moved to `commonMain`, and the `org.json` it parsed
+ * with became `JsonElement`. The Robolectric dependency existed for
+ * `org.json` itself — never for a `Context`, nothing here inflates a view or
+ * reads a resource — and that is gone too, so the suite needs nothing Android
+ * and runs on every target.
+ *
+ * The measurement that made Robolectric necessary is still worth keeping,
+ * because it is why *this* migration is a behaviour change and not a
+ * substitution: **there are two `org.json` implementations and they disagree.**
+ * `android-all` carries AOSP's `libcore/json`; the Maven `org.json:json` is a
+ * different one. `optString` of a `JSONObject.NULL` is `"null"` on AOSP and
+ * `""` on the reference, and a fractional number is `Double` on AOSP and
+ * `BigDecimal` on the reference. **The first of those two is what two cases
+ * below now pin the corrected answer to**, and the second is why the old
+ * reader's `Long.MIN_VALUE` sentinel was a sentinel at all.
  *
  * ## Every scope is injected, and none of these cases wait
  *
@@ -48,8 +52,6 @@ import kotlin.test.assertTrue
  * real dispatcher: unconfined runs the body eagerly on the calling thread, so
  * no `advanceUntilIdle` is needed and nothing here sleeps for a debounce.
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [35])
 class WatchProgressStoreHostTest {
 
     private fun store(
@@ -180,16 +182,32 @@ class WatchProgressStoreHostTest {
     }
 
     /**
-     * The two readers have identical bodies, and the `Long.MIN_VALUE` filter is
-     * load-bearing in a way that is invisible: `optLong(key, Long.MIN_VALUE)`
-     * cannot tell a stored `Long.MIN_VALUE` from a non-numeric value, so a
-     * genuine `Long.MIN_VALUE` in the stored JSON **is dropped**. A timestamp of
-     * `Long.MIN_VALUE` is not a thing any caller can produce, so this is benign
-     * in production — but the suite pins it rather than leaving it as an
-     * accident of the sentinel choice.
+     * A stored `Long.MIN_VALUE` is **kept**, and only a non-numeric entry is
+     * dropped. **This case asserted the opposite until the `org.json` →
+     * `JsonElement` migration**, and again the change is a fix.
+     *
+     * The old reader used `optLong(key, Long.MIN_VALUE)` as its accept filter:
+     * `optLong` answers its default for anything it cannot read, so a sentinel
+     * was the only way to detect a non-number, and a genuinely stored
+     * `Long.MIN_VALUE` was therefore indistinguishable from a non-numeric entry
+     * and silently dropped. `JsonElement` needs no sentinel at all —
+     * `jsonPrimitive.longOrNull` is `null` for a non-number and the real value
+     * for `Long.MIN_VALUE`, which *is* a valid long — so the masking is gone
+     * rather than merely relocated.
+     *
+     * **The writer still uses `Long.MIN_VALUE` as a sentinel**, in
+     * `setWatchProgress`'s `max(a ?: MIN, b ?: MIN).takeIf { it != MIN }`, and
+     * that code is untouched by the migration because it reads a
+     * `Map<String, Long>` rather than JSON. So the masking did not vanish, it
+     * **moved to the other side of the same value**: the reader now hands back a
+     * real `Long.MIN_VALUE` that the gate then reads as "no tombstone at all" and
+     * lets the write through. Benign in production, since timestamps are
+     * `nowMs()` and a caller cannot produce this value — but it is the reason
+     * this case is asserted rather than deleted, and `WatchProgressStore`'s KDoc
+     * says so at the reader.
      */
     @Test
-    fun aStoredLongMinValueIsDroppedBecauseItCannotBeToldApartFromANonNumericValue() {
+    fun aStoredLongMinValueIsKeptAndOnlyANonNumericEntryIsDropped() {
         val kv = RecordingKeyValueStore(
             mapOf(
                 "@wp_tombstones" to """{"movie:tt1":5,"movie:tt2":-9223372036854775808,"movie:tt3":"not a number"}""",
@@ -197,7 +215,11 @@ class WatchProgressStoreHostTest {
         )
         val s = store(kv)
 
-        assertEquals(mapOf("movie:tt1" to 5L), s.getWatchProgressTombstones())
+        assertEquals(
+            mapOf("movie:tt1" to 5L, "movie:tt2" to Long.MIN_VALUE),
+            s.getWatchProgressTombstones(),
+            "a real Long.MIN_VALUE is a value now; only a non-numeric entry is dropped",
+        )
     }
 
     @Test
@@ -264,22 +286,43 @@ class WatchProgressStoreHostTest {
     }
 
     /**
-     * `optString` of a JSON null is the four characters `null` on AOSP, so
-     * `fromJson`'s `.trim().ifBlank { null }` does **not** turn a stored null
-     * into a null `remoteImdbId` — it produces the string `"null"`. This is the
-     * `e27619cb` measurement showing up in a real round trip, and it is the
-     * reason the codec cannot be a naive `optString`. Pinned because the bug it
-     * would produce is a remote id that is literally `null` reaching the
-     * backend.
+     * A stored JSON null `remoteImdbId` reads back as a null `remoteImdbId`.
+     *
+     * **This case asserted the opposite until the `org.json` → `JsonElement`
+     * migration, and the change is a fix rather than a regression.** Under
+     * `org.json` the answer was the four characters `"null"`, because
+     * `optString` of a `JSONObject.NULL` is `"null"` on AOSP (measured in
+     * `e27619cb`; the Maven artifact gives `""`) and `.trim().ifBlank { null }`
+     * does not blank a non-blank string. The old answer was **a platform
+     * rendering leaking through a string accessor**, and the bug it would
+     * produce is a remote id that is literally `null` reaching the backend.
+     *
+     * Under `JsonElement` a JSON null is `JsonNull`, whose `contentOrNull` is
+     * `null`, so the codec says what the data said. **The discriminator
+     * matters and is the other half of this case: a *non-string* primitive
+     * still goes through `contentOrNull` and is trimmed the same way**, so a
+     * numeric id keeps its stringification rather than silently becoming null —
+     * which is why this is `contentOrNull` and not a `jsonPrimitive.string`
+     * cast that would throw.
      */
     @Test
-    fun aStoredNullRemoteImdbIdComesBackAsTheFourCharactersNullOnThisPlatform() {
+    fun aStoredNullRemoteImdbIdComesBackAsNullAndANumericOneKeepsItsStringification() {
         val kv = RecordingKeyValueStore(
-            mapOf("@watch_progress:movie:tt1" to """{"currentTime":1,"duration":10,"lastUpdated":0,"remoteImdbId":null}"""),
+            mapOf(
+                "@watch_progress:movie:tt1" to
+                    """{"currentTime":1,"duration":10,"lastUpdated":0,"remoteImdbId":null}""",
+                "@watch_progress:movie:tt2" to
+                    """{"currentTime":1,"duration":10,"lastUpdated":0,"remoteImdbId":4242}""",
+            ),
         )
         val s = store(kv)
 
-        assertEquals("null", s.getWatchProgress("tt1", "movie")!!.remoteImdbId, "and not null")
+        assertNull(s.getWatchProgress("tt1", "movie")!!.remoteImdbId, "a JSON null is a null, not the string \"null\"")
+        assertEquals(
+            "4242",
+            s.getWatchProgress("tt2", "movie")!!.remoteImdbId,
+            "but a number is still stringified, so the migration did not turn every value into null",
+        )
     }
 
     /** And the write side is the opposite: a blank is never written at all. */

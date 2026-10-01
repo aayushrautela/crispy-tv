@@ -36,13 +36,15 @@ kotlin {
         // the four `:platform-core` ports, coroutines, `org.json` and
         // `kotlin.math` -- and nothing was testing any of it.
         //
-        // The answer is not a `commonTest`. The code under test is in
-        // `androidMain`, and `commonTest` cannot see it. It is not a plain JVM
-        // test either, because `org.json` is a class of the Android platform
-        // and is absent from every other target's classpath. So the suite is
-        // an `androidHostTest` under Robolectric, the same third use of
-        // Robolectric in this repository as `:backend`'s and `:app`'s
-        // `org.json` suites -- and the first here that is *not* for a `Context`.
+        // The suite started in an `androidHostTest` under Robolectric, because
+        // the code was in `androidMain` and pinned there by `org.json`, which is
+        // a class of the Android platform and absent from every other target's
+        // classpath. **Both reasons are gone.** `WatchProgressStore` is in
+        // `commonMain` and parses with `JsonElement`, so the suite is in
+        // `commonTest`, needs no Robolectric, and runs on every target --
+        // desktop JVM and Android host included, which is the two-halves rule
+        // the repo records. `implementation(libs.robolectric)` was removed
+        // here rather than left for a suite that does not exist.
         withHostTest {}
     }
 
@@ -59,8 +61,8 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
-        getByName("androidHostTest").dependencies {
-            implementation(libs.robolectric)
+        commonTest.dependencies {
+            implementation(kotlin("test"))
 
             // `UnconfinedTestDispatcher`, for the recorded reason: a class that
             // takes a `CoroutineScope` and would otherwise build its own is only
@@ -72,13 +74,40 @@ kotlin {
             implementation(libs.coroutines.test)
         }
 
-        commonTest.dependencies {
-            implementation(kotlin("test"))
-        }
-
         commonMain.dependencies {
             api(project(":android:core-domain"))
             api(libs.coroutines.core)
+
+            // **Declared here because the consumer moved here.**
+            // `WatchProgressStore` was in `androidMain` and took the four ports
+            // as constructor parameters, and it got them from
+            // `:platform-android` in `androidMain.dependencies` -- which is a
+            // plain `com.android.library`, so nothing above this line can see
+            // it. The file now lives in `commonMain` and names `KeyValueStore`,
+            // `TimeSource`, `MonotonicClock` and `AppLogger` directly, so the
+            // dependency moves down with it. This is the recorded ordering
+            // constraint: **a dependency moves down when the consumer moves
+            // down**, and a file's dependency is declared in the source set the
+            // file is in, not where it used to be.
+            api(project(":android:platform-core"))
+
+            // **The node type, and it is decided rather than open.**
+            // `WatchProgressStore` was pinned to `androidMain` solely by
+            // `org.json`, and `org.json` is a class of the Android platform
+            // supplied by `android.jar` -- it is not a dependency of this
+            // project, so there is no version to bump and no artifact to swap.
+            //
+            // `JsonElement` is the replacement because of one measured
+            // property: **a JSON null and an absent key are different events**,
+            // and `optNullableString` depends on exactly that. A bare
+            // `Any?`/`Map<String, Any?>` tree cannot carry the distinction --
+            // this file's own `toAnyMap`-style helpers collapse it -- and
+            // writing a node type of our own is a parser we would then have to
+            // test as carefully as the one being replaced.
+            //
+            // It was already in `libs.versions.toml` with zero consumers, so
+            // this is a declaration rather than a version resolution.
+            implementation(libs.serialization.json)
         }
 
         androidMain.dependencies {

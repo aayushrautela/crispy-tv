@@ -255,8 +255,38 @@ deleting JSON moves them zero files); and it named **none** of the four where JS
 neutralising the accessors alone moves zero of them. The candidates are `kotlinx.serialization`'s
 `JsonElement` (already in `libs.versions.toml` as `serializationJson = "1.11.0"`, **zero consumers
 repo-wide**) and a `:core-domain` type of our own, and an untyped `Any?` tree cannot carry it because
-`JSONObject.NULL` and an absent key are different events. **That is a recorded product decision, not a
-refactor.** Separately: **the library that ships is not the library a JVM test can stand in for** —
+`JSONObject.NULL` and an absent key are different events. **That decision has been made: it is
+`kotlinx.serialization.json.JsonElement`**, on the grounds that it is the only candidate that keeps a JSON
+null distinguishable from an absent key, and a node type we wrote ourselves would be a parser we then have
+to test as carefully as the one it replaces. It was already versioned in `libs.versions.toml` with zero
+consumers, so adopting it is a declaration rather than a version resolution.
+**`WatchProgressStore.kt` was the first file it moved**, and it is worth reading as the shape of the rest:
+405 lines of `androidMain` that imported **not one `android.*` type** because it already took the four
+`:platform-core` ports as constructor parameters, so the JSON node type was the only thing pinning it.
+That produced two behaviour changes, and **the existing suite caught both — which is what the suite was
+characterised for.**
+  - **A stored JSON null `remoteImdbId` now reads as `null`** rather than the four characters `"null"`.
+    The old answer was a platform rendering leaking through a string accessor, and the bug it produces is
+    a remote id of literally `null` reaching the backend. A *non-string* primitive still goes through
+    `contentOrNull` and is trimmed the same way, so `remoteImdbId: 4242` still reads `"4242"` — that
+    second half is the discriminator, and it is why the code is `contentOrNull` rather than a
+    `jsonPrimitive.string` cast that would throw.
+  - **A stored `Long.MIN_VALUE` tombstone is now kept, and only a non-numeric entry is dropped.** The old
+    reader used `optLong(key, MIN)` as its accept filter, and `optLong` answers its default for anything
+    unreadable — so a sentinel was the *only* way to detect a non-number, and a real `Long.MIN_VALUE` was
+    indistinguishable from one and silently dropped. `jsonPrimitive.longOrNull` needs no sentinel.
+    **The masking did not vanish, it moved:** `setWatchProgress` still uses `Long.MIN_VALUE` as one, on a
+    `Map<String, Long>` rather than on JSON, so the reader now hands back a real `Long.MIN_VALUE` that the
+    gate reads as "no tombstone at all". Benign, because timestamps are `nowMs()` — and recorded in both
+    the test and the production KDoc, because **two sentinels on opposite sides of one value is the shape
+    to watch for when a type change removes one of them.**
+**A file's dependency belongs in the source set the file is in, not where it used to be.** Moving the
+store cost 29 errors, all member-level on the four ports, because `:platform-core` was reachable only
+through `:platform-android` in `androidMain.dependencies` — a plain `com.android.library`, which publishes
+no JVM variant, so nothing in a `commonMain` could see it. `api(project(":android:platform-core"))` moved
+down with the file. *This is the same rule recorded for `HttpClientPort`, and it is the reason a port
+declared as an `androidMain` dependency is invisible to `commonMain` even though the code compiles there.*
+Separately: **the library that ships is not the library a JVM test can stand in for** —
 `optString` of a `JSONObject.NULL` is `"null"` on AOSP and `""` on the Maven artifact, and a fractional
 number is `Double` versus `BigDecimal`, so Robolectric here is for `org.json` itself and **not** for a
 `Context`.
