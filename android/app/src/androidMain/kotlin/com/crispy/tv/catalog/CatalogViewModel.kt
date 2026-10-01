@@ -2,6 +2,7 @@ package com.crispy.tv.catalog
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.Dispatchers
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -26,7 +27,7 @@ class CatalogViewModel(
                 enablePlaceholders = false
             ),
             pagingSourceFactory = {
-                CatalogPagingSource(homeCatalogService, section)
+                CatalogPagingSource(homeCatalogService, section, Dispatchers.IO)
             }
         ).flow.cachedIn(viewModelScope)
 

@@ -24,13 +24,17 @@ plugins {
  * before any code crossed a source-set boundary, because moving 31k lines of
  * Compose at the same time as restructuring the modules would have made a
  * failure impossible to attribute. Phase 4 then moves the screens into
- * `commonMain` one vertical slice at a time, and 110 of the 191 main-source files are there.
+ * `commonMain` one vertical slice at a time, and 113 of the 193 main-source files are there.
  *
- * The remaining 81 are held by three things: a type that cannot be named off
- * Android (a `Context`, `SharedPreferences`, `org.json`, `androidx.paging`,
+ * The remaining 80 are held by three things: a type that cannot be named off
+ * Android (a `Context`, `SharedPreferences`, `org.json`,
  * `:android:native-engine`'s own types), a composition root that by definition
  * needs a platform to resolve against, and screen code still split
- * factory-from-viewmodel. The third of those is the smallest: the viewmodels
+ * factory-from-viewmodel. `androidx.paging` left that first list when
+ * `CatalogPagingSource` moved -- `paging-common` is on the `commonMain`
+ * classpath at :328 -- and it went for a reason worth keeping: **the two halves
+ * of the family answer differently**, so "paging is KMP" names no answer and
+ * the artifact has to be the question. The third of those is the smallest: the viewmodels
  * themselves are already in `commonMain`, so what is left is the factories and
  * the nav graph that resolve them. The rules that decide what is worth changing
  * are in AGENTS.md under *Rules* sections 1 and 2. The two counts above are a
@@ -59,7 +63,7 @@ plugins {
  * | ~~`DetailsPalette.kt`~~ | **freed** | `AiInsightsStoryOverlay`, `DetailsBody`, `DetailsRatingsSection` | **none left -- all three moved.** The three reasons this row claimed were all wrong, and each is worth recording because two of them were premises rather than measurements. `com.materialkolor` 5.0.0 is a genuine KMP artifact (it publishes `android`, `iosArm64`, `iosSimulatorArm64`, `jvm`, `macosArm64`, `js`, `wasmJs`), so `rememberDynamicColorScheme` and `themeColor` were never blockers. `LocalContext` is Coil's own `coil3.compose.LocalPlatformContext` in `commonMain`. And the bitmap is not a blocker either, it is the *return type* of an `expect`: `coil3.toBitmap` yields `android.graphics.Bitmap` on Android and `org.jetbrains.skia.Bitmap` elsewhere, so no `commonMain` signature can name it -- the extraction takes Compose's `ImageBitmap`, which every target shares, and only the two loader composables stayed behind for `Context`. That is the fourth time a blocker in this table turned out to be an untested premise |
  * | the composition root | `SupabaseServicesProvider`, `BackendServicesProvider`, `PlaybackDependencies`, `DistributionComponents`, the two settings `…RepositoryProvider`s | `ProfileMenuRoute`, `CalendarScreen`, `SettingsScreen`, `SettingsNavGraph`, `AppDistribution` | these *are* the root; a screen resolves them in `androidMain` and needs a seam for the values, not for the providers |
  * | `androidx.navigation` | not on the `commonMain` classpath at all | all 6 files in `ui/navigation` | a dependency decision: JetBrains publishes a Multiplatform navigation-compose, and it is not the artifact this module currently resolves |
- * | `androidx.paging` | not on the `commonMain` classpath at all | `CatalogPagingSource`, `LibraryPagingSource`, `BrowsePagingSource` | same shape: paging 3.3+ has KMP artifacts, and this is a version/artifact question rather than a code question |
+ * | `androidx.paging` | `paging-common` **is** on the `commonMain` classpath (`:328`); `paging-runtime` and `paging-compose` are not | `LibraryPagingSource`, `BrowsePagingSource` (`CatalogPagingSource` moved to `commonMain`) | measured per artifact, and the two halves of the family answer differently: `paging-common-3.5.1` publishes `iosArm64`/`iosSimulatorArm64`/`linuxX64`/`linuxArm64`/`desktop`, while `paging-runtime-3.5.1` publishes no platform variants at all — so `paging` is not "KMP", it is **two artifacts with opposite answers**, which is why only `paging-common` is a `commonMain` dependency |
  * | `StreamResolver` | `androidMain/.../addons` | `SelectorCoordinator`, `HomeStreamSelector` | the same port treatment as `BackendApi`, applied to a type the project owns |
  * | `R.raw` | `:ui-assets` | `DetailsRatingsSection` (7 logos) | see the rule below: split the file, and push the name matching to `commonMain` the way `ReviewProviderOrNull` did |
  *

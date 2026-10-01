@@ -557,6 +557,19 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   slot rather than a defaulted one: defaulting to `Dispatchers.Default` compiles on every
   target and silently puts blocking I/O on a CPU-sized pool. Measured when
   `DetailsMetadataLoader` moved to `commonMain`; the view model passes `Dispatchers.IO`.
+  **The rule was right and the commit that broke on it quoted the import list as evidence
+  that it did not apply — so the missing half is the mechanism, not the rule.** `Dispatchers.IO`
+  is `public` on the JVM and **`internal` on Kotlin/Native**, so the compiler says *"Cannot access
+  'val IO: CoroutineDispatcher': it is internal in `kotlinx.coroutines.Dispatchers`"* rather than
+  `Unresolved reference`, **and `Dispatchers.IO` needs no import of its own** — `Dispatchers` is
+  the import, so an import scan is structurally incapable of finding the use. **Every local gate in
+  this repository compiles it as public**: `desktopTest` compiles `commonMain`+`desktop`,
+  `androidHostTest` compiles `commonMain`+`androidMain`, and both are JVM. **A green desktop compile
+  is therefore not evidence about a `commonMain` file**, and this cost **three red `apple.yml` runs**
+  on **one line** — `CatalogPagingSource.kt:26:50`, `2b4c5033`, fixed in the landing after it.
+  **`apple.yml` on a macOS runner is the only gate that can see this class of error, so a dispatched
+  run has to be *read*: 204 means accepted, not green, and dispatching and forgetting it is what let
+  three consecutive red runs sit unread.**
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
   interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
   member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can

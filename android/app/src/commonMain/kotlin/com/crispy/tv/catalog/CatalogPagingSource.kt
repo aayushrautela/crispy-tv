@@ -3,12 +3,26 @@ package com.crispy.tv.catalog
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.crispy.tv.home.HomeCatalogService
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
+/**
+ * [ioDispatcher] is required and has no default, and that is the whole point of it.
+ *
+ * `Dispatchers.IO` is **public on the JVM and internal on Kotlin/Native**, so it
+ * compiles in `commonMain` on desktop and cannot be accessed at all on
+ * `iosArm64`. **A default would have made this file look fixed on every machine
+ * that is not a Mac** -- and the first symptom would be three red `apple.yml`
+ * runs, not a red desktop build. `Dispatchers.Default` would be worse still: it
+ * compiles everywhere and silently puts blocking I/O on a CPU-sized pool.
+ *
+ * **This is the `DetailsMetadataLoader` shape, and it was already recorded.**
+ * The same reasoning is why `LibraryRoute.kt`'s `clock` slot has no default.
+ */
 class CatalogPagingSource(
     private val homeCatalogService: HomeCatalogService,
-    private val section: CatalogSectionRef
+    private val section: CatalogSectionRef,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : PagingSource<Int, CatalogItem>() {
 
     override fun getRefreshKey(state: PagingState<Int, CatalogItem>): Int? {
@@ -23,7 +37,7 @@ class CatalogPagingSource(
         val pageSize = params.loadSize.coerceAtLeast(1)
 
         return runCatching {
-            val result = withContext(Dispatchers.IO) {
+            val result = withContext(ioDispatcher) {
                 homeCatalogService.fetchCatalogPage(
                     section = section,
                     page = page,
