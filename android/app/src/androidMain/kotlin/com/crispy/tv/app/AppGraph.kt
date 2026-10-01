@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.ai.AiInsightsRepository
+import com.crispy.tv.ai.aiInsightsRepository
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.data.repository.DefaultCatalogRepository
@@ -20,7 +20,6 @@ import com.crispy.tv.optimistic.FileBackedPendingMutationStore
 import com.crispy.tv.optimistic.UserMediaMutationExecutor
 import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.platform.android.AndroidAppLogger
-import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,15 +43,10 @@ class AppGraph(
     }
 
     private val aiInsightsRepository by lazy {
-        AiInsightsRepository.create(appContext)
+        aiInsightsRepository(appContext)
     }
 
     private val detailsUseCases: DetailsUseCases by lazy {
-        // `AiInsightsRepository` stays in androidMain and its functions take a
-        // `Locale`, which `commonMain` cannot name. The round trip through a
-        // BCP-47 tag (`toLanguageTag` at the caller, `forLanguageTag` here)
-        // preserves the language the wire and the cache key on.
-        fun localeFor(languageTag: String): Locale = Locale.forLanguageTag(languageTag)
         DetailsUseCases(
             sessionRepository = sessionRepository,
             catalogRepository = catalogRepository,
@@ -61,10 +55,10 @@ class AppGraph(
             backendApi = BackendServicesProvider.backendClient(appContext),
             logger = AndroidAppLogger(appContext),
             cachedInsights = { itemId, languageTag ->
-                aiInsightsRepository.loadCached(itemId, localeFor(languageTag))
+                aiInsightsRepository.loadCached(itemId, languageTag)
             },
             generateInsights = { itemId, languageTag ->
-                aiInsightsRepository.generate(itemId, localeFor(languageTag))
+                aiInsightsRepository.generate(itemId, languageTag)
             },
         )
     }

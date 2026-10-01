@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 115 `commonMain` / 78 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 117 `commonMain` / 78 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -411,6 +411,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   can still be unpinnable, because the blocker can be a _type_**: `grep -rn "class X"` its distinctive
   types and read the owning module's `plugins { }` block. A plain `com.android.library` publishes no
   JVM variant, so no KMP `commonMain` can name its types however clean the code looks.
+  **And a pin is per file, not per token — the token you hunted is rarely the one that decides
+  whether the file moves, and a scan that tests for the tokens you are chasing is not a test for
+  the pins you are not.** `DetailsRoute.kt`'s only `java.*` use was `Locale.US` at `:35`, which
+  reads as the whole story; `LocalContext` at `:7` and `appGraph()` at `:10` are what actually kept
+  it in `androidMain`, and both were in the rows the scan had already printed.
+  `HouseholdAddonsCloudSync.kt` is the same shape behind `android.util.Log`. The scan's own output
+  held the refutation and the summary read past it to call `Locale` "the *sole* pin", which was
+  true and was the wrong question. **Read the whole import list of a file you are about to claim
+  you understand, and treat every second pin as the one that decides.**
 - **A private decision is an untestable decision, and a private member is worse than a private
   function** — `private` is a property of the class, not of the file, so a `private` member cannot be
   named by a test in its own module either. Name it in production (`:tv`'s `CrispyTvDarkColors` was
@@ -600,6 +609,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   capability, and the slot carries the data** — `shareText: (String) -> Unit`, `openUrl`,
   `loadProfile`, `stashHandoff`. A slot over `(Context) -> Unit` would keep the platform type on the
   wrong side of the line.
+  **The same rule says which half of a class is the factory, and a `Context` *holder* in a
+  constructor parameter is the pin that keeps an otherwise-portable class out of `commonMain`.**
+  `AiInsightsRepository` named four collaborators and all but one were already `:backend`
+  `commonMain`; the single `Context`-and-`SharedPreferences` holder in its constructor was the
+  whole reason it sat in `androidMain`, and *a file whose parameter names a concrete platform
+  holder cannot be read from `commonMain` however portable its own body is*. So the landing was
+  the class moving while the factory stayed — `AiInsightsRepository` to `commonMain`, its
+  `companion object { fun create(context) }` to a top-level `androidMain` `aiInsightsRepository(context)`
+  — with a two-member `AiInsightsCache` interface between them. **A class whose companion
+  constructs it from a `Context` is a composition root wearing a class's clothes, and that is
+  one landing, not two.** Two corollaries: **a composition root's own comment can assert the very
+  placement the landing is about to change** (`AppGraph.kt` carried "`AiInsightsRepository` stays
+  in androidMain", which this landing made false — correct it in the same commit rather than leave
+  it contradicting the diff), and **a value crossing as itself is worth checking for a round
+  trip**: `AppGraph` held a BCP-47 tag, rebuilt a `Locale` from it, and the repository called
+  `toLanguageTag()` on the result — two conversions carrying no information between them.
 - **No-default slots for anything a call site must not forget.** A defaulted capability lets a call
   site silently hide a row the build ships.
 - **When a platform composition local is unreachable, the answer is usually a value the caller
@@ -609,6 +634,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `titlecase(Locale.ENGLISH)` is locale-dependent while `replaceFirstChar { it.uppercase() }` is
   not, so splitting them puts the Turkish dotless-i bug in shared code. *A step is platform work if
   its answer depends on the platform; "it is just a `String` call" is not the test.*
+  **And sometimes the platform step is deleted rather than moved, which is a behaviour fix and not
+  a simplification.** `String.lowercase(Locale)` is the JVM-only overload and Kotlin's
+  `lowercase()` is locale-invariant, so five `s.lowercase(Locale.US)` sites became `s.lowercase()`
+  — and `Locale.US` was a real answer and the wrong one, because a locale is a *rendering*
+  context: rendering a manifest URL in Turkish lowercases `I` to a dotless `ı`, so the same
+  addon would key differently on a Turkish device and every household sync would install and
+  uninstall the same row. `SharedPreferencesSearchHistoryStore` was already using `Locale.ROOT`
+  for its dedupe key, so this was the second instance of one rule. **When a `Locale` argument is
+  passed to a comparison, ask whether the answer depends on the device at all — if it does not,
+  the argument is the bug.** The other two `Locale` uses are *not* deletable and the difference
+  is worth keeping straight: `Locale.getDefault().toLanguageTag()` is a genuine reading of a
+  platform value and belongs at the edge (three factories), while
+  `DateTimeFormatter.ofPattern(…, Locale.getDefault())` is a genuine *formatting* locale that
+  `kotlinx-datetime` cannot express the same way — **counting all three as one `Locale.` is a
+  census that cannot tell a deletion from a port.**
 - **A duplicate body is a signal one copy needs a caller.** `episodeHeaderMetadata` and
   `episodeRowMeta` assembled the same string byte-identically in two files with no dependency
   between them; letting one delegate **reversed the package dependency** in the better direction.
@@ -741,6 +781,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `searchItemKey`, `watchCtaSubtext`, `selectedSeasonOrFirst`, `visibleEpisodes` and about a dozen
   others were `private` and are now `internal`. A test's own private re-implementation of a decision
   is *worse* than no test: everything about it is correct and it proves the suite, not the code.
+- **Moving a file into `commonMain` does not make it testable — a _concrete class_ in its
+  constructor does, and a file whose only untestable collaborator is a class has to be recorded
+  as a negative result rather than left looking finished.** `AiInsightsRepository` is now
+  `:app`'s `commonMain` and **nothing can test it**: its third collaborator is
+  `CrispyBackendClient`, a `class` and not an `interface`, so a `commonTest` can neither
+  construct it nor stand in for it — and measured, it has **zero references anywhere in `:app`'s
+  `commonTest`**, so it was never nameable from there. Its other three seams are faked today
+  (`FakeAccountApi`; `ActiveProfileStore` over a `FakeKeyValueStore` in four suites; the
+  `AiInsightsCache` interface added alongside). **A suite that runs and a suite that could be
+  written look identical in a build log, and the second is the one a reader counts as
+  progress** — so the landing's own test count staying at 475/513 is the *honest* number here,
+  and a same-day count is not evidence of coverage. *The fix is a type, not a test:* making
+  `CrispyBackendClient` an interface, whose own blocker is that 39 of
+  `CrispyBackendParsers.kt`'s 45 functions are `internal fun CrispyBackendClient.parseX(…)` —
+  *the receiver is the thing to change this time.*
 - **A decision is not "in the composable" because it renders; it is in the composable only if it
   needs the composition.** A `when` inside a `@Composable` body is uncallable, so its arms cannot
   be covered. A condition over several values written inline is *five decisions wearing one coat* —

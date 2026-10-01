@@ -6,7 +6,6 @@ import com.crispy.tv.accounts.AccountApi
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
-import java.util.Locale
 import com.crispy.tv.backend.AddonDto
 
 class HouseholdAddonsCloudSync(
@@ -77,17 +76,28 @@ class HouseholdAddonsCloudSync(
             // unknown types (e.g. jsplugin) must never be touched here.
             val knownStremio = serverAddons.filter { it.type == ADDON_TYPE_STREMIO }
 
-            val serverByUrl = knownStremio.associateBy { it.manifestUrl.lowercase(Locale.US) }
-            val localByUrl = localRows.associateBy { it.manifestUrl.lowercase(Locale.US) }
+            // The four comparisons below are a **case-insensitive identity**
+            // test on a URL, so the key is the URL in root case. They used to
+            // ask for `en_US` explicitly, which is a real answer and the wrong
+            // one: a locale is a *rendering* context, and rendering a URL in
+            // Turkish lowercases `I` to a dotless `ı`, so the same manifest
+            // would key differently on a Turkish device and every sync would
+            // install and uninstall the same addon. `String.lowercase()` with
+            // no argument is locale-invariant, which is the same contract
+            // `Locale.ROOT` states -- and `SharedPreferencesSearchHistoryStore`
+            // was already using `Locale.ROOT` for its own dedupe key, so this
+            // is the fourth instance of one rule rather than a fifth spelling.
+            val serverByUrl = knownStremio.associateBy { it.manifestUrl.lowercase() }
+            val localByUrl = localRows.associateBy { it.manifestUrl.lowercase() }
 
             localRows.forEach { local ->
-                if (local.manifestUrl.lowercase(Locale.US) !in serverByUrl) {
+                if (local.manifestUrl.lowercase() !in serverByUrl) {
                     backend.installAddon(session.accessToken, profileId, local.manifestUrl)
                 }
             }
 
             knownStremio.forEach { server ->
-                if (server.manifestUrl.lowercase(Locale.US) !in localByUrl) {
+                if (server.manifestUrl.lowercase() !in localByUrl) {
                     backend.uninstallAddon(session.accessToken, profileId, server.id)
                 }
             }

@@ -9,9 +9,19 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.util.Locale
 
-class AiInsightsCacheStore(context: Context) {
+/**
+ * The `SharedPreferences` implementation of [AiInsightsCache], and the reason
+ * the repository needed an interface rather than a moved class: this holds a
+ * `Context` for its whole life.
+ *
+ * It is left with **no `java.*` use at all** — `keyFor` used to call
+ * `locale.toLanguageTag()` on the `Locale` it was handed, so the cache key was
+ * already a tag. Taking the tag directly does not change a single stored key:
+ * the string that reaches `prefs.getString` is the same string, so a device
+ * that upgrades reads the entries it wrote before.
+ */
+class AiInsightsCacheStore(context: Context) : AiInsightsCache {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -19,13 +29,13 @@ class AiInsightsCacheStore(context: Context) {
         purgeLegacyEntries()
     }
 
-    fun load(
+    override fun load(
         itemId: String,
-        locale: Locale = Locale.getDefault(),
+        languageTag: String,
     ): AiInsightsResult? {
         val normalizedItemId = itemId.trim()
         if (normalizedItemId.isBlank()) return null
-        val raw = prefs.getString(keyFor(normalizedItemId, locale), null) ?: return null
+        val raw = prefs.getString(keyFor(normalizedItemId, languageTag), null) ?: return null
         // **Only the reader used to convert**, and that sentence is what this
         // port deletes: `save` below now builds with `buildJsonObject` too, so
         // both sides of the boundary are `JsonElement` and the note that
@@ -43,9 +53,9 @@ class AiInsightsCacheStore(context: Context) {
         return AiInsightsResult(slides = slides)
     }
 
-    fun save(
+    override fun save(
         itemId: String,
-        locale: Locale = Locale.getDefault(),
+        languageTag: String,
         result: AiInsightsResult,
     ) {
         val normalizedItemId = itemId.trim()
@@ -86,7 +96,7 @@ class AiInsightsCacheStore(context: Context) {
         }
         val json = buildJsonObject { put("slides", array) }
 
-        prefs.edit().putString(keyFor(normalizedItemId, locale), json.toString()).apply()
+        prefs.edit().putString(keyFor(normalizedItemId, languageTag), json.toString()).apply()
     }
 
     private fun purgeLegacyEntries() {
@@ -95,8 +105,8 @@ class AiInsightsCacheStore(context: Context) {
         prefs.edit().also { editor -> legacyKeys.forEach(editor::remove) }.apply()
     }
 
-    private fun keyFor(itemId: String, locale: Locale): String =
-        "$CACHE_PREFIX${itemId}_${locale.toLanguageTag().ifBlank { DEFAULT_LOCALE_TAG }}"
+    private fun keyFor(itemId: String, languageTag: String): String =
+        "$CACHE_PREFIX${itemId}_${languageTag.ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
         private const val PREFS_NAME = "ai_insights_cache"

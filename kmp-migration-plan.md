@@ -92,7 +92,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **115** | **78** | **43** |
+| **`:app`** | **117** | **78** | **43** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -145,21 +145,21 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **115** | **78** |
-| **total** | **210** | **95** |
+| **`:app`** | **117** | **78** |
+| **total** | **212** | **95** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 115 of 193, i.e. **60%**, and
-the 82 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 117 of 195, i.e. **60%**, and
+the 78 that remain are behind the walls listed in the table above.
 
 **The percentage is the figure that outlived one correction and died on the next,
 which is the whole argument for not quoting a ratio.** It was `106 of 186`, became
-`110 of 193` and round-tripped through the *same* 57%, and 5 files later it is
-`115 of 193` = **60%**. Nothing about the module changed in any of those steps that the
+`110 of 193` and round-tripped through the *same* 57%, and 7 files later it is
+`117 of 195` = **60%**. Nothing about the module changed in any of those steps that the
 percentage could see — a file or two each time, and every move freed real files.
 *A ratio is the worst kind of count to quote, because it can stay constant while
 every number in it is being corrected — and then move when nothing it describes has.*
@@ -167,7 +167,7 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 82 that remain, in four families, and three of them no static scan can see
+### The 78 that remain, in four families, and three of them no static scan can see
 
 `:app`'s remaining `androidMain` files were re-audited from both directions. A first
 pass named 21 files with zero framework imports, and a better one named 14, and the
@@ -202,6 +202,29 @@ audit, and no jar-grep:
 receiver wipes out smart casts and manufactures 14 errors from 3 causes, and an
 unresolved enum manufactures a non-exhaustive-`when` error that is not a defect at all.
 *The honest number is the count of distinct unresolved names.*
+
+**One file moved into `commonMain` with no test, and the reason is a *type*, not a
+missing suite.** `AiInsightsRepository` is now `:app`'s `commonMain` (its
+`Context`-taking companion became a top-level `androidMain`
+`aiInsightsRepository(context)`), and nothing can test it: its third collaborator is
+**`CrispyBackendClient`, a concrete class and not an interface**, so a `commonTest`
+can neither construct it nor stand in for it — and measured, **`CrispyBackendClient` has
+zero references anywhere in `:app`'s `commonTest`**, so it has never been nameable from
+there. Its other two are faked today and were before this landing: `AccountApi` by
+`FakeAccountApi`, and `ActiveProfileStore` constructed over a `FakeKeyValueStore` in
+`ProfileMenuRouteTest`, `SearchViewModelTest`, `AccountViewModelsTest` and
+`BackendContextResolverTest`. The fourth is now the `AiInsightsCache` interface this
+landing introduced. **So three of the four seams are already faked where they are
+needed, and the fourth is the one that decides whether the file is testable at all** —
+the same shape as §1's *"a file with zero forbidden imports can still be unpinnable,
+because the blocker can be a type"*, pointing the other way. Making `CrispyBackendClient`
+an interface is the fix, and its own blocker is
+measured: **39 of `CrispyBackendParsers.kt`'s 45 functions are
+`internal fun CrispyBackendClient.parseX(…)`**, so it is the same wall
+`70ce5243` came at from the other side — *a file whose receiver is pinned cannot be
+freed by changing its arguments, and this time the receiver is the thing to change.*
+Recorded as the next `:backend`-level port rather than attempted here, because it reaches
+every one of those 45 parsers.
 
 What moved `:app` was mostly **not** UI work. It was removing the things that were
 *pinning* UI to `androidMain`:

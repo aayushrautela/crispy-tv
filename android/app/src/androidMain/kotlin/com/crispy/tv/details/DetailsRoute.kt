@@ -13,7 +13,6 @@ import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.flow.collectLatest
-import java.util.Locale
 
 @Composable
 fun DetailsRoute(
@@ -32,7 +31,7 @@ fun DetailsRoute(
     val appContext = LocalContext.current.applicationContext
 
     val normalizedType = remember(itemType) {
-        when (itemType.trim().lowercase(Locale.US)) {
+        when (itemType.trim().lowercase()) {
             "movie" -> "movie"
             "series", "show", "tv" -> "show"
             "anime" -> "anime"
