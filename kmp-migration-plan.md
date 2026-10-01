@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **123** | **73** | **43** |
+| **`:app`** | **124** | **72** | **43** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,15 +152,15 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **123** | **73** |
-| **total** | **219** | **90** |
+| **`:app`** | **124** | **72** |
+| **total** | **220** | **89** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 123 of 196, i.e. **63%**, and
+than by anything structural. `:app` is 124 of 196, i.e. **63%**, and
 the 73 that remain are behind the walls listed in the table above.
 
 **The percentage is the figure that outlived one correction and died on the next,
@@ -189,7 +189,7 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 73 that remain: **the leaves are the screens, and one of them has now moved**
+### The 72 that remain: **the leaves are the screens, and one of them has now moved**
 
 **This section used to claim a taxonomy, then carried a census, then carried a wrong
 census, and the reason the third one was wrong is the most useful thing in it.** Every
@@ -873,7 +873,29 @@ left to be discovered.
   - **"Bound to navigation" is a statement about the file, not about the mechanism.** Across the whole repository there are exactly three distinct imports of shared-transition machinery: six sites of `com.crispy.tv.ui.navigation.LocalSharedTransitionScope`, **one** of `androidx.compose.animation.SharedTransitionScope` and **one** of `androidx.compose.animation.SharedTransitionLayout`. **Zero** of the 27 participants import `androidx.navigation` for the transition itself — `androidx.compose.animation` is Compose Multiplatform and present on every target. Navigation is what *navigates*; the thing that *transitions* is Compose.
   - **The bug this hid, and it was a real one on every non-Android target:** the scope was provided from two lines inside `AppNavHost.kt` (`androidMain`), so all **14 `commonMain` participants read `null` off Android and rendered with no transition — silently, with no error anywhere.** The participants were correct all along; only the host was missing.
   - **Fixed by a new `CrispySharedTransitionLayout` in `:app` `commonMain`**, public, with a no-default `content` slot so a caller cannot obtain a provider that provides nothing. `AppNavHost.kt` shrank by four lines and stays `androidMain` (it is genuinely `NavHost`-bound), and `desktopApp` now wraps its screens in it — so a shared transition is exercised on a non-Android target for the first time. `DesktopSharedTransitionTest` asserts the scope is non-null under the host **and** null without it, which is what makes the first assertion mean "the host supplied it" rather than "the local defaults to it".
-  - **Still open, and genuinely Phase 5's, but the stated reason was wrong:** the seven `*NavGraph.kt` files plus `AppRoot` and `AppNavHost` are the 9-file nav layer and they are still `androidMain`. They were held there because `androidx.navigation` had no KMP artifact, and **that is now resolved** — the fork is on the `commonMain` classpath and compiles. What holds them is that each graph calls a `Context`-taking `androidMain` factory (`homeViewModelFactory`, `searchViewModelFactory`, `SettingsNavGraph`'s `SupabaseServicesProvider` and `AppDistribution`), and `AppNavHost` names all the graphs, so the layer is mutually referencing and moves as a unit or not at all. **This is still a navigation problem and not a transition one** — the conclusion survives, the cause does not, and the next step is the factories rather than the dependency. Do not read the remaining `androidMain` participants as transition work.
+  - **Three of the 9 nav-layer files are now in `commonMain`, and the sentence that described the
+    rest has been wrong three times, so it is worth stating plainly what is actually true.** It said
+    the layer is held by `androidx.navigation` having no KMP artifact -- resolved by the fork, which
+    is on the `commonMain` classpath and compiles. Then it said each graph calls a `Context`-taking
+    `androidMain` factory -- true, and the reason three of them needed seven, five and six
+    no-default slots respectively. Then it said `AppNavHost` names every graph so **the layer moves
+    as a unit or not at all** -- **which `SearchNavGraph`, `AuthNavGraph` and `LibraryNavGraph` have
+    each refuted by moving one at a time.** *A set moves as a unit only when the references are
+    mutual, and a graph calling a route is a one-way edge*: `androidMain` sees `commonMain`, so a
+    route moves out from under a graph that has not moved yet. `AccountSettingsRoute` was the proof
+    in advance -- it was `commonMain` and was reached by an `androidMain` graph until `AuthNavGraph`
+    moved.
+    **So the next step is the SCREENS, not the factories and not the dependency.** A file can move
+    once its *callees* are in `commonMain`, so movement propagates upward from the leaves. Three
+    leaves have now moved (`SearchNavGraph`'s routes, `LibraryRoute` (247), `CalendarScreen` (321)),
+    and `LibraryNavGraph` is the **first graph to move because its callee moved** rather than
+    because its own pins were discharged -- its only remaining pin was a `Log.d`, which was a port
+    and not a pin at all, since `platform-core`'s `commonMain` already declares
+    `AppLogger.debug(tag, message)` and `:platform-core` is on `:app`'s `commonMain` classpath.
+    The four graphs still in `androidMain` are each waiting on a route or a screen, and the largest
+    of those is `DetailsScreen` (580) -- behind `AppDistribution` (76), behind `PlaybackDependencies`
+    (188), which names `:native-engine`. **That chain is a product decision, not a port**, and so is
+    `paging-runtime` behind `CatalogViewModel` (51) and `DiscoverScreen` (637).
 - Tokenise the design system so a 10-foot TV surface and a resizable desktop window are both servable **without changing today's appearance**.
 - **`architecture.md` updated for the ported codebase. This was the last named item in Phase 4, and it is documentation rather than code. Done.** Measured staleness, all four points verified against the tree: its `## Status` names "the Android and iOS clients", and desktop has shipped; `## Recommended Package Direction` points at `android/app/src/main/java/com/crispy/tv/` with a `feature/` and an `infra/` that do not exist, and the `AppGraph.kt` it names is at `android/app/src/androidMain/kotlin/com/crispy/tv/app/AppGraph.kt`; and `## What To Refactor First` item 2 tells the reader to replace `WatchProvider?`, a type that no longer exists anywhere (`grep -rl WatchProvider android --include=*.kt` returns nothing). Its **backend-first ownership model is still correct and was kept** — so this was a KMP pass over a document whose reasoning survives, not a rewrite. **Reading it in full first was the whole lesson**: patching those four anchors in isolation would have missed the seven non-existent type names, the four already-finished refactor items, and the competing seven-phase plan. What changed: the client set is now all four targets; `## Recommended Package Direction` became `## Recommended Module Direction` and is now the **real module graph** rather than a package tree that was never built, with the two directories that answer the old question named (`domain/repository/` in `:app` `commonMain`, `AppGraph.kt` in `androidMain`); `## What To Refactor First In This Repo` is split into *Still true* and *Done since this list was written* with the numbering kept; `## Migration Plan` is retitled for scope; `## Fetch And Cache Policy` is explicitly labelled a proposal with the `DataSource` collision named; and the mutation lifecycle in `## Offline And Retry Behavior` was replaced with the **real four-state sealed `MutationStatus`** — which has no `CONFIRMED`, because a synced mutation is **deleted**, and no `RETRY_SCHEDULED`, because retry is a `Pending` carrying `nextAttemptAtMs`, and which has a `Conflict(serverValue)` the old list had no word for, so the document's own `## Conflict Resolution` section could not be implemented as written. 594 → 666 lines; `:1-200`, which is the spine, is untouched.
 - **Material3 Expressive: use it on every target.** This supersedes an earlier revision

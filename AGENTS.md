@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 123 `commonMain` / 73 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 124 `commonMain` / 72 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -199,28 +199,34 @@ is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
 `staticCompositionLocalOf<SharedTransitionScope?> { null }`. The single provider used to be two lines
 inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
 and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
-cannot obtain a provider that provides nothing. **`SearchNavGraph.kt` and `AuthNavGraph.kt` are now in `commonMain`** and
-the other five graphs are still in `androidMain` -- and the finding is that **the graphs are no
-longer the unit of work: a file can move once its _callees_ are in `commonMain`, so movement
-propagates upward from the leaves, and the leaves are the screens.** `LibraryRoute.kt` (247)
-moved on exactly that evidence, and every one of its callees -- `currentMonthKeyOf`,
-`LibraryFiltersRow`, `LibraryStatusMessage`, `LibraryEmptyState`, `LibraryAppendState`,
-`historyItems`, `CrispyScreen`, `ProfileIconButton`, `ItemActionSheet`, `StandardTopAppBar`,
-`topLevelAppBarColors`, `responsivePageHorizontalPadding`, `appBarScrollBehavior` -- was already
-in `commonMain`. **The reason recorded here for years was wrong
-twice before it was right once**. It said they stay because `androidx.navigation` has no KMP
-artifact — true of Google's artifact, and false once `:app` swapped to
+cannot obtain a provider that provides nothing. **`SearchNavGraph.kt`, `AuthNavGraph.kt` and
+`LibraryNavGraph.kt` are now in `commonMain`** and the other four graphs are still in `androidMain`
+-- and the finding is that **the graphs are no longer the unit of work: a file can move once its
+_callees_ are in `commonMain`, so movement propagates upward from the leaves, and the leaves are
+the screens.** `LibraryRoute.kt` (247) moved on exactly that evidence, and every one of its
+callees -- `currentMonthKeyOf`, `LibraryFiltersRow`, `LibraryStatusMessage`, `LibraryEmptyState`,
+`LibraryAppendState`, `historyItems`, `CrispyScreen`, `ProfileIconButton`, `ItemActionSheet`,
+`StandardTopAppBar`, `topLevelAppBarColors`, `responsivePageHorizontalPadding`,
+`appBarScrollBehavior` -- was already in `commonMain`. **The reason recorded here for years was
+wrong three times before it was right.** It said the graphs stay because `androidx.navigation` has
+no KMP artifact -- true of Google's artifact, and false once `:app` swapped to
 `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` (measured across five
 `.module` links, and **compiled**; the fork keeps the `androidx.navigation.compose` package, so not
-one import changed). What actually holds the remaining five is that **each one calls a
-`Context`-taking `androidMain` factory, and `AppNavHost` names every graph by name, so the layer is
-mutually referencing and moves as a unit or not at all** — with one exception that proves the rule:
-`SearchNavGraph` reached `commonMain` once **two pins below its imports** were discharged, and a
-pin that arrives through a *call* is invisible to every import scan. The two were
+one import changed). Then it said each graph calls a `Context`-taking `androidMain` factory, which
+is why three of them needed seven, five and six no-default slots respectively.
+**And it said `AppNavHost` names every graph so the layer moves as a unit or not at all -- which
+three graphs have now refuted by moving one at a time.** *A set moves as a unit only when the
+references are mutual, and a graph calling a route is a one-way edge*: `androidMain` sees
+`commonMain`, so a route moves out from under a graph that has not moved yet. That is the whole
+reason `LibraryNavGraph` could move at all -- **its only pin was a `Log.d`, and it moved because
+`LibraryRoute` below it had already moved.**
+`SearchNavGraph` reached `commonMain` for a different reason, and both are worth keeping: it came
+once **two pins below its imports** were discharged, and a pin that arrives through a *call* is
+invisible to every import scan. The two were
 `coil3.compose.LocalPlatformContext.current.applicationContext` and the two factory functions
 themselves; the graph now takes `searchViewModelFactory: ViewModelProvider.Factory` and
 `loadProfile: suspend () -> ActiveProfileInfo?` as **no-default slots carrying the product, not a
-lambda producing it** — *a slot its caller must `remember` is the product type*, since the caller is
+lambda producing it** -- *a slot its caller must `remember` is the product type*, since the caller is
 a composable. And the fourth pin was neither an import nor a call in the graph: it was the four
 **route builders** in `androidMain`, reachable with no import because they are extensions on
 `AppRoutes`. *A file in a package can be pinned by a sibling in the same package, and no scan of any

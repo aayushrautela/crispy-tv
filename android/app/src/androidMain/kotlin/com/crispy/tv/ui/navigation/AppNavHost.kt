@@ -17,6 +17,10 @@ import coil3.compose.LocalPlatformContext
 import com.crispy.tv.accounts.accountSettingsViewModelFactory
 import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.accounts.profileListViewModelFactory
+import com.crispy.tv.details.localeDateFormatters
+import com.crispy.tv.library.deviceUtcOffsetMillis
+import com.crispy.tv.library.libraryViewModelFactory
+import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.search.searchViewModelFactory
 
 private const val TopLevelNavigationDurationMillis = 200
@@ -72,6 +76,29 @@ fun AppNavHost(
         val profileListFactory = remember(appContext) { profileListViewModelFactory(appContext) }
         val accountSettingsFactory = remember(appContext) { accountSettingsViewModelFactory(appContext) }
         val accountProfileLoader = remember(appContext) { activeProfileLoader(appContext) }
+
+        // `addLibraryNavGraph` is the same shape a third time, and the two of its
+        // seven values that are NOT plain products are the reason this block is
+        // longer than the other two. `monthName` and `loadProfile` are remembered
+        // lambdas because their identity is load-bearing -- `ProfileIconButton`
+        // keys a `produceState` on `loadProfile`, and `LibraryRoute` re-reads
+        // `monthName`'s receiver per composition. `clock` and `utcOffsetMillis`
+        // are remembered lambdas that deliberately re-read on every *call*: the
+        // offset is wrong if it is captured at composition time, for the hours
+        // either side of a daylight-saving change, and this screen groups rows by
+        // month. So the lambdas are stable and the reads inside them are not.
+        //
+        // `libraryProfileLoader` is a THIRD `activeProfileLoader(appContext)`
+        // instance rather than a reuse of `profileLoader` or
+        // `accountProfileLoader` above, on the same grounds: each graph used to
+        // build its own, and sharing one would key three graphs' state to a
+        // single lambda identity.
+        val libraryFactory = remember(appContext) { libraryViewModelFactory(appContext) }
+        val libraryMonthName = remember(appContext) { localeDateFormatters(appContext).monthName }
+        val libraryClock = remember { { System.currentTimeMillis() } }
+        val libraryUtcOffset = remember { { deviceUtcOffsetMillis() } }
+        val libraryProfileLoader = remember(appContext) { activeProfileLoader(appContext) }
+        val libraryLogger = remember(appContext) { AndroidAppLogger(appContext) }
         NavHost(
             navController = navController,
             startDestination = TopLevelDestination.Home.route,
@@ -140,7 +167,15 @@ fun AppNavHost(
                 loadProfile = profileLoader,
             )
             addDiscoverNavGraph(navController)
-            addLibraryNavGraph(navController)
+            addLibraryNavGraph(
+                navController = navController,
+                viewModelFactory = libraryFactory,
+                monthName = libraryMonthName,
+                clock = libraryClock,
+                utcOffsetMillis = libraryUtcOffset,
+                loadProfile = libraryProfileLoader,
+                logger = libraryLogger,
+            )
             addSettingsNavGraph(navController)
             addAccountNavGraph(
                 navController = navController,
