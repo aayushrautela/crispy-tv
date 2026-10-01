@@ -791,8 +791,15 @@ fun ProfileManagementRoute(
     // A plain value, not a composable slot: `viewModel(factory = ...)` keys on factory
     // identity, so a composable slot would be re-invoked every recomposition and defeat
     // the `remember` that keeps the store alive. The platform hoists the whole
-    // LocalContext -> applicationContext -> remember -> factory block into the nav graph
-    // and passes the result here. See AccountViewModelFactories.kt.
+    // LocalContext -> applicationContext -> remember -> factory block into the
+    // COMPOSITION ROOT and passes the result here -- which used to say "into the nav
+    // graph", and for the two routes below that was the reason `AuthNavGraph.kt`
+    // could not move: the block has to be hoisted into a `commonMain` file, so it
+    // could not stay in a nav graph, so it could not stay in `androidMain`. The
+    // hoisting now happens in `AppNavHost.kt`, which is `androidMain` and holds a
+    // `Context`. The two routes ABOVE this pair are reached by callers that have not
+    // moved, so for them the original sentence is still literally true.
+    // See AccountViewModelFactories.kt.
     viewModelFactory: ViewModelProvider.Factory,
 ) {
     val viewModel: ProfileListViewModel = viewModel(factory = viewModelFactory)
@@ -1055,8 +1062,15 @@ fun AccountSettingsRoute(
     // A plain value, not a composable slot: `viewModel(factory = ...)` keys on factory
     // identity, so a composable slot would be re-invoked every recomposition and defeat
     // the `remember` that keeps the store alive. The platform hoists the whole
-    // LocalContext -> applicationContext -> remember -> factory block into the nav graph
-    // and passes the result here. See AccountViewModelFactories.kt.
+    // LocalContext -> applicationContext -> remember -> factory block into the
+    // COMPOSITION ROOT and passes the result here -- which used to say "into the nav
+    // graph", and for the two routes below that was the reason `AuthNavGraph.kt`
+    // could not move: the block has to be hoisted into a `commonMain` file, so it
+    // could not stay in a nav graph, so it could not stay in `androidMain`. The
+    // hoisting now happens in `AppNavHost.kt`, which is `androidMain` and holds a
+    // `Context`. The two routes ABOVE this pair are reached by callers that have not
+    // moved, so for them the original sentence is still literally true.
+    // See AccountViewModelFactories.kt.
     viewModelFactory: ViewModelProvider.Factory,
 ) {
     val viewModel: AccountSettingsViewModel = viewModel(factory = viewModelFactory)

@@ -181,7 +181,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 120 `commonMain` / 75 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 121 `commonMain` / 74 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -199,13 +199,13 @@ is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
 `staticCompositionLocalOf<SharedTransitionScope?> { null }`. The single provider used to be two lines
 inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
 and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
-cannot obtain a provider that provides nothing. **`SearchNavGraph.kt` is now in `commonMain`** and
-the other six graphs are still in `androidMain`, **and the reason recorded here for years was wrong
+cannot obtain a provider that provides nothing. **`SearchNavGraph.kt` and `AuthNavGraph.kt` are now in `commonMain`** and
+the other five graphs are still in `androidMain`, **and the reason recorded here for years was wrong
 twice before it was right once**. It said they stay because `androidx.navigation` has no KMP
 artifact — true of Google's artifact, and false once `:app` swapped to
 `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` (measured across five
 `.module` links, and **compiled**; the fork keeps the `androidx.navigation.compose` package, so not
-one import changed). What actually holds the remaining six is that **each one calls a
+one import changed). What actually holds the remaining five is that **each one calls a
 `Context`-taking `androidMain` factory, and `AppNavHost` names every graph by name, so the layer is
 mutually referencing and moves as a unit or not at all** — with one exception that proves the rule:
 `SearchNavGraph` reached `commonMain` once **two pins below its imports** were discharged, and a
@@ -724,6 +724,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `titlecase(Locale.ENGLISH)` is locale-dependent while `replaceFirstChar { it.uppercase() }` is
   not, so splitting them puts the Turkish dotless-i bug in shared code. *A step is platform work if
   its answer depends on the platform; "it is just a `String` call" is not the test.*
+  **And read what the consumer DOES with the value before typing the slot — a value it *stores*
+  must stay a lambda, a value it merely passes on may be the product.** `SearchNavGraph`'s slot
+  was first typed `() -> ViewModelProvider.Factory` and the compile rejected it with
+  *`actual type is 'ViewModelProvider.Factory', but '() -> ViewModelProvider.Factory' was expected`*,
+  because the caller is a composable and `remember`s it, so the product is what arrives — and
+  `ProfileManagementRoute:798` then does `viewModel(factory = viewModelFactory)`, handing it on.
+  `AuthNavGraph`'s third slot is the **counterexample that completes the rule**:
+  `ProfileMenuRoute:98` is `produceState<ActiveProfileInfo?>(initialValue = null, loadProfile)`,
+  **so the lambda is a `produceState` key** — a fresh one each recomposition restarts the profile
+  load, so it must stay `suspend () -> ActiveProfileInfo?`. *The question is not whether a slot
+  is a lambda or a product; it is whether the consumer keys on its identity.* Two more facts from
+  the same landing: **a `Context` its caller must `remember` is already reachable at the call
+  site** — `AppNavHost` had no `Context` at all until it read `LocalPlatformContext.current` in
+  its own body — and **two graphs that each call the same loader must each get their own
+  `remember`ed instance**, because sharing one keys both graphs' state to a single identity and a
+  recomposition in one restarts the other's load.
   **And sometimes the platform step is deleted rather than moved, which is a behaviour fix and not
   a simplification.** `String.lowercase(Locale)` is the JVM-only overload and Kotlin's
   `lowercase()` is locale-invariant, so five `s.lowercase(Locale.US)` sites became `s.lowercase()`

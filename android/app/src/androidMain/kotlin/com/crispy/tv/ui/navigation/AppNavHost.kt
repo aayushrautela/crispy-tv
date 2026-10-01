@@ -14,7 +14,9 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import coil3.compose.LocalPlatformContext
+import com.crispy.tv.accounts.accountSettingsViewModelFactory
 import com.crispy.tv.accounts.activeProfileLoader
+import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.search.searchViewModelFactory
 
 private const val TopLevelNavigationDurationMillis = 200
@@ -58,6 +60,18 @@ fun AppNavHost(
         val appContext = remember(platformContext) { platformContext.applicationContext }
         val searchFactory = remember(appContext) { searchViewModelFactory(appContext) }
         val profileLoader = remember(appContext) { activeProfileLoader(appContext) }
+
+        // `addAccountNavGraph` is the same shape a second time: three `Context`
+        // destinations, three factory call sites, one hoisted block. **These are
+        // separate `remember`s rather than a reuse of `profileLoader` above, on
+        // purpose.** Both graphs call `activeProfileLoader(appContext)`, and each
+        // used to build its own; sharing one instance would make a single lambda
+        // identity key two graphs' state, so a recomposition in one could cancel or
+        // restart the other's load. Three remembered values, not one, is the
+        // behaviour-preserving shape.
+        val profileListFactory = remember(appContext) { profileListViewModelFactory(appContext) }
+        val accountSettingsFactory = remember(appContext) { accountSettingsViewModelFactory(appContext) }
+        val accountProfileLoader = remember(appContext) { activeProfileLoader(appContext) }
         NavHost(
             navController = navController,
             startDestination = TopLevelDestination.Home.route,
@@ -131,6 +145,9 @@ fun AppNavHost(
             addAccountNavGraph(
                 navController = navController,
                 onSignedOut = onSignedOut,
+                profileListFactory = profileListFactory,
+                accountSettingsFactory = accountSettingsFactory,
+                loadProfile = accountProfileLoader,
             )
             addPlayerDestination(navController)
         }
