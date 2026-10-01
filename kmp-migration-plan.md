@@ -83,16 +83,25 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 
 | Module | `commonMain` | `androidMain` | `commonTest` |
 |---|---|---|---|
-| `core-domain` | 29 | 0 | 28 |
+| `core-domain` | 29 | 0 | 29 |
 | `platform-core` | 7 | 0 | 1 |
 | `sharedUI` | 5 | 0 | 1 |
-| `player` | 6 | 0 | 1 |
+| `player` | 6 | 0 | 2 |
 | `addons` | 10 | 5 | 1 |
-| `backend` | 9 | 8 | 4 |
-| `home` | 13 | 4 | 6 |
-| `network` | 2 | 4 | 1 |
-| `watchhistory` | 2 | 3 | 0 |
-| **`:app`** | **110** | **81** | **41** |
+| `backend` | 17 | 1 | 5 |
+| `home` | 13 | 5 | 6 |
+| `network` | 3 | 4 | 1 |
+| `watchhistory` | 5 | 1 | 3 |
+| **`:app`** | **110** | **83** | **41** |
+
+**Seven of these ten rows were wrong when this table was last refreshed, and
+the total was wrong in both directions.** `backend` was three landings stale, `home`
+was short one `androidMain` file, `core-domain`'s `commonTest` count was short by
+one, and `:app` was short two — so the `:app` row alone had drifted far enough to
+move the total by 13 files while every individual row still looked plausible.
+**A per-module table is only refreshed by re-running the measurement over every
+row; patching the rows the current landing touched leaves the others wrong, and a
+row that is one file out is indistinguishable from a row that is right.**
 
 `:player` had this shape until its landing and was the sharpest of the findings,
 because unlike `:addons` **its `androidMain` is empty** — nothing about it looked
@@ -102,17 +111,28 @@ reach**, which makes the module read as Android-only, while its `commonMain` is 
 lines of pure string handling whose regexes a hand-rolled implementation gets wrong
 quietly. It now has 27 cases.
 
-**`:watchhistory` is a measured non-finding and the sweep is complete.** Its two
-`commonMain` files are `WatchHistoryConfig.kt` — a single field defaulting to `"dev"` —
-and `sync/WatchSyncSource.kt`, a three-method interface with empty bodies. A suite there
-would re-assert the compiler, the same reasoning `AGENTS.md` records for
-`ProfileRepository` and `AccountSettingsRepository`. **A module with no test source set
-is a question, not a defect** — and the answer here was wrong, because the question was asked of
-`commonMain` when the module was the subject. The module had no test source set of any kind, and the
-unmeasured content was 405 lines of `androidMain`. It now has **both** test source sets and two
-`commonMain` classes. **Of its three `androidMain` files, one has moved to `commonMain` with the JSON
-node type changed**, one is `OkHttpWatchSyncSource.kt` and is blocked by OkHttp, and one is
-`BackendWatchHistoryService.kt`, the composition root for this module.
+**`:watchhistory` was recorded as a measured non-finding, and the measurement was
+correct about `commonMain` and wrong about the module.** Its two `commonMain` files
+were `WatchHistoryConfig.kt` — a single field defaulting to `"dev"` — and
+`sync/WatchSyncSource.kt`, a three-method interface with empty bodies, so a suite
+there would have re-asserted the compiler. **A module with no test source set is a
+question, not a defect** — and the answer here was wrong, because the question was
+asked of `commonMain` when the module was the subject. The module had no test source
+set of any kind, and the unmeasured content was 405 lines of `androidMain`.
+
+**It now has 5 `commonMain` files, 3 `commonTest` files and exactly 1 `androidMain`
+file, and its 44 cases run on two targets** — `desktopTest` and `testAndroidHostTest`
+both report 44, from the one `commonTest` source set, which is the shape this whole
+plan argues for. **All three of its former `androidMain` files are accounted for, and
+only one of them was ever blocked by its subject matter:** `WatchProgressStore` moved
+when the JSON node type changed; `BackendWatchHistoryService` moved with **no
+substance change at all** — zero `android.*` imports, zero OkHttp, zero
+`System.currentTimeMillis`, and all 27 of its imports resolving in a `commonMain`
+source set — because its receiver, `CrispyBackendClient`, had only just become
+`commonMain`; and `OkHttpWatchSyncSource.kt` **is still `androidMain` and is blocked
+by OkHttp**, implementing a `commonMain` interface. **The middle one is the finding:
+a 681-line file sat two landings behind a receiver, and nothing about it looked
+pinned until the receiver moved.**
 
 | Module | `commonMain` | `androidMain` |
 |---|---|---|
@@ -121,18 +141,26 @@ node type changed**, one is `OkHttpWatchSyncSource.kt` and is blocked by OkHttp,
 | `sharedUI` | 5 | 0 |
 | `player` | 6 | 0 |
 | `addons` | 10 | 5 |
-| `backend` | 9 | 8 |
-| `home` | 13 | 4 |
-| `network` | 2 | 4 |
-| `watchhistory` | 2 | 3 |
-| **`:app`** | **110** | **81** |
-| **total** | **192** | **105** |
+| `backend` | 17 | 1 |
+| `home` | 13 | 5 |
+| `network` | 3 | 4 |
+| `watchhistory` | 5 | 1 |
+| **`:app`** | **110** | **83** |
+| **total** | **205** | **99** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
-files in `commonMain` than in `androidMain`. `:app` is 106 of 186, i.e. **57%**, and
-the 80 that remain are behind the walls listed in the table above.
+files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
+down to **one** `androidMain` file each, both of them pinned by a transport rather
+than by anything structural. `:app` is 110 of 193, i.e. **57%**, and
+the 83 that remain are behind the walls listed in the table above.
+
+**The 57% is the one figure here that survived unchanged, and it survived by
+coincidence.** It was `106 of 186` and it is now `110 of 193` — both operands
+moved and both round to the same integer, so the percentage is right for a reason
+that has nothing to do with being right. *A ratio is the worst kind of count to
+quote, because it can stay constant while every number in it is being corrected.*
 
 What moved `:app` was mostly **not** UI work. It was removing the things that were
 *pinning* UI to `androidMain`:

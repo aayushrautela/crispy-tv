@@ -108,6 +108,35 @@ kotlin {
             // It was already in `libs.versions.toml` with zero consumers, so
             // this is a declaration rather than a version resolution.
             implementation(libs.serialization.json)
+
+            // `:android:player` and `:android:backend` moved DOWN with
+            // `BackendWatchHistoryService.kt`, which moved down because it has
+            // **zero platform pins** -- 0 `import android.*`, 0 okhttp3, 0
+            // `System.currentTimeMillis`, and all 27 of its imports resolve in a
+            // `commonMain` source set.
+            //
+            // The note these two replaced said the ordering constraint is "the
+            // service that implements `WatchHistoryService` is in this source set
+            // and cannot see it". **The constraint was real; that was not the
+            // reason.** Both dependencies were declared here, in `androidMain`, so
+            // the service could see them perfectly well. The note had conflated
+            // *where a dependency is declared* with *where the file that consumes
+            // it lives* -- a file in `androidMain` sees anything `androidMain`
+            // declares, and only stops seeing it when the file itself moves. So
+            // the two facts have to be kept apart when reasoning about which
+            // dependency has to move first: the ordering rule is still "the
+            // dependency moves down when the *consumer* moves down", and nothing
+            // about it is a claim that an already-declared dependency is invisible
+            // to the source set that declared it.
+            //
+            // `:android:backend` could not have moved down before `70ce5243` and
+            // `a0e975b6`, because `CrispyBackendClient` was a *receiver* of this
+            // file's parse calls and is only now in `commonMain`. **That is the
+            // same ordering constraint the note described, applied to the module
+            // it did not mention** -- so the note was right in shape and wrong in
+            // subject, which is the harder kind of stale to notice.
+            implementation(project(":android:player"))
+            implementation(project(":android:backend"))
         }
 
         androidMain.dependencies {
@@ -115,14 +144,22 @@ kotlin {
             // inject these types into their own constructors.
             api(project(":android:platform-android"))
 
-            // :android:player is now multiplatform, so it could in principle move
-            // down to commonMain. It does not yet, because the service that
-            // implements `WatchHistoryService` is in this source set and cannot see
-            // it. That is the same ordering constraint as `HttpClientPort`: the
-            // dependency moves down when the *consumer* moves down.
-            implementation(project(":android:player"))
+            // `:android:player` and `:android:backend` used to be here, with a
+            // note explaining why they could not move down. They have moved down
+            // to `commonMain` alongside the service, which had no platform pin at
+            // all; see the comment there for why the note's stated reason was not
+            // the real one.
+            //
+            // `:android:network` is the last dependency that genuinely cannot.
+            // Its only consumer in this module is `OkHttpWatchSyncSource.kt` --
+            // **the one `androidMain` file that remains** -- and that file is
+            // pinned by OkHttp itself (6 `okhttp3` sites, `okio.BufferedSource`,
+            // 2 `org.json` sites) while implementing `WatchSyncSource`, which is
+            // already a `commonMain` interface. So this is not an ordering
+            // constraint at all: it is a dependency that will stay here until that
+            // one file gets a second implementation over `:network`'s
+            // `CrispyHttpClient` port, the same move `OkHttpCrispyHttpClient` was.
             implementation(project(":android:network"))
-            implementation(project(":android:backend"))
 
             implementation(libs.coroutines.android)
         }
