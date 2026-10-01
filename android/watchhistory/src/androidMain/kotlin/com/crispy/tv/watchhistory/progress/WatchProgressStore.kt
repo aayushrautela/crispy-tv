@@ -261,47 +261,6 @@ class WatchProgressStore(
         }
     }
 
-    private fun normalizeContinueWatchingEpisodeRemoveId(id: String, episodeId: String): String {
-        val trimmedEpisodeId = episodeId.trim()
-        if (trimmedEpisodeId.isBlank()) return ""
-
-        val colonParts = trimmedEpisodeId.split(':')
-        if (colonParts.size >= 2) {
-            val season = colonParts[colonParts.size - 2].toIntOrNull()
-            val episode = colonParts[colonParts.size - 1].toIntOrNull()
-            if (season != null && episode != null) {
-                return "$id:$season:$episode"
-            }
-        }
-
-        val match = Regex("s(\\d+)e(\\d+)", RegexOption.IGNORE_CASE).find(trimmedEpisodeId)
-        if (match != null) {
-            val season = match.groupValues.getOrNull(1)?.toIntOrNull()
-            val episode = match.groupValues.getOrNull(2)?.toIntOrNull()
-            if (season != null && episode != null) {
-                return "$id:$season:$episode"
-            }
-        }
-
-        if (trimmedEpisodeId.startsWith("$id:")) return trimmedEpisodeId
-        return "$id:$trimmedEpisodeId"
-    }
-
-    private fun getWatchProgressPrefKey(id: String, type: String, episodeId: String?): String {
-        val base = "$WATCH_PROGRESS_KEY_PREFIX$type:$id"
-        return if (episodeId.isNullOrBlank()) base else "$base:$episodeId"
-    }
-
-    private fun getContentDurationPrefKey(id: String, type: String, episodeId: String?): String {
-        val base = "$CONTENT_DURATION_KEY_PREFIX$type:$id"
-        return if (episodeId.isNullOrBlank()) base else "$base:$episodeId"
-    }
-
-    private fun buildWpKeyString(id: String, type: String, episodeId: String? = null): String {
-        val base = "$type:$id"
-        return if (episodeId.isNullOrBlank()) base else "$base:$episodeId"
-    }
-
     private fun writeTombstones(map: Map<String, Long>) {
         val obj = JSONObject()
         for ((k, v) in map) {
@@ -391,8 +350,6 @@ class WatchProgressStore(
         /** A constant now, rather than the old per-instance `logTag` parameter. */
         private const val LOG_TAG = "WatchProgressStore"
 
-        private const val WATCH_PROGRESS_KEY_PREFIX = "@watch_progress:"
-        private const val CONTENT_DURATION_KEY_PREFIX = "@content_duration:"
         private const val WP_TOMBSTONES_KEY = "@wp_tombstones"
         private const val CONTINUE_WATCHING_REMOVED_KEY = "@continue_watching_removed"
 

@@ -460,15 +460,62 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   silently. `:network` is now 27 cases. **A module that looks untestable is not a module
   with nothing to test** — read the `commonMain` file list and its line counts before
   concluding anything from the `androidMain` shape.
-- **A module with no test source set is a question, not a defect, and one of the four is a
-  measured non-finding.** `:android:watchhistory`'s `commonMain` is `WatchHistoryConfig.kt`
-  — one field defaulting to `"dev"` — and `sync/WatchSyncSource.kt`, a three-method interface
-  with empty bodies. A suite there re-asserts the compiler, the same reasoning recorded below
-  for `ProfileRepository` and `AccountSettingsRepository`. **This is why the sweep is written
-  down with its answer**: the four-module finding is closed, and closing it means recording
-  that one module was asked and deliberately left alone. Its three `androidMain` files are
-  blocked by `org.json`, by reaching `:backend`/`:player`, and by OkHttp respectively, as its
-  own build-file KDoc records.
+- **A module with no test source set is a question, not a defect — and the question has to be
+  the *module*, not the source set a sweep happened to look in.** `:android:watchhistory` was
+  recorded here as "a measured non-finding": its `commonMain` is `WatchHistoryConfig.kt` — one
+  field defaulting to `"dev"` — plus `sync/WatchSyncSource.kt`, a three-method interface with
+  empty bodies, so a `commonTest` there "re-asserts the compiler". **That was a correct claim
+  about `commonMain` and the wrong scope**, and it hid the real answer for a long time: the
+  module had **no test source set of any kind** — no `withHostTest {}`, no `commonTest`, no
+  `androidHostTest` — and the unmeasured content was 405 lines of `androidMain`
+  (`progress/WatchProgressStore.kt`), not the two-file `commonMain`. **A "measured non-finding"
+  is a claim about a scope, and the scope was inherited from the sweep rather than chosen by
+  the question.**
+  The file's own build-file KDoc said all three `androidMain` files were blocked — by `org.json`,
+  by reaching `:backend`/`:player`, by OkHttp — and that is what made the module read as
+  Android-shaped. **Reading the file settles it faster than the KDoc does:**
+  `WatchProgressStore.kt` imports `com.crispy.tv.platform.{AppLogger, KeyValueStore,
+  MonotonicClock, TimeSource}`, coroutines, `org.json` and `kotlin.math` — **not one
+  `android.*` import**, no `Context`, no `SharedPreferences`, no `java.io.File`, no OkHttp, no
+  Compose. It already took the four `:platform-core` ports as constructor parameters, so it
+  was **designed portable and only the JSON parsing blocked it**, and `org.json` is the *sole*
+  remaining pin.
+  It now has both test source sets, 18 cases, and four of its pure functions in `commonMain`
+  as `WatchProgressKeys.kt`. **The lift cost `git diff --numstat` of `0 43` — deletions only,
+  zero insertions** — because a same-package top-level declaration is what every existing
+  call site was already resolving to. **The two key-prefix constants had to move with the
+  functions, and leaving them behind would have been worse than a compile error:** they were
+  `private companion` members, which a top-level function cannot see, and **a companion member
+  shadows a same-named top-level declaration inside the class body** — so `WatchProgressStore`
+  would have kept filtering with its own copy while the lifted functions wrote with the new
+  one, two strings that must agree with nothing making them agree. `getAllWatchProgress`
+  filters with `startsWith(WATCH_PROGRESS_KEY_PREFIX)` and
+  `removeAllWatchProgressForContent` rebuilds keys with `getWatchProgressPrefKey`, so the
+  prefix is a **writer/reader contract**, and `strippingTheProgressPrefixYieldsExactlyTheWpKey`
+  now asserts it over a 3×5×5 loop. The suite is in `commonTest`, not `androidHostTest`,
+  precisely because the declarations moved to `commonMain` — so it needs no Robolectric and no
+  `org.json`, and it runs on **both** `desktopTest` and `testAndroidHostTest`.
+  **Three of its eighteen fixtures were wrong on the first run and the code was right in all
+  three**, which is the fixture version of *a caught mutation is not evidence about the case you
+  would have named*: `tt1:s01e02-special` was written as a fixture for the verbatim strategy and
+  the **token** strategy claimed it first, so the case actually pinned the order between them;
+  `":5"` splits to `["", "5"]`, so the season slot is blank, every strategy misses, and the
+  fallback yields `tt1::5` — I had dropped a colon; and threading a reduced remove id back into
+  `buildWpKeyString` produced `movie:tt1:tt1:2:5`, because the reduced value is **already**
+  `type:id`-shaped and is not an episode id.
+- **A dead private member is a product question, and so is an owned scope with no owner to hand
+  it from.** Both surfaced in the same file and neither was "fixed". **`normalizedImdbIdOrNull`
+  (17 lines of real imdb-id validation) has exactly one hit in the repository: its own
+  declaration** — every other private member has ≥2, and `buildWpKeyString` has 10. Deleting it
+  is a product call (was a caller removed?) and it is recorded instead. And
+  **`WatchProgressStore`'s scope parameter is defaulted to
+  `CoroutineScope(SupervisorJob() + Dispatchers.Default)` and the default is live**: its one
+  construction site, `BackendWatchHistoryService.kt:51`, passes only the other four arguments.
+  **The recorded fix for this antipattern does not apply here**, because
+  `BackendWatchHistoryService` owns no scope either — no `CoroutineScope`, no `SupervisorJob`,
+  no `cancel`, no `onDestroy` — so injecting the caller's scope **would move the antipattern up
+  a level rather than remove it**. That is a design question about where a long-lived
+  background service's scope comes from, and it is written down rather than guessed at.
 - **A document's own heading, prose class, or type names are not evidence about the code — and a
   second numbered plan for one repository is a defect even when every sentence in it is correct.**
   `architecture.md` was rewritten for the ported codebase and both halves of that bullet came from

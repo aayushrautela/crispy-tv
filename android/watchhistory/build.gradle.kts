@@ -26,6 +26,24 @@ kotlin {
         namespace = "com.crispy.tv.watchhistory"
         compileSdk = 37
         minSdk = 26
+
+        // This module had no test source set at all -- not a `commonTest`, not
+        // an `androidHostTest` -- and an earlier sweep recorded it as a
+        // measured non-finding on the grounds that its `commonMain` is two files
+        // and a suite there would re-assert the compiler. That reasoning was
+        // about the wrong file. `WatchProgressStore.kt` is 405 lines of
+        // `androidMain` logic, it has **no `android.*` import at all** -- only
+        // the four `:platform-core` ports, coroutines, `org.json` and
+        // `kotlin.math` -- and nothing was testing any of it.
+        //
+        // The answer is not a `commonTest`. The code under test is in
+        // `androidMain`, and `commonTest` cannot see it. It is not a plain JVM
+        // test either, because `org.json` is a class of the Android platform
+        // and is absent from every other target's classpath. So the suite is
+        // an `androidHostTest` under Robolectric, the same third use of
+        // Robolectric in this repository as `:backend`'s and `:app`'s
+        // `org.json` suites -- and the first here that is *not* for a `Context`.
+        withHostTest {}
     }
 
     jvm("desktop")
@@ -41,6 +59,14 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
+        getByName("androidHostTest").dependencies {
+            implementation(libs.robolectric)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+
         commonMain.dependencies {
             api(project(":android:core-domain"))
             api(libs.coroutines.core)
