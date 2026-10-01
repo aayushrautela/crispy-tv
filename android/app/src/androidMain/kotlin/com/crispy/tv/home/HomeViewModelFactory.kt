@@ -11,6 +11,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.platform.android.AndroidTimeSource
 import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
+import kotlinx.coroutines.Dispatchers
 
 /**
  * The `androidMain` construction site for [HomeViewModel]. It holds every line
@@ -65,6 +66,7 @@ fun homeViewModelFactory(context: Context): ViewModelProvider.Factory {
                     },
                     timeSource = AndroidTimeSource(),
                     logger = logger,
+                    ioDispatcher = Dispatchers.IO,
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

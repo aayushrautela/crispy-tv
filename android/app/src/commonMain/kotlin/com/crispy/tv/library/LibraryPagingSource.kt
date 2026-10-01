@@ -8,7 +8,7 @@ import com.crispy.tv.backend.ClientMediaCard
 import com.crispy.tv.backend.ClientMediaCardQueryResult
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.addons.util.formatRating
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 class LibraryPagingSource(
@@ -17,6 +17,18 @@ class LibraryPagingSource(
     private val sectionId: String,
     private val libraryCache: LibraryDiskCache,
     private val appliedGenerationMsProvider: () -> Long?,
+    /**
+     * The dispatcher the disk cache and the page fetch run on.
+     *
+     * No default, and that is deliberate. `Dispatchers.IO` does not exist in
+     * `commonMain`: on Kotlin/Native it is `internal`, so naming it here stops this
+     * file compiling for an Apple target. Defaulting to `Dispatchers.Default` would be
+     * worse than not compiling, because it puts blocking disk and socket work on a
+     * CPU-sized pool and nothing about the result looks wrong. The caller is
+     * [LibraryViewModel], which is itself handed one, and its factory is the place
+     * `Dispatchers.IO` still exists.
+     */
+    private val ioDispatcher: CoroutineDispatcher,
 ) : PagingSource<String, CatalogItem>() {
     override fun getRefreshKey(state: PagingState<String, CatalogItem>): String? = null
 
@@ -32,7 +44,7 @@ class LibraryPagingSource(
 
             if (params.key == null) {
                 val cached =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         libraryCache.read(backendContext.profileId, sectionId)
                     }
                 if (cached != null) {
@@ -45,7 +57,7 @@ class LibraryPagingSource(
             }
 
             val page =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     loadLibrarySectionPage(
                         backend = backend,
                         accessToken = backendContext.accessToken,
@@ -57,7 +69,7 @@ class LibraryPagingSource(
                 }
 
             if (params.key == null) {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     libraryCache.write(
                         profileId = backendContext.profileId,
                         sectionId = sectionId,

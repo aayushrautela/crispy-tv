@@ -56,7 +56,7 @@ class SearchViewModel(
     private val aiSearchRepository: AiSearchRepository,
     private val searchHistoryStore: SearchHistoryStore,
     private val languageTagProvider: () -> String,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState(recentSearches = searchHistoryStore.load()))

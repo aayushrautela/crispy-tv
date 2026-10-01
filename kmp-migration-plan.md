@@ -880,6 +880,25 @@ Grow the Phase 1 skeleton into the shipping app.
 
 **Gate:** launches and is usable on Windows, macOS and Linux from one codebase; desktop holds a full watch session.
 
+### Measured 2026-10-01 — `:app`'s `commonMain` is now clean for a Native target
+
+`apple.yml` compiles all ten Apple-target modules (see the `verify_apple_targets.py` note above),
+and the first such run failed at `:android:app:compileKotlinIosArm64` with **18 errors across nine
+files and five classes of JVM API in `commonMain`**. All five are now fixed and the fixes are
+recorded in `AGENTS.md`; the transferable finding is the one about a gate that cannot reach a
+module. In summary: five view models and `LibraryViewModel` had a **defaulted** `ioDispatcher`
+(defaulting to `Dispatchers.IO`, which does not exist in `commonMain`), `LibraryPagingSource` and
+`LibraryScreen` used it inline, `SubtitleRepository` defaulted its whole `CoroutineScope` to a
+`SupervisorJob` it never cancelled, `UserMediaRepository.getCanonicalContinueWatching` defaulted
+`nowMs` to `System.currentTimeMillis()` (the same defect `WatchHistoryService` had already fixed
+in the same-named method), `HomeCalendarComponents` used a fully-qualified `java.time.LocalDate`
+that needed no import and therefore no purity-gate visibility, `SubtitleRepository` used
+`synchronized`, and `ItemActionSheet` carried a stale `androidx.compose.ui.res.painterResource`
+import alongside the Compose Multiplatform one.
+
+**The new shared function is `formatIso8601MonthDay` in `:core-domain`'s `domain/watch`**, beside
+`formatIso8601LongDate` and over the same `MONTH_LABELS` table, with 9 cases in `FormatIso8601MonthDayTest`.
+
 ### Phase 6 — iOS + Liquid Glass *(2–3 wks)*
 
 **Measured 2026-10-01, and one thing this phase was assumed to be is not.** The queue read

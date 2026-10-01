@@ -10,6 +10,7 @@ import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.streams.StreamResolverProvider
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Builds the [HomeSelectorViewModel], which is the part of it that needs a [Context].
@@ -43,6 +44,7 @@ fun homeSelectorViewModelFactory(context: Context): ViewModelProvider.Factory {
                 pluginStreamLoader = AppDistribution.current.pluginStreamLoader(appContext),
                 userMediaRepository = appContext.appGraph().userMediaRepository,
                 stashHandoff = { stream, lookupId -> PlayerStreamHandoff.stash(stream, lookupId) },
+                ioDispatcher = Dispatchers.IO,
             ) as T
         }
     }

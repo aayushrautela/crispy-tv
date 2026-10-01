@@ -11,6 +11,7 @@ import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
+import kotlinx.coroutines.Dispatchers
 
 /**
  * The `libraryViewModelFactory` half of [LibraryViewModel]'s move to `commonMain`.
@@ -58,6 +59,7 @@ fun libraryViewModelFactory(context: Context): ViewModelProvider.Factory {
                     },
                     clock = { System.currentTimeMillis() },
                     newMutationId = { newUserMutationId() },
+                    ioDispatcher = Dispatchers.IO,
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

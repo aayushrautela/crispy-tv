@@ -71,7 +71,16 @@ internal class HomeSelectorViewModel(
     pluginStreamLoader: PluginStreamLoader?,
     private val userMediaRepository: UserMediaRepository,
     private val stashHandoff: (AddonStream, String) -> String?,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * No default, deliberately.
+     *
+     * `Dispatchers.IO` does not exist in `commonMain`: on Kotlin/Native it is `internal`,
+     * so a file that defaults to it does not compile for iOS at all. Defaulting to
+     * `Dispatchers.Default` instead would be worse than not compiling -- it would put
+     * blocking work on a CPU-sized pool and look correct. The caller is the composition
+     * root, where `Dispatchers.IO` does exist and is the right answer.
+     */
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     /**
      * Built here rather than injected because its `scope` is [viewModelScope], which

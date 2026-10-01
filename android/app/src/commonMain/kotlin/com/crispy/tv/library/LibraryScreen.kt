@@ -54,7 +54,7 @@ import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
@@ -124,6 +124,16 @@ class LibraryViewModel internal constructor(
     // androidMain. DetailsViewModel takes this same slot under this same name for
     // the same reason, and both supply it from the same function.
     private val newMutationId: () -> String,
+    /**
+     * The dispatcher the library disk cache is read on.
+     *
+     * No default, for the reason `LibraryPagingSource` documents: `Dispatchers.IO`
+     * is `internal` on Kotlin/Native, and a `Dispatchers.Default` default would put
+     * blocking disk work on a CPU-sized pool while looking correct. The factory in
+     * `androidMain` is the caller, and it hands the same value down to the paging
+     * source it builds.
+     */
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
@@ -183,7 +193,7 @@ class LibraryViewModel internal constructor(
             val serverGen = generations.generationMsFor(sectionId)
             if (serverGen != null) {
                 val applied =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         libraryCache.read(context.profileId, sectionId)?.appliedGenerationMs
                     }
                 if (applied == null || serverGen > applied) {
@@ -240,6 +250,7 @@ class LibraryViewModel internal constructor(
                             sectionId = sectionId,
                             libraryCache = libraryCache,
                             appliedGenerationMsProvider = { latestGenerations?.generationMsFor(sectionId) },
+                            ioDispatcher = ioDispatcher,
                         )
                     },
                 ).flow

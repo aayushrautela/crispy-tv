@@ -26,6 +26,7 @@ import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
 import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.domain.watch.formatIso8601MonthDay
 
 @Composable
 internal fun CalendarEpisodeCard(
@@ -215,12 +216,7 @@ internal fun CalendarSeriesCard(
 private fun calendarBadgeLabel(item: CalendarEpisodeItem): String? {
     if (item.isReleased) return "Released"
     val releaseDate = item.releaseDate ?: return null
-    return try {
-        val date = java.time.LocalDate.parse(releaseDate.take(10))
-        "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
-    } catch (_: Exception) {
-        null
-    }
+    return formatIso8601MonthDay(releaseDate.take(10))
 }
 
 private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {

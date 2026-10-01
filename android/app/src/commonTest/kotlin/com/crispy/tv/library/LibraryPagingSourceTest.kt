@@ -6,6 +6,7 @@ import com.crispy.tv.accounts.RecordingBackendApi
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.ClientMediaCardQueryResult
 import com.crispy.tv.catalog.CatalogItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -34,6 +35,7 @@ class LibraryPagingSourceTest {
         sectionId = sectionId,
         libraryCache = cache,
         appliedGenerationMsProvider = { appliedGenerationMs },
+        ioDispatcher = Dispatchers.Unconfined,
     )
 
     private fun refresh(key: String?, loadSize: Int = 20): PagingSource.LoadParams<String> =

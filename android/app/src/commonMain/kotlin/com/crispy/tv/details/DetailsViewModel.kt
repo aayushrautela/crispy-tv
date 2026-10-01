@@ -59,7 +59,16 @@ class DetailsViewModel internal constructor(
     private val newMutationId: () -> String,
     private val languageTagProvider: () -> String,
     private val clock: () -> Long,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * No default, deliberately.
+     *
+     * `Dispatchers.IO` does not exist in `commonMain`: on Kotlin/Native it is `internal`,
+     * so a file that defaults to it does not compile for iOS at all. Defaulting to
+     * `Dispatchers.Default` instead would be worse than not compiling -- it would put
+     * blocking work on a CPU-sized pool and look correct. The caller is the composition
+     * root, where `Dispatchers.IO` does exist and is the right answer.
+     */
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     // The coordinator is built here rather than in the factory: `scope` is

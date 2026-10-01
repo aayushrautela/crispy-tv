@@ -216,6 +216,18 @@ Common-domain tests (`commonTest`; `:android:backend:desktopTest`, `:android:app
 - **A `commonMain` class that three repositories depend on must be an interface, or those repositories cannot be tested at all.** `BackendContextResolver` was a final class in `commonMain`; a KMP class is final by default, so `SyncProviderRepository` and its two siblings were *unconstructible* in a test — not hard to test, impossible. The fix is `interface BackendContextResolver` plus `CachingBackendContextResolver`, which is the same `BackendApi`/`AccountApi` discipline applied to the project's own seam instead of to a transport. Ask of any `commonMain` class a caller takes as a constructor parameter: *can a test hand this caller something?*
 - **An exhaustive test double is a property of the module that owns the interface, not of every module that needs one.** `UnusedBackendApi` (52 members, throws) lives in `:backend`'s `commonTest` and is wired into `check-local.sh`, so a new `BackendApi` member is caught there. `:app`'s `RecordingBackendApi` is 52 members too, and it has to be: a *partial* double in a different module would let a new member arrive unexamined there. A narrow double is only acceptable when the exhaustive one already exists and is gated — the cost is a second 300-line file that must be regenerated when the interface changes, and a narrow one silently rots.
 - **`kotlin.test` takes the assertion message *last*; `org.junit.Assert` takes it first.** The repo's `:androidApp` tests use the JUnit order and the `commonTest` suites use the `kotlin.test` order, and both are correct. Getting it wrong does not compile, so this is a compiler error rather than a trap.
+- **`kotlin.concurrent.atomics` is not in this toolchain's standard library, so the tidy
+  single-slot answer is unavailable — measure the primitive before designing around it.**
+  `AtomicReference` is the obvious replacement for a `synchronized` pair in `commonMain`, and
+  importing `kotlin.concurrent.atomics.AtomicReference` fails with `Unresolved reference
+  'concurrent'`. The available answer was `kotlinx.coroutines.sync.Mutex`, which **suspends**, so
+  adopting it turned a synchronous cache-hit fast path into a scheduled one. That is a behaviour
+  change on a caller's hot path and it is not free: it was accepted, and written down at the
+  lock, because the alternative was a dependency heavier than one dispatch. **The first question
+  for a locking change in shared code is not "which primitive" but "which primitives exist in
+  this stdlib" — a correct design can be unimplementable, and the compile error is cheaper to
+  find than the design is to justify.** (`kotlin.concurrent.atomics` is available behind a
+  language flag in newer toolchains; it is not here, and assuming a name is not measuring it.)
 - **Before concluding an AndroidX dependency is a blocker, read its `.module` on Google Maven — the answer is split down the middle far more often than not.** `androidx.paging:paging-common:3.5.1` publishes a genuine KMP artifact (android, desktop, iosArm64, iosSimulatorArm64, macosArm64, linuxX64, linuxArm64, js, wasmJs, mingwX64, tvOS, watchOS), so `PagingSource`, `PagingState`, `LoadParams` and `LoadResult` all resolve in `commonMain` — while `paging-runtime` and `paging-compose` (`Pager`, `PagingConfig`, `cachedIn`, `LazyPagingItems`) are the Android-only half and stay in `androidMain`. `androidx.navigation:navigation-compose:2.9.8` is the opposite: its only `available-at` files are `-android-`, `-jvmstubs-` and `-linuxx64stubs-`, and **the two `*Stubs*` variants are dokkadoc stub artifacts, not compilable KMP targets** — reading them as a yes is a false positive in the opposite direction from the usual one. **Maven Central 404s for every AndroidX coordinate**, so fetch `https://dl.google.com/dl/android/maven2/…/<artifact>.module`. When half a library is KMP, declare the KMP half in `commonMain.dependencies` **after** its consumer exists: a `commonMain` dependency with no `commonMain` consumer is speculative, and the repo's principles say not to ship that.
 - **The number of roots tells you the size of the next batch before you start it.** Of the three `PagingSource`s, `BrowsePagingSource` had a single root (`BackendBrowseRepository`) and moved once the repository stopped constructing its own ports. `CatalogPagingSource` has a single root too — `HomeCatalogService`, in `:home`'s `androidMain`, pinned by `org.json` — and `org.json` in `commonMain` is settled and permanent, so neither it nor its consumer can move; that is a measured dead end, not an unstarted batch. `LibraryPagingSource` has five roots (`CrispyBackendClient`, `LibraryDiskCacheStore`, two section constants, and the cache's `read`/`write`) and is a whole batch of its own.
 - `CalendarServiceTest` (34 cases) and `UpNextServiceTest` (16) cover `:home`'s two moved services. **Write a bucket-boundary case as two cases either side of the exact instant, and write every date as its ISO form with the epoch in a comment** — the boundary *is* the assertion, and a `Clock` fixture makes it readable where a raw `1_767_830_400_000L` does not.
@@ -358,6 +370,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **first** — it is one command, and it finds an entire untested surface that no per-file audit
   will surface. `:addons` now has `withHostTest {}` and a `commonTest`, and its 28 cases run on
   desktop JVM *and* Android host.
+  **The corollary bit hardest: `:app` is the one module with no Native compile gate, and it is
+  the one module that was broken.** Every pure-Kotlin KMP module here declares `linuxX64` as a
+  compile-only target, and exactly those modules are clean of JVM API. `:app` is a Compose module,
+  Compose Multiplatform publishes no `linuxX64` artifacts, and so `:app` could not have the gate
+  that catches exactly the bug class it contained. Five classes of JVM API sat in its `commonMain`
+  and **three of them needed no import** — `System.currentTimeMillis()`, a fully-qualified
+  `java.time.LocalDate`, and `synchronized` — so `scripts/check_common_purity.py` was blind to them
+  too. Only a real Native compile found them, which is `apple.yml`'s `:app:compileKotlinIosArm64`.
+  **A gate that cannot reach a module is not a weak gate, it is no gate, and the module it cannot
+  reach is the one to worry about.** The second half of the lesson is what to do about it: a
+  `linuxX64` block with a comment saying why it is absent is better than no comment, because
+  `android/app/build.gradle.kts` does carry one — under a heading that reads `## No linuxX64 here`.
   **Sweeping that one command across every module finds four more of the same shape:**
   `:platform-core` (7 files), `:player` (6), `:network` (2) and `:watchhistory` (2) —
   **17 files of `commonMain` with no test source set at all.** `:platform-core` is the
@@ -667,6 +691,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   a flaky network to sign in again — no compile error, no test failure, just a worse product.
   Keep `isFailure` and `getOrNull()` as **two** questions wherever the original answered them
   separately.
+- **A lock around two fields does not make the pair atomic, and holding the pair as one immutable
+  value inside the critical section fixes it for free.** `SubtitleRepository` guarded
+  `cachedKey` and `cachedSubtitles` with `synchronized(cacheLock)`. Each field's access was safe
+  and **the pair's consistency was luck**: a reader could take the new key and the old list,
+  because its two reads sit either side of the point where the writer is mid-update. This was
+  found while replacing `synchronized` for portability, and it is a latent bug independent of it —
+  the same code was already wrong on the JVM. **When a lock protects more than one field, ask
+  what a reader sees halfway through a write; if the answer is "a mix of two states", the
+  invariant is in the fields' relationship and not in the lock.**
+- **A class that builds its own `CoroutineScope(SupervisorJob() + ...)` owns a job nothing
+  cancels, and every coroutine it starts outlives the session that asked.** `SubtitleRepository`
+  built its fetch scope in its own constructor default, so a subtitle fetch for a player session
+  that was already torn down kept running. Its only production caller is
+  `PlayerSessionViewModel`, which has its own `viewModelScope` that `onCleared` cancels; passing
+  that instead retires the leak. **A defaulted scope is worse than a required one for the same
+  reason a defaulted dispatcher is: it hides the lifetime decision from every call site.**
 - **A cache with other readers must be shared, not moved in.** `seasonEpisodesCache` is read by
   five places in the view model other than the fetch it was extracted from; a map owned by the
   loader would have been a second cache, and the screen would have consulted the first. The first

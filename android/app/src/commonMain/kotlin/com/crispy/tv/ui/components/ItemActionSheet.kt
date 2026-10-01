@@ -24,7 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+// `painterResource` has two overloads with the same name: this one takes an `Int`, and
+// `org.jetbrains.compose.resources.painterResource` below takes a `DrawableResource`. This
+// file used to import both, and the Android one survived a move into `commonMain` — where it
+// resolves on neither desktop JVM nor a Native target, which is why nothing here failed
+// until `:app` was compiled for `iosArm64`. The call site passes a `DrawableResource`, so the
+// CMP overload is the one the file actually uses, and a grep for `painterResource` matches
+// two imports and tells you nothing about which is live.
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp

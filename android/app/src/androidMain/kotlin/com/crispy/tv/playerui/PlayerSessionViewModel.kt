@@ -142,7 +142,23 @@ class PlayerSessionViewModel(
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         PlaybackSettingsRepositoryProvider.get(this.appContext)
-    private val subtitleRepository: SubtitleRepository = SubtitleRepository(streamResolver, logger = AndroidAppLogger(this.appContext))
+    /**
+     * The fetch scope is this view model's own, not one the repository creates.
+     *
+     * `SubtitleRepository` used to build `CoroutineScope(SupervisorJob() + Dispatchers.IO)`
+     * for itself: a scope with a `SupervisorJob` that nothing ever cancelled, so every
+     * fetch outlived the session that asked for it. `viewModelScope` is cancelled in
+     * `onCleared`, which is the lifetime a subtitle fetch actually has. The slot is
+     * also now mandatory rather than defaulted -- `Dispatchers.IO` does not exist in
+     * `commonMain`, and a defaulted dispatcher is the shape this repository's own rules
+     * reject.
+     */
+    private val subtitleRepository: SubtitleRepository =
+        SubtitleRepository(
+            streamResolver,
+            logger = AndroidAppLogger(this.appContext),
+            scope = viewModelScope,
+        )
     private val selectorCoordinator =
         SelectorCoordinator(
             scope = viewModelScope,

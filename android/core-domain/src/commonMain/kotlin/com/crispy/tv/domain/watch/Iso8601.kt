@@ -192,6 +192,27 @@ fun formatIso8601LongDate(value: String): String? {
 }
 
 /**
+ * The month and day of [value], as `MMM d` renders it: `Jan 5`, `Dec 31`.
+ *
+ * The same [MONTH_LABELS] table and the same unpadded day of month that
+ * [formatIso8601LongDate] uses, without the year. It exists because a badge on an
+ * episode row wants the day a user recognises and not the year they already know,
+ * and because the alternative was a `java.time` call in a `commonMain` file -- which
+ * does not compile for a Kotlin/Native target, and cannot be seen by an import scan
+ * when it is written fully qualified.
+ *
+ * A value this cannot read is `null` rather than rendered, exactly as
+ * [formatIso8601LongDate] does. It does **not** truncate: callers that hold a
+ * longer ISO value are expected to pass the first ten characters, which is the
+ * arrangement `formatIso8601LongDate` documents for itself.
+ */
+fun formatIso8601MonthDay(value: String): String? {
+    val epochDay = parseIso8601DateToEpochDay(value) ?: return null
+    val (_, month, dayOfMonth) = civilFromEpochDay(epochDay)
+    return "${MONTH_LABELS[month - 1]} $dayOfMonth"
+}
+
+/**
  * The year-of-era, zero-padded to four digits, as `MMM d, yyyy` renders it.
  *
  * A proleptic year at or before 0 sits in the era before the common one, where

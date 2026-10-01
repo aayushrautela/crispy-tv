@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Builds the `ViewModelProvider.Factory` for [PersonDetailsViewModel].
@@ -55,6 +56,7 @@ fun personDetailsViewModelFactory(
                 personId = personId,
                 personLoader = personLoader,
                 languageTagProvider = { Locale.getDefault().toLanguageTag() },
+                ioDispatcher = Dispatchers.IO,
             ) as T
         }
     }

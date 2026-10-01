@@ -12,6 +12,7 @@ import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.streams.StreamResolverProvider
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Composition root for [DetailsViewModel].
@@ -54,6 +55,7 @@ internal fun detailsViewModelFactory(
                 newMutationId = { newUserMutationId() },
                 languageTagProvider = { Locale.getDefault().toLanguageTag() },
                 clock = { System.currentTimeMillis() },
+                ioDispatcher = Dispatchers.IO,
             ) as T
         }
     }

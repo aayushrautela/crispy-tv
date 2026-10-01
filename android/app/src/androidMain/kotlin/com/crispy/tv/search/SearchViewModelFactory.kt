@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Builds the [ViewModelProvider.Factory] for [SearchViewModel].
@@ -35,6 +36,7 @@ fun searchViewModelFactory(appContext: Context): ViewModelProvider.Factory {
                 aiSearchRepository = aiSearchRepository(context),
                 searchHistoryStore = SharedPreferencesSearchHistoryStore(context),
                 languageTagProvider = { Locale.getDefault().toLanguageTag() },
+                ioDispatcher = Dispatchers.IO,
             )
             @Suppress("UNCHECKED_CAST")
             return viewModel as T
