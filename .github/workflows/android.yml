@@ -65,6 +65,13 @@ jobs:
       - name: Check commonMain purity
         run: python scripts/check_common_purity.py
 
+      - name: Check the KMP module graph
+        # A commonMain source set may only depend on another commonMain. A plain
+        # com.android.library publishes no JVM variant, so a commonMain edge into
+        # one is invisible to the compiler in a way the purity gate cannot see:
+        # the Kotlin is clean and the reference still cannot resolve off Android.
+        run: python3 scripts/verify_kmp_structure.py
+
       - name: Validate contract fixtures
         run: python scripts/validate_contracts.py
 

@@ -99,6 +99,20 @@ fi
 # Runs right after the workflow validator because it reads that same file.
 "$PY" scripts/verify_apple_targets.py
 
+# The module graph's one invariant: a commonMain source set may only depend on
+# another commonMain. Nothing in the Gradle build or the Kotlin compiler states
+# this, because it is not a resolution failure -- a commonMain edge into a plain
+# com.android.library resolves on Android and is simply unavailable everywhere
+# else, so the breakage appears on a target nobody was running. That is a
+# property of `plugins { }`, which no other gate reads.
+#
+# It also reports same-package names resolved across a module boundary with no
+# Gradle edge, which is invisible to the build graph by construction: a rename in
+# the owning module breaks the consumer with no diff in the consumer. Those are
+# classified UNDECLARED / PLATFORM / SHARED so the deliberate
+# package-preservation technique is not reported as a defect.
+"$PY" scripts/verify_kmp_structure.py
+
 # JVM args (including MaxMetaspaceSize=1g for the Kotlin/Native compiler) are
 # set in ~/.gradle/gradle.properties. Passing -Dorg.gradle.jvmargs here would
 # spawn a second daemon with different opts, so we let the user-level config apply.
