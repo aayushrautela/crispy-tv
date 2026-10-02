@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -58,6 +57,7 @@ import com.crispy.tv.ui.resources.ic_crop_filled
 import com.crispy.tv.ui.resources.ic_graphic_eq_filled
 import com.crispy.tv.ui.resources.ic_info
 import com.crispy.tv.ui.resources.ic_layers
+import com.crispy.tv.ui.resources.ic_player_aspect_ratio
 import com.crispy.tv.ui.resources.ic_subtitles_filled
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
@@ -300,7 +300,7 @@ internal fun PlayerBottomControls(
                     ) {
                         if (resizeMode == PlayerResizeMode.Zoom) {
                             Icon(
-                                painter = painterResource(com.crispy.tv.app.R.drawable.ic_player_aspect_ratio),
+                                painter = painterResource(Res.drawable.ic_player_aspect_ratio),
                                 contentDescription = "Resize: ${resizeMode.label}",
                                 tint = palette.onPillBackground,
                                 modifier = Modifier.size(20.dp),
@@ -435,8 +435,22 @@ internal fun formatPlaybackTimeMs(timeMs: Long): String {
     val seconds = totalSeconds % 60
 
     return if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
+        "$hours:${twoDigits(minutes)}:${twoDigits(seconds)}"
     } else {
-        "%d:%02d".format(minutes, seconds)
+        "$minutes:${twoDigits(seconds)}"
     }
 }
+
+/**
+ * Zero-pads [value] to two digits, which is what the `%02d` this replaced did.
+ *
+ * The padding is deliberately a private helper rather than an `internal` one: the
+ * decision a test should pin is the *shape* of the rendered clock, and
+ * [formatPlaybackTimeMs] is where that shape lives. A test for this on its own
+ * would prove the string library, not the format.
+ *
+ * No sign handling, and none is needed: the only caller derives all three parts
+ * from a value already clamped at zero, so every part is in `0..59` (or `0..` for
+ * hours, which is never padded).
+ */
+private fun twoDigits(value: Int): String = if (value < 10) "0$value" else value.toString()
