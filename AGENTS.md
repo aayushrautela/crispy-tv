@@ -613,9 +613,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   mapping before deciding a divergence is a product decision** — it is independent proof when it is
   not. The same rule covers **a duplicated `public` constant that is dead because the same name in a
   different package hides it**: *an identical declaration reachable with no diff.*
-- **"This is bound to navigation" is a statement about the file, not about the mechanism.** Across the
-  repository there are three distinct imports of shared-transition machinery and **zero** of the
-  participating files import `androidx.navigation` for the transition itself — the provider was two
+- **"This is bound to navigation" is a statement about the file, not about the mechanism.** The provider was two
   lines inside a file in a package called `ui/navigation`, which is exactly why it read as
   navigation-bound, and **neither of those two lines named navigation.** *The dependency is in the
   file, not in the lines that matter.* And **a missing provider is a silent null**: all 14
