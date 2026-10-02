@@ -929,6 +929,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   by a before/after delta.**
 - **A test asserting a guard's *reason* needs the two answers to differ in exactly one respect.**
   Write down what each world would answer; if the strings are equal, the case is decoration.
+- **A near-miss fixture written from the SHAPE of its neighbours is not a near miss, it is a guess —
+  so run the function and read its answer before putting it in the table.** `normalizedDetailsItemType`
+  maps `"series"`, `"show"` and `"tv"` to one key prefix and everything else to a blank sentinel, so I
+  built an 11-row table of near misses (`"seri"`, `"seriesextra"`, `" tv "`, `"tv show"`, …) chosen to
+  defeat the plausible rewrites — a `contains` arm and a `startsWith` arm. One row, `"tv "`, **fails
+  the test**: it trims to `"tv"`, which *is* an accepted shape, so I had also listed it in the
+  accepted table and the fixture contradicted itself. **Two tables of expectations for one function
+  must not be written from the same reading of the source**, and only running the function settles
+  which of the two is wrong. The replacement row, `"tv show"`, is the sharper near miss anyway: both
+  of its words are accepted values *on their own*, so it is the one input an `any { it in accepted }`
+  rewrite would let through. *And a case that contradicts another case in the same file is a defect in
+  the fixture, not in the code — read the failing row's neighbours before editing production.*
 - **A stub cannot be evidence about the value it replaces.** Assert on what production computed
   (`askedFor`), never on a string the stub invented.
 - **Read a `data class` end to end before writing a fixture,** closing paren included. And check for
@@ -1205,6 +1217,17 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   - **A read-back must skip a `count == 1` assertion when the new string is `""`** — asserting an
     empty string occurs exactly once always fails, which reads as a broken write when the write was
     a deletion and correct. Assert `old not in back` instead.
+  - **An anchor that a PREVIOUS edit introduces is 0x in the original by construction, so phase 1
+    will abort on a patch that is entirely correct.** `patch_home_details.py` had one edit add
+    `import com.crispy.tv.details.DetailsRatingBadgeLogo` and a later edit anchor on that same line to
+    change a call site; phase 1 counts anchors in the ORIGINAL text, where the import does not yet
+    exist, so it aborted `PHASE 1 FAILED: anchor occurs 0x` on a patch with nothing wrong in it.
+    **Phase 1 is not complaining about the patch — it is telling you the anchor you chose belongs to
+    an edit that has not run yet, which is precisely the thing phase 1 exists to catch.** Fold the
+    import into the edit that needs it. *A second draft of the same script failed differently, with
+    the Edit tool putting the replacement text where the anchor belonged and leaving the old text
+    behind, which is the "count the brackets" failure above wearing a different hat: after any manual
+    Edit to a patch script, re-read the edit list before running it.*
 - **A gate that parses a sentence it does not own must FAIL when it cannot find
     it -- and a literal space in that regex is a silent off switch.** `verify_kmp_port.py`
     reads the census size out of `kmp-migration-plan.md` with
@@ -1264,6 +1287,32 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     the table's arithmetic**, parsing the rows and the sum line separately and requiring
     them to agree *and* to equal each other. **A count nobody recomputes is a claim, and
     "the gate passed" is not a recomputation of a number the gate never looked at.**
+- **Turning a POSITIONAL call into named arguments is a claim about the signature, not a
+  refactor, and a wrong claim type-checks.** `DetailsRoute` called
+  `appGraph().detailsViewModelFactory(itemId, normalizedType, runtimeEntry)` positionally, where
+  `AppGraph.detailsViewModelFactory` (`app/AppGraph.kt:68`) names its **second parameter
+  `itemType`** while receiving the already-normalized value. Restyling it as
+  `detailsViewModelFactory(itemId, normalizedType = …, runtimeEntry)` produced two compiler errors
+  (`No parameter with name 'normalizedType' found`, `No value passed for parameter 'itemType'`) —
+  and the compiler was **right to reject it, not right to have caught it**: had the parameter been
+  named `normalizedType`, the same edit would have compiled and silently passed the **raw** route
+  argument into a ViewModel key. **The dangerous shape is the one that renames cleanly, because the
+  edit and the behaviour change are the same edit.** Two things make it survivable: read the
+  declaration's parameter names before naming anything, and note that **a name-only grep picks the
+  wrong declaration** — there is a same-named free function `internal fun detailsViewModelFactory(`
+  at `details/DetailsViewModelFactory.kt:26` with a **six**-parameter signature
+  `(itemId, itemType, runtimeEntry, detailsUseCases, outbox, appContext)`, while the one being called
+  is a three-parameter member on `AppGraph`.
+- **A `public` function cannot expose an `internal` type, and the fix is to narrow the function, not
+  to widen the type.** `DetailsRoute.kt:89:5 'public' function exposes its 'internal' parameter type
+  argument 'HeroTrailerLayerArgs'` arrived the moment the route took a `@Composable` slot carrying an
+  `internal class`. The tempting fix is `internal class` → `public class`, which widens a type no
+  consumer outside `:app` can name in order to keep one declaration looking tidy. The right question
+  is what the **siblings already are**: both `DetailsScreen` (`:93`) and `HomeRoute`
+  (`commonMain/home/HomeScreen.kt:55`) are `internal`, and there is exactly one caller in the module —
+  so `DetailsRoute` being `public` was the lone outlier, and narrowing it aligns it. **A visibility
+  error is a report about the module's convention, and the convention is what you should read, not
+  the single declaration the compiler named.**
 - **Structural line-range edits must precede string replacements earlier in the same file.** A
   replacement changes the line count and moves the range out from under the edit.
 - **An anchor copied from a tool's rendered output can differ in one character** — the source had

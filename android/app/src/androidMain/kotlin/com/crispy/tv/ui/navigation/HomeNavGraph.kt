@@ -11,7 +11,17 @@ import androidx.compose.ui.platform.LocalConfiguration
 import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.app.appGraph
+import com.crispy.tv.details.DetailsRatingBadgeLogo
 import com.crispy.tv.details.DetailsRoute
+import com.crispy.tv.details.HeroTrailerLayer
+import com.crispy.tv.details.ReviewProviderBadge
+import com.crispy.tv.details.YouTubeExtraVideoDialog
+import com.crispy.tv.details.localeDateFormatters
+import com.crispy.tv.details.normalizedDetailsItemType
+import com.crispy.tv.details.rememberSeedColor
+import com.crispy.tv.details.shareOnCrispy
+import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.home.CalendarEpisodeItem
 import com.crispy.tv.home.CalendarRoute
 import com.crispy.tv.home.CalendarSeriesItem
@@ -22,6 +32,7 @@ import com.crispy.tv.home.homeViewModelFactory
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) { entry ->
@@ -216,6 +227,19 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         val initialArtworkUrl = entry.arguments?.getString(AppRoutes.HomeDetailsArtworkUrlArg)?.ifBlank { null }
         val sharedElementKey = entry.arguments?.getString(AppRoutes.HomeDetailsSharedElementKeyArg)?.ifBlank { null }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            // `DetailsRoute` is `commonMain` now, so this file is where every platform
+            // value it needs is read. `navController.context` is an Android property
+            // reached through an expression rather than a named type, which is exactly
+            // the capability this file has by being `androidMain` at all -- the same
+            // shape as the `appContext` three blocks above, for `HomeRoute`.
+            val appContext = navController.context.applicationContext
+            // `remember`, because `LocaleDateFormatters` re-reads the device's date-order
+            // and 12/24-hour settings when it is built, and the screen reads the two
+            // formatters on every recomposition. A fresh instance per recomposition would
+            // be a fresh formatter per recomposition.
+            val localeFormatters = remember(appContext) { localeDateFormatters(appContext) }
+            val configuration = LocalConfiguration.current
+            val normalizedItemType = remember(itemType) { normalizedDetailsItemType(itemType) }
             DetailsRoute(
                 itemId = itemId,
                 itemType = itemType,
@@ -246,6 +270,88 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             chosenStreamHandoffKey = chosenStreamHandoffKey,
                         )
                     )
+                },
+                // The `remember` keys are load-bearing and are NOT the route's own.
+                // The route used to build this factory keyed on `itemId,
+                // normalizedType, runtimeEntry` as well as the context, because
+                // `viewModel()` caches on the factory's identity: a factory rebuilt on a
+                // route-argument change drops the ViewModel and reloads the screen. The
+                // route's `normalizedType` is its own local, so the same mapping is
+                // applied here to keep the two keys in step -- and
+                // `normalizedDetailsItemType` is the one function that decides it.
+                // `itemType`, NOT `normalizedType`: the original call was positional --
+                // `detailsViewModelFactory(itemId, normalizedType, runtimeEntry)` -- and
+                // `AppGraph.detailsViewModelFactory` names its second parameter
+                // `itemType` while receiving the already-normalized value. Turning that
+                // into a named argument with `normalizedType =` does not fail; it quietly
+                // passes the RAW argument, and the compiler is the only thing that says so:
+                //
+                //     No parameter with name 'normalizedType' found.
+                //     No value passed for parameter 'itemType'.
+                //
+                // So the normalization is spelled on the right side of the `itemType =`.
+                //
+                // And the `remember` keys name the *normalized* value, not the raw one, to
+                // keep the factory's identity byte-identical to what the route produced.
+                // Keying on the raw argument would be harmless -- `viewModel()` caches on
+                // `viewModelKey`, not on the factory, so a rebuilt factory is only ever
+                // used on a cache miss and then behaves the same -- but "harmless" is a
+                // claim, and one line is cheaper than having to argue it later.
+                detailsViewModelFactory = remember(appContext, itemId, normalizedItemType, runtimeEntry) {
+                    appContext.appGraph().detailsViewModelFactory(
+                        itemId = itemId,
+                        itemType = normalizedItemType,
+                        runtimeEntry = runtimeEntry,
+                    )
+                },
+                playbackSettingsRepository = remember(appContext) {
+                    PlaybackSettingsRepositoryProvider.get(appContext)
+                },
+                // `appContext`, not a composition-local context: `shareOnCrispy`
+                // documents that the chooser needs `FLAG_ACTIVITY_NEW_TASK` because a
+                // composition-local context is not necessarily the application context.
+                // The screen used to build its own inline copy of this call and read the
+                // latter, which is what made that copy a latent crash.
+                shareText = { text -> shareOnCrispy(context = appContext, text = text) },
+                dateFormat = localeFormatters.date,
+                timeFormat = localeFormatters.time,
+                clock = { System.currentTimeMillis() },
+                // Two deliberately separate decisions over one read. This file already
+                // reads `LocalConfiguration` for `HomeRoute`'s `isCompact` three blocks
+                // above, so the second read costs a line and not a dependency.
+                isWideScreen = configuration.screenWidthDp >= 768 &&
+                    configuration.screenHeightDp < configuration.screenWidthDp,
+                isCompact = configuration.screenWidthDp < 600,
+                screenHeightDp = configuration.screenHeightDp,
+                youtubeTrailerPlaybackSupported = AppDistribution.current.capabilities
+                    .youtubeInHeroPlaybackSupported,
+                // `rememberSeedColor`'s own nullability meets the screen's
+                // `?: fallbackSeed` here, so the screen never has to know it is nullable.
+                imageSeedColor = { imageUrl, fallbackSeed ->
+                    rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed).value
+                        ?: fallbackSeed
+                },
+                // The one place the Android trailer surface is named. The layer's own
+                // nine parameters are reproduced verbatim, so this is an unpack rather
+                // than a reshape: `HeroTrailerLayerArgs` exists only to keep the seam one
+                // parameter wide.
+                heroTrailerLayer = { args ->
+                    HeroTrailerLayer(
+                        modifier = args.modifier,
+                        trailer = args.trailer,
+                        viewportWidthPx = args.viewportWidthPx,
+                        viewportHeightPx = args.viewportHeightPx,
+                        shouldPlay = args.shouldPlay,
+                        isMuted = args.isMuted,
+                        onFirstFrameRendered = args.onFirstFrameRendered,
+                        onPlaybackState = args.onPlaybackState,
+                        onFocusLossPause = args.onFocusLossPause,
+                    )
+                },
+                reviewProviderBadge = { provider -> ReviewProviderBadge(provider = provider) },
+                ratingBadgeLogo = { logo -> DetailsRatingBadgeLogo(logo = logo) },
+                youTubeExtraVideoDialog = { video, onDismiss ->
+                    YouTubeExtraVideoDialog(video = video, onDismiss = onDismiss)
                 },
             )
         }
