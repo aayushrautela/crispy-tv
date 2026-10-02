@@ -726,8 +726,8 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   not, so splitting them puts the Turkish dotless-i bug in shared code. *A step is platform work if
   its answer depends on the platform; "it is just a `String` call" is not the test.*
   **And read what the consumer DOES with the value before typing the slot — a value it *stores*
-  must stay a lambda, a value it merely passes on may be the product.** Because the caller is a
-  composable and `remember`s it, so the product is what arrives. `AuthNavGraph`'s third slot is the
+  must stay a lambda, a value it merely passes on may be the product.** The caller `remember`s it,
+  so the product is what arrives. `AuthNavGraph`'s third slot is the
   **counterexample that completes the rule**: its consumer is a `produceState`, **so the lambda is a
   `produceState` key** — a fresh one each recomposition restarts the load, so it must stay a
   suspend lambda. *The question is not whether a slot is a lambda or a product; it is whether the
@@ -736,10 +736,9 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   own `remember`ed instance**, because sharing one keys both graphs' state to a single identity.
   **And sometimes the platform step is deleted rather than moved, which is a behaviour fix and not
   a simplification.** `String.lowercase(Locale)` is the JVM-only overload and Kotlin's
-  `lowercase()` is locale-invariant, so the `Locale` arguments became plain `lowercase()` — and
-  the locale was a real answer and the wrong one, because **a locale is a *rendering* context**:
-  **When a `Locale` argument is passed to a comparison, ask whether the answer depends on the
-  device at all — if it does not, the argument is the bug.** The other two `Locale` uses are *not*
+  `lowercase()` is locale-invariant, so the `Locale` arguments became plain `lowercase()`.
+  **A locale is a *rendering* context: when a `Locale` argument is passed to a comparison, ask
+  whether the answer depends on the device at all — if it does not, the argument is the bug.** The other two `Locale` uses are *not*
   deletable and the difference is worth keeping straight: `Locale.getDefault().toLanguageTag()` is a
   genuine reading of a platform value and belongs at the edge, while
   `DateTimeFormatter.ofPattern(…, Locale.getDefault())` is a genuine *formatting* locale that
