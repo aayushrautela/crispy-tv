@@ -20,21 +20,33 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackState
  *
  * This is a pure refactor. Every body below is the body that was in the view model, and
  * the only text change is that the inline literal `1_000L` is now
- * [INITIAL_SEEK_TOLERANCE_MS]. Nothing here moves a file into `commonMain`, and nothing
- * could: [NativePlaybackEngine], [NativePlaybackState], [NativePlaybackError] and
- * [NativePlaybackSnapshot] are declared in `:android:native-engine`, which is a plain
- * `com.android.library` and so publishes no JVM variant. `:app` cannot name those types
- * from a `commonMain` source set whatever the code looks like, which is the wall Phase 5
- * has to remove before any of this becomes portable.
+ * [INITIAL_SEEK_TOLERANCE_MS].
  *
- * [NativePlaybackEnginePreference] is the interesting counter-example and is worth reading
- * before planning that work: it is *not* in `:native-engine`. It sits in `:core-domain`'s
- * `commonMain`, because a preference is a stored setting carried by `PlaybackSettings` in
- * its public interface, and it was moved out precisely because leaving it there pinned
- * every settings type that mentioned it to `androidMain` **by the module type rather than
- * by anything in the code**. [resolveInitialEngine] is the clearest illustration of what
- * remains: its input is portable and its output is not, so the function has to stay here
- * for exactly one reason.
+ * ## Why this file is in `commonMain`, and why that used to read as impossible
+ *
+ * **The first version of this note said the opposite: that nothing here could move to
+ * `commonMain` because [NativePlaybackEngine], [NativePlaybackState],
+ * [NativePlaybackError] and [NativePlaybackSnapshot] were declared in
+ * `:android:native-engine`.** They were, and that was true at the time, but it described
+ * a *location* rather than a wall, and it was the reason a 162-line file with no
+ * `android.*` and no `java.*` import was filed as blocked for the rest of Phase 4.
+ *
+ * `:android:native-engine` is a plain `com.android.library` and so publishes no JVM
+ * variant, which means a `commonMain` cannot name anything declared in it **whatever the
+ * code looks like**. That part was right. What it missed is that the pin rides in on the
+ * *type*, and the types are portable: seven of them and the `PlaybackSessionController`
+ * port itself were lifted into `:core-domain`'s `commonMain` under this same package,
+ * which is why moving this file needed no import edit anywhere.
+ *
+ * The lesson worth keeping is the one [NativePlaybackEnginePreference] already demonstrated:
+ * **a file can be portable in every line it writes and still be unpinnable, and what
+ * decides is the *kind* of the names it mentions, not how much platform API it calls.** This
+ * file calls none. It named four data types that had no business living in an Android
+ * library.
+ *
+ * Its only production consumer is `PlayerSessionViewModel`, which is still in `androidMain`
+ * because it holds a Media3 `PlayerView`. It reaches this file with no import, from the
+ * same package.
  */
 
 /**
