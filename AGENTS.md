@@ -709,9 +709,9 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **counterexample that completes the rule**: its consumer is a `produceState`, **so the lambda is a
   `produceState` key** — a fresh one each recomposition restarts the load, so it must stay a
   suspend lambda. *The question is not whether a slot is a lambda or a product; it is whether the
-  consumer keys on its identity.* Two further consequences: **a `Context` its caller must
-  `remember` is already reachable at the call site**, and **two graphs that each call the same loader must each get their
-  own `remember`ed instance**, because sharing one keys both graphs' state to a single identity.
+  consumer keys on its identity.* **A `Context` its caller must `remember` is already
+  reachable at the call site**, and **two graphs calling the same loader each need their own
+  `remember`ed instance**, since sharing one keys both graphs' state to a single identity.
   **And sometimes the platform step is deleted rather than moved, which is a behaviour fix and not
   a simplification.** `String.lowercase(Locale)` is the JVM-only overload and Kotlin's
   `lowercase()` is locale-invariant, so the `Locale` arguments became plain `lowercase()`.
@@ -720,8 +720,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   deletable and the difference is worth keeping straight: `Locale.getDefault().toLanguageTag()` is a
   genuine reading of a platform value and belongs at the edge, while
   `DateTimeFormatter.ofPattern(…, Locale.getDefault())` is a genuine *formatting* locale that
-  `kotlinx-datetime` cannot express the same way — **so counting all three as one `Locale.` is a
-  census that cannot tell a deletion from a port.**
+  `kotlinx-datetime` cannot express the same way.
 - **A duplicate body is a signal one copy needs a caller.** `episodeHeaderMetadata` and
   `episodeRowMeta` assembled the same string byte-identically in two files with no dependency
   between them; letting one delegate **reversed the package dependency** in the better direction.
