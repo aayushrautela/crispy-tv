@@ -437,8 +437,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   declaration` rule first collected from *other modules only*, missing the ten held by a **same-module** declaration; adding `:app`'s own `androidMain` dropped the bucket to zero.
   **A zero bucket is the most informative thing a first-match partition produces, and it is a claim
   about a _rule_ before it is a claim about the set** — the near-miss explanation fit the other rule
-  rather than the hole, and the two rules look identical in the output. **So the gate must assert every bucket is non-empty before it asserts they
-  sum, and every empty bucket must be allowlisted with the landing that emptied it** — otherwise the
+  rather than the hole, and the two rules look identical in the output. **So the gate must assert every bucket is non-empty before it asserts they sum, and every empty bucket must be allowlisted with the landing that emptied it** — otherwise the
   sum passes over a `Counter` that never incremented, which is the `True`-checksum disaster wearing a
   different hat. **A bucket name that asserts a negative is a claim the
   measurement must TEST, not a label it may print; in a first-match partition the rules
@@ -447,8 +446,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   down what its rule _excludes_ first, then run the script that would refute it.** *A check that does
   not run is not a weak check, it is no check.*
   **And a pin is per file, not per token — the token you hunted is rarely the one that decides
-  whether the file moves, and a scan that tests for the tokens you are chasing is not a test for
-  the pins you are not.** `DetailsRoute.kt`'s only `java.*` use read as the whole story while
+  whether the file moves.** `DetailsRoute.kt`'s only `java.*` use read as the whole story while
   `LocalContext` and `appGraph()` are what actually kept it in `androidMain`. **So read the whole
   import list of a file you are about to claim you understand, and treat every second pin as the one
   that decides.**
