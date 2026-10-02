@@ -433,9 +433,8 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `PlayerSessionDecisions.kt` (also `:native-engine`-pinned) and `PersonDetailsRoute.kt` (in the
   `java.time` bucket *and* the same-module bucket) each carry two — **a bucket is a floor, not a
   description, and a two-pin file needs a second look the output cannot give it.**
-  **And the gate caught that census's own hole, which is the part to keep.** Its `sibling
-  declaration` rule first collected from *other modules only*, so it reported **10 files with no pin**
-  — the ten held by a **same-module** declaration. Adding `:app`'s own `androidMain` dropped it to zero.
+  **And the gate caught that census's own hole, which is the part to keep**: the `sibling
+  declaration` rule first collected from *other modules only*, missing the ten held by a **same-module** declaration; adding `:app`'s own `androidMain` dropped the bucket to zero.
   **A zero bucket is the most informative thing a first-match partition produces, and it is a claim
   about a _rule_ before it is a claim about the set** — the near-miss explanation fit the other rule
   rather than the hole, and the two rules look identical in the output. **So the gate must assert every bucket is non-empty before it asserts they
