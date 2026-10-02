@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **127** | **69** | **48** |
+| **`:app`** | **128** | **68** | **49** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,16 +152,27 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **127** | **69** |
-| **total** | **233** | **82** |
+| **`:app`** | **128** | **68** |
+| **total** | **234** | **81** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 127 of 196, i.e. **65%**, and
-the 69 that remain are behind the walls listed in the table above. `:app` moved no file in the landing that took `:addons` to 18/3 -- only two of its wiring call sites lost an argument -- so the ratio is deliberately unchanged, and the module that moved is the one the counts are about.
+than by anything structural. `:app` is 128 of 197, i.e. **65%**, and
+the 68 that remain are behind the walls listed in the table above.
+
+**The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
+token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
+in `commonMain` — the blocker for two landings was `MetadataAddonRegistry` and `CloudAddonRow`
+being declared in `:addons`' `androidMain`, which is where they sat until the landing before
+last, and which a forward import scan cannot see because there is no import. What made it
+testable rather than merely movable was a **parameter type**: `backend` went from the concrete
+`CrispyBackendClient` to `BackendApi`, the interface that class already implements. The 39
+`internal fun CrispyBackendClient.parseX(...)` extensions that block making the client an
+interface are `internal` to `:backend` and never stood between a `:app` file and its own
+`commonTest` at all.
 
 **The percentage is the figure that outlived one correction and died on the next,
 which is the whole argument for not quoting a ratio.** It was `106 of 186`, became

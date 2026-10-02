@@ -69,6 +69,28 @@ open class RecordingBackendApi : BackendApi {
     val getMeCalls = mutableListOf<String>()
     val getAccountSettingsCalls = mutableListOf<String>()
 
+    // --- Household addon sync (`HouseholdAddonsCloudSync`) -------------------------
+    //
+    // These three were `unused(...)` until that class moved into `commonMain`. That
+    // class's whole decision surface is the diff between two row sets, so the three
+    // members it calls are exactly the ones a double has to hold open.
+    //
+    // `serverAddons` is the answer, the lists are the record, and no other member is
+    // consulted: asserting on `installAddonCalls` is asserting on what production
+    // asked for, which is the only kind of assertion a double can support.
+    val listAddonsCalls = mutableListOf<String>()
+    var serverAddons: List<AddonDto> = emptyList()
+    val installAddonCalls = mutableListOf<InstallAddonCall>()
+    val uninstallAddonCalls = mutableListOf<UninstallAddonCall>()
+
+    /** What `installAddon` answers. Defaults to an echo so a test need not say. */
+    var installedAddon: (InstallAddonCall) -> AddonDto = { call ->
+        AddonDto(id = "installed-${call.manifestUrl}", manifestUrl = call.manifestUrl, createdAt = NOW)
+    }
+
+    /** What `uninstallAddon` answers. */
+    var uninstalled: Boolean = true
+
     var providerStates: List<ProviderState> = emptyList()
     var startImportResult: StartImportResult? = null
     var meResponse: MeResponse? = null
@@ -180,19 +202,31 @@ open class RecordingBackendApi : BackendApi {
         settings: Map<String, String>
     ): AccountSettings = unused("patchAccountSettings")
     override suspend fun deleteAccount(accessToken: String): Boolean = unused("deleteAccount")
-    override suspend fun listAddons(accessToken: String): List<AddonDto> = unused("listAddons")
+    override suspend fun listAddons(accessToken: String): List<AddonDto> {
+        listAddonsCalls += accessToken
+        return serverAddons
+    }
+
     override suspend fun installAddon(
         accessToken: String,
         profileId: String,
         manifestUrl: String,
         type: String,
         payload: Map<String, String>
-    ): AddonDto = unused("installAddon")
+    ): AddonDto {
+        val call = InstallAddonCall(accessToken, profileId, manifestUrl, type, payload)
+        installAddonCalls += call
+        return installedAddon(call)
+    }
+
     override suspend fun uninstallAddon(
         accessToken: String,
         profileId: String,
         addonId: String
-    ): Boolean = unused("uninstallAddon")
+    ): Boolean {
+        uninstallAddonCalls += UninstallAddonCall(accessToken, profileId, addonId)
+        return uninstalled
+    }
     override suspend fun getAvatars(): List<Avatar> = unused("getAvatars")
     override suspend fun searchTitles(
         accessToken: String,
@@ -560,3 +594,20 @@ internal fun importJob(
     updatedAt = null,
 )
 
+/** What `HouseholdAddonsCloudSync` asked `installAddon`, verbatim. */
+data class InstallAddonCall(
+    val accessToken: String,
+    val profileId: String,
+    val manifestUrl: String,
+    val type: String,
+    val payload: Map<String, String>
+)
+
+/** What `HouseholdAddonsCloudSync` asked `uninstallAddon`, verbatim. */
+data class UninstallAddonCall(
+    val accessToken: String,
+    val profileId: String,
+    val addonId: String
+)
+
+private const val NOW = "2026-01-01T00:00:00Z"

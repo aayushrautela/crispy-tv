@@ -193,7 +193,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 127 `commonMain` / 69 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. 128 `commonMain` / 68 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -495,7 +495,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   as a `::englishDisplayNameForTag` slot, so it is *correctly* in `androidMain` and
   moving it would delete the platform step the slot exists to supply; and
   `AppDistribution.kt` (77) is the recorded `:native-engine` product decision. The
-  fourth, `HouseholdAddonsCloudSync.kt` (143), looked like a one-pin move — twelve
+  fourth, `HouseholdAddonsCloudSync.kt` (143), looked like a one-pin move — eleven
   `android.util.Log` calls and nothing else — and it is blocked one layer down:
   `MetadataAddonRegistry` and `CloudAddonRow` are declared in **`android/addons/src/androidMain`**
   and are reachable with **no import**, so the forward scan cannot see them. 19
@@ -1076,6 +1076,14 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `CrispyBackendClient` an interface, whose own blocker is that 39 of
   `CrispyBackendParsers.kt`'s 45 functions are `internal fun CrispyBackendClient.parseX(…)` —
   *the receiver is the thing to change this time.*
+  **That wall is scoped to the module that owns the type, and a consumer outside it was never
+  behind it at all.** Those 39 extensions are `internal` to `:backend`, so they block
+  `:backend`'s own `commonTest` and nothing else — and `class CrispyBackendClient(...)` **is
+  already in `commonMain`** and already implements `BackendApi`. `HouseholdAddonsCloudSync` moved
+  and gained a 12-case suite by changing one constructor parameter from `CrispyBackendClient` to
+  `BackendApi`: **a no-behaviour change on the one wiring call site, and the whole difference
+  between testable and not.** So before recording a `class` collaborator as a wall, ask *whose*
+  `commonTest` it blocks — the fix may be a parameter type rather than an `interface`.
 - **A decision is not "in the composable" because it renders; it is in the composable only if it
   needs the composition.** A `when` inside a `@Composable` body is uncallable, so its arms cannot
   be covered. A condition over several values written inline is *five decisions wearing one coat* —
@@ -1205,6 +1213,13 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **"answers null" and "does not keep the entry" are two different facts and a contract-only suite
   cannot tell them apart.** Deleting `cache.remove(...)` left every one of 24 assertions green. The
   name claimed a fact the body could not reach, and the fix was not to weaken the name.
+- **A path that returns early does not run the shared tail, so a suite written from the method's
+  *name* asserts a completion the code never logs.** `pullToLocal`'s "no active session" arm
+  logs one line and returns; `logOutcome` sits after the `try`, so a skip produces **no** `pull
+  completed` line. The failing expectation read `[\"pull skipped: no active session\", \"pull
+  completed\"]` and was wrong about the second entry. This is the same defect as a name wider
+  than its body, through the other door: **read the early return, because the shared tail is
+  after it and a suite cannot tell an unexecuted tail from a wrong message.**
 - **Robolectric's `android-all` lives in `~/.m2`, not in the Gradle cache, and a `find` in the
   wrong place is evidence of nothing.** `:backend`'s first host test wants a real `org.json` rather
   than a `Context`, and `find ~/.gradle/caches -iname '*android-all*'` returned **0 results** on
