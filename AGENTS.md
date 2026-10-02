@@ -607,8 +607,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 - **Shared constants are not the shared format, and the difference is the part nobody
   writes.** `SecretFormat` carried `PREFIX`, `IV_SEPARATOR` and `GCM_TAG_LENGTH_BITS` in
   `:platform-core`'s `commonMain` and both stores referenced them — and both stores still
-  *joined and split* the value themselves, identically and by eye. Two stores agreeing on
-  the shape was therefore a promise in prose rather than a call to one function. The fix is
+  *joined and split* the value themselves, identically and by eye. The fix is
   `SecretFormat.encode(ivBase64, ciphertextBase64)` and `SecretFormat.decode(stored)`, and the
   reason they take **`String`s rather than byte arrays** is the part worth keeping: base64 is
   a platform concern (`android.util.Base64`, `java.util.Base64`, `NSData`), so what is shared
