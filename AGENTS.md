@@ -762,33 +762,29 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `loadProfile`, `stashHandoff`. A slot over `(Context) -> Unit` would keep the platform type on the
   wrong side of the line.
   **The same rule says which half of a class is the factory, and a `Context` *holder* in a
-  constructor parameter is the pin that keeps an otherwise-portable class out of `commonMain`.**
-  `AiInsightsRepository` named four collaborators and all but one were already `:backend`
-  `commonMain`; the single `Context`-and-`SharedPreferences` holder in its constructor was the
-  whole reason it sat in `androidMain`, and *a file whose parameter names a concrete platform
-  holder cannot be read from `commonMain` however portable its own body is*. So the landing was
-  the class moving while the factory stayed — `AiInsightsRepository` to `commonMain`, its
-  `companion object { fun create(context) }` to a top-level `androidMain` `aiInsightsRepository(context)`
-  — with a two-member `AiInsightsCache` interface between them. **A class whose companion
-  constructs it from a `Context` is a composition root wearing a class's clothes, and that is
-  one landing, not two.** Two corollaries: **a composition root's own comment can assert the very
-  placement the landing is about to change** (`AppGraph.kt` carried "`AiInsightsRepository` stays
-  in androidMain", which this landing made false — correct it in the same commit rather than leave
-  it contradicting the diff), and **a value crossing as itself is worth checking for a round
+  constructor parameter is the pin that keeps an otherwise-portable class out of `commonMain`** —
+  *a file whose parameter names a concrete platform holder cannot be read from `commonMain` however
+  portable its own body is*. `AiInsightsRepository` named four collaborators and all but one were
+  already `:backend` `commonMain`; the single `Context`-and-`SharedPreferences` holder was the whole
+  reason it sat in `androidMain`. **A class whose companion constructs it from a `Context` is a
+  composition root wearing a class's clothes, and that is one landing, not two** — the class moves,
+  the `companion object { fun create(context) }` becomes a top-level `androidMain` function, and a
+  two-member interface goes between them. Two corollaries: **a composition root's own comment can
+  assert the very placement the landing is about to change** (`AppGraph.kt` carried "`AiInsightsRepository`
+  stays in androidMain", which the landing made false — correct it in the same commit rather than
+  leave it contradicting the diff), and **a value crossing as itself is worth checking for a round
   trip**: `AppGraph` held a BCP-47 tag, rebuilt a `Locale` from it, and the repository called
   `toLanguageTag()` on the result — two conversions carrying no information between them.
   **And the split is an *extraction*, not a move, and a `private` class is what forces it.**
-  `CalendarScreen.kt` (321) took the same shape: `CalendarViewModel` held a value
-  (`CalendarService`) and its `companion object` held `factory(context: Context)`. The factory
-  became a sibling `androidMain` file — **and the class had to be widened from `private` to
-  `internal` to make that possible, because a `private` member cannot be named by anything
-  outside its own file, including the factory that exists to construct it.** So the factory is a
-  new top-level `calendarViewModelFactory(context)`, and *the cheapest pins to discharge are the
-  ones that die with their sole consumer:* the `Context` read in `CalendarRoute` existed only to
-  reach the factory, so it disappeared without a slot of its own, and `remember` went with it
-  because that was its only use in the file. **A pin that vanishes when the thing that read it
-  moves is not visible as a pin at all while both halves sit in the same file** — which is the
-  reason the per-file import scan found four pins here and the `commonMain` side needed two slots.
+  `CalendarScreen.kt` took the same shape: the view model held a value and its `companion object`
+  held `factory(context: Context)`. The factory became a sibling `androidMain` file — **and the
+  class had to be widened from `private` to `internal` to make that possible, because a `private`
+  member cannot be named by anything outside its own file, including the factory that exists to
+  construct it.** So the factory is a new top-level function, and *the cheapest pins to discharge
+  are the ones that die with their sole consumer:* a `Context` read only to reach the factory
+  disappears without a slot of its own, and a `remember` that existed only for it goes too.
+  **A pin that vanishes when the thing that read it moves is not visible as a pin at all while both
+  halves sit in the same file.**
 - **No-default slots for anything a call site must not forget.** A defaulted capability lets a call
   site silently hide a row the build ships.
 - **When a platform composition local is unreachable, the answer is usually a value the caller
@@ -799,35 +795,28 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   not, so splitting them puts the Turkish dotless-i bug in shared code. *A step is platform work if
   its answer depends on the platform; "it is just a `String` call" is not the test.*
   **And read what the consumer DOES with the value before typing the slot — a value it *stores*
-  must stay a lambda, a value it merely passes on may be the product.** `SearchNavGraph`'s slot
-  was first typed `() -> ViewModelProvider.Factory` and the compile rejected it with
-  *`actual type is 'ViewModelProvider.Factory', but '() -> ViewModelProvider.Factory' was expected`*,
-  because the caller is a composable and `remember`s it, so the product is what arrives — and
-  `ProfileManagementRoute:798` then does `viewModel(factory = viewModelFactory)`, handing it on.
-  `AuthNavGraph`'s third slot is the **counterexample that completes the rule**:
-  `ProfileMenuRoute:98` is `produceState<ActiveProfileInfo?>(initialValue = null, loadProfile)`,
-  **so the lambda is a `produceState` key** — a fresh one each recomposition restarts the profile
-  load, so it must stay `suspend () -> ActiveProfileInfo?`. *The question is not whether a slot
-  is a lambda or a product; it is whether the consumer keys on its identity.* Two more facts from
-  the same landing: **a `Context` its caller must `remember` is already reachable at the call
-  site** — `AppNavHost` had no `Context` at all until it read `LocalPlatformContext.current` in
-  its own body — and **two graphs that each call the same loader must each get their own
-  `remember`ed instance**, because sharing one keys both graphs' state to a single identity and a
-  recomposition in one restarts the other's load.
+  must stay a lambda, a value it merely passes on may be the product.** `SearchNavGraph`'s slot was
+  first typed `() -> ViewModelProvider.Factory` and the compile rejected it, because the caller is a
+  composable and `remember`s it, so the product is what arrives. `AuthNavGraph`'s third slot is the
+  **counterexample that completes the rule**: its consumer is a `produceState`, **so the lambda is a
+  `produceState` key** — a fresh one each recomposition restarts the load, so it must stay a
+  suspend lambda. *The question is not whether a slot is a lambda or a product; it is whether the
+  consumer keys on its identity.* Two further consequences: **a `Context` its caller must
+  `remember` is already reachable at the call site** (`AppNavHost` had no `Context` at all until it
+  read one in its own body), and **two graphs that each call the same loader must each get their
+  own `remember`ed instance**, because sharing one keys both graphs' state to a single identity.
   **And sometimes the platform step is deleted rather than moved, which is a behaviour fix and not
   a simplification.** `String.lowercase(Locale)` is the JVM-only overload and Kotlin's
-  `lowercase()` is locale-invariant, so five `s.lowercase(Locale.US)` sites became `s.lowercase()`
-  — and `Locale.US` was a real answer and the wrong one, because a locale is a *rendering*
-  context: rendering a manifest URL in Turkish lowercases `I` to a dotless `ı`, so the same
-  addon would key differently on a Turkish device and every household sync would install and
-  uninstall the same row. `SharedPreferencesSearchHistoryStore` was already using `Locale.ROOT`
-  for its dedupe key, so this was the second instance of one rule. **When a `Locale` argument is
-  passed to a comparison, ask whether the answer depends on the device at all — if it does not,
-  the argument is the bug.** The other two `Locale` uses are *not* deletable and the difference
-  is worth keeping straight: `Locale.getDefault().toLanguageTag()` is a genuine reading of a
-  platform value and belongs at the edge (three factories), while
+  `lowercase()` is locale-invariant, so five `Locale.US` arguments became plain `lowercase()` — and
+  the locale was a real answer and the wrong one, because **a locale is a *rendering* context**:
+  rendering a manifest URL in Turkish lowercases `I` to a dotless `ı`, so the same addon would key
+  differently on a Turkish device and every household sync would install and uninstall the same
+  row. **When a `Locale` argument is passed to a comparison, ask whether the answer depends on the
+  device at all — if it does not, the argument is the bug.** The other two `Locale` uses are *not*
+  deletable and the difference is worth keeping straight: `Locale.getDefault().toLanguageTag()` is a
+  genuine reading of a platform value and belongs at the edge (three factories), while
   `DateTimeFormatter.ofPattern(…, Locale.getDefault())` is a genuine *formatting* locale that
-  `kotlinx-datetime` cannot express the same way — **counting all three as one `Locale.` is a
+  `kotlinx-datetime` cannot express the same way — **so counting all three as one `Locale.` is a
   census that cannot tell a deletion from a port.**
 - **A duplicate body is a signal one copy needs a caller.** `episodeHeaderMetadata` and
   `episodeRowMeta` assembled the same string byte-identically in two files with no dependency
