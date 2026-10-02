@@ -608,14 +608,11 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   byte-identical is the strongest form of the answer. **Resolve a large error cascade by distinct
   unresolved _names_**, mapped back to their declaring file, not by line.
 - **Two libraries naming one role differently is a mapping, not a divergence — and it is invisible
-  until you put the two files side by side.** `:tv`'s `androidx.tv.material3` calls the border roles
-  `border`/`borderVariant` where `:sharedUI`'s calls them `outline`/`outlineVariant`, and both sides
-  held the same two hex values written out twice. Read as two schemes this looks exactly like a
-  deliberate TV palette divergence that must be preserved. **Read the receiving side's own hand-written
+  until you put the two files side by side.** Read as two schemes this looks exactly like a
+  deliberate divergence that must be preserved. **Read the receiving side's own hand-written
   mapping before deciding a divergence is a product decision** — it is independent proof when it is
   not. The same rule covers **a duplicated `public` constant that is dead because the same name in a
-  different package hides it** (`:tv`'s second `CrispySpinner`, 11 call sites on the other one, zero
-  on its own): *an identical declaration reachable with no diff.*
+  different package hides it**: *an identical declaration reachable with no diff.*
 - **"This is bound to navigation" is a statement about the file, not about the mechanism.** Across the
   repository there are three distinct imports of shared-transition machinery and **zero** of the
   participating files import `androidx.navigation` for the transition itself — the provider was two
