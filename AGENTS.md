@@ -529,11 +529,9 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   hard as its imports do, and an import scan cannot see it.** **Read the property initialisers of a
   wrapper before planning its port, not its import list and not its KDoc row.**
   **A premise about the *ecosystem* ages in one direction, so "no equivalent exists" is the version
-  that rots.** Three KDocs asserted "`java.util.UUID` has no Kotlin/Native equivalent", and it was true
-  when written: `kotlin.uuid` did not exist. It is now `Uuid.random()`, **stable** in the resolved
+  that rots.** Three KDocs asserted "`java.util.UUID` has no Kotlin/Native equivalent"; it is now `Uuid.random()`, **stable** in the resolved
   Kotlin 2.4.10 stdlib -- and *stable* is a measurement, not a version number: the class carries
-  `kotlin.WasExperimental`, and of the companion's members **only `generateV4` still carries
-  `kotlin.uuid.ExperimentalUuidApi`**. **One of the three claims was in `commonMain`**, so a `commonMain`
+  `kotlin.WasExperimental` while only `generateV4` still carries `kotlin.uuid.ExperimentalUuidApi`. **One of the three claims was in `commonMain`**, so a `commonMain`
   reader was being told a `commonMain` file could not exist. **When a KDoc names a platform capability
   as the reason a file cannot move, re-run that claim against the resolved artifact before planning
   the file, and correct every copy in the same commit: a corrected premise with two surviving copies
