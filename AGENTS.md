@@ -1191,6 +1191,51 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   - **A read-back must skip a `count == 1` assertion when the new string is `""`** — asserting an
     empty string occurs exactly once always fails, which reads as a broken write when the write was
     a deletion and correct. Assert `old not in back` instead.
+- **A gate that parses a sentence it does not own must FAIL when it cannot find
+    it -- and a literal space in that regex is a silent off switch.** `verify_kmp_port.py`
+    reads the census size out of `kmp-migration-plan.md` with
+    `tracked file is classified \(`(\d+) == \1`\)`. The first version required
+    "is classified" **contiguously**, and re-wrapping that sentence in the plan -- one
+    newline, no content change -- stopped the match. The `if m:` guard then skipped
+    the comparison entirely, so the gate printed its clean summary and **exited 0 while
+    checking nothing at all**. It is now `\s+` throughout, and a missing anchor
+    returns **2** (measurement failure) with a message saying the gate parses prose it
+    does not own. *A gate that goes dormant on a whitespace change and still reports
+    green is worse than no gate, because it is believed.* **The same bug appeared a
+    second time in the proof harness's own injection**, which is the tell: if the
+    harness cannot find the thing it is corrupting, the harness is asserting on a
+    string it does not actually read. Re-prove a gate by deleting its input.
+  - **A `defaultdict` makes an empty bucket invisible, so a check for one can never
+    fire.** The empty-bucket rule in `verify_kmp_port.py` iterated `buckets.items()`,
+    and `buckets` was a `defaultdict(list)` keyed by append -- so a bucket no file
+    matched into **did not exist**, and the proof harness proved it: forcing every rule
+    to stop matching produced a silent exit 0. The fix is to seed the dict with every
+    **declared** bucket name before classifying, derived from the rule tables so a new
+    rule cannot be added without one. **Pre-seeding turned two rules that had silently
+    never matched (`androidx.window`, `androidx.paging.runtime`) into visible zeros**,
+    which is the whole return on doing it. *A safeguard that cannot fire is not a
+    safeguard, and it is invisible in review precisely because it looks like one.*
+  - **A report that indexes its own allowlist crashes on the condition it reports.**
+    `EMPTY_ALLOWED[b]` raised `KeyError` for a bucket that reached zero with no landing
+    recorded -- exactly the finding the gate exists to emit. `.get(b, "...")`. **And
+    "a landing emptied it" and "this never matched" are different claims**, so they get
+    different allowlists (`EMPTY_ALLOWED` / `NEVER_MATCHED`): putting a landing in the
+    second would be a lie, and conflating them is the confusion the allowlist rule
+    exists to prevent.
+  - **A hand-maintained table cannot be trusted to still sum, and a table that does not
+    sum is worse than no table because it looks like a measurement.** The census in
+    `kmp-migration-plan.md` had drifted from its own prose twice -- a row not updated
+    when its bucket lost a member, and two readings of "what counts as a pin" filling
+    one table. It is now produced by `scripts/verify_kmp_port.py` and **asserted against
+    the plan**, so a landing that moves a file without refreshing the document is a red
+    gate rather than a quietly wrong paragraph. *That script deliberately does NOT
+    resolve a type name to its declaring module*, and the discarded attempt is the
+    reason: it produced `Int declared in android/tv` (a declaration regex capturing an
+    **extension function's receiver** as the declared name), filed a type declared once
+    in `:home`'s `commonMain` under `:tv`, and reported every declaration site as
+    pinned by itself. **A partial resolver is not a weaker measurement, it is a
+    different and wrong one, and a gate that emits plausible wrong lines gets switched
+    off.**
 - **Structural line-range edits must precede string replacements earlier in the same file.** A
   replacement changes the line count and moves the range out from under the edit.
 - **An anchor copied from a tool's rendered output can differ in one character** — the source had

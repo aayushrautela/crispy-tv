@@ -61,25 +61,44 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
 
-**Where `:app` stands, and the honest shape of the remainder.** The 66 files still in
-its `androidMain` are **not** 66 independent jobs. A reverse audit — forbidden imports
-first, then subtracting every type declared in every module's `commonMain` — leaves
-**10 candidates and resolves 0 of them**. Every one is pinned by a measured wall:
-`androidx.navigation` (the 9-file nav layer — **the coordinate swap landed and the
-   artifact is on the `commonMain` classpath now**, so this one is a `Context` reached
-   through a *call*, not an import),
-`paging-compose` (whose `commonMain` declaration landed -- `paging-compose:3.5.1`
-   publishes `platform.type=common` plus `iosArm64`/`iosSimulatorArm64`, so the *Compose*
-   half is free; `paging-runtime:3.5.1` is a real `.aar` depending on `androidx.recyclerview`
-   and really is Android-only, and it is pinned on `catalog/CatalogViewModel.kt` and
-   `discover/DiscoverScreen.kt` rather than on the two files named first), the composition
-   root,
-:android:native-engine` (the four `playerui` files), and `org.json` — which was recorded
-here as permanent and **is not**: the node type is **decided**, `kotlinx.serialization.json.JsonElement`,
-and `WatchProgressStore.kt` was the first file it moved. That file was 405 lines of `androidMain`
-with **not one `android.*` import** — it already took the four `:platform-core` ports, so only the
-JSON parsing pinned it. It is now `commonMain`, and its 44 cases run on **both** `desktopTest` and
-`testAndroidHostTest` from `commonTest` with no Robolectric and no `org.json` on either classpath.
+**Where `:app` stands, and the honest shape of the remainder.** The 61 files still in
+its `androidMain` are **not** 61 independent jobs, and the partition that says
+which is which is **measured by `scripts/verify_kmp_port.py`** rather than
+maintained here by hand -- the hand-maintained version of this very table had
+drifted from its own prose twice. That script also asserts the count stated in
+this document, so a landing that moves a file without refreshing the plan is a
+red gate rather than a quietly wrong paragraph. See **"The 61 that remain"** for
+the buckets and, just as importantly, for the *method* the buckets are allowed to
+use: an earlier attempt resolved each type name to its declaring module and was
+discarded, because it produced confident nonsense (`Int declared in android/tv`,
+every declaration site reported as pinned by itself) rather than because the
+question was wrong.
+
+**The remainder is dominated by two things, and neither is a pile of small
+files.** The first is `android.jar` itself, 38 of the 61 -- and most of those are
+composition roots whose only import is `android.content.Context`, which is
+**correct placement** rather than work: `fun create(context: Context)` *is* a
+composition root, and `:desktopApp` will need its own. The second is
+`androidx.navigation`, 6 files, and that is **the one thing gating the desktop
+app, and it is a decision rather than a port**: `NavHostController` is an Android
+`Activity`, while the artifact itself is KMP, so the question is what a
+non-Android target navigates with. `CrispySharedTransitionLayout` is already in
+`commonMain` waiting for a graph that can reach it.
+
+Two earlier claims in this paragraph are worth keeping because they were
+*reversed* by measurement rather than merely superseded. `paging-compose` is KMP
+(`paging-compose:3.5.1` publishes `platform.type=common` plus the two iOS
+targets) and `paging-runtime` really is an `.aar` depending on
+`androidx.recyclerview` -- so the pin is on `catalog/CatalogViewModel.kt` and
+`discover/DiscoverScreen.kt`, not on the files this paragraph used to name. And
+`org.json`, recorded here as a permanent wall, is **not** permanent: the node
+type is decided (`kotlinx.serialization.json.JsonElement`) and
+`WatchProgressStore.kt` was the first file it moved. That file was 405 lines of
+`androidMain` with **not one `android.*` import** -- it already took the four
+`:platform-core` ports, so only the JSON parsing pinned it -- and its 44 cases
+now run on **both** `desktopTest` and `testAndroidHostTest` from `commonTest`,
+with neither Robolectric nor `org.json` on either classpath.
+
 **The JSON-only remainder is five files**, re-measured rather than decremented.
 So Phase 4's remaining file count is a misleading measure of the work left, and Phase 5
 is not waiting on Phase 4.
@@ -226,43 +245,82 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 66 that remain: **not one of them is movable, and that is measured rather than argued**
+### The 61 that remain, measured by `scripts/verify_kmp_port.py`
 
-**This section has carried a taxonomy, then a census, then a wrong census, and now a
-measured negative, and the reason the third was wrong is still the most useful thing in
-it.** Every earlier version classified files by **artifact family** — and the family a
-file belongs to is not a fact about the file, which is exactly the error the `paging`
-row recorded when it admitted that "a bucket measured by which artifacts a family
-imports is also a claim about which file in the family imports them". The current version
-classifies each of `:app`'s **66** `androidMain` files **individually, by its own import
-set** — comment lines stripped, first matching rule wins — under **four gates**: every
-tracked file is classified (`61 == 61`); the buckets sum; **at least one bucket is
-non-empty** (the all-zeros-under-a-`True`-checksum failure below); and **every empty bucket
-is on an allowlist carrying the landing that removed its wall**.
+**This table used to be maintained by hand, and it drifted from its own prose
+twice** -- once because a row was not updated when its bucket lost a member, and
+once because two different readings of "what counts as a pin" filled the same
+table. Both times the number that was wrong was the one nobody re-measured, which
+is the argument for measuring it. The counts below are therefore **produced by a
+committed script** and asserted against this file: `verify_kmp_port.py` reads
+the census size stated below and fails when it no longer matches the tree, so a
+landing that moves a file without refreshing this table is a red gate rather
+than a quietly wrong document.
+
+**The script deliberately does not resolve a type name to its declaring module,
+and that is a decision rather than an omission.** An earlier version of this
+analysis did exactly that and was thrown away, because it produced three
+distinct classes of confident falsehood: a name declared once in `:home`'s
+`commonMain` was filed under `:tv`; a naive declaration regex captured an
+**extension function's receiver** as the declared name, so `fun
+Modifier.crispyTheme()` "declared" `Modifier` and `val Int.dp` "declared" `Int`,
+producing the line `Int declared in android/tv` for a declaration that exists
+nowhere in the tree; and every file that declared a type was reported as pinned
+*by* its own declaration. Resolving a name to a declaration needs overload
+resolution, star imports, same-package precedence and the module graph. **A
+partial version of it is not a weaker measurement, it is a different and wrong
+one**, and a gate that emits plausible wrong lines gets switched off.
+
+What the script *can* decide without guessing is counted, and the buckets are a
+**lower bound**. The invariants it enforces are that every tracked file is
+classified (`61 == 61`), that the buckets sum, that every empty bucket is either
+allowlisted with the landing that emptied it or recorded as never having
+matched, and that the plan's own stated count still agrees with the tree:
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **43** | `android.jar` proper — see the import-set breakdown below | no — it is the platform |
-| **11** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** — `CatalogScreen`, `DetailsRoute`, `AppDistribution`, `PersonDetailsRoute`, `PlayerSessionDecisions`, `PlayerTrackSheet`, `AppRoot`, `AppNavHost`, `DiscoverNavGraph`, `HomeNavGraph`, `SettingsNavGraph` | no — **the other half of the same-package trap**: a sibling in the same *module* is as reachable-without-import as one in the same package. **A first-match partition can only report a file's _first_ pin, so this row is a floor and not a description**: `PlayerSessionDecisions.kt` imports **only** `com.crispy.tv.nativeengine.playback.{NativePlaybackEngine, NativePlaybackEnginePreference, NativePlaybackError, NativePlaybackSnapshot, NativePlaybackState}` at `:3-7` — no `android.*`, no `java.*` — so it is *also* a `:native-engine` file and has **two** pins; `PlayerTrackSheet.kt` imports only `androidx.compose.*` (plus `androidx.annotation.DrawableRes`), so its one pin is invisible from the label and this row is the only place it is recorded. `PersonDetailsRoute.kt` is in this row **and** in the `java.*` bucket, for the same reason |
-| **6** | `android.view` interop — `YouTubeExtraVideoDialog`, `PlayerGestureController`, `PlayerOverlay`, `PlayerRoute`, `PlayerSessionViewModel`, `PlayerNavGraph` | no — Android `View`s embedded in Compose, which `android.jar` is the source of |
-| **4** | an `R` reference — `DetailsHero`, `DetailsRatingBadgeLogo`, `ReviewProviderBadge`, `PlayerOverlayControls` | no, and **already correct**: the pure half is in `commonMain` behind a no-default composable slot |
-| **0** | `:native-engine`'s types | **empty because the landing that lifted the seven value types emptied it** — its only member was `PlayerSessionSupport.kt`, and a bucket that hits zero has to name the landing that emptied it rather than quietly shrink |
-| **1** | `java.util.Locale` alone — `AndroidLanguageLabels.kt` | no, and **correctly placed**: it is the platform answer `commonMain`'s `languageLabelForCode` takes as a `::englishDisplayNameForTag` slot, and moving it would delete the step the slot exists to supply |
-| **0** | `other-module androidMain declaration` | **empty because `:addons` reached 20 `commonMain` / 2 `androidMain`** and `MetadataAddonRegistry`/`CloudAddonRow` moved (`b9816f4c`) |
-| **0** | `default-import JVM call` — `synchronized(lock)`, `System.currentTimeMillis()` | **empty because both are gone** (`b43ea7ee`) |
-| **0** | **no hard pin at all** | **the point of the whole section, and the answer is zero** |
+| **38** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
+| **6** | `androidx.navigation` | **the one thing gating desktop, and a DECISION not a port.** `NavHostController` is an Android `Activity`; the artifact itself is KMP. `CrispySharedTransitionLayout` is already in `commonMain` waiting for a graph that can reach it |
+| **6** | `androidx.media3` | no -- Media3 publishes no non-Android artifact |
+| **4** | a JVM-only member that needs **no import**, or an `R.<type>` reference | partly. `String.format` was one of these and it made a 442-line file pass a careful audit as clean |
+| **2** | `androidx.activity.compose` | the artifact is KMP; the pin is the Android `Host` |
+| **2** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** | no -- **the same-package trap inside one module**: a sibling in the same *module* is as reachable-without-import as one in the same package |
+| **2** | `androidx.paging.compose` | the artifact is KMP; `paging-runtime` is not, and is the pin where it appears |
+| **1** | `androidx.core` | the artifact is KMP; the pin is `ContextCompat` |
 
-**39 + 11 + 6 + 4 + 0 + 1 = 61, nothing unmatched.** The fifth bucket is now **zero**: the
-landing which lifted `NativeTrack` and `externalSubtitleTrackId` into `:core-domain`
-emptied it, because its only member was `PlayerTrackSheet.kt`, and a bucket that hits
-zero has to name the landing that emptied it rather than quietly shrink.
+**38 + 6 + 6 + 4 + 2 + 2 + 2 + 1 = 61, nothing unmatched.** Every file carries at
+least one pin, so the residual bucket is **zero**; it emptied when the
+`R.<lowercase>` rule began matching `R.raw.*`, which is what the two
+provider-badge files use.
 
-#### The 41's import sets, because "it imports `android.jar`" is not a finding
+**Two buckets are declared and match nothing today, and that is recorded rather
+than assumed:** `androidx.window` and `androidx.paging.runtime`. They are kept
+as forward-looking rules so the next landing that imports one does not have to
+re-derive the prefix, and the script distinguishes *never matched* from *emptied
+by a landing*, because a bucket that shrank and a bucket that was always empty
+look identical in a diff and only one of them means a measurement stopped
+running.
+
+**A first-match partition can only report a file's _first_ pin, so every row
+above is a floor and not a description.** The two files this table used to name
+here have since **left `androidMain` entirely**, and they are worth keeping as
+the worked example of why a bucket is a floor and why an import is not a module.
+`PlayerSessionDecisions.kt` and `PlayerSessionSupport.kt` were both filed under
+`:native-engine`'s types, and both import **only**
+`com.crispy.tv.nativeengine.playback.*` -- no `android.*`, no `java.*`. What
+freed them was not a code change at all: a lift moved the value types they name
+into `:core-domain`'s `commonMain` **keeping the package identical**, so the pin
+vanished while the import lines did not change by a character.
+**A coordinate in an import list cannot tell you where a type lives, and an
+analysis that buckets a file by reading its imports is bucketing it by a string
+that is free to change meaning.**
+
+#### The 38's import sets, because "it imports `android.jar`" is not a finding
 
 Grouped by the file's **entire** import set rather than by family — and the grouping is worth
 printing for exactly one reason, which is that **the case this section used to lead with is
 empty**: **no file imports `android.content.Context` and nothing else at all**, measured `0` of
-`65`, and **none** is exactly `Context` + `java.util.Locale` either, which an earlier draft of
+`61`, and **none** is exactly `Context` + `java.util.Locale` either, which an earlier draft of
 this sentence claimed of three named files. Every one of them reaches for something else as well,
 and several reach for two or three. So there are no singletons in that sense, only near-
 singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,

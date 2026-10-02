@@ -72,6 +72,13 @@ jobs:
         # the Kotlin is clean and the reference still cannot resolve off Android.
         run: python3 scripts/verify_kmp_structure.py
 
+      - name: Check the plan's census still describes the tree
+        # The census in kmp-migration-plan.md is hand-maintained and has drifted
+        # from its own prose twice. This measures the :app/androidMain counts and
+        # fails when the plan's stated number no longer matches, which is the
+        # failure a moved file silently causes.
+        run: python3 scripts/verify_kmp_port.py
+
       - name: Validate contract fixtures
         run: python scripts/validate_contracts.py
 
