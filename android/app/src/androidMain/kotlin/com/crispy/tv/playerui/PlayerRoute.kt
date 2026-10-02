@@ -3,9 +3,7 @@
 
 package com.crispy.tv.playerui
 
-import android.graphics.Rect
 import android.util.Log
-import android.util.Rational
 import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -62,8 +60,8 @@ fun PlayerRoute(
 
     val colorScheme = rememberDetailsColorScheme(seedColor = seedColor)
     val palette = remember(colorScheme) { detailsPaletteFromScheme(colorScheme) }
-    var videoBounds by remember { mutableStateOf<Rect?>(null) }
-    val updateVideoBounds: (Rect) -> Unit = { bounds ->
+    var videoBounds by remember { mutableStateOf<PictureInPictureSourceRect?>(null) }
+    val updateVideoBounds: (PictureInPictureSourceRect) -> Unit = { bounds ->
         if (videoBounds != bounds) {
             Log.d(
                 TAG,
@@ -118,7 +116,7 @@ fun PlayerRoute(
         .onGloballyPositioned { coordinates ->
             val bounds = coordinates.boundsInWindow()
             updateVideoBounds(
-                Rect(
+                PictureInPictureSourceRect(
                     bounds.left.roundToInt(),
                     bounds.top.roundToInt(),
                     bounds.right.roundToInt(),
@@ -136,7 +134,7 @@ fun PlayerRoute(
             uiState.videoLayout.toPictureInPictureAspectRatio()
                 ?: videoBounds
                     ?.takeIf { it.width() > 0 && it.height() > 0 }
-                    ?.let { bounds -> Rational(bounds.width(), bounds.height()) }
+                    ?.let { bounds -> PictureInPictureAspectRatio(bounds.width(), bounds.height()) }
         val pipEnabled =
             videoBounds != null &&
                 uiState.errorMessage == null &&
@@ -269,13 +267,13 @@ fun PlayerRoute(
     }
 }
 
-private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): Rational? {
+private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): PictureInPictureAspectRatio? {
     val layout = this ?: return null
     val aspectRatio = layout.aspectRatioValue() ?: return null
     val denominator = 10_000
     val numerator = (aspectRatio * denominator.toFloat()).roundToInt()
     return if (numerator > 0) {
-        Rational(numerator, denominator)
+        PictureInPictureAspectRatio(numerator, denominator)
     } else {
         null
     }

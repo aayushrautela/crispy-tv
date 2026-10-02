@@ -9,7 +9,6 @@ import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import kotlin.math.roundToInt
 
 /**
  * Owns picture-in-picture state and parameters for the host [ComponentActivity].
@@ -24,8 +23,8 @@ internal class PlayerPipController(private val activity: ComponentActivity) {
         mutableStateOf(activity.isInPictureInPictureMode)
 
     private var enabled: Boolean = false
-    private var sourceRect: Rect? = null
-    private var aspectRatio: Rational? = null
+    private var sourceRect: PictureInPictureSourceRect? = null
+    private var aspectRatio: PictureInPictureAspectRatio? = null
     private var lastAppliedConfig: PictureInPictureConfig? = null
 
     fun updateConfig(config: PictureInPictureConfig) {
@@ -67,11 +66,10 @@ internal class PlayerPipController(private val activity: ComponentActivity) {
     private fun buildParams(): PictureInPictureParams {
         val builder = PictureInPictureParams.Builder()
 
-        sourceRect?.let(builder::setSourceRectHint)
+        sourceRect?.let { builder.setSourceRectHint(Rect(it.left, it.top, it.right, it.bottom)) }
         aspectRatio
-            ?.takeIf { it.numerator > 0 && it.denominator > 0 }
-            ?.let(::clampAspectRatio)
-            ?.let(builder::setAspectRatio)
+            .clampedAspectRatio()
+            ?.let { builder.setAspectRatio(Rational(it.numerator, it.denominator)) }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setAutoEnterEnabled(enabled)
@@ -81,18 +79,7 @@ internal class PlayerPipController(private val activity: ComponentActivity) {
         return builder.build()
     }
 
-    private fun clampAspectRatio(rational: Rational): Rational {
-        val ratio = rational.toDouble()
-        return when {
-            ratio > MAX_ASPECT_RATIO -> Rational((MAX_ASPECT_RATIO * 100).roundToInt(), 100)
-            ratio < MIN_ASPECT_RATIO -> Rational(100, (MAX_ASPECT_RATIO * 100).roundToInt())
-            else -> rational
-        }
-    }
-
     private companion object {
         const val TAG = "PlayerPipController"
-        const val MAX_ASPECT_RATIO = 2.39
-        const val MIN_ASPECT_RATIO = 1.0 / MAX_ASPECT_RATIO
     }
 }

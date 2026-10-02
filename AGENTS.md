@@ -1250,6 +1250,20 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     pinned by itself. **A partial resolver is not a weaker measurement, it is a
     different and wrong one, and a gate that emits plausible wrong lines gets switched
     off.**
+  - **A gate that checks one sentence of a document has not checked the document, and the
+    part it skips is the part that rots.** `verify_kmp_port.py` reads the census *identity*
+    (`57 == 57`) out of `kmp-migration-plan.md` and asserts the plan's stated count against
+    the tree. It does **not** read the bucket **table** two paragraphs below that sentence,
+    so the table drifted while every gate stayed green: its rows summed to **59**, its own
+    prose said **60**, and the gate measured **57** -- three different numbers, none of them
+    a measurement of anything. It had been wrong in two places at once (`android.jar` 36 vs
+    35, `activity-compose` 2 vs 1), which is the first-match-partition rule again: a
+    landing empties exactly one bucket, and a table maintained by hand gets one row right
+    and the other seven stale. **The fix was to patch the numbers from the gate's own
+    `--json` output, never by reading the table -- and then to make the patch script assert
+    the table's arithmetic**, parsing the rows and the sum line separately and requiring
+    them to agree *and* to equal each other. **A count nobody recomputes is a claim, and
+    "the gate passed" is not a recomputation of a number the gate never looked at.**
 - **Structural line-range edits must precede string replacements earlier in the same file.** A
   replacement changes the line count and moves the range out from under the edit.
 - **An anchor copied from a tool's rendered output can differ in one character** — the source had

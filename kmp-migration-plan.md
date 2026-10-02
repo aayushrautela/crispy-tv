@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **142 of 200 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 142) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **143 of 200 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 143) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -75,7 +75,7 @@ every declaration site reported as pinned by itself) rather than because the
 question was wrong.
 
 **The remainder is dominated by two things, and neither is a pile of small
-files.** The first is `android.jar` itself, 38 of the 61 -- and most of those are
+files.** The first is `android.jar` itself, 35 of the 57 -- and most of those are
 composition roots whose only import is `android.content.Context`, which is
 **correct placement** rather than work: `fun create(context: Context)` *is* a
 composition root, and `:desktopApp` will need its own. The second is
@@ -118,7 +118,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **142** | **58** | **59** |
+| **`:app`** | **143** | **57** | **60** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -171,16 +171,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **142** | **58** |
-| **total** | **252** | **71** |
+| **`:app`** | **143** | **57** |
+| **total** | **253** | **70** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 142 of 200, i.e. **71%**, and
-the 58 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 143 of 200, i.e. **72%**, and
+the 57 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -273,22 +273,22 @@ one**, and a gate that emits plausible wrong lines gets switched off.
 
 What the script *can* decide without guessing is counted, and the buckets are a
 **lower bound**. The invariants it enforces are that every tracked file is
-classified (`58 == 58`), that the buckets sum, that every empty bucket is either
+classified (`57 == 57`), that the buckets sum, that every empty bucket is either
 allowlisted with the landing that emptied it or recorded as never having
 matched, and that the plan's own stated count still agrees with the tree:
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **36** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
+| **35** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
 | **6** | `androidx.navigation` | **the one thing gating desktop, and a DECISION not a port.** `NavHostController` is an Android `Activity`; the artifact itself is KMP. `CrispySharedTransitionLayout` is already in `commonMain` waiting for a graph that can reach it |
 | **6** | `androidx.media3` | no -- Media3 publishes no non-Android artifact |
 | **4** | a JVM-only member that needs **no import**, or an `R.<type>` reference | partly. `String.format` was one of these and it made a 442-line file pass a careful audit as clean |
-| **2** | `androidx.activity.compose` | the artifact is KMP; the pin is the Android `Host` |
+| **1** | `androidx.activity.compose` | the artifact is KMP; the pin is the Android `Host` |
 | **2** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** | no -- **the same-package trap inside one module**: a sibling in the same *module* is as reachable-without-import as one in the same package |
 | **2** | `androidx.paging.compose` | the artifact is KMP; `paging-runtime` is not, and is the pin where it appears |
 | **1** | `androidx.core` | the artifact is KMP; the pin is `ContextCompat` |
 
-**37 + 6 + 6 + 4 + 2 + 2 + 2 + 1 = 60, nothing unmatched.** Every file carries at
+**35 + 6 + 6 + 4 + 1 + 2 + 2 + 1 = 57, nothing unmatched.** Every file carries at
 least one pin, so the residual bucket is **zero**; it emptied when the
 `R.<lowercase>` rule began matching `R.raw.*`, which is what the two
 provider-badge files use.
@@ -315,7 +315,7 @@ vanished while the import lines did not change by a character.
 analysis that buckets a file by reading its imports is bucketing it by a string
 that is free to change meaning.**
 
-#### The 38's import sets, because "it imports `android.jar`" is not a finding
+#### The 35's import sets, because "it imports `android.jar`" is not a finding
 
 Grouped by the file's **entire** import set rather than by family — and the grouping is worth
 printing for exactly one reason, which is that **the case this section used to lead with is
