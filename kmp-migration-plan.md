@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **139 of 198 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 139) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **141 of 199 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 141) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -67,7 +67,7 @@ which is which is **measured by `scripts/verify_kmp_port.py`** rather than
 maintained here by hand -- the hand-maintained version of this very table had
 drifted from its own prose twice. That script also asserts the count stated in
 this document, so a landing that moves a file without refreshing the plan is a
-red gate rather than a quietly wrong paragraph. See **"The 61 that remain"** for
+red gate rather than a quietly wrong paragraph. See **"The 58 that remain"** for
 the buckets and, just as importantly, for the *method* the buckets are allowed to
 use: an earlier attempt resolved each type name to its declaring module and was
 discarded, because it produced confident nonsense (`Int declared in android/tv`,
@@ -118,7 +118,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **139** | **59** | **58** |
+| **`:app`** | **141** | **58** | **58** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -171,16 +171,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **139** | **59** |
-| **total** | **249** | **72** |
+| **`:app`** | **141** | **58** |
+| **total** | **251** | **71** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 139 of 198, i.e. **70%**, and
-the 59 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 141 of 199, i.e. **71%**, and
+the 58 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -245,7 +245,7 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 61 that remain, measured by `scripts/verify_kmp_port.py`
+### The 58 that remain, measured by `scripts/verify_kmp_port.py`
 
 **This table used to be maintained by hand, and it drifted from its own prose
 twice** -- once because a row was not updated when its bucket lost a member, and
@@ -273,7 +273,7 @@ one**, and a gate that emits plausible wrong lines gets switched off.
 
 What the script *can* decide without guessing is counted, and the buckets are a
 **lower bound**. The invariants it enforces are that every tracked file is
-classified (`59 == 59`), that the buckets sum, that every empty bucket is either
+classified (`58 == 58`), that the buckets sum, that every empty bucket is either
 allowlisted with the landing that emptied it or recorded as never having
 matched, and that the plan's own stated count still agrees with the tree:
 

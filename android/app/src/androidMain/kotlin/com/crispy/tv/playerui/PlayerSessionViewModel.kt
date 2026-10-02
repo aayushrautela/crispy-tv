@@ -73,66 +73,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-enum class PlayerSurface {
-    NONE,
-    INFO,
-    EPISODES,
-    MORE,
-    STREAMS,
-    AUDIO,
-    SUBTITLES,
-}
-
-@Immutable
-data class PlayerUiState(
-    val title: String,
-    val subtitle: String? = null,
-    val isMetadataLoaded: Boolean = false,
-    val artworkUrl: String? = null,
-    val activeEngine: NativePlaybackEngine = NativePlaybackEngine.EXO,
-    val isBuffering: Boolean = true,
-    val isPlaying: Boolean = false,
-    val durationMs: Long = 0L,
-    val stableDurationMs: Long = 0L,
-    val statusMessage: String = "Preparing playback...",
-    val errorMessage: String? = null,
-    val videoLayout: NativeVideoLayout? = null,
-    val details: MediaDetails? = null,
-    val activeIdentity: PlaybackIdentity? = null,
-    val activeSurface: PlayerSurface = PlayerSurface.NONE,
-    val seasons: List<Int> = emptyList(),
-    val selectedSeason: Int? = null,
-    val seasonEpisodes: List<MediaVideo> = emptyList(),
-    val episodesIsLoading: Boolean = false,
-    val episodesStatusMessage: String = "",
-    val recommendedItems: List<CatalogItem> = emptyList(),
-    val moreIsLoading: Boolean = false,
-    val currentPlaybackUrl: String? = null,
-    val audioTracks: List<NativeTrack> = emptyList(),
-    val selectedAudioTrackId: String? = null,
-    val subtitleTracks: List<NativeTrack> = emptyList(),
-    val selectedSubtitleTrackId: String? = null,
-    val subtitleDelayMs: Int = 0,
-    val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
-    val addonSubtitles: List<AddonSubtitle> = emptyList(),
-    val addonSubtitlesLoading: Boolean = false,
-    val addonSubtitlesError: String? = null,
-    /**
-     * The intro/outro segments the viewer can skip, empty until the intro-skip
-     * service answers for the active episode.
-     */
-    val introSkipIntervals: List<IntroSkipInterval> = emptyList(),
-    /**
-     * The `skipIntroEnabled` setting as the last fetch actually read it.
-     *
-     * Carried rather than read from the repository by the overlay because the
-     * overlay is a pure function of this state, and because the two are written
-     * in the same `_uiState.update` as the intervals themselves -- so the flag on
-     * screen cannot describe a different decision from the one the fetch made.
-     */
-    val skipIntroEnabled: Boolean = false,
-)
-
 class PlayerSessionViewModel(
     appContext: Context,
     identity: PlaybackIdentity?,

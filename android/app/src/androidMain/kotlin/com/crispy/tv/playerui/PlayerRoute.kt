@@ -21,6 +21,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -199,6 +201,26 @@ fun PlayerRoute(
                 selectorState = selectorState,
                 positionMsState = positionMsState,
                 palette = palette,
+                // `LocalConfiguration` is android-only even under Compose Multiplatform: it
+                // is absent from `ui`'s common metadata and lives in `ui-android`. This is
+                // therefore the only place the width can be read, and the overlay receives
+                // the decision's result rather than a way to re-make it. Same shape as
+                // `HomeRoute`/`DetailsRoute`, which already take `isCompact: Boolean` for
+                // an identical `< 600` read.
+                isCompact = LocalConfiguration.current.screenWidthDp < 600,
+                // `::englishDisplayNameForTag` is the Android implementation of a slot the
+                // shared track sheets already take with no default, so it needs no import --
+                // same package. The overlay is moving to commonMain and this line is the one
+                // that stays behind to say which of the implementations it is.
+                displayName = ::englishDisplayNameForTag,
+                // This is the one line that stays behind. `androidx.activity.compose`
+                // publishes no KMP variant and is declared only in `androidMain`, so
+                // the overlay takes the registration as a slot rather than naming the
+                // platform type. The overlay still decides *when* to register
+                // (`isSurfaceOpen`); only the act of registering is handed over.
+                registerBackHandler = { enabled, onBack ->
+                    BackHandler(enabled = enabled, onBack = onBack)
+                },
                 onBack = {
                     Log.d(TAG, "overlay back pressed")
                     onBack()

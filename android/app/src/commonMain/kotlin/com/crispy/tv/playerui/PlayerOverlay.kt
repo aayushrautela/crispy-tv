@@ -1,7 +1,5 @@
 package com.crispy.tv.playerui
 
-import android.view.ViewConfiguration
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -34,7 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
@@ -59,6 +57,17 @@ internal fun PlayerOverlay(
     selectorState: StreamSelectorUiState,
     positionMsState: State<Long>,
     palette: DetailsPaletteColors,
+    isCompact: Boolean,
+    displayName: (String) -> String,
+    // A back handler is a platform *registration*, not a decision this composable
+    // makes, and the overlay already takes `onBack` -- so it does not need to own the
+    // registration itself. Compose Multiplatform does ship a portable `BackHandler`,
+    // and using it was the obvious move; it is `@Deprecated` upstream with the message
+    // "Use NavigationEventHandler instead", it is `@ExperimentalComposeUiApi`, and the
+    // CMP Gradle plugin generates no accessor for it, so it would cost a hand-managed
+    // build-file line to buy this one call site. The slot carries the whole platform
+    // step, and its single caller is already Android-only.
+    registerBackHandler: @Composable (enabled: Boolean, onBack: () -> Unit) -> Unit,
     onBack: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
@@ -97,7 +106,7 @@ internal fun PlayerOverlay(
     var showLoadingCurtain by remember { mutableStateOf(uiState.isBuffering) }
     var seekRipple by remember { mutableStateOf<SeekRippleState?>(null) }
 
-    val doubleTapTimeoutMs = ViewConfiguration.getDoubleTapTimeout()
+    val doubleTapTimeoutMs = LocalViewConfiguration.current.doubleTapTimeoutMillis
     val seekChain = remember(doubleTapTimeoutMs) { TapSeekChain(doubleTapWindowMs = doubleTapTimeoutMs.toLong()) }
     val tapGestureScope = rememberCoroutineScope()
 
@@ -120,7 +129,7 @@ internal fun PlayerOverlay(
     val isSurfaceOpen = uiState.activeSurface != PlayerSurface.NONE || selectorState.visible
     val latestIsSurfaceOpen by rememberUpdatedState(isSurfaceOpen)
 
-    BackHandler(enabled = isSurfaceOpen) {
+    registerBackHandler(isSurfaceOpen) {
         onCloseSurface()
     }
 
@@ -378,7 +387,7 @@ internal fun PlayerOverlay(
             onAccentColor = palette.onAccent,
             useCrispyImageModel = true,
             scrimColor = Color.Transparent,
-            isCompact = LocalConfiguration.current.screenWidthDp < 600,
+            isCompact = isCompact,
             onDismiss = onCloseSurface,
             onProviderSelected = {
                 resetControlsTimer()
@@ -398,7 +407,7 @@ internal fun PlayerOverlay(
             // Same package as `AndroidLanguageLabels.kt`, so no import: the sheet's
             // `displayName` slot is filled with the Android implementation here, at the
             // one place that is allowed to know it exists.
-            displayName = ::englishDisplayNameForTag,
+            displayName = displayName,
             onSelectAudioTrack = {
                 resetControlsTimer()
                 onSelectAudioTrack(it)
@@ -414,7 +423,7 @@ internal fun PlayerOverlay(
             addonSubtitlesLoading = uiState.addonSubtitlesLoading,
             addonSubtitlesError = uiState.addonSubtitlesError,
             palette = palette,
-            displayName = ::englishDisplayNameForTag,
+            displayName = displayName,
             onSelectSubtitleTrack = {
                 resetControlsTimer()
                 onSelectSubtitleTrack(it)
