@@ -524,9 +524,8 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   a comment about that caller.
   **A build file's per-file table is the same kind of premise, and it was wrong about both of the
   entries it listed for one file.** `:addons`' table said `RemoteSupabaseSyncLabService` was in
-  `androidMain` for "`Context` and `org.json`". It named no `org.json` type at all, and the `Context`
-  was a constructor parameter **the class never read** -- it had been under a
-  `@Suppress("UNUSED_PARAMETER")` the whole time. **So the pin was a parameter nobody consulted, and
+  `androidMain` for "`Context` and `org.json`" -- it named no `org.json` type, and the `Context`
+  was a parameter the class never read. **So the pin was a parameter nobody consulted, and
   the fix was to DELETE it rather than slot it: a wrapper's parameter list pins a file exactly as
   hard as its imports do, and an import scan cannot see it.** **Read the property initialisers of a
   wrapper before planning its port, not its import list and not its KDoc row.**
@@ -546,8 +545,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `androidx.navigation`; `54f0189c` then went **red on BOTH workflows** on a build that compiles and
   tests clean locally, because both run that gate. *A stale document misleads a reader; a stale gate
   fails the build.* **So after any swap, grep the scripts, not just the docs.** The fix is the file's
-  **own** pattern (remove the prefix, add the measured comment, give the re-add trigger) and **not
-  an allowlist entry for the offending file** -- a safety gate that fires on correct code gets switched
+  **own** pattern and **not an allowlist entry for the offending file** -- a safety gate that fires on correct code gets switched
   off. **Re-prove a gate you have changed by violating its premise and confirming it still fires**:
   *removing a token is not the same evidence as the gate still working, and only the second one is a
   measurement.*
