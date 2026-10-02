@@ -738,31 +738,23 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   *absence* is then false.** `LibraryDiskCache` had two members because the paging source used two;
   the screen made it three. Grep the suite for the reasoning, not just for the type.
 - **A `Context` used for *wiring* belongs in the factory. A `Context` used for a *call* is a
-  capability, and the slot carries the data** — `shareText: (String) -> Unit`, `openUrl`,
+  capability, and the slot carries the data** -- `shareText: (String) -> Unit`, `openUrl`,
   `loadProfile`, `stashHandoff`. A slot over `(Context) -> Unit` would keep the platform type on the
   wrong side of the line.
   **The same rule says which half of a class is the factory, and a `Context` *holder* in a
-  constructor parameter is the pin that keeps an otherwise-portable class out of `commonMain`** —
+  constructor parameter is the pin that keeps an otherwise-portable class out of `commonMain`** --
   *a file whose parameter names a concrete platform holder cannot be read from `commonMain` however
-  portable its own body is*. `AiInsightsRepository` named four collaborators and all but one were
-  already `:backend` `commonMain`; the single `Context`-and-`SharedPreferences` holder was the whole
-  reason it sat in `androidMain`. **A class whose companion constructs it from a `Context` is a
-  composition root wearing a class's clothes, and that is one landing, not two** — the class moves,
-  the `companion object { fun create(context) }` becomes a top-level `androidMain` function, and a
-  two-member interface goes between them. Two corollaries: **a composition root's own comment can
-  assert the very placement the landing is about to change** (`AppGraph.kt` carried "`AiInsightsRepository`
-  stays in androidMain", which the landing made false — correct it in the same commit rather than
-  leave it contradicting the diff), and **a value crossing as itself is worth checking for a round
-  trip**: `AppGraph` held a BCP-47 tag, rebuilt a `Locale` from it, and the repository called
-  `toLanguageTag()` on the result — two conversions carrying no information between them.
-  **And the split is an *extraction*, not a move, and a `private` class is what forces it.**
-  `CalendarScreen.kt` took the same shape: the view model held a value and its `companion object`
-  held `factory(context: Context)`. The factory became a sibling `androidMain` file — **and the
-  class had to be widened from `private` to `internal` to make that possible, because a `private`
-  member cannot be named by anything outside its own file, including the factory that exists to
-  construct it.** So the factory is a new top-level function, and *the cheapest pins to discharge
-  are the ones that die with their sole consumer:* a `Context` read only to reach the factory
-  disappears without a slot of its own, and a `remember` that existed only for it goes too.
+  portable its own body is*. **A class whose companion constructs it from a `Context` is a
+  composition root wearing a class's clothes, and that is one landing, not two** -- the class moves,
+  the `companion object { fun create(context) }` becomes a top-level `androidMain` function, and an
+  interface goes between them. Two corollaries: **a composition root's own comment can assert the very
+  placement the landing is about to change** -- correct it in the same commit rather than leave it
+  contradicting the diff -- and **a value crossing as itself is worth checking for a round trip**.
+  **And the split is an *extraction*, not a move, and a `private` class is what forces it** -- it
+  must be widened to `internal`, because a `private` member cannot be named by anything outside its
+  own file, including the factory that exists to construct it. *The cheapest pins to discharge are the
+  ones that die with their sole consumer:* a `Context` read only to reach the factory disappears
+  without a slot of its own, and a `remember` that existed only for it goes too.
   **A pin that vanishes when the thing that read it moves is not visible as a pin at all while both
   halves sit in the same file.**
 - **No-default slots for anything a call site must not forget.** A defaulted capability lets a call
