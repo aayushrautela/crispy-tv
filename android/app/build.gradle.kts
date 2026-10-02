@@ -292,6 +292,16 @@ kotlin {
             // OkHttp implementation stays in `:watchhistory`'s `androidMain`;
             // this dependency is the interface, not the socket.
             implementation(project(":android:watchhistory"))
+            // `CrispyHttpClient`, the transport interface `RemoteIntroSkipService`
+            // takes, is in `:network`'s `commonMain` -- the OkHttp socket
+            // (`OkHttpCrispyHttpClient`) and `AppHttp` are in its `androidMain`,
+            // and `:app`'s own `androidMain` still sees those through the Android
+            // variant. Declared here rather than in `androidMain` because the
+            // consumer is a `commonMain` source set: with the line below the
+            // androidMain one, `IntroSkipService.kt` resolved neither `network` on
+            // its import line nor `CrispyHttpClient`, which is the same
+            // member-level failure `:platform-core` recorded and it moves the same way.
+            implementation(project(":android:network"))
             // Coil, for `CrispyImage.kt` and the card composables that render
             // through it. `coil-compose` and `coil-core` both publish
             // android, jvm, iosArm64, iosSimulatorArm64, macosArm64, js and
@@ -445,7 +455,6 @@ kotlin {
             implementation(project(":android:home"))
             implementation(project(":android:player"))
             implementation(project(":android:native-engine"))
-            implementation(project(":android:network"))
             implementation(project(":android:watchhistory"))
             implementation(project(":android:platform-android"))
             implementation(project(":android:backend"))

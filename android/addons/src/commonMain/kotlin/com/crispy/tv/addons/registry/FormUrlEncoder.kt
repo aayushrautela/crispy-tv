@@ -57,7 +57,7 @@ package com.crispy.tv.addons.registry
  * The empty string encodes to itself, which is what the old call did and what a
  * `[0x20]`-style early return would get wrong for no reason.
  */
-internal fun formUrlEncodeComponent(value: String): String {
+fun formUrlEncodeComponent(value: String): String {
     if (value.isEmpty()) return value
     val out = StringBuilder(value.length)
     for (byte in value.encodeToByteArray()) {

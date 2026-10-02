@@ -56,13 +56,13 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **110 of 191 `:app` files moved** |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **129 of 195 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 129) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
 
-**Where `:app` stands, and the honest shape of the remainder.** The 80 files still in
-its `androidMain` are **not** 80 independent jobs. A reverse audit — forbidden imports
+**Where `:app` stands, and the honest shape of the remainder.** The 66 files still in
+its `androidMain` are **not** 66 independent jobs. A reverse audit — forbidden imports
 first, then subtracting every type declared in every module's `commonMain` — leaves
 **10 candidates and resolves 0 of them**. Every one is pinned by a measured wall:
 `androidx.navigation` (the 9-file nav layer — **the coordinate swap landed and the
@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **128** | **68** | **49** |
+| **`:app`** | **129** | **66** | **50** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,16 +152,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **128** | **68** |
-| **total** | **234** | **81** |
+| **`:app`** | **129** | **66** |
+| **total** | **235** | **79** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 128 of 197, i.e. **65%**, and
-the 68 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 129 of 195, i.e. **66%**, and
+the 66 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -180,8 +180,9 @@ which is the whole argument for not quoting a ratio.** It was `106 of 186`, beca
 through two landings in which real files moved, went to `118 of 195` = **61%** on a single
 16-line file with the whole denominator unchanged, held at `120 of 195` = **62%** across two
 more landings, reached `122 of 195` = **63%** after a 247-line file moved, and is
-`123 of 196` = **63%** after a 321-line file moved -- **and this is the first landing in
-seven whose denominator changed at all.** It was 195 for six, and the seventh moved it
+`123 of 196` = **63%** after a 321-line file moved, and is `129 of 195` = **66%** now that
+the intro-skip landing moved two more out of `androidMain` -- **and the 321-line move was
+the first landing in seven whose denominator changed at all.** It was 195 for six, and the seventh moved it
 because `CalendarScreenFactory.kt` was *added* to `androidMain` while `CalendarScreen.kt`
 left it: **a landing that both moves a file and extracts a factory is net-zero on the
 source set the extraction lands in**, so `:app` is 123/73 rather than the 123/72 that
@@ -200,7 +201,7 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 68 that remain: **not one of them is movable, and that is measured rather than argued**
+### The 66 that remain: **not one of them is movable, and that is measured rather than argued**
 
 **This section has carried a taxonomy, then a census, then a wrong census, and now a
 measured negative, and the reason the third was wrong is still the most useful thing in
@@ -208,16 +209,16 @@ it.** Every earlier version classified files by **artifact family** — and the 
 file belongs to is not a fact about the file, which is exactly the error the `paging`
 row recorded when it admitted that "a bucket measured by which artifacts a family
 imports is also a claim about which file in the family imports them". The current version
-classifies each of `:app`'s **68** `androidMain` files **individually, by its own import
+classifies each of `:app`'s **66** `androidMain` files **individually, by its own import
 set** — comment lines stripped, first matching rule wins — under **four gates**: every
-tracked file is classified (`68 == 68`); the buckets sum; **at least one bucket is
+tracked file is classified (`66 == 66`); the buckets sum; **at least one bucket is
 non-empty** (the all-zeros-under-a-`True`-checksum failure below); and **every empty bucket
 is on an allowlist carrying the landing that removed its wall**.
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **44** | `android.jar` proper — see the import-set breakdown below | no — it is the platform |
-| **12** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** — `CatalogScreen`, `DetailsRoute`, `AppDistribution`, `IntroSkipButtonOverlay`, `PersonDetailsRoute`, `PlayerSessionDecisions`, `PlayerTrackSheet`, `AppRoot`, `AppNavHost`, `DiscoverNavGraph`, `HomeNavGraph`, `SettingsNavGraph` | no — **the other half of the same-package trap**: a sibling in the same *module* is as reachable-without-import as one in the same package. **A first-match partition can only report a file's _first_ pin, so this row is a floor and not a description**: `PlayerSessionDecisions.kt` imports **only** `com.crispy.tv.nativeengine.playback.{NativePlaybackEngine, NativePlaybackEnginePreference, NativePlaybackError, NativePlaybackSnapshot, NativePlaybackState}` at `:3-7` — no `android.*`, no `java.*` — so it is *also* a `:native-engine` file and has **two** pins; `PlayerTrackSheet.kt` imports only `androidx.compose.*` (plus `androidx.annotation.DrawableRes`), so its one pin is invisible from the label and this row is the only place it is recorded. `PersonDetailsRoute.kt` is in this row **and** in the `java.*` bucket, for the same reason |
+| **43** | `android.jar` proper — see the import-set breakdown below | no — it is the platform |
+| **11** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** — `CatalogScreen`, `DetailsRoute`, `AppDistribution`, `PersonDetailsRoute`, `PlayerSessionDecisions`, `PlayerTrackSheet`, `AppRoot`, `AppNavHost`, `DiscoverNavGraph`, `HomeNavGraph`, `SettingsNavGraph` | no — **the other half of the same-package trap**: a sibling in the same *module* is as reachable-without-import as one in the same package. **A first-match partition can only report a file's _first_ pin, so this row is a floor and not a description**: `PlayerSessionDecisions.kt` imports **only** `com.crispy.tv.nativeengine.playback.{NativePlaybackEngine, NativePlaybackEnginePreference, NativePlaybackError, NativePlaybackSnapshot, NativePlaybackState}` at `:3-7` — no `android.*`, no `java.*` — so it is *also* a `:native-engine` file and has **two** pins; `PlayerTrackSheet.kt` imports only `androidx.compose.*` (plus `androidx.annotation.DrawableRes`), so its one pin is invisible from the label and this row is the only place it is recorded. `PersonDetailsRoute.kt` is in this row **and** in the `java.*` bucket, for the same reason |
 | **6** | `android.view` interop — `YouTubeExtraVideoDialog`, `PlayerGestureController`, `PlayerOverlay`, `PlayerRoute`, `PlayerSessionViewModel`, `PlayerNavGraph` | no — Android `View`s embedded in Compose, which `android.jar` is the source of |
 | **4** | an `R` reference — `DetailsHero`, `DetailsRatingBadgeLogo`, `ReviewProviderBadge`, `PlayerOverlayControls` | no, and **already correct**: the pure half is in `commonMain` behind a no-default composable slot |
 | **1** | `:native-engine`'s types — `PlayerSessionSupport.kt` | no — a plain `com.android.library` publishes no JVM variant, so this is **structurally unreachable at any version** |
@@ -226,11 +227,11 @@ is on an allowlist carrying the landing that removed its wall**.
 | **0** | `default-import JVM call` — `synchronized(lock)`, `System.currentTimeMillis()` | **empty because both are gone** (`b43ea7ee`) |
 | **0** | **no hard pin at all** | **the point of the whole section, and the answer is zero** |
 
-**44 + 12 + 6 + 4 + 1 + 1 = 68, nothing unmatched.**
+**43 + 11 + 6 + 4 + 1 + 1 = 66, nothing unmatched.**
 
-#### The 44's import sets, because "it imports `android.jar`" is not a finding
+#### The 43's import sets, because "it imports `android.jar`" is not a finding
 
-Grouped by the file's **entire** import set rather than by family: **25 import nothing but
+Grouped by the file's **entire** import set rather than by family: **17 import nothing but
 `android.content.Context`** and nothing else at all; **3** are `Context` + `java.util.Locale`
 (`DetailsViewModelFactory`, `PersonDetailsViewModelFactory`, `SearchViewModelFactory`); and
 the rest are singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,
@@ -238,18 +239,18 @@ the rest are singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,
 `Context` + `Uri` + `Locale`, `Context` + `java.io.File`, `Context` + `Looper`,
 `Context` + `audio focus`, `Context` + `AtomicBoolean`, `Context` + `DateFormat`/
 `YearMonth`/`DateTimeFormatter`/`Locale`, `Context` + `URLEncoder`/`StandardCharsets`,
-`android.util.Log` + `URLEncoder`/`StandardCharsets`/`TimeUnit` (`IntroSkipService`),
 `java.time.LocalDate`/`DateTimeFormatter`/`Locale` (`PersonDetailsRoute`) — plus the
 **player cluster** (`PlayerHost`, `PlayerMediaSessionManager`, `PlayerPipController`,
 `PictureInPictureConfig`) and the **media3/`:native-engine` cluster**
 (`PlaybackSessionControllerPlayer`, `PlaybackDependencies`, `DistributionComponents`,
 `ProfileDataCloudSync`).
 
-**The 25 are the finding, and they are not work.** `fun create(context: Context)` **is** a
+**The 17 are the finding, and they are not work.** `fun create(context: Context)` **is** a
 composition root, and a `Context` used for wiring belongs in the factory — so
 **`AppGraph`, the eleven service providers and the ViewModel factories are not files
 waiting to move; they are the edge.** A count that lumps them in with `android.jar` reads
-as 44 blocked files and is really **1 blocked file and 25 correct ones.**
+as 43 blocked files and is really **17 correct ones and 26 files that reach the platform
+for something other than wiring.**
 
 #### Two buckets are empty, and each is a landing rather than an absence
 
@@ -258,7 +259,7 @@ claim about a _rule_ before it is a claim about the set.** The first version of 
 collected sibling declarations from **other modules only**, and so reported
 **`compose-local only: 10`** — offering precisely the ten files that three earlier landings
 had already recorded as blocked by a **same-module** `androidMain` declaration reachable
-with no import. Adding `:app`'s own `androidMain` to that rule moved 10 of the 12 and
+with no import. Adding `:app`'s own `androidMain` to that rule moved 10 of the 11 and
 dropped the bucket to **0**. **Two rules that look identical in the output answer different
 questions, so a zero has to be attributed to a specific rule before it is explained** — and
 the near-miss explanation ("`:addons` finished") was true of the *other-module* rule and

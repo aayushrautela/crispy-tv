@@ -103,7 +103,13 @@ fun IntroSkipButtonOverlay(
     }
 }
 
-private fun skipLabelFor(segmentType: IntroSkipSegmentType): String {
+/**
+ * The label each [IntroSkipSegmentType] renders. `internal` rather than `private`
+ * because `private` is a property of the file, not of the package, so a `commonTest`
+ * could not name this function even now that both it and
+ * [IntroSkipSegmentType] are in `commonMain`.
+ */
+internal fun skipLabelFor(segmentType: IntroSkipSegmentType): String {
     return when (segmentType) {
         IntroSkipSegmentType.INTRO,
         IntroSkipSegmentType.OP,

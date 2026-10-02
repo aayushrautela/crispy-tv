@@ -1,11 +1,6 @@
 package com.crispy.tv.introskip
 
-import android.util.Log
-import com.crispy.tv.network.CrispyHttpClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import com.crispy.tv.addons.registry.formUrlEncodeComponent
 import com.crispy.tv.library.optBooleanOrNull
 import com.crispy.tv.library.optDoubleOrNull
 import com.crispy.tv.library.optIntOrNull
@@ -13,12 +8,15 @@ import com.crispy.tv.library.optJsonArray
 import com.crispy.tv.library.optJsonObject
 import com.crispy.tv.library.optStringOrEmpty
 import com.crispy.tv.library.optStringOrNull
+import com.crispy.tv.network.CrispyHttpClient
+import com.crispy.tv.platform.AppLogger
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 
 private const val TAG = "IntroSkipService"
 private const val DEFAULT_INTRO_DB_BASE_URL = "https://api.introdb.app"
@@ -29,6 +27,7 @@ private const val INTRODB_TIMEOUT_MS = 5_000
 private const val ANISKIP_TIMEOUT_MS = 5_000
 private const val MAL_LOOKUP_TIMEOUT_MS = 5_000
 private const val MIN_INTERVAL_MS = 500L
+private const val DEFAULT_CACHE_TTL_MS = 600_000L
 
 data class IntroSkipRequest(
     val imdbId: String? = null,
@@ -89,8 +88,11 @@ interface IntroSkipService {
 
 class RemoteIntroSkipService(
     private val httpClient: CrispyHttpClient,
+    private val logger: AppLogger,
+    private val nowMs: () -> Long,
+    private val ioDispatcher: CoroutineDispatcher,
     introDbBaseUrl: String = DEFAULT_INTRO_DB_BASE_URL,
-    private val cacheTtlMs: Long = TimeUnit.MINUTES.toMillis(10)
+    private val cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS
 ) : IntroSkipService {
     private val introDbBaseUrl = introDbBaseUrl.trim().ifBlank { DEFAULT_INTRO_DB_BASE_URL }.trimEnd('/')
     private val cacheMutex = Mutex()
@@ -98,7 +100,7 @@ class RemoteIntroSkipService(
 
     override suspend fun getSkipIntervals(request: IntroSkipRequest): List<IntroSkipInterval> {
         val normalized = request.normalize() ?: return emptyList()
-        val nowMs = System.currentTimeMillis()
+        val nowMs = nowMs()
 
         val cached = cacheMutex.withLock {
             val entry = cache[normalized.cacheKey] ?: return@withLock null
@@ -114,11 +116,11 @@ class RemoteIntroSkipService(
         }
 
         val fetched =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 runCatching {
                     fetchIntervals(normalized)
                 }.onFailure { error ->
-                    Log.w(TAG, "Failed to fetch intro skip intervals", error)
+                    logger.warn(TAG, "Failed to fetch intro skip intervals", error)
                 }.getOrDefault(emptyList())
             }
                 .sortedBy { it.startTimeMs }
@@ -175,7 +177,7 @@ class RemoteIntroSkipService(
             return emptyList()
         }
         if (response.statusCode !in 200..299) {
-            Log.w(TAG, "IntroDB returned HTTP ${response.statusCode}")
+            logger.warn(TAG, "IntroDB returned HTTP ${response.statusCode}")
             return emptyList()
         }
 
@@ -221,7 +223,7 @@ class RemoteIntroSkipService(
             return emptyList()
         }
         if (response.statusCode !in 200..299) {
-            Log.w(TAG, "AniSkip returned HTTP ${response.statusCode}")
+            logger.warn(TAG, "AniSkip returned HTTP ${response.statusCode}")
             return emptyList()
         }
 
@@ -322,7 +324,7 @@ class RemoteIntroSkipService(
                 )
             HttpResponse(statusCode = response.code, body = response.body)
         }.onFailure { error ->
-            Log.w(TAG, "HTTP request failed for $url", error)
+            logger.warn(TAG, "HTTP request failed for $url", error)
         }.getOrNull()
     }
 
@@ -333,9 +335,9 @@ class RemoteIntroSkipService(
 
         return runCatching {
             // `SerializationException` where this raised `JSONException`; the
-        // caller's `runCatching` absorbs either, and `:app` names neither --
-        // the census measured zero `JSONException` occurrences.
-        Json.parseToJsonElement(rawBody).jsonObject
+            // caller's `runCatching` absorbs either, and `:app` names neither --
+            // the census measured zero `JSONException` occurrences.
+            Json.parseToJsonElement(rawBody).jsonObject
         }.getOrNull()
     }
 
@@ -423,11 +425,7 @@ private fun buildUrl(base: String, query: Map<String, String>): String {
 
     val encodedQuery =
         query.entries.joinToString(separator = "&") { entry ->
-            val encodedValue =
-                URLEncoder.encode(
-                    entry.value,
-                    StandardCharsets.UTF_8.toString()
-                )
+            val encodedValue = formUrlEncodeComponent(entry.value)
             "${entry.key}=$encodedValue"
         }
     return "$base?$encodedQuery"

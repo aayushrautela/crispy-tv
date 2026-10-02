@@ -8,6 +8,7 @@ import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.platform.AppConfig
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.platform.android.AndroidMonotonicClock
 import com.crispy.tv.platform.android.AndroidTimeSource
@@ -181,6 +182,9 @@ object PlaybackDependencies {
         val appContext = context.applicationContext
         RemoteIntroSkipService(
             httpClient = AppHttp.client(appContext),
+            logger = AndroidAppLogger(appContext),
+            nowMs = { System.currentTimeMillis() },
+            ioDispatcher = Dispatchers.IO,
             introDbBaseUrl = AppConfig.INTRODB_API_URL,
         )
     }
