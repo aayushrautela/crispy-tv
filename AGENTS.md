@@ -424,9 +424,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   per-file scan was asking: _not one of them is movable_** — `44 android.jar / 12 same-module
   declaration / 6 android.view interop / 4 R / 1 plain-library type / 1 java.*`, with three further
   buckets at exactly **zero**, which is the finding and not a gap. And **a census answer of "one pin"
-  is a claim about the file that was scanned, not about the set the file belongs to**: an earlier
-  four-of-70 scan offered four unpinned files, and all four are now either moved or shown to be
-  correctly placed.
+  is a claim about the file that was scanned, not about the set the file belongs to.**
   Two consequences of the 68 are worth more than any landing they stopped. **25 of the 44 import
   nothing but `android.content.Context`**, and `fun create(context: Context)` *is* a composition root
   with the wiring `Context` belonging in the factory — so **a bucket that lumps a wiring `Context`
@@ -445,8 +443,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   identical in the output. **So the gate must assert every bucket is non-empty before it asserts they
   sum, and every empty bucket must be allowlisted with the landing that emptied it** — otherwise the
   sum passes over a `Counter` that never incremented, which is the `True`-checksum disaster wearing a
-  different hat. Three separate failures produced one wrong census and **all three manufactured
-  candidates rather than losing them. So a bucket name that asserts a negative is a claim the
+  different hat. **A bucket name that asserts a negative is a claim the
   measurement must TEST, not a label it may print; in a first-match partition the rules
   after the first are never evaluated for the files the first one caught, so a sole-pin bucket cannot
   be produced that way at all; and when a tally produces a bucket that looks like a finding, write
