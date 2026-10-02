@@ -933,9 +933,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   key set before the values**: comparing keys first reports a new role as "the list changed"
   rather than as a confusing value diff. Always **name the role in the failure message** — 32
   roles in a loop with a shared message identifies nothing.
-- **A `Color(0xFF141414)` literal is ARGB, not RGB.** A first pass parsed byte 0 as red and
-  reported 27 of 37 palette roles non-neutral, which is why the "obvious" answer is worth
-  checking against the type. Once measured correctly: 37 roles, **5** non-neutral
+- **A `Color(0xFF141414)` literal is ARGB, not RGB.** Measured: 37 roles, **5** non-neutral
   (`spinner`, `error`, `errorContainer`, `onErrorContainer`, `inverseSurface`), 32 neutral —
   and **two of the five are not R > G > B**: `error` (`0xFFE8455C`) and `errorContainer`
   (`0xFFB03040`) are pink-red with blue above green, so a blanket "is it warm?" assertion
