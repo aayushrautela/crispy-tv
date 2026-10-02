@@ -18,7 +18,8 @@ class ProfileDataCloudSync(
     private val playbackSettings: PlaybackSettingsRepository,
     private val activeProfileStore: ActiveProfileStore =
         ActiveProfileStore(SharedPreferencesKeyValueStore(context, "supabase_sync_lab")),
-    private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
+    private val shadowStore: ProfileDataShadowStore =
+        ProfileDataShadowStore(SharedPreferencesKeyValueStore(context, "profile_data_shadow")),
 ) {
     suspend fun pullForActiveProfile(): Result<Unit> {
         val session =

@@ -56,12 +56,12 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **136 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 136) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **137 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 137) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
 
-**Where `:app` stands, and the honest shape of the remainder.** The 61 files still in
+**Where `:app` stands, and the honest shape of the remainder.** The 60 files still in
 its `androidMain` are **not** 61 independent jobs, and the partition that says
 which is which is **measured by `scripts/verify_kmp_port.py`** rather than
 maintained here by hand -- the hand-maintained version of this very table had
@@ -118,7 +118,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **136** | **61** | **54** |
+| **`:app`** | **137** | **60** | **55** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -171,16 +171,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **136** | **61** |
-| **total** | **246** | **74** |
+| **`:app`** | **137** | **60** |
+| **total** | **247** | **73** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 136 of 197, i.e. **69%**, and
-the 61 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 137 of 197, i.e. **70%**, and
+the 60 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -273,7 +273,7 @@ one**, and a gate that emits plausible wrong lines gets switched off.
 
 What the script *can* decide without guessing is counted, and the buckets are a
 **lower bound**. The invariants it enforces are that every tracked file is
-classified (`61 == 61`), that the buckets sum, that every empty bucket is either
+classified (`60 == 60`), that the buckets sum, that every empty bucket is either
 allowlisted with the landing that emptied it or recorded as never having
 matched, and that the plan's own stated count still agrees with the tree:
 
@@ -288,7 +288,7 @@ matched, and that the plan's own stated count still agrees with the tree:
 | **2** | `androidx.paging.compose` | the artifact is KMP; `paging-runtime` is not, and is the pin where it appears |
 | **1** | `androidx.core` | the artifact is KMP; the pin is `ContextCompat` |
 
-**38 + 6 + 6 + 4 + 2 + 2 + 2 + 1 = 61, nothing unmatched.** Every file carries at
+**37 + 6 + 6 + 4 + 2 + 2 + 2 + 1 = 60, nothing unmatched.** Every file carries at
 least one pin, so the residual bucket is **zero**; it emptied when the
 `R.<lowercase>` rule began matching `R.raw.*`, which is what the two
 provider-badge files use.
