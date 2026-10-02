@@ -125,7 +125,7 @@ okhttp = "5.5.0"
 # --- Image loading ---
 coil = "3.5.0"
 
-# --- Filesystem (transitive through `coil-core`; only the test fake is declared) ---
+# --- Filesystem (`coil-core` brings it to `:app`; see the note by `okio-core`) ---
 okio = "3.17.0"
 
 # --- Coroutines ---
@@ -225,11 +225,22 @@ coil-singleton = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coi
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 coil-svg = { group = "io.coil-kt.coil3", name = "coil-svg", version.ref = "coil" }
 
-# `okio` itself is NOT declared as a library: it reaches `commonMain` through
-# `coil-core`, and declaring a second version of something already on the
-# classpath is how a module ends up compiled against one and run with another.
-# This is the test-only half, which the production artifact does not carry, and
-# its version is pinned to the one `okio` resolves to rather than chosen here.
+# `okio`'s **version** is pinned here rather than chosen per module, because a
+# `FileSystem` subclass compiled against one version and run with another is an
+# abstract-method error at best. Two accessors, for two different reasons:
+#
+# - `okio-core` is the production artifact, and it is declared **only** where a
+#   module cannot reach it transitively. `:app` never declares it: `coil-core`
+#   resolves `okio:3.17.0` onto its `commonMain` classpath, so declaring a second
+#   copy of something already there is how a module ends up compiled against one
+#   and run with another. `:addons` does declare it, for
+#   `MetadataAddonRegistry.installationId` -- that module has no `coil3`, so
+#   **"it arrives transitively" is a fact about one module and not about the
+#   library.** `libs.okio.core` rather than `libs.okio` because `okio` is already
+#   a group accessor here, and a version catalog cannot have both.
+# - `okio-fakefilesystem` is the test-only half, which the production artifact
+#   does not carry.
+okio-core = { module = "com.squareup.okio:okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }

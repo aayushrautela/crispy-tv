@@ -42,7 +42,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.plugins.repo.PluginRepoClient
 import com.crispy.tv.plugins.repo.PluginRepoInfo
@@ -63,6 +62,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 @Immutable
 internal data class PluginsSettingsUiState(
@@ -193,7 +193,7 @@ internal class PluginsSettingsViewModel(
                             repoClient = PluginRepoClient(appContext, AppHttp.okHttp(appContext)),
                             cloudSync = SupabaseServicesProvider.createHouseholdAddonsCloudSync(
                                 appContext,
-                                MetadataAddonRegistry(appContext),
+                                metadataAddonRegistry(appContext),
                             ),
                         ) as T
                     }

@@ -86,7 +86,9 @@ DECL = re.compile(
 
 # `typealias` produces no class file, and `expect` is a declaration without a body
 # on the common target, so neither may be counted as an expected class.
-TYPEALIAS = re.compile(r"^typealias\s+")
+# `actual typealias` is a typealias too, and the `actual ` prefix is what made
+# this line fall through every branch below and hide a facade that exists.
+TYPEALIAS = re.compile(r"^(?:actual\s+)?typealias\s+")
 EXPECT = re.compile(r"^expect\s+(class|interface|object)\s+")
 
 # A top-level function or property makes the file emit a `<FileName>Kt` facade.
@@ -178,6 +180,16 @@ def declared_types(path: Path) -> tuple[set[str], bool]:
             facade_name = m.group(1)
             continue
         if TYPEALIAS.match(line):
+            # A top-level `typealias` DOES emit a `<FileName>Kt` facade even though
+            # it declares no type: `actual typealias JvmSynchronized = ...` produced
+            # a `JvmSynchronized...Kt` class, and skipping typealiases here reported
+            # it as a stale output -- which is indistinguishable, to a reader, from
+            # the breakage this gate exists to catch. **A gate that fires on correct
+            # code gets switched off.** An `expect annotation class` is still
+            # skipped by the `EXPECT` branch below, which is measured rather than
+            # assumed: `JvmSynchronized.kt` declares one and emitted no facade on the
+            # Android target, because nothing actualizes it there.
+            has_facade = True
             continue
         if EXPECT.match(line):
             continue

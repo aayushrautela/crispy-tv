@@ -33,12 +33,13 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 class RemoteMetadataLabDataSource(
     context: Context,
     private val httpClient: CrispyHttpClient,
 ) : MetadataLabDataSource {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext)
+    private val addonRegistry = metadataAddonRegistry(context.applicationContext)
     private val addonClient = AddonMetadataClient(addonRegistry, httpClient)
 
     override suspend fun load(

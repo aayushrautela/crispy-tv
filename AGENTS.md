@@ -780,6 +780,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **`apple.yml` on a macOS runner is the only gate that can see this class of error, so a dispatched
   run has to be *read*: 204 means accepted, not green, and dispatching and forgetting it is what let
   three consecutive red runs sit unread.**
+  **The same error arrives through a symbol that was never an import, and the two halves of one file
+  can need different packages.** `MetadataAddonRegistry` used `@Volatile` and `@Synchronized` with
+  **no import at all** — they resolved from the JVM's default import of `kotlin.jvm.*`, which a
+  `commonMain` file does not get, so a scan cannot see either. Their replacements do **not** come
+  from the same place: `@Volatile` is `kotlin.concurrent.Volatile` and works, while
+  **`kotlin.concurrent.Synchronized` does not resolve at all** in Kotlin 2.4.10
+  (`Unresolved reference 'Synchronized'`) and **`kotlin.jvm.Synchronized` resolves on the JVM and is
+  rejected as an `error` by `compileKotlinLinuxX64`**. The answer the compiler itself prints is
+  *"introduce your own optional-expectation annotation and actualize it with a typealias"* — which is
+  `JvmSynchronized`, an `@OptionalExpectation` annotation typealiased on Android. **So the newer name
+  is the one that does not exist and the older name is the one that is forbidden**, and *the
+  migration a symbol's name suggests was not available*. Note which gate saw each: `compileKotlinDesktop`
+  and `compileAndroidMain` were **green** on the rejected import, and `compileKotlinLinuxX64` -- a target
+  **`:app` does not have** because it is a Compose module -- is what refused it. A `Mutex` was the
+  portable alternative and was rejected on its merits rather than on a preference: `withLock`
+  suspends, so it would have made all five public methods `suspend` and reached every caller.
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
   interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
   member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can
@@ -1065,6 +1081,18 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   recall as 7 when the answer is **8**, because `initialize`'s string differs from `syncNow`'s by one
   inserted word, which is precisely the copy-paste pair the suite exists to catch. *A count is a
   claim about the code; read the strings before asserting how many there are.*
+  **The defaulted-expected-value shape is the same defect wearing a default argument, and it fails
+  *en masse* rather than one case at a time.** `ManifestUriTest` has a `row(raw, host, baseUrl,
+  pathSegments = emptyList(), encodedQuery = null)` helper over a 26-row measured table, and the
+  default asserted that **every** row's path is empty. Thirteen cases failed together with
+  `expected:<[]> but was:<[manifest.json]>`, and only the four rows written out disagreed with the
+  default. **A defaulted expected value is a fixture that agrees with every case it was not given
+  to**, so the fix is no default at all: every row states it, and a row added later cannot inherit a
+  wrong one. Read together with the counting shape above, the pattern is that **a value the author
+  filled in from memory is a value about the code rather than about the case** — `7` when the answer
+  was `8`, `emptyList()` when the answer was `["manifest.json"]`, and `Example.COM` when the answer was
+  `example.com` because the id lowercases the hint. **Three defaults, three wrong, and in each case
+  the fixture was the defect and the production code was right.**
   **And a list built eagerly is already cumulative by the time a loop reads it** — the
   dispatcher-slot test built all nine results first, so the counter a `RecordingDispatcher` was
   holding had already reached 8 when the loop inspected its first member, and the failure
@@ -1370,6 +1398,20 @@ GitHub Actions (`.github/workflows/`), all `workflow_dispatch`-only by deliberat
 - **Workflow YAML must parse with no duplicate keys** (`scripts/validate_workflows.py`, run first in `check-local.sh` and as the first step of every workflow). A duplicate key makes a workflow fail to *load*, which produces a run that fails in under a second with an empty log. The symptom reads as "the tests failed" when no test ever ran, and nothing inside the workflow can report it, because it never started. This happened: two `run:` lines under one step in `android.yml` and `android-release.yml` produced two instant-failure runs and no test output. `yaml.safe_load` takes the last value for a repeated key and reports nothing, so the validator loads through a constructor that raises on the second occurrence, at any depth.
 - **A class file in the output can outlive the declaration that produced it, and the cause is not established.** During the extraction of the 52 backend response types, `CrispyBackendClient$ResponsiveImageSet.class` sat in `build/classes/kotlin` with a timestamp seven hours older than the change that removed the nested type, and a `clean` followed by a normal build left it visible for a while. A stale class binds a reference that should have failed to compile, so a later green build certifies nothing and **every other gate in this repository becomes unreliable**. That risk is real even though the mechanism is unexplained. **The two obvious explanations were tested and are both false**, so do not repeat them as if they were established: (1) removing a nested declaration from a file and recompiling incrementally deletes its class correctly, and (2) `git mv`-ing a file between source sets with mtime preserved did not cause Gradle to skip it — the task reran and produced the class. `scripts/verify_kmp_outputs.py` therefore exists as a *detector* rather than a fix: it asserts no compiled class has no source declaration, and it is proven by injecting both a top-level orphan and a nested one. It runs at the end of `check-local.sh` and in `android.yml`; it reads `build/classes/kotlin`, so it must run *after* the compile tasks. A CI runner is always clean, which is why the check belongs to the local gate. If you ever see this fire on an artefact you did not inject, that is the observation that explains it — capture it rather than reaching for a mechanism.
 - **The detector has to know how Kotlin names a file facade when the file name contains a dot.** It infers `<FileName>Kt` from the source stem, and the compose-resources plugin names its generated accessors `Drawable0.commonMain.kt`, whose facade is `Drawable0_commonMainKt`. Using the stem verbatim reported all 111 migrated resources as orphans — indistinguishable from the stale-output breakage the gate exists to catch, on a tree that was entirely clean. **A safety gate that fires on correct code gets switched off, so keep its notion of "correct" in step with the code generators it reads.** Re-prove it after any change by injecting all three orphan shapes: a top-level class, a nested class whose owner does not name it, and a facade whose name contains a dot.
+  **A second shape fired on the very next landing, and it is a hole in the *rule* rather than in the
+  naming: the dot handling above was already correct, and the file that broke it had no dot in it.**
+  `actual typealias JvmSynchronized = kotlin.jvm.Synchronized` in `JvmSynchronizedAndroid.kt` emitted
+  `JvmSynchronizedAndroidKt`, and the gate reported that class as a stale output on a tree where
+  nothing was stale. Two independent reasons, either of which alone is enough: **`TYPEALIAS` matched
+  `^typealias` and not `^actual typealias`**, so the line fell through *every* branch — not
+  `TYPEALIAS`, not `EXPECT`, not `DECL`, not `TOP_LEVEL_MEMBER` — and `has_facade` stayed false; and
+  **the rule itself was wrong**, because a top-level `typealias` declares no type and no property and
+  *still* emits a facade. **`expect annotation class` was measured and deliberately still skipped** —
+  `JvmSynchronized.kt` declares one and emitted no facade on Android, because nothing actualizes it
+  there — so the two look alike in the source and answer differently on the classpath, which is
+  exactly the kind of pair a reader will collapse. *An `actual typealias` is the shape to check
+  whenever an expect/actual pair lands, because it is the one declaration whose facade exists on one
+  target and not on another.*
 - **Never rewrite source with a regex.** A regex applied to source files cannot see inside comments or string literals, so it silently corrupts or deletes code. This cost a full revert during the backend extraction: a "sound" cleanup rule matched any `com.crispy.tv.backend.X` import, self-matched on the import's own package, and deleted 140 live imports; a separate heuristic matched `User` inside the string `"User-Agent"` and added eight phantom imports. Neither failed loudly — the compiler did, which is the only reason the damage was caught. For a mechanical change, either let the compiler find the affected sites and fix them by hand, or parse properly (see the lexer in `scripts/verify_kmp_outputs.py` for what "properly" means: a character scanner, not a substitution chain). A regex is fine for *matching* a single line you then read; it is not fine for *rewriting*.
 - Names are platform + intent, not Gradle build type. Do not reintroduce `debug`/`release` into workflow names; "debug CI" and "debug build" are different things.
 - `verify_apk_distribution.py` reads the **dex** and is only valid on unminified builds, so it runs in `android.yml` (debug) and not in `android-release.yml`. Release asserts via `verifyDistributionExclusions`, which reads the dependency graph and is minification-proof.

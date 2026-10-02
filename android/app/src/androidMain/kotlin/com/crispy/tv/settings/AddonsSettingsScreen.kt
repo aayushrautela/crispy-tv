@@ -86,6 +86,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 @Immutable
 internal data class InstalledAddonUi(
@@ -427,7 +428,7 @@ internal class AddonsSettingsViewModel(
                     if (modelClass.isAssignableFrom(AddonsSettingsViewModel::class.java)) {
                         val httpClient = AppHttp.client(appContext)
                         val addonRegistry =
-                            MetadataAddonRegistry(context = appContext)
+                            metadataAddonRegistry(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return AddonsSettingsViewModel(
                             addonRegistry = addonRegistry,

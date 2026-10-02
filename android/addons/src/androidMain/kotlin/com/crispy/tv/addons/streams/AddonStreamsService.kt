@@ -3,7 +3,6 @@ package com.crispy.tv.addons.streams
 import android.content.Context
 import android.util.Log
 import com.crispy.tv.addons.registry.AddonManifestSeed
-import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabMediaType
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +31,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import java.util.Locale
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 private const val TAG = "CrispyAddonSubs"
 
@@ -54,7 +54,7 @@ class AddonStreamsService(
     context: Context,
     private val httpClient: CrispyHttpClient,
 ) {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext)
+    private val addonRegistry = metadataAddonRegistry(context.applicationContext)
     private val manifestFetchSemaphore = Semaphore(6)
     private val endpointsCacheLock = Any()
 

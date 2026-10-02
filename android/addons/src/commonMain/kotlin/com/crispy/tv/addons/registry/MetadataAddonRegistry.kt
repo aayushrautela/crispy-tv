@@ -1,12 +1,11 @@
 package com.crispy.tv.addons.registry
 
-import android.content.Context
-import android.net.Uri
-import kotlinx.serialization.json.Json
 import com.crispy.tv.addons.optJsonArray
 import com.crispy.tv.addons.optLongOrNull
 import com.crispy.tv.addons.optStringOrEmpty
 import com.crispy.tv.addons.stringAtOrEmpty
+import com.crispy.tv.platform.KeyValueStore
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,8 +14,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import java.security.MessageDigest
-import java.nio.charset.StandardCharsets
+import kotlin.concurrent.Volatile
+import okio.ByteString.Companion.encodeUtf8
 
 data class AddonManifestSeed(
     val installationId: String,
@@ -33,13 +32,61 @@ data class CloudAddonRow(
     val sortOrder: Int
 )
 
-class MetadataAddonRegistry(context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
+/**
+ * The installed-addon registry: which manifest URLs are installed, in what order,
+ * their cached manifest JSON, and which addons the user removed.
+ *
+ * ## The four pins this file was moved out of `androidMain` for
+ *
+ * It was 573 lines in `androidMain` behind four things, and **three of them were
+ * constructor or call arguments rather than walls** -- which is the shape the
+ * `:backend` ports established and the reason this file was re-audited instead of
+ * re-described:
+ *
+ * - **`Context`, for one `SharedPreferences` file.** That is `:platform-core`'s
+ *   `KeyValueStore`, already implemented on Android by
+ *   `SharedPreferencesKeyValueStore` and already used by `:app`, `:backend` and
+ *   `:watchhistory`. It arrives as a [store] slot with no default, and
+ *   `metadataAddonRegistry(context)` in `androidMain` is the only place the
+ *   platform type is named.
+ * - **`System.currentTimeMillis()`, twice, at `:81` and `:222`.** It needs no
+ *   import, so no token scan can see it, and it is the pin that survives a
+ *   mechanical read of the import list. It is [nowMs], with no default, exactly
+ *   as `:backend`'s `AccountSessionStore` took one.
+ * - **`@Volatile` and `@Synchronized`, seven sites**, which resolved from the JVM's
+ *   default import of `kotlin.jvm.*` -- a default import a `commonMain` file does
+ *   not get. **The two replacements do not come from the same place and only the
+ *   compiler knows that**: `@Volatile` is `kotlin.concurrent.Volatile` and works,
+ *   while the newer `kotlin.concurrent.Synchronized` does not resolve at all
+ *   (`Unresolved reference 'Synchronized'`) and `kotlin.jvm.Synchronized` is
+ *   rejected as an *error* by `compileKotlinLinuxX64`. So the answer is
+ *   `@JvmSynchronized`, an `@OptionalExpectation` annotation typealiased to
+ *   `kotlin.jvm.Synchronized` on Android -- see its KDoc for what that does and
+ *   does not guarantee on the other targets. **This is the `Dispatchers.IO` rule
+ *   arriving through a different symbol: a green JVM build proves nothing here,
+ *   and `compileKotlinLinuxX64` is the gate that saw it.**
+ * - **`android.net.Uri`.** The one real wall: no URL parser exists in any
+ *   `commonMain` in this repository, and `core-domain`'s `normalizeAddonUrl` is a
+ *   stricter *rule*, not a parser. [ManifestUri] is the replacement, written
+ *   against `UriBehaviourHostTest`'s 26-row table -- which is also why that
+ *   measurement ran first. See [ManifestUri] for the three findings.
+ *
+ * `MessageDigest("SHA-1")` and `StandardCharsets.UTF_8` went at the same time as
+ * `Uri`, and they were the one place where *merely equivalent* was not good
+ * enough: [installationId] is half of every persisted addon identity, so a digest
+ * that merely computed the same function would re-identify every installed addon
+ * on every device. Its ten goldens in `MetadataAddonRegistryTest` were produced by
+ * running the old `MessageDigest` code on the JVM and are compared against okio's
+ * `sha1()`.
+ */
+class MetadataAddonRegistry(
+    private val store: KeyValueStore,
+    private val nowMs: () -> Long,
+) {
     @Volatile
     private var cachedState: RegistryState? = null
 
-    @Synchronized
+    @JvmSynchronized
     fun orderedSeeds(): List<AddonManifestSeed> {
         val state = ensureState()
         return state.addonOrder.mapNotNull { installationId ->
@@ -47,7 +94,7 @@ class MetadataAddonRegistry(context: Context) {
         }
     }
 
-    @Synchronized
+    @JvmSynchronized
     fun exportCloudAddons(): List<CloudAddonRow> {
         val state = ensureState()
         return state.addonOrder.mapIndexedNotNull { index, installationId ->
@@ -59,7 +106,7 @@ class MetadataAddonRegistry(context: Context) {
         }
     }
 
-    @Synchronized
+    @JvmSynchronized
     fun reconcileCloudAddons(rows: List<CloudAddonRow>): Int {
         if (rows.isEmpty()) {
             return 0
@@ -79,7 +126,7 @@ class MetadataAddonRegistry(context: Context) {
         }
 
         val state = ensureState()
-        val now = System.currentTimeMillis()
+        val now = nowMs()
         val installed = linkedMapOf<String, PersistedAddon>()
         val orderedInstallations = mutableListOf<String>()
         var includesOpenSubtitles = false
@@ -136,7 +183,7 @@ class MetadataAddonRegistry(context: Context) {
         return orderedInstallations.size
     }
 
-    @Synchronized
+    @JvmSynchronized
     fun cacheManifest(seed: AddonManifestSeed, manifest: JsonObject) {
         val state = ensureState()
         val existing = state.installedAddons[seed.installationId] ?: return
@@ -154,7 +201,7 @@ class MetadataAddonRegistry(context: Context) {
         persistState(state.copy(installedAddons = installed))
     }
 
-    @Synchronized
+    @JvmSynchronized
     fun markAddonRemoved(addonId: String) {
         if (addonId.isBlank()) {
             return
@@ -190,7 +237,7 @@ class MetadataAddonRegistry(context: Context) {
         )
     }
 
-    @Synchronized
+    @JvmSynchronized
     private fun ensureState(): RegistryState {
         val existing = cachedState ?: readStateFromPrefs()
         val next = normalizeState(existing)
@@ -219,7 +266,7 @@ class MetadataAddonRegistry(context: Context) {
         }
 
         val desiredSeeds = buildDesiredSeeds(userRemovedAddonIds)
-        val now = System.currentTimeMillis()
+        val now = nowMs()
         desiredSeeds.forEach { desired ->
             val existing = installed[desired.installationId]
             if (existing == null) {
@@ -317,14 +364,17 @@ class MetadataAddonRegistry(context: Context) {
                 else -> "https://$input"
             }
 
-        val parsedUri = Uri.parse(normalizedInput)
-        val uri = when (parsedUri.scheme?.lowercase()) {
-            null, "", "stremio" -> parsedUri.buildUpon().scheme("https").build()
-            else -> parsedUri
-        }
+        // `ManifestUri.parse` needs a scheme and a non-blank host, and every branch
+        // of the normalization above guarantees the scheme: `stremio://` is
+        // rewritten, a `URI_SCHEME_REGEX` match keeps its own, everything else is
+        // prefixed. **That guarantee is why the old `buildUpon().scheme("https")`
+        // arm for a null/blank/`stremio` scheme is deleted rather than ported** --
+        // it was unreachable, and carrying it over would be porting dead code.
+        // `UriBehaviourHostTest` measured all 26 shapes to establish that.
+        val uri = ManifestUri.parse(normalizedInput) ?: return null
 
-        val host = uri.host?.takeIf { it.isNotBlank() } ?: return null
-        val pathSegments = uri.pathSegments.filter { it.isNotBlank() }
+        val host = uri.host
+        val pathSegments = uri.pathSegments
         val basePath =
             if (pathSegments.lastOrNull().equals("manifest.json", ignoreCase = true)) {
                 pathSegments.dropLast(1)
@@ -332,16 +382,7 @@ class MetadataAddonRegistry(context: Context) {
                 pathSegments
             }
 
-        val baseUrl =
-            Uri.Builder()
-                .scheme(uri.scheme ?: "https")
-                .encodedAuthority(uri.encodedAuthority)
-                .apply {
-                    basePath.forEach { segment -> appendPath(segment) }
-                }
-                .build()
-                .toString()
-                .trimEnd('/')
+        val baseUrl = uri.baseUrlFor(basePath)
 
         val addonIdHint =
             addonIdHintOverride
@@ -365,21 +406,26 @@ class MetadataAddonRegistry(context: Context) {
     }
 
     private fun installationId(addonIdHint: String, manifestUrl: String): String {
-        val digest = MessageDigest.getInstance("SHA-1")
-            .digest(manifestUrl.lowercase().toByteArray(StandardCharsets.UTF_8))
-        val hash = digest.take(6).joinToString(separator = "") { byte -> "%02x".format(byte) }
+        // `MessageDigest("SHA-1")` over `StandardCharsets.UTF_8`, then the first
+        // **six bytes** rendered as lower-case hex by `"%02x".format(byte)`.
+        // okio's `ByteString.hex()` is already lower-case, so the first 12
+        // characters of the full 40 are those twelve digits -- *measured*, not
+        // assumed: see the ten goldens in `MetadataAddonRegistryTest`, which were
+        // produced by running the code this replaces. A digest that merely
+        // computed the same function would still re-identify every installed addon.
+        val hash = manifestUrl.lowercase().encodeUtf8().sha1().hex().take(SHA1_HASH_CHARS)
         val normalizedHint = addonIdHint.lowercase().replace(NON_ID_CHARS_REGEX, "-").trim('-')
             .ifEmpty { "addon" }
         return "$normalizedHint:$hash"
     }
 
     private fun persistState(state: RegistryState) {
-        prefs.edit().putString(KEY_STATE, state.toJson().toString()).apply()
+        store.putString(KEY_STATE, state.toJson().toString())
         cachedState = state
     }
 
     private fun readStateFromPrefs(): RegistryState {
-        val raw = prefs.getString(KEY_STATE, null) ?: return RegistryState.empty()
+        val raw = store.getString(KEY_STATE, null) ?: return RegistryState.empty()
         return runCatching {
             // `Json.parseToJsonElement` raises `SerializationException` where
             // `JSONObject(String)` raised `JSONException`; the surrounding
@@ -391,8 +437,19 @@ class MetadataAddonRegistry(context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "metadata_addon_registry"
+        /**
+         * The `SharedPreferences` file's name on Android, and the [KeyValueStore]
+         * name everywhere else. It is a name and not an Android type on purpose:
+         * the `SharedPreferences` *file* it names is created by
+         * `metadataAddonRegistry(context)` in `androidMain`, and that constant is
+         * the only thing the two halves have to agree on.
+         */
+        const val STORE_NAME = "metadata_addon_registry"
+
         private const val KEY_STATE = "state_json"
+
+        /** Six bytes of SHA-1, rendered as hex. */
+        private const val SHA1_HASH_CHARS = 12
 
         private const val DEFAULT_CINEMETA_ADDON_ID = "com.linvo.cinemeta"
         private const val DEFAULT_OPENSUBTITLES_ADDON_ID = "org.stremio.opensubtitlesv3"

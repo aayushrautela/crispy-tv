@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import android.content.Context
 import com.crispy.tv.addons.registry.AddonManifestSeed
-import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.addons.lookup.parseLookupId
 import java.net.URLEncoder
@@ -21,12 +20,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 internal class CalendarMetaEpisodeService(
     context: Context,
     private val httpClient: CrispyHttpClient,
 ) {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext)
+    private val addonRegistry = metadataAddonRegistry(context.applicationContext)
 
     suspend fun getUpcomingEpisodes(
         seriesId: String,

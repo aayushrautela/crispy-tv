@@ -31,7 +31,10 @@ plugins {
  * | `CachingStreamResolver` | `androidMain` | OkHttp, and `AddonStreamsService` is a final class built from a `Context` and an `okhttp3` client. It is also the class the port's KDoc points at — the port is the half that could travel, the cache is the half that cannot. Its `System.currentTimeMillis()` calls are a second, independent reason it could not move on its own merits |
  * | `BackendEpisodeListProvider` | `commonMain` | moved once both of its parameters became `BackendApi` / `AccountApi` ports. It had no Android type of its own |
  * | `RemoteSupabaseSyncLabService` | `commonMain` | was listed here for "`Context` and `org.json`", and **neither was ever true**: it named no `org.json` type, and the `Context` was a parameter the class did not read, under a `@Suppress("UNUSED_PARAMETER")` that said so on the class itself. A parameter nobody consults is not a dependency, so deleting it -- rather than slotting it -- is what moved the file. `Dispatchers.IO` became an `ioDispatcher` with no default, and it is the second member of the interface that does *not* enter it (`syncNow`), which `commonTest` pins |
-     * | `MetadataAddonRegistry`, `RemoteMetadataLabDataSource` | `androidMain` | `Context`, and for the registry `android.net.Uri` plus a SHA-1 of an addon id. The `Uri` half is the wall: no URL parser exists in any `commonMain`, and `core-domain`'s `normalizeAddonUrl` is a much stricter rule, not a substitute |
+     * | `MetadataAddonRegistry` | `commonMain` | moved once its four pins were measured rather than described. `Context` -> `KeyValueStore` (`:platform-core`'s existing port; `metadataAddonRegistry(context)` in `androidMain` is the only place `SharedPreferences` is named), `System.currentTimeMillis()` -> a `nowMs` slot with no default -- **it needs no import, so no token scan can see it**, and it is the pin that survives a mechanical read of the import list -- `MessageDigest("SHA-1")` + `StandardCharsets` -> `ByteString.encodeUtf8().sha1()`, and `android.net.Uri` -> the `ManifestUri` below. Its `installationId` is **half of every persisted addon identity**, so merely-equivalent was not good enough and the ten goldens in `MetadataAddonRegistryTest` were produced by running the `MessageDigest` code on a JVM and printing it |
+     * | `ManifestUri` | `commonMain` | new. The only URL parser in the repository, and it exists because there had to be one: no `commonMain` had any, and `core-domain`'s `normalizeAddonUrl` is a stricter *rule*, not a parser. Written against `UriBehaviourHostTest`'s 26-row table -- **`Uri.toString()` is the identity on every shape, so it carries the normalized string through and has no re-renderer**, which removes the whole class of bug where a port rebuilds a subtly different string from the same components |
+     * | `JvmSynchronized` | `commonMain` + `androidMain` | `@OptionalExpectation`, typealiased to `kotlin.jvm.Synchronized` on Android. `kotlin.concurrent.Synchronized` **does not resolve at all** in Kotlin 2.4.10 and `kotlin.jvm.Synchronized` is rejected as an *error* by `compileKotlinLinuxX64`; this is the `Dispatchers.IO` rule through a different symbol |
+     * | `RemoteMetadataLabDataSource` | `androidMain` | `Context`, `URLEncoder`, `StandardCharsets`. Three of `:addons`' four remaining `androidMain` files |
  */
 kotlin {
     jvmToolchain(21)
@@ -80,6 +83,22 @@ kotlin {
             // `androidMain`. `normalizedCatalogMediaType` alone blocked 8 `:app` files.
             implementation(project(":android:backend"))
 
+            // For `MetadataAddonRegistry`'s `KeyValueStore`. `api` because the type
+            // appears in the class's own public constructor: a consumer that holds a
+            // `MetadataAddonRegistry` has to be able to see what it was built from,
+            // and `:platform-core` is a plain KMP module that publishes a JVM variant
+            // so `commonMain` *can* see it -- which is the whole difference between
+            // this and `:platform-android` one block down.
+            api(project(":android:platform-core"))
+
+            // For `MetadataAddonRegistry.installationId`: `MessageDigest("SHA-1")`
+            // plus `StandardCharsets.UTF_8` is now `ByteString.encodeUtf8().sha1()`.
+            // **okio reaches `:app` through `coil3` with no dependency line of its
+            // own, and `:addons` has no coil3** -- so this module states it
+            // explicitly. `sha1()` and `.hex()` are what make the twelve hex digits
+            // of `installationId` reproducible rather than merely equivalent.
+            implementation(libs.okio.core)
+
             // For `JsonAccessors.kt`, which was declared in `androidMain` for
             // exactly as long as its three consumers were -- and no longer is.
             // **A file's dependency belongs in the source set the file is in, not
@@ -103,7 +122,7 @@ kotlin {
             implementation(libs.coroutines.test)
         }
 
-        // `UriProbeHostTest` measures `android.net.Uri`, which is a class of the
+        // `UriBehaviourHostTest` measures `android.net.Uri`, which is a class of the
         // Android platform rather than a dependency of this project -- so it cannot
         // go in `commonTest`, which compiles for `linuxX64` and both Apple
         // targets. It needs Robolectric for `android-all`, and **that jar is the
@@ -124,6 +143,13 @@ kotlin {
 
             implementation(project(":android:network"))
             implementation(project(":android:backend"))
+
+            // `:platform-android` is a plain `com.android.library`, so it publishes
+            // no JVM variant and `commonMain` cannot see it -- which is why
+            // `MetadataAddonRegistry` takes `:platform-core`'s `KeyValueStore` and
+            // `metadataAddonRegistry(context)` builds the `SharedPreferences`
+            // implementation here. `:app` has the same split for the same reason.
+            implementation(project(":android:platform-android"))
 
             implementation(libs.coroutines.android)
         }
