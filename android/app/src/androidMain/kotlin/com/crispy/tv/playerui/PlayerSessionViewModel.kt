@@ -29,6 +29,9 @@ import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
+import com.crispy.tv.introskip.IntroSkipInterval
+import com.crispy.tv.introskip.IntroSkipService
+import com.crispy.tv.introskip.toIntroSkipRequestOrNull
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.catalog.CatalogItem
@@ -58,6 +61,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +117,20 @@ data class PlayerUiState(
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,
     val addonSubtitlesError: String? = null,
+    /**
+     * The intro/outro segments the viewer can skip, empty until the intro-skip
+     * service answers for the active episode.
+     */
+    val introSkipIntervals: List<IntroSkipInterval> = emptyList(),
+    /**
+     * The `skipIntroEnabled` setting as the last fetch actually read it.
+     *
+     * Carried rather than read from the repository by the overlay because the
+     * overlay is a pure function of this state, and because the two are written
+     * in the same `_uiState.update` as the intervals themselves -- so the flag on
+     * screen cannot describe a different decision from the one the fetch made.
+     */
+    val skipIntroEnabled: Boolean = false,
 )
 
 class PlayerSessionViewModel(
@@ -159,6 +177,13 @@ class PlayerSessionViewModel(
             logger = AndroidAppLogger(this.appContext),
             scope = viewModelScope,
         )
+    private val introSkipService: IntroSkipService =
+        PlaybackDependencies.introSkipServiceFactory(this.appContext)
+    /**
+     * The in-flight intro-skip lookup, kept so a new episode can cancel the one
+     * it replaces. `null` whenever nothing is in flight.
+     */
+    private var introSkipJob: Job? = null
     private val selectorCoordinator =
         SelectorCoordinator(
             scope = viewModelScope,
@@ -622,6 +647,9 @@ class PlayerSessionViewModel(
         }
         selectorCoordinator.dismiss()
         requestPlayback(engine = uiState.value.activeEngine)
+        // `activeIdentity` rather than a parameter: this path does not receive one
+        // and does not set one, and it is the identity the viewer arrived with.
+        refreshIntroSkipIntervals(activeIdentity)
     }
 
     fun showStreams() {
@@ -968,6 +996,75 @@ class PlayerSessionViewModel(
 
         selectorCoordinator.dismiss()
         requestPlayback(engine = uiState.value.activeEngine)
+        refreshIntroSkipIntervals(identity)
+    }
+
+    /**
+     * Ask the intro-skip service about [identity] and publish what it answers.
+     *
+     * Called from both places playback (re)starts for an episode --
+     * [switchPlayback] and [playResolvedStream] -- and **that it is two call sites
+     * rather than one is the measured finding here.** `requestPlayback` looks
+     * like the single funnel and is not: an engine switch and a retry both call
+     * it too, and a re-lookup on either would spend requests for an episode whose
+     * segments are already in hand. Meanwhile `playResolvedStream` -- the
+     * `autoSelectStream` path, which is the *default* -- never sets
+     * `activeIdentity` at all, so a hook placed only in `switchPlayback` would
+     * have worked from the second episode onwards and silently not at all on the
+     * first play of the common case.
+     *
+     * It is called where it is because that is where the previous episode's
+     * segments have to be dropped: an interval list belonging to the episode just
+     * left would put a "Skip Intro" button on screen at the end of a different
+     * episode.
+     *
+     * Two guards, and they are not the same guard. The **cancellation** is a
+     * cost decision: a viewer who skips an episode is usually skipping it because
+     * they do not want it, so letting three ten-second timeouts run to completion
+     * spends requests whose answer will never be read. The **identity check** is a
+     * correctness one, and it is still needed with cancellation in place, because
+     * a response that has already been handed back cannot be un-delivered.
+     *
+     * On `viewModelScope`, and picking between the two scopes this view model
+     * already has is the whole decision here. `backgroundScope` exists for
+     * exactly one collaborator -- the progress reporter -- and the comment on it
+     * says why it is not cancelled in `onCleared`: "bounded reporting jobs must
+     * finish flushing after clearing". A watch-progress flush *wants* to outlive
+     * its view model, because dropping a half-written position on the way out is
+     * the one outcome the user cannot recover from. This lookup wants the
+     * opposite. It is speculative, it exists only to populate on-screen state,
+     * and if the view model is gone then the state it was writing is gone too --
+     * so there is no answer worth waiting for. The `SubtitleRepository` property
+     * 20 lines above records the same finding, in the other direction, after
+     * that repository was caught building its own uncancellable scope for
+     * lookups of exactly this shape. Two lookups for more data, one answer each,
+     * and the scopes had to differ.
+     */
+    private fun refreshIntroSkipIntervals(identity: PlaybackIdentity?) {
+        introSkipJob?.cancel()
+        introSkipJob = null
+
+        val enabled = playbackSettingsRepository.settings.value.skipIntroEnabled
+        val request = identity?.toIntroSkipRequestOrNull()
+
+        // One update, so the flag the overlay renders and the flag this fetch
+        // honoured cannot disagree: both are the same `enabled`.
+        _uiState.update {
+            it.copy(skipIntroEnabled = enabled, introSkipIntervals = emptyList())
+        }
+
+        if (!enabled || request == null) {
+            return
+        }
+
+        val forIdentity = identity
+        introSkipJob = viewModelScope.launch {
+            val intervals = introSkipService.getSkipIntervals(request)
+            if (activeIdentity != forIdentity) {
+                return@launch
+            }
+            _uiState.update { it.copy(introSkipIntervals = intervals) }
+        }
     }
 
     private fun onPlaybackMetrics(snapshot: NativePlaybackSnapshot) {

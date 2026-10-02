@@ -9,6 +9,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+// A direction-aware extension, not a member of `PaddingValues` the way
+// `calculateLeftPadding` is -- which is why the calls further down this file
+// resolve without it and this one does not.
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -41,6 +45,7 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.domain.player.TapSeekChain
 import com.crispy.tv.domain.player.TapSeekEvent
+import com.crispy.tv.introskip.IntroSkipButtonOverlay
 import com.crispy.tv.streams.StreamSelectorSheet
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_pause_filled
@@ -191,6 +196,27 @@ internal fun PlayerOverlay(
             state = seekRipple,
             contentPadding = tightBottomPadding,
             modifier = Modifier.fillMaxSize(),
+        )
+
+        // Outside the controls' AnimatedVisibility on purpose. This button has its
+        // own 15-second window inside the overlay, and the transport controls
+        // auto-hide after 4 -- so nesting it inside would make the button
+        // disappear exactly when the viewer is watching the intro they want to
+        // skip. It also reuses the existing `onSeekTo`: skipping to the end of an
+        // intro is the same seek a scrub bar drag performs, so a second seek
+        // parameter would be a second spelling of one operation.
+        IntroSkipButtonOverlay(
+            enabled = uiState.skipIntroEnabled,
+            currentPositionMs = positionMsState.value,
+            intervals = uiState.introSkipIntervals,
+            onSkipRequested = onSeekTo,
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(
+                        top = overlayPadding.calculateTopPadding(),
+                        end = overlayPadding.calculateEndPadding(layoutDirection),
+                    ),
         )
 
         AnimatedVisibility(

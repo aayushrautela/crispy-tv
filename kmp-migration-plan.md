@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **129 of 195 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 129) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **131 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 131) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **129** | **66** | **50** |
+| **`:app`** | **131** | **66** | **51** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,15 +152,15 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **129** | **66** |
-| **total** | **235** | **79** |
+| **`:app`** | **131** | **66** |
+| **total** | **237** | **79** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 129 of 195, i.e. **66%**, and
+than by anything structural. `:app` is 131 of 197, i.e. **66%**, and
 the 66 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
@@ -179,11 +179,21 @@ which is the whole argument for not quoting a ratio.** It was `106 of 186`, beca
 `110 of 193` and round-tripped through the *same* 57%, sat at `117 of 195` = **60%**
 through two landings in which real files moved, went to `118 of 195` = **61%** on a single
 16-line file with the whole denominator unchanged, held at `120 of 195` = **62%** across two
-more landings, reached `122 of 195` = **63%** after a 247-line file moved, and is
-`123 of 196` = **63%** after a 321-line file moved, and is `129 of 195` = **66%** now that
-the intro-skip landing moved two more out of `androidMain` -- **and the 321-line move was
-the first landing in seven whose denominator changed at all.** It was 195 for six, and the seventh moved it
-because `CalendarScreenFactory.kt` was *added* to `androidMain` while `CalendarScreen.kt`
+more landings, reached `122 of 195` = **63%** after a 247-line file moved, and reached
+`123 of 196` = **63%** after a 321-line file moved, reached `130 of 196` = **66%** when the
+intro-skip landing moved two more out of `androidMain` -- and **that figure is the second half
+of a mistake recorded here deliberately**, because the previous version of this sentence said
+`129 of 195` and was wrong in both halves at once: the landing moved *two* files, so 128 became
+130, and it only moved them, so the denominator stayed at 196 exactly. **A count computed from
+the moved file instead of measured is wrong even when the move is the one being described, and
+a landing that moves a file is net-zero on the sum that is the denominator.** It is
+`131 of 197` = **66%** now that the landing which *wired* intro skip up *added* a mapper to
+`commonMain` -- **a numerator change that did not move the percentage by a single point**, which
+is the "or by adding a file" case in the next sentence happening again one landing later.
+**The 321-line move was the first landing in seven whose denominator changed at all.** It was
+195 for six, the seventh moved it to 196, and this one moved it again to 197, for the same
+reason it did the first time, which is that a landing can move a file and *add* one and the
+second fact is about a different set than the first: `CalendarScreenFactory.kt` was *added* to `androidMain` while `CalendarScreen.kt`
 left it: **a landing that both moves a file and extracts a factory is net-zero on the
 source set the extraction lands in**, so `:app` is 123/73 rather than the 123/72 that
 predicting from the moved file alone gives. And **the percentage did not move when the
