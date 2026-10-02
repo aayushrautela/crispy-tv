@@ -435,12 +435,10 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   description, and a two-pin file needs a second look the output cannot give it.**
   **And the gate caught that census's own hole, which is the part to keep.** Its `sibling
   declaration` rule first collected from *other modules only*, so it reported **10 files with no pin**
-  — precisely the ten three earlier landings had recorded as held by a **same-module** `androidMain`
-  declaration reachable with no import. Adding `:app`'s own `androidMain` dropped the bucket to zero.
+  — the ten held by a **same-module** declaration. Adding `:app`'s own `androidMain` dropped it to zero.
   **A zero bucket is the most informative thing a first-match partition produces, and it is a claim
-  about a _rule_ before it is a claim about the set** — the near-miss explanation ("`:addons`
-  finished") was true of the *other-module* rule and irrelevant to the hole, and the two rules look
-  identical in the output. **So the gate must assert every bucket is non-empty before it asserts they
+  about a _rule_ before it is a claim about the set** — the near-miss explanation fit the other rule
+  rather than the hole, and the two rules look identical in the output. **So the gate must assert every bucket is non-empty before it asserts they
   sum, and every empty bucket must be allowlisted with the landing that emptied it** — otherwise the
   sum passes over a `Counter` that never incremented, which is the `True`-checksum disaster wearing a
   different hat. **A bucket name that asserts a negative is a claim the
