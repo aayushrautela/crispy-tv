@@ -578,18 +578,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   share is twice as likely to be believed and no more likely to be right.** The general form: **an
   omission nobody mentioned reads as a decision nobody made.**
   **And a count PREDICTED from the change is a count that has to include the change's own second
-  half.** `CalendarScreen.kt` moved `androidMain` → `commonMain` and the landing predicted 123/72 —
-  **but it also created `CalendarScreenFactory.kt` in `androidMain`, so `androidMain` is
-  net-zero and the measured answer is 123/73.** A landing that both moves a file and extracts a
-  factory does not reduce the source set it extracted into. **A "move" and a "create" are two
-  facts about two different sets, and quoting only the first is the same class of error as
-  quoting a count off the working tree instead of out of `HEAD`** — one number was measured and
-  one was extrapolated, and they are formatted identically.
-  **A checksum that prints `True` is a claim, not a check** — and a bash associative array whose
+  half.** A landing that both moves a file and extracts a factory does not reduce the source set
+  it extracted into -- a "move" and a "create" are two facts about two different sets, and quoting
+  only the first is the same class of error as quoting a count off the working tree instead of out
+  of `HEAD`.
+  **A checksum that prints `True` is a claim, not a check** -- and a bash associative array whose
   keys contain spaces breaks in a way that satisfies the check exactly when the counting is most
   broken: `printf '%s\n' "${!bucket[@]}" | sort` word-splits every key, so the *reporting* loop
-  iterates words while the *counting* loop is untouched, and `sum(counts.values())` over a
-  `Counter` that never incremented is `0` — which compares equal to the total you expected, and
+  iterates words while the counting loop is untouched, and `sum(counts.values())` over a
+  `Counter` that never incremented is `0` -- which compares equal to the total you expected, and
   prints `True` above six rows of zeros. **Do a partition tally in a language with a real dict,
   and make the check assert that the buckets are non-empty before it asserts they sum.**
 - **A target declaration is a claim, and a target no CI job builds cannot fail — so it asserts nothing
