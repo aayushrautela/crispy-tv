@@ -637,8 +637,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   on a macOS runner is the only gate that can see this class of error, so a dispatched run has to be
   *read*: 204 means accepted, not green.**
   **The same error arrives through symbols that were never imports.** `@Volatile` and `@Synchronized`
-  resolved from the JVM's default import of `kotlin.jvm.*`, which a `commonMain` file does not get. Their replacements do **not** come from the same place:
-  `@Volatile` is `kotlin.concurrent.Volatile` and works, while **`kotlin.concurrent.Synchronized` does
+  resolved from the JVM's default import of `kotlin.jvm.*`, which a `commonMain` file does not get. `@Volatile` is `kotlin.concurrent.Volatile` and works, while **`kotlin.concurrent.Synchronized` does
   not resolve at all** in Kotlin 2.4.10 and **`kotlin.jvm.Synchronized` resolves on the JVM and is
   rejected as an `error` by `compileKotlinLinuxX64`**. The compiler's own answer is *"introduce your
   own optional-expectation annotation and actualize it with a typealias"* -- which is
