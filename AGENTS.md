@@ -516,9 +516,8 @@ The per-landing narrative this replaced is in the git history, where it belongs.
 - **Re-test a premise this file or a build file states as settled.** **Measure the artifact you are
   about to declare, never the family**: `LocalWindowInfo` does not exist in any resolved Compose artifact and `LocalConfiguration` is
   Android-only in `ui-android`, yet `paging-common` is KMP, `paging-runtime` really is Android-only, and
-  **`paging-compose` is KMP**. And **a KDoc sentence about one caller
-  is not a statement about the function** -- a comment explaining *why* one caller behaves unusually is
-  a comment about that caller.
+  **`paging-compose` is KMP**. And **a KDoc sentence about one caller is a comment about that
+  caller, not a statement about the function.**
   **A build file's per-file table is the same kind of premise, and it was wrong about both of the
   entries it listed for one file.** `:addons`' table said `RemoteSupabaseSyncLabService` was in
   `androidMain` for "`Context` and `org.json`" -- it named no `org.json` type, and the `Context`
@@ -529,8 +528,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **A premise about the *ecosystem* ages in one direction, so "no equivalent exists" is the version
   that rots.** Three KDocs asserted "`java.util.UUID` has no Kotlin/Native equivalent"; it is now `Uuid.random()`, **stable** in the resolved
   Kotlin 2.4.10 stdlib -- and *stable* is a measurement, not a version number: the class carries
-  `kotlin.WasExperimental` while only `generateV4` still carries `kotlin.uuid.ExperimentalUuidApi`. **One of the three claims was in `commonMain`**, so a `commonMain`
-  reader was being told a `commonMain` file could not exist. **When a KDoc names a platform capability
+  `kotlin.WasExperimental` while only `generateV4` still carries `kotlin.uuid.ExperimentalUuidApi`, one of which was in `commonMain`. **When a KDoc names a platform capability
   as the reason a file cannot move, re-run that claim against the resolved artifact before planning
   the file, and correct every copy in the same commit: a corrected premise with two surviving copies
   is worse than the original, because the next reader finds both.**
