@@ -300,16 +300,14 @@ its default for anything unreadable — so a sentinel was the *only* way to dete
 JSON), so the reader now hands back a real `MIN_VALUE` the gate reads as "no tombstone" — benign,
 because timestamps are `nowMs()`, and **two sentinels on opposite sides of one value is the shape to
 watch for when a type change removes one of them.**
-**A file's dependency belongs in the source set the file is in, not where it used to be.** Moving the
-store cost 29 errors, all member-level on the four ports, because `:platform-core` was reachable only
-through `:platform-android` in `androidMain.dependencies` — a plain `com.android.library`, which publishes
-no JVM variant, so nothing in a `commonMain` could see it. `api(project(":android:platform-core"))` moved
-down with the file. *This is the same rule recorded for `HttpClientPort`, and it is the reason a port
-declared as an `androidMain` dependency is invisible to `commonMain` even though the code compiles there.*
-Separately: **the library that ships is not the library a JVM test can stand in for** —
-`optString` of a `JSONObject.NULL` is `"null"` on AOSP and `""` on the Maven artifact, and a fractional
-number is `Double` versus `BigDecimal`, so Robolectric here is for `org.json` itself and **not** for a
-`Context`.
+**A file's dependency belongs in the source set the file is in, not where it used to be.**
+`:platform-core` was declared in `androidMain.dependencies`, reachable only through the plain
+`com.android.library` `:platform-android`, which publishes no JVM variant -- so nothing in a
+`commonMain` could see it, and the member-level errors on every port member stopped the moment
+`api(project(":android:platform-core"))` moved down with the file. *This is the same rule recorded for
+`HttpClientPort`, and it is the reason a port declared as an `androidMain` dependency is invisible to
+`commonMain` even though the code compiles there.* The other half -- that the library which ships and
+the library a JVM test can stand in for are different implementations -- is a rule of its own, in section 3.
 
 **`:backend` then paid that cost, and it took all five files plus the client, not the two that were
 first named.** `CrispyBackendJsonExtensions.kt` (13 policies) and `CrispyBackendParsers.kt` (45 parsers)
