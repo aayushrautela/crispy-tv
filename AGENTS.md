@@ -29,39 +29,19 @@ Two things worth knowing that a reader would otherwise have to rediscover:
   claim, not a measurement. **Refresh §1's counts in the same commit as any landing that
   moves files** — the plan is now tracked, so its only verified section being wrong is
   visible to every reader.
-- **A `commonMain` file is worth nothing until a non-Android target consumes it.** A
-  file count is therefore not progress on its own; ask what runs it. The `apple.yml` and
-  `:android:desktopApp` entries under *Project Layout* are where that gets answered. **Two
-  consequences that a migration plans hit in this exact order.** **A file whose receiver is
-  pinned cannot be freed by changing its arguments** — 39 of `CrispyBackendParsers.kt`'s 45
-  functions are `internal fun CrispyBackendClient.parseX(json: JSONObject)`, so the pin rides in
-  on the *extension receiver*, and a `JsonElement` parameter would have changed nothing about
+- **A `commonMain` file is worth nothing until a non-Android target consumes it** -- see the
+  `apple.yml` and `:android:desktopApp` entries under *Project Layout*, where that gets answered
+  (the sentence is not repeated here because a second copy drifts). **Two
+  consequences that arrived in this exact order.** **A file whose receiver is
+  pinned cannot be freed by changing its arguments** -- 39 of `CrispyBackendParsers.kt`'s 45
+  functions are `internal fun CrispyBackendClient.parseX(...)`, so the pin rides in
+  on the *extension receiver*, and changing a parameter type changes nothing about
   where the function lives. **And a consumer that cannot move makes its helpers worth nothing to
-  move either**: `:app`'s two JSON accessor files are pure, with zero `android` imports and one
-  consumer each, and porting them moves zero files, because the consumers are
-  `ProfileDataShadowStore` (pinned by `getSharedPreferences`) and `LibraryDiskCacheStore` (60+
-  `org.json` touchpoints plus `java.io.File` and `MessageDigest`). **Both of those pins are
-  gone — `LibraryDiskCacheStore` is `commonMain` now (okio plus `ByteString.sha256()`) — so this
-  sentence is a record of the pin, not a description of the wall, and a reader who takes it for
-  the latter goes to re-audit a wall that no longer exists.** The same is true one clause down.
-  `CrispyBackendClient` read as nearly free to port because it spoke OkHttp in only three places
-  and never touched `OkHttpClient` at all, and what pinned it was
-  `CrispyHttpResponse(val url: HttpUrl, …, val headers: Headers, …)` naming OkHttp in its own
-  **constructor** — **and that transport has since been ported too.**
-  `android/network/src/commonMain/…/CrispyHttpClient.kt` declares
-  `data class CrispyHttpResponse(val code: Int, val body: String)` and
-  `data class HttpRequest(val method, val url: String, val headers: Map<String, String>, val body: String?)`,
-  and **`git grep -l 'import okhttp3' -- '*/src/commonMain'` returns zero hits repo-wide.** So
-  **"port `CrispyBackendClient`" now has to be re-measured rather than read off this paragraph:**
-  okhttp 5.5.0's own `okhttp-5.5.0.module` publishes **8 variants — two metadata, `android`
-  (api/runtime/sources), `jvm` (api/runtime/sources) — and no Native, no JS, no linux**, so
-  `HttpUrl` is not an available answer *and* `OkHttpCrispyHttpClient` cannot move. The blocker
-  the receiver already names, 39 of `CrispyBackendParsers.kt`'s 45 functions being
-  `internal fun CrispyBackendClient.parseX(…)`, is the one thing here still worth re-counting,
-  and what it asks for is that the *receiver* become an `interface`.
-  padding a mutation driver with `expect_survive` entries** — and it is worth an order of
-  magnitude more to record the *negative result* than to spend the churn, because the finding is
-  what stops the work being re-attempted.
+  move either**: porting a pure file moves zero files while its consumer stays pinned.
+  **Both examples this paragraph used to name have since moved, so re-measure rather than
+  read them off here** -- the transport is `commonMain` now with zero `okhttp3` imports
+  repo-wide, and the one thing still worth re-counting is whether the *receiver* becomes an
+  `interface`.
 
 Also orthogonal to the goal but binding on every change: Android and Swift must stay
 aligned with `contracts/SPEC.md` (`android/core-domain` and `ios/ContractRunner`).
