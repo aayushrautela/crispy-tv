@@ -481,18 +481,17 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `BackendWatchHistoryService` owns no scope either, so injecting the caller's would just relocate it.
 - **A composite key built by string concatenation is a parser, and the parser is wrong on exactly the
   inputs the format cannot represent.** `removeAllWatchProgressForContent` assumed **the id contributes
-  exactly one part**; a provider-qualified id does not, so the removal addresses a key that does not
-  exist and leaves a tombstone blocking a legitimate write. **A separator in a composite key is a
+  exactly one part**; a provider-qualified id does not, so the removal misses and leaves a blocking
+  tombstone. **A separator in a composite key is a
   claim that the field cannot contain it, and nothing states that claim anywhere.** A format that
   cannot round-trip is a product decision to migrate or to constrain, not a bug to patch — changing
   it orphans every stored key, and here that is a user-visible resume position. Note also that
   **a key format is not visible in a signature**: expectations written from the parameter names rather
   than the format fail. **And a measured golden is the same mistake one level up, which is harder to
   see because the measurement is real.** **A correct SHA-256 of a string the function does
-  not build is still a wrong expectation**, and "I measured it" reads like evidence in a way that
-  "I wrote it out" does not. **So a golden has to be measured *through* the function** — a
+  not build is still a wrong expectation**. **So a golden has to be measured *through* the function** — a
   `commonTest` that prints, compared against the old implementation — and never from the format the
-  function is assumed to assemble. The collision pair that does collide is `("a", "b:c")` /
+  function is assumed to assemble. The pair that collides is `("a", "b:c")` /
   `("a:b", "c")` — **the separator has to be the field boundary, not a character that looks like
   one** — and a collision test with no non-collision test beside it is satisfied by a function that
   hashes only its second argument.
