@@ -15,6 +15,7 @@ import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 import com.crispy.tv.addons.sources.RemoteMetadataLabDataSource
 import com.crispy.tv.addons.sources.RemoteSupabaseSyncLabService
 import com.crispy.tv.network.AppHttp
@@ -39,8 +40,9 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
     val appContext = context.applicationContext
     return CoreDomainMetadataLabResolver(
         RemoteMetadataLabDataSource(
-            context = appContext,
+            addonRegistry = metadataAddonRegistry(appContext),
             httpClient = AppHttp.client(appContext),
+            ioDispatcher = Dispatchers.IO,
         )
     )
 }

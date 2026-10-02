@@ -1,6 +1,5 @@
 package com.crispy.tv.addons.sources
 
-import android.content.Context
 import com.crispy.tv.domain.metadata.AddonMetadataCandidate
 import com.crispy.tv.domain.metadata.MetadataRecord
 import com.crispy.tv.network.CrispyHttpClient
@@ -12,8 +11,9 @@ import com.crispy.tv.player.MetadataTransportStat
 import com.crispy.tv.addons.lookup.parseLookupId
 import com.crispy.tv.addons.registry.AddonManifestSeed
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
+import com.crispy.tv.addons.registry.formUrlEncodeComponent
 import com.crispy.tv.addons.streams.asApiPath
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import com.crispy.tv.addons.optJsonArray
 import com.crispy.tv.addons.optJsonObject
@@ -31,20 +31,45 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import com.crispy.tv.addons.registry.metadataAddonRegistry
+import kotlin.concurrent.Volatile
 
+/**
+ * The Stremio-style addon lab over HTTP: one source of transport stats, metadata and
+ * resources for every installed addon.
+ *
+ * **This file was `androidMain` for three pins, and all three were arguments rather than
+ * walls** — the same shape as every other landing in this module, and worth stating because
+ * the alternative reading is that it needed a transport rewrite:
+ *
+ * - `Context` was read **once**, in the constructor body, to build the registry
+ *   (`metadataAddonRegistry(context.applicationContext)`). It became the
+ *   `addonRegistry: MetadataAddonRegistry` slot, which is strictly *less* coupling: the class
+ *   now names the registry and not the storage behind it.
+ * - `Dispatchers.IO` was one `withContext` and became the `ioDispatcher` slot. It has no
+ *   default, because a defaulted dispatcher hides the lifetime decision from every call site
+ *   — and `Dispatchers.IO` is not even visible from `commonMain` (it is `internal` on Native).
+ * - `java.net.URLEncoder` + `StandardCharsets` was **one call site**, and it became
+ *   [formUrlEncodeComponent], which is *not* [percentEncodeSegment]: a form encoder emits `+`
+ *   for a space, treats `*` as safe and `~` as escapable, and decodes nothing. Those three
+ *   differences are the whole content of that function's KDoc table, and they were **measured
+ *   against the JVM's `URLEncoder`**, because a lookup id is `baseId:season:episode` and so
+ *   contains the `:` on every single request.
+ *
+ * The two `@Volatile` fields below resolve from the JVM's default import of `kotlin.jvm.*`,
+ * which a `commonMain` file does not get, so the explicit `kotlin.concurrent.Volatile` import
+ * is load-bearing rather than stylistic. **`compileKotlinLinuxX64` is the target that sees
+ * this**; `compileKotlinDesktop` and `compileAndroidMain` are both green either way.
+ */
 class RemoteMetadataLabDataSource(
-    context: Context,
+    private val addonRegistry: MetadataAddonRegistry,
     private val httpClient: CrispyHttpClient,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : MetadataLabDataSource {
-    private val addonRegistry = metadataAddonRegistry(context.applicationContext)
     private val addonClient = AddonMetadataClient(addonRegistry, httpClient)
 
     override suspend fun load(
         request: MetadataLabRequest
-    ): MetadataLabPayload = withContext(Dispatchers.IO) {
+    ): MetadataLabPayload = withContext(ioDispatcher) {
         val parsedLookupId = parseLookupId(request.rawId)
         val contentId = parsedLookupId.baseId
         val streamLookupId = buildLookupId(contentId, parsedLookupId.season, parsedLookupId.episode)
@@ -375,7 +400,7 @@ private class AddonMetadataClient(
         mediaType: MetadataLabMediaType,
         lookupId: String
     ): JsonObject? {
-        val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
+        val encodedId = formUrlEncodeComponent(lookupId)
         val typePath = mediaType.asApiPath()
         val url = buildString {
             append(endpoint.baseUrl.trimEnd('/'))

@@ -197,7 +197,7 @@ where that gets answered.
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
-| `:android:player`, `:network`, `:addons`, `:home`, `:backend`, `:watchhistory`, `:platform-core` | KMP | **`:backend` used to be the mirror of `:network`** — `commonMain` a pure interface layer, the whole implementation `androidMain` + OkHttp + `org.json` — **and is now 17 `commonMain` files / 3,989 lines with exactly 1 `androidMain` file**: `SecureTokenStore`, on Android Keystore, and permanently — nothing else in the module touches the platform. **The two ports that emptied it were both constructor parameters** (`AccountSessionStore`, `nowMs: () -> Long`), so **the last two files were not pinned by the node type at all**, which is why the census that found `org.json` 31 times in `SupabaseAccountClient` did not find the file's actual pins. Its `androidHostTest` is gone; all 33 of its cases run from `commonTest` |
+| `:android:player`, `:network`, `:addons`, `:home`, `:backend`, `:watchhistory`, `:platform-core` | KMP | **`:addons` is the one module with nothing left to port — 20 `commonMain` / 2 `androidMain`, and both remaining files are deliberate platform seams** (`MetadataAddonRegistryAndroid.kt` names `Context`; `JvmSynchronizedAndroid.kt` typealiases `kotlin.jvm.Synchronized`). It was six files, and the finding across all six is that **every pin was a constructor parameter**: a `Context` read once in a body, `Log`, `Dispatchers.IO`, `System.currentTimeMillis()`, `@Volatile` with no import, one `lowercase(Locale.US)` argument, and — twice — a **parameter nobody read at all**, which had to be *deleted* rather than sloted. **Not one of them needed a rewrite**, and the module's build file had listed the blockers wrongly on four of the six. | **`:backend` used to be the mirror of `:network`** — `commonMain` a pure interface layer, the whole implementation `androidMain` + OkHttp + `org.json` — **and is now 17 `commonMain` files / 3,989 lines with exactly 1 `androidMain` file**: `SecureTokenStore`, on Android Keystore, and permanently — nothing else in the module touches the platform. **The two ports that emptied it were both constructor parameters** (`AccountSessionStore`, `nowMs: () -> Long`), so **the last two files were not pinned by the node type at all**, which is why the census that found `org.json` 31 times in `SupabaseAccountClient` did not find the file's actual pins. Its `androidHostTest` is gone; all 33 of its cases run from `commonTest` |
 | `:android:platform-desktop` | `kotlin.jvm` | the desktop side of all six ports. Exists because `desktopApp` is a real caller |
 | `:android:desktopApp` | `kotlin.jvm` | the desktop entry point and the **seam proof** (plan §3) |
 | `:android:tv` | `com.android.application` | Android TV placeholder; stays on the Android source set forever |
@@ -1169,6 +1169,16 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   assertion nor the two lists. A one-line `private fun outcomes(vararg v: SeasonEpisodesOutcome):
   List<SeasonEpisodesOutcome> = v.toList()` makes the expected side explicit and reads better than
   spelling the type argument at four call sites.
+- **The round-trip half of that is a shape worth naming, because here the code was right and the
+  property was wrong.** A suite for the ported `java.net.URLEncoder` asserted
+  `percentDecode(formUrlEncodeComponent(x)) == x`, which is false for exactly one input, `"a b"`:
+  it encodes to `a+b`, and the decoder is *Uri's path* decoder, which does not read `+` as a space.
+  **The pair that must not collide is the pair the server sees, not the pair a path decode can
+  tell apart** — `formUrlEncodeComponent` is injective on the encoded string, which is what keeps
+  `tt1234567:1:5` and `tt1234567-1-5` from naming the same resource, and no local decoder can
+  check that. So the property is replaced by injectivity over a table of near-miss inputs, and
+  **a codec's own decoder is the wrong instrument for a codec's property: it is a different
+  decoder, with a different alphabet.**
 - **An assertion can describe a rule the code does not have, and the failure reads as a
   production bug.** `theCachedListIsOnlyConsultedWhenTheCurrentOneHasNoAnswer` asserted that a
   cached episode is *shadowed* by the current season's list, so it expected the current
