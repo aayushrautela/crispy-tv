@@ -1283,8 +1283,34 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   every call site. **When every error is that, the annotation is misplaced, not the calls.**
 - **Extracting a decision out of a `val` can destroy a smart cast the branch depended on.** The fix
   is a safe call that is behaviourally identical, and the compiler is right to complain.
+- **A hand-written "superset" import list is not a superset, so derive a split file's imports from
+  the original file's import set mechanically.** Cutting `HeroTrailerLayer` out of the 577-line
+  `DetailsHero.kt`, I wrote a generous import list by hand on the reasoning that an unused import is
+  only a warning while a missing one is a compile error. The first compile produced **11 errors, all
+  in the new file, all missing imports** — `DisposableEffect`, `SideEffect`, `Box`, `clipToBounds`,
+  `TrailerSource`, `size`, `Color`. The fix was mechanical and should have been the first attempt:
+  take the original file's import block, and for each import ask whether the **moved body** names its
+  simple name. That converges in one compile instead of five, and it leaves the file's imports
+  partitioned rather than duplicated.
 - **A "no forbidden token remains" guard must be scoped to code, not prose** — you will write about
   the token in the sentence that documents its removal.
+- **A guard that quotes only the FIRST matching line of its own finding will hide a real leftover.**
+  While debugging a `System.currentTimeMillis()` guard I printed just the first line containing the
+  token, concluded "it is only in a KDoc", and deleted the guard — and the token was in *both* a
+  KDoc and live code at `DetailsScreen.kt:465`, which then failed to compile. **The lesson is the
+  ElementTree one applied to a scanner: a partial read of a finding is not a finding.** Print every
+  hit with its line number before deciding which kind of occurrence it is; if two differ, the guard
+  has to be scoped so it fails on the code one.
+- **When a callee cannot move, the seam is a `@Composable` slot, and the slot's *payload* is a design
+  decision.** `HeroSection` reached the Media3 trailer surface through
+  `heroTrailerLayer: @Composable (HeroTrailerLayerArgs) -> Unit` carrying **nine** named fields. Two
+  names exist for that payload and both are defensible: reproduce the implementation's nine-parameter
+  signature on the slot, or introduce one value type. What decided it here is that the Android file
+  unpacks `args` straight back into the same nine named parameters, so the request object buys a
+  one-wide seam and changes no call — which makes it a *narrowing*, not a shape decision. This is
+  the same trade as `PlayerOverlay`'s 21 callbacks wanting a `PlayerActions` value, recorded there;
+  the difference is that a 9-parameter slot crosses a module boundary between two files, so the
+  value type stops being optional hygiene.
 - **`git mv` preserves mtime**, so Gradle's incremental Kotlin compile can skip a moved file and
   report success with no class produced. Compile a moved file once with `--rerun-tasks`.
 - **After any revert, check `git status --short` for ` D` in the index** and compile *both* source

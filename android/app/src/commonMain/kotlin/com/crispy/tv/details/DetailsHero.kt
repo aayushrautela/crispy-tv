@@ -1,8 +1,5 @@
 package com.crispy.tv.details
 
-import android.view.LayoutInflater
-import android.view.ViewGroup
-import androidx.annotation.OptIn
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -43,29 +40,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.source.MergingMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
-import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.addons.model.MediaDetails
-import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.TrailerSource
-import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.ui.components.crispyImageRequest
@@ -78,18 +60,7 @@ import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_pause_filled
 import com.crispy.tv.ui.resources.ic_play_arrow_filled
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
-
-internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
-    return details?.artworkUrl
-}
-
-internal data class HeroTrailerSource(
-    val id: String,
-    val source: TrailerSource,
-)
 
 @Composable
 internal fun HeroSection(
@@ -97,6 +68,8 @@ internal fun HeroSection(
     imageUrl: String?,
     palette: DetailsPaletteColors,
     trailer: List<HeroTrailerSource> = emptyList(),
+    screenHeightDp: Int,
+    heroTrailerLayer: @Composable (HeroTrailerLayerArgs) -> Unit,
     showTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
@@ -112,10 +85,12 @@ internal fun HeroSection(
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
-    val heroHeight = (configuration.screenHeightDp.dp * 0.40f).coerceIn(300.dp, 520.dp)
+    // Not named `heroHeight`: the top-level function has that name, and a `val`
+    // of the same name is ambiguous inside its own initialiser -- which is a
+    // different failure from the local shadowing the function at every use.
+    val heroBoxHeight = heroHeight(screenHeightDp)
 
     val hasTrailer = trailer.isNotEmpty()
     var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
@@ -125,7 +100,7 @@ internal fun HeroSection(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(heroHeight)
+            .height(heroBoxHeight)
             .then(if (isActuallyPlaying) Modifier.keepScreenOn() else Modifier)
     ) {
         val heroMaxWidth = maxWidth
@@ -187,7 +162,7 @@ internal fun HeroSection(
             val heroRequest = crispyImageRequest(
                 url = imageUrl,
                 width = heroMaxWidth,
-                height = heroHeight,
+                height = heroBoxHeight,
                 memoryCacheKey = backdropKey,
                 placeholderMemoryCacheKey = cardCacheKey,
             )
@@ -233,16 +208,18 @@ internal fun HeroSection(
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
 
         if (showTrailer && hasTrailer) {
-            HeroTrailerLayer(
-                modifier = Modifier.fillMaxSize(),
-                trailer = trailer,
-                viewportWidthPx = widthPx,
-                viewportHeightPx = heightPx.toInt(),
-                shouldPlay = shouldAttemptPlayback,
-                isMuted = isTrailerMuted,
-                onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
-                onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
-                onFocusLossPause = onFocusLossPause,
+            heroTrailerLayer(
+                HeroTrailerLayerArgs(
+                    modifier = Modifier.fillMaxSize(),
+                    trailer = trailer,
+                    viewportWidthPx = widthPx,
+                    viewportHeightPx = heightPx.toInt(),
+                    shouldPlay = shouldAttemptPlayback,
+                    isMuted = isTrailerMuted,
+                    onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
+                    onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
+                    onFocusLossPause = onFocusLossPause,
+                )
             )
         }
 
@@ -369,209 +346,36 @@ internal fun HeroSection(
     }
 }
 
-@OptIn(UnstableApi::class)
-@Composable
-private fun HeroTrailerLayer(
-    modifier: Modifier,
-    trailer: List<HeroTrailerSource>,
-    viewportWidthPx: Int,
-    viewportHeightPx: Int,
-    shouldPlay: Boolean,
-    isMuted: Boolean,
-    onFirstFrameRendered: () -> Unit,
-    onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
-    onFocusLossPause: () -> Unit,
-) {
-    val context = LocalContext.current
-    val audioFocusManager = PlaybackDependencies.getAudioFocusManager(context)
+/**
+ * The hero's height, as a pure function of the window's height in dp.
+ *
+ * It was `(configuration.screenHeightDp.dp * 0.40f).coerceIn(300.dp, 520.dp)`,
+ * written out inside the composable, and `LocalConfiguration` is absent from
+ * Compose Multiplatform's common metadata -- it lives in `ui-android`'s
+ * `AndroidCompositionLocals_androidKt` -- so no `commonMain` composable can read it.
+ *
+ * Naming it is what makes the three regimes testable rather than asserted: below
+ * the floor the floor wins, above the ceiling the ceiling wins, and in between it
+ * is a linear 40%. A single golden could only ever have pinned one of them.
+ */
+internal fun heroHeight(screenHeightDp: Int): Dp =
+    (screenHeightDp.dp * 0.40f).coerceIn(300.dp, 520.dp)
 
-    val latestOnFirstFrameRendered = rememberUpdatedState(onFirstFrameRendered)
-    val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
-    val latestShouldPlay = rememberUpdatedState(shouldPlay)
-
-    var currentIndex by remember(trailer) { mutableStateOf(0) }
-    var source by remember(trailer) { mutableStateOf<TrailerPlaybackSource?>(null) }
-    var advanceRequests by remember(trailer) { mutableStateOf(0) }
-
-    LaunchedEffect(trailer) {
-        currentIndex = 0
-        source = null
-        advanceRequests = 0
-    }
-
-    val currentEntry = trailer.getOrNull(currentIndex)
-
-    LaunchedEffect(currentEntry, shouldPlay) {
-        if (!shouldPlay) return@LaunchedEffect
-        if (source != null) return@LaunchedEffect
-        val entry = currentEntry ?: return@LaunchedEffect
-        source = when (entry.source) {
-            TrailerSource.DIRECT -> TrailerPlaybackSource(videoUrl = entry.id)
-            TrailerSource.YOUTUBE -> withContext(Dispatchers.IO) {
-                AppDistribution.current.trailerExtractor.resolve(
-                    videoId = entry.id,
-                    viewportWidthPx = viewportWidthPx,
-                    viewportHeightPx = viewportHeightPx,
-                )
-            }
-        }
-        if (source == null) advanceRequests++
-    }
-
-    LaunchedEffect(advanceRequests) {
-        if (advanceRequests <= 0) return@LaunchedEffect
-        val next = currentIndex + 1
-        if (next < trailer.size) {
-            currentIndex = next
-            source = null
-        }
-    }
-
-    val playbackSource = source ?: return
-
-    val exoPlayer = remember(playbackSource.videoUrl, playbackSource.audioUrl) {
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context))
-            .build()
-            .apply {
-                repeatMode = Player.REPEAT_MODE_ONE
-                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                volume = if (isMuted) 0f else 1f
-            }
-    }
-
-    DisposableEffect(exoPlayer) {
-        audioFocusManager.registerSource("trailer", pauseHandler = onFocusLossPause)
-        onDispose {
-            audioFocusManager.unregisterSource("trailer")
-            audioFocusManager.release("trailer")
-            runCatching { exoPlayer.release() }
-        }
-    }
-
-    var hasRenderedFirstFrame by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
-    var lastSentState by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Int?>(null) }
-
-    fun sendState(state: Int) {
-        if (lastSentState == state) return
-        lastSentState = state
-        latestOnPlaybackState.value(state, exoPlayer.currentPosition / 1000.0)
-    }
-
-    DisposableEffect(exoPlayer) {
-        var errored = false
-        val listener =
-            object : Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    hasRenderedFirstFrame = true
-                    latestOnFirstFrameRendered.value()
-                    if (latestShouldPlay.value) {
-                        sendState(1)
-                    }
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    if (!errored) {
-                        errored = true
-                        advanceRequests++
-                    }
-                }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying) {
-                        if (hasRenderedFirstFrame) {
-                            sendState(1)
-                        }
-                        return
-                    }
-
-                    when (exoPlayer.playbackState) {
-                        Player.STATE_ENDED -> sendState(0)
-                        Player.STATE_BUFFERING -> sendState(3)
-                        else -> sendState(2)
-                    }
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (exoPlayer.isPlaying) return
-                    when (playbackState) {
-                        Player.STATE_ENDED -> sendState(0)
-                        Player.STATE_BUFFERING -> sendState(3)
-                    }
-                }
-            }
-
-        exoPlayer.addListener(listener)
-        onDispose { exoPlayer.removeListener(listener) }
-    }
-
-    LaunchedEffect(exoPlayer, playbackSource.videoUrl, playbackSource.audioUrl) {
-        val mediaSourceFactory = DefaultMediaSourceFactory(context)
-        val videoSource = mediaSourceFactory.createMediaSource(MediaItem.fromUri(playbackSource.videoUrl))
-        val mediaSource =
-            playbackSource.audioUrl?.let { audioUrl ->
-                MergingMediaSource(
-                    videoSource,
-                    mediaSourceFactory.createMediaSource(MediaItem.fromUri(audioUrl))
-                )
-            } ?: videoSource
-
-        hasRenderedFirstFrame = false
-        lastSentState = null
-
-        exoPlayer.setMediaSource(mediaSource)
-        exoPlayer.prepare()
-    }
-
-    SideEffect {
-        exoPlayer.volume = if (isMuted) 0f else 1f
-    }
-
-    LaunchedEffect(exoPlayer, shouldPlay) {
-        exoPlayer.playWhenReady = shouldPlay
-        if (shouldPlay) {
-            exoPlayer.play()
-            audioFocusManager.acquire("trailer")
-        } else {
-            exoPlayer.pause()
-            audioFocusManager.release("trailer")
-        }
-    }
-
-    Box(
-        modifier = modifier.clipToBounds()
-    ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                (LayoutInflater.from(ctx).inflate(com.crispy.tv.app.R.layout.hero_trailer_player_view, null, false) as PlayerView).apply {
-                    layoutParams =
-                        ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                        )
-                    useController = false
-                    controllerAutoShow = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    isEnabled = false
-                    isClickable = false
-                    isLongClickable = false
-                    isFocusable = false
-                    isFocusableInTouchMode = false
-                    descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-                    player = exoPlayer
-                    videoSurfaceView?.apply {
-                        isClickable = false
-                        isLongClickable = false
-                        isFocusable = false
-                        isFocusableInTouchMode = false
-                    }
-                }
-            },
-            update = { view ->
-                view.player = exoPlayer
-            }
-        )
-    }
-}
+/**
+ * The nine values the Android trailer layer needs, as one value.
+ *
+ * `HeroSection` passes it to its `heroTrailerLayer` slot; the Android file
+ * unpacks it straight back into `HeroTrailerLayer`'s parameters, so the
+ * implementation's signature is unchanged and this is the only new type.
+ */
+internal class HeroTrailerLayerArgs(
+    val modifier: Modifier,
+    val trailer: List<HeroTrailerSource>,
+    val viewportWidthPx: Int,
+    val viewportHeightPx: Int,
+    val shouldPlay: Boolean,
+    val isMuted: Boolean,
+    val onFirstFrameRendered: () -> Unit,
+    val onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
+    val onFocusLossPause: () -> Unit,
+)

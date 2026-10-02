@@ -4,7 +4,6 @@
 
 package com.crispy.tv.details
 
-import android.content.Intent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -50,8 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,7 +66,6 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource
 import com.crispy.tv.details.trailer.extractYouTubeVideoId
-import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.StreamSelectorSheet
 import com.crispy.tv.ui.components.CrispyIcon
@@ -120,6 +116,99 @@ internal fun DetailsScreen(
     onTrailerMutedChanged: (Boolean) -> Unit,
     onAiInsightsClick: () -> Unit,
     onDismissAiInsights: () -> Unit,
+    /**
+     * Sharing, as the step rather than as a string. The screen composes the text
+     * ("Check out <title> on Crispy") and hands it over; it does not build an
+     * `ACTION_SEND` chooser.
+     *
+     * **It used to, twice.** The `onShare` branch of `AiInsightsStoryOverlay`
+     * hand-built `Intent.ACTION_SEND` + `Intent.createChooser` inline while the
+     * `shareText` slot two hundred lines up already called `shareOnCrispy`. The
+     * hand-built one omitted `FLAG_ACTIVITY_NEW_TASK`, which
+     * `LocaleDateFormatters.shareOnCrispy` documents as required because
+     * `LocalContext.current` is not necessarily the application context -- so this
+     * was a latent `AndroidRuntimeException` on the one path a user reaches by
+     * tapping share on an AI insights card, not merely a duplicate.
+     */
+    shareText: (String) -> Unit,
+    /**
+     * The two formatters cross as **function values, not as the `LocaleDateFormatters`
+     * class**: the class is declared in `androidMain`, so putting it in a
+     * `commonMain` signature would re-create the pin this landing exists to remove.
+     * `DetailsHeader` already takes them in this shape, and it is the reason this
+     * is the second occurrence rather than a new pattern.
+     */
+    dateFormat: (Long) -> String,
+    timeFormat: (Long) -> String,
+    /**
+     * `System.currentTimeMillis()` needs no import, so no scan can see it. It
+     * crossed because the screen only *builds* the slot its callee already had;
+     * `DetailsHeader` reads `clock` to compute a countdown, which is exactly the
+     * kind of value a test has to be able to supply.
+     */
+    clock: () -> Long,
+    /**
+     * Two booleans, not one, and not a screen-size pair. `LocalConfiguration` is
+     * absent from Compose Multiplatform's common metadata and lives in
+     * `ui-android`'s `AndroidCompositionLocals_androidKt`, so no `commonMain`
+     * composable can read it. The 768 and 600 thresholds are separate decisions
+     * that happen to share one read, so they stay separate here.
+     */
+    isWideScreen: Boolean,
+    isCompact: Boolean,
+    /**
+     * `AppDistribution.current.capabilities.youtubeInHeroPlaybackSupported`,
+     * read twice. The seam is Android-only because Android's composition root is
+     * `CrispyApplication`; what crosses is the one boolean both reads wanted, and
+     * the decision built from it -- see `trailerNeedsEmbedFallback` below.
+     */
+    youtubeTrailerPlaybackSupported: Boolean,
+    /**
+     * The window's height in dp, because `heroHeight` is a pure function and
+     * `LocalConfiguration` cannot be read from `commonMain`. Crossing the value
+     * rather than the reader is what keeps the 40% rule testable here instead of
+     * moving it to the caller, where it would be untestable and unowned.
+     */
+    screenHeightDp: Int,
+    /**
+     * The Media3 trailer surface, as a slot. `HeroTrailerLayer` is an ExoPlayer
+     * plus an inflated `PlayerView` plus libass, so it has no portable form and
+     * stays in `androidMain` -- exactly the split `PlaybackSurfaceController`
+     * made against `PlaybackSessionController`.
+     */
+    heroTrailerLayer: @Composable (HeroTrailerLayerArgs) -> Unit,
+    /**
+     * The artwork's seed colour, sampled on a background thread.
+     *
+     * `rememberSeedColor` is `@Composable` and reaches Coil's
+     * `PlatformContext` and `LocalContext`, and it returns `State<Color?>`
+     * because the sample arrives asynchronously -- so the *value* crosses as a
+     * composable slot returning `Color?`, and the `?: fallbackSeed` decision
+     * stays here, where it was before.
+     */
+    imageSeedColor: @Composable (imageUrl: String?, fallbackSeed: Color) -> Color?,
+    /**
+     * Three composable slots for the three things this screen used to *call*
+     * directly, each of which stays in `androidMain` for a different and stated
+     * reason: `ReviewProviderBadge` and `DetailsRatingBadgeLogo` render `R.raw.*`
+     * assets from `:ui-assets`, a plain `com.android.library` with no JVM variant
+     * (and CMP documents SVG as unsupported on Android, so the assets cannot even
+     * become `composeResources`), while `YouTubeExtraVideoDialog` is a dialog and
+     * has no portable form.
+     *
+     * `DetailsBody` already takes the first two in exactly this shape with no
+     * default -- this screen was bypassing its own callee's slots to call the
+     * Android implementations itself.
+     *
+     * The two `YouTubeExtraVideoDialog` calls are **not** merged. They differ in
+     * which of `selectedMakingOfVideo` / `selectedTrailerEmbed` is non-null, and
+     * today BOTH compose because the dialog early-returns on a null video; each
+     * still acquires audio focus and registers a playback source. Collapsing them
+     * would change behaviour that nothing here is being measured against.
+     */
+    reviewProviderBadge: @Composable (String) -> Unit,
+    ratingBadgeLogo: @Composable (RatingBadgeLogo) -> Unit,
+    youTubeExtraVideoDialog: @Composable (MetadataVideoView?, () -> Unit) -> Unit,
 ) {
     val details = uiState.details
     val aiBackdropUrls =
@@ -129,19 +218,15 @@ internal fun DetailsScreen(
             }.distinct()
         }
     val listState = rememberLazyListState()
-    val configuration = LocalConfiguration.current
-    val context = LocalContext.current
     val density = LocalDensity.current
-    val localeFormatters = remember(context) { localeDateFormatters(context) }
-    // The same expression `DetailsHeader` used to run twice, once per layout branch.
-    val isWideScreen = configuration.screenWidthDp >= 768 &&
-        configuration.screenHeightDp < configuration.screenWidthDp
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageUrl = remember(details, initialArtworkUrl) {
         detailsHeroImageUrl(details = details) ?: initialArtworkUrl
     }
     val fallbackSeed = Color.White
-    val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
+    // Both values, not one: `showPalettePlaceholder` below distinguishes "no seed"
+    // from "the seed is white", and folding the null away here would erase that.
+    val rawSeed = imageSeedColor(imageUrl, fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed
     val detailsScheme = rememberDetailsColorScheme(seedColor = seedColor)
     val detailsSchemeAnimated = rememberAnimatedColorScheme(target = detailsScheme)
@@ -219,9 +304,7 @@ internal fun DetailsScreen(
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
         if (!playbackSettings.trailerAutoplayEnabled) return@LaunchedEffect
-        if (!AppDistribution.current.capabilities.youtubeInHeroPlaybackSupported &&
-            heroTrailerSources.firstOrNull()?.source == TrailerSource.YOUTUBE
-        ) {
+        if (trailerNeedsEmbedFallback(youtubeTrailerPlaybackSupported, heroTrailerSources.firstOrNull()?.source)) {
             return@LaunchedEffect
         }
 
@@ -282,6 +365,8 @@ internal fun DetailsScreen(
                         imageUrl = imageUrl,
                         palette = palette,
                         trailer = heroTrailerSources,
+                        screenHeightDp = screenHeightDp,
+                        heroTrailerLayer = heroTrailerLayer,
                         showTrailer = showTrailer,
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,
@@ -290,8 +375,11 @@ internal fun DetailsScreen(
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
                                 val primary = heroTrailerSources.firstOrNull()
-                                if (!AppDistribution.current.capabilities.youtubeInHeroPlaybackSupported && primary?.source == TrailerSource.YOUTUBE) {
-                                    selectedTrailerEmbed = primary.toEmbeddedVideo()
+                                if (trailerNeedsEmbedFallback(youtubeTrailerPlaybackSupported, primary?.source)) {
+                                    // `?.` not `.`: the guard above guarantees non-null, but it
+                                    // guarantees it to a *call*, not to the data-flow analysis, and
+                                    // the extraction is what turned an inline comparison into one.
+                                    selectedTrailerEmbed = primary?.toEmbeddedVideo()
                                 } else if (!showTrailer) {
                                     showTrailer = true
                                     userPausedTrailer = false
@@ -322,10 +410,10 @@ internal fun DetailsScreen(
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
                         onSetLiked = onSetLiked,
-                        shareText = { text -> shareOnCrispy(context = context, text = text) },
-                        dateFormat = localeFormatters.date,
-                        timeFormat = localeFormatters.time,
-                        clock = { System.currentTimeMillis() },
+                        shareText = shareText,
+                        dateFormat = dateFormat,
+                        timeFormat = timeFormat,
+                        clock = clock,
                         isWideScreen = isWideScreen,
                         softFade = softFade,
                     )
@@ -338,12 +426,8 @@ internal fun DetailsScreen(
                     onRetry = onRetry,
                     onSeasonSelected = onSeasonSelected,
                     onItemClick = onItemClick,
-                    reviewProviderBadge = { provider ->
-                        ReviewProviderBadge(provider = provider)
-                    },
-                    ratingBadgeLogo = { logo ->
-                        DetailsRatingBadgeLogo(logo = logo)
-                    },
+                    reviewProviderBadge = reviewProviderBadge,
+                    ratingBadgeLogo = ratingBadgeLogo,
                     onPersonClick = onPersonClick,
                     onEpisodeClick = onEpisodeClick,
                     onToggleEpisodeWatched = onToggleEpisodeWatched,
@@ -394,15 +478,9 @@ internal fun DetailsScreen(
                     )
             )
 
-            YouTubeExtraVideoDialog(
-                video = selectedMakingOfVideo,
-                onDismiss = { selectedMakingOfVideo = null },
-            )
+            youTubeExtraVideoDialog(selectedMakingOfVideo) { selectedMakingOfVideo = null }
 
-            YouTubeExtraVideoDialog(
-                video = selectedTrailerEmbed,
-                onDismiss = { selectedTrailerEmbed = null },
-            )
+            youTubeExtraVideoDialog(selectedTrailerEmbed) { selectedTrailerEmbed = null }
 
             StreamSelectorSheet(
                 visible = selectorState.visible,
@@ -412,10 +490,11 @@ internal fun DetailsScreen(
                 accentColor = palette.accent,
                 onAccentColor = palette.onAccent,
                 // The sheet asks its own question (`screenWidthDp < 600`) and this
-                // screen asks its own (`>= 768` and landscape). They share the
-                // `configuration` read above, not a threshold, so both are written
-                // out rather than folded into one name.
-                isCompact = configuration.screenWidthDp < 600,
+                // screen asks its own (`>= 768` and landscape). They were two reads
+                // of one `LocalConfiguration`; they are now two parameters, still
+                // not one name, because the thresholds are separate decisions that
+                // happened to share a read.
+                isCompact = isCompact,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
                 onStreamSelected = onStreamSelected,
@@ -464,7 +543,7 @@ internal fun DetailsScreen(
                                     }
                                 }
                             }
-                            ReviewProviderBadge(provider = review.provider)
+                            reviewProviderBadge(review.provider)
                         }
 
                         Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
@@ -553,18 +632,37 @@ internal fun DetailsScreen(
                     palette = palette,
                     isInWatchlist = visibleUiState.isInWatchlist,
                     onToggleWatchlist = onToggleWatchlist,
-                    onShare = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "Check out $shareTitle on Crispy")
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share $shareTitle"))
-                    },
+                    onShare = { shareText("Check out $shareTitle on Crispy") },
                 )
             }
         }
     }
 }
+
+/**
+ * Does this trailer have to fall back to the embedded player?
+ *
+ * One decision that the file used to write out twice, as the same two-clause
+ * condition in two places that then did different things with the answer -- the
+ * autoplay `LaunchedEffect` returned early, and the toggle promoted the source to
+ * an embed. Two copies of a rule is how they drift apart; this is the copy.
+ *
+ * The capability arrives as the **value** `youtubeTrailerPlaybackSupported` and not
+ * as `AppDistribution`, because `AppDistribution` is declared in `androidMain` (its
+ * installer is `CrispyApplication`) and naming it in a `commonMain` signature would
+ * re-create the pin. It is a pure function of two common types, so unlike the other
+ * decisions in this file it became callable from `commonTest` the moment it was
+ * named.
+ *
+ * Only a YOUTUBE source can need the fallback. A direct source is served by the
+ * native engine regardless of what the hero supports, and an unknown source
+ * (`null`) is not a trailer to begin with -- which is why this is not simply
+ * `!youtubePlaybackSupported`.
+ */
+internal fun trailerNeedsEmbedFallback(
+    youtubePlaybackSupported: Boolean,
+    source: TrailerSource?,
+): Boolean = !youtubePlaybackSupported && source == TrailerSource.YOUTUBE
 
 private fun HeroTrailerSource.toEmbeddedVideo(): MetadataVideoView =
     MetadataVideoView(
