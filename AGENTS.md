@@ -486,29 +486,22 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   a level rather than remove it**: `WatchProgressStore`'s default scope is live, but
   `BackendWatchHistoryService` owns no scope either, so injecting the caller's would just relocate it.
 - **A composite key built by string concatenation is a parser, and the parser is wrong on exactly the
-  inputs the format cannot represent.** `removeAllWatchProgressForContent` splits the stored key and
-  takes `subList(2, size)`, which assumes **the id contributes exactly one part**; a
-  provider-qualified id does not, so the removal addresses a key that does not exist, and leaves a
-  tombstone there that would later block a legitimate write. **A separator in a composite key is a
+  inputs the format cannot represent.** `removeAllWatchProgressForContent` assumed **the id contributes
+  exactly one part**; a provider-qualified id does not, so the removal addresses a key that does not
+  exist and leaves a tombstone blocking a legitimate write. **A separator in a composite key is a
   claim that the field cannot contain it, and nothing states that claim anywhere.** A format that
   cannot round-trip is a product decision to migrate or to constrain, not a bug to patch — changing
   it orphans every stored key, and here that is a user-visible resume position. Note also that
-  **a key format is not visible in a signature**: three of that suite's first-run failures were me
-  writing expectations from the parameter names rather than the format. **And a measured golden is
-  the same mistake one level up, which is harder to see because the measurement is real.**
-  `libraryCacheFileName(profileId, sectionId)` hashes `"library:${profileId.trim()}:${sectionId.trim()}"`
-  and its seven-value golden was built by feeding pre-joined key strings to `MessageDigest` in a
-  standalone JVM — which cannot see the `trim()`. The whitespace row therefore held the digest of
-  the **untrimmed** key `library:  :  `, a string the function never produces, and it failed against
-  `e1db8a0e…`, the correct digest of `library::`. **A correct SHA-256 of a string the function does
+  **a key format is not visible in a signature**: expectations written from the parameter names rather
+  than the format fail. **And a measured golden is the same mistake one level up, which is harder to
+  see because the measurement is real.** **A correct SHA-256 of a string the function does
   not build is still a wrong expectation**, and "I measured it" reads like evidence in a way that
   "I wrote it out" does not. **So a golden has to be measured *through* the function** — a
   `commonTest` that prints, compared against the old implementation — and never from the format the
-  function is assumed to assemble. The second failure in the same run was the mirror image: the
-  collision pair `("a/b", "c:history")` / `("a", "b/c:history")` does not collide, because a `/`
-  was mistaken for the `:`. The pair that does is `("a", "b:c")` / `("a:b", "c")` — **the separator
-  has to be the field boundary, not a character that looks like one** — and a collision test with no
-  non-collision test beside it is satisfied by a function that hashes only its second argument.
+  function is assumed to assemble. The collision pair that does collide is `("a", "b:c")` /
+  `("a:b", "c")` — **the separator has to be the field boundary, not a character that looks like
+  one** — and a collision test with no non-collision test beside it is satisfied by a function that
+  hashes only its second argument.
 - **A comment claiming a choice between two orderings that coincide is unobservable**, and a test for
   it would pass on either implementation — sorting `prefix + s` is the same order as sorting `s` for
   a constant prefix. Record it rather than assert it, and pin the comment's *real* content (that it
