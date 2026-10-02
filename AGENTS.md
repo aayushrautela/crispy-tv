@@ -551,13 +551,10 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   it extracted into -- a "move" and a "create" are two facts about two different sets, and quoting
   only the first is the same class of error as quoting a count off the working tree instead of out
   of `HEAD`.
-  **A checksum that prints `True` is a claim, not a check** -- and a bash associative array whose
-  keys contain spaces breaks in a way that satisfies the check exactly when the counting is most
-  broken: `printf '%s\n' "${!bucket[@]}" | sort` word-splits every key, so the *reporting* loop
-  iterates words while the counting loop is untouched, and `sum(counts.values())` over a
-  `Counter` that never incremented is `0` -- which compares equal to the total you expected, and
-  prints `True` above six rows of zeros. **Do a partition tally in a language with a real dict,
-  and make the check assert that the buckets are non-empty before it asserts they sum.**
+  **A checksum that prints `True` is a claim, not a check** -- a bash associative array whose
+  keys contain spaces word-splits in the reporting loop while the counting loop is untouched, so the
+  check passes exactly when the counting is most broken. **Do a partition tally in a language with a
+  real dict, and make the check assert that the buckets are non-empty before it asserts they sum.**
 - **A target declaration is a claim, and a target no CI job builds cannot fail — so it asserts nothing
   about whether the code is platform-free.** Ten modules declared `iosArm64`; `apple.yml` compiled two,
   and eight carried a target nothing ever built. `scripts/verify_apple_targets.py` now fails when a
