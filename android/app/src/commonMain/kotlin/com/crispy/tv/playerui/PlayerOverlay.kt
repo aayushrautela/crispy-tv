@@ -99,7 +99,7 @@ internal fun PlayerOverlay(
             top = overlayPadding.calculateTopPadding(),
             bottom = maxOf(4.dp, overlayPadding.calculateBottomPadding() - 8.dp),
         )
-    val effectiveDurationMs = if (uiState.stableDurationMs > 0L) uiState.stableDurationMs else uiState.durationMs
+    val effectiveDurationMs = effectiveDurationMs(uiState.stableDurationMs, uiState.durationMs)
 
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
     var controlsResetToken by remember { mutableStateOf(0) }
@@ -126,7 +126,7 @@ internal fun PlayerOverlay(
         resetControlsTimer()
     }
 
-    val isSurfaceOpen = uiState.activeSurface != PlayerSurface.NONE || selectorState.visible
+    val isSurfaceOpen = isSurfaceOpen(uiState.activeSurface, selectorState.visible)
     val latestIsSurfaceOpen by rememberUpdatedState(isSurfaceOpen)
 
     registerBackHandler(isSurfaceOpen) {
@@ -272,7 +272,7 @@ internal fun PlayerOverlay(
                     }
                 }
 
-                val isSeries = uiState.details?.itemType?.equals("movie", ignoreCase = true) == false
+                val isSeries = isSeriesDetails(uiState.details?.itemType)
                 val pills =
                     if (isSeries) {
                         val episodesThumbUrl =
