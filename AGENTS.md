@@ -446,27 +446,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   sum, and every empty bucket must be allowlisted with the landing that emptied it** — otherwise the
   sum passes over a `Counter` that never incremented, which is the `True`-checksum disaster wearing a
   different hat. Three separate failures produced one wrong census and **all three manufactured
-  candidates rather than losing them**: a bash tally with space-containing bucket keys printed six
-  rows of zeros under a `True` checksum, a rule ordering let the coarse bucket absorb the navigation
-  files, and `set(hits) <= {"LocalContext","LocalConfiguration"}` classified every unpinned file as
-  Compose-local, because it is true of the empty set. **So a bucket name that asserts a negative is a
-  claim the measurement must TEST, not a label it may print; in a first-match partition the rules
+  candidates rather than losing them. So a bucket name that asserts a negative is a claim the
+  measurement must TEST, not a label it may print; in a first-match partition the rules
   after the first are never evaluated for the files the first one caught, so a sole-pin bucket cannot
   be produced that way at all; and when a tally produces a bucket that looks like a finding, write
   down what its rule _excludes_ first, then run the script that would refute it.** *A check that does
   not run is not a weak check, it is no check.*
   **And a pin is per file, not per token — the token you hunted is rarely the one that decides
   whether the file moves, and a scan that tests for the tokens you are chasing is not a test for
-  the pins you are not.** `DetailsRoute.kt`'s only `java.*` use was `Locale.US` at `:35`, which
-  reads as the whole story; `LocalContext` at `:7` and `appGraph()` at `:10` are what actually kept
-  it in `androidMain`, and both were in the rows the scan had already printed. **So read the whole
+  the pins you are not.** `DetailsRoute.kt`'s only `java.*` use read as the whole story while
+  `LocalContext` and `appGraph()` are what actually kept it in `androidMain`. **So read the whole
   import list of a file you are about to claim you understand, and treat every second pin as the one
   that decides.**
   **And when a whole family is re-scanned token by token, the tokens are usually no longer the wall —
   so classify a family by its blocker before choosing a file in it, or each landing finds a different
-  token and each finds it was not the pin** (a defaulted `clock` behind `LocalContext` and
-  `paging-compose`; a screen reading the wall clock behind `android.content.Intent`; a `Locale`
-  argument behind `android.util.Log`). **And when the census is near-zero, recording the partition is
+  token and each finds it was not the pin.** **And when the census is near-zero, recording the partition is
   worth an order of magnitude more than a landing**, because the finding is what stops the work being
   re-attempted — and what remains is **a dependency decision, not a code one**, the same class of
   finding as the navigation wall.
