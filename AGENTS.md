@@ -893,25 +893,19 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   readers are worth counting before a KDoc reasons about ownership.
 - **A mechanical port changes behaviour in *both* directions, and each direction is invisible
   until it fails — so port a type by asking what its old members permitted, not what its new ones
-  accept.** Three failures in the `:backend` JSON port, all on `org.json` -> `JsonElement`, and the
-  three are the three shapes of the mistake: **`org.json` was lenient where the new type is strict**
-  (`jsonPrimitive` *throws* on a container, where `optString` returned its JSON text, so a naive
-  `this[key]?.jsonPrimitive?.contentOrNull` turns a readable value into a crash); **`org.json` was
-  mutable where the new type is not** (`json[key] = value` does not compile, because `JSONObject`'s
-  whole API was `put` and `JsonObject` has no members at all); and **`JsonPrimitive` has no
-  `Any?` constructor**, so `else -> JsonPrimitive(this)` needed a `when` keeping `is Boolean` and
-  `is Number` intact — stringifying both would have been a *second* silent change stacked on the
-  node type itself. **And `else -> this` is the arm that survives a port least often, because it was
-  right about the old type and wrong about the new one.** In `toKotlinValue`, `else -> this` was
-  correct for `org.json`, where a primitive *already was* a `Boolean`/`String`/`Number`, and it would
-  have handed out raw `JsonElement`s from `toAnyMap` for the new type — where a primitive is **one
-  class holding a literal**, so "pass it through unchanged" no longer means anything.
+  accept.** Three failures in the `:backend` JSON port, and the three are the three shapes of the
+  mistake: **`org.json` was lenient where the new type is strict** (`jsonPrimitive` *throws* on a
+  container where `optString` returned text, so a naive accessor turns a readable value into a crash);
+  **`org.json` was mutable where the new type is not** (no `put` on `JsonObject`); and
+  **`JsonPrimitive` has no `Any?` constructor**, so a `when` keeps `is Boolean` and `is Number`
+  intact — stringifying both stacks a second silent change on the node type itself.
+  **And `else -> this` is the arm that survives a port least often, because it was right about the old
+  type and wrong about the new one**: a primitive that *already was* a value becomes one class holding
+  a literal, so "pass it through unchanged" no longer means anything.
   **The coercion direction decides the fix: a lenient accessor feeding a strict parser is a
-  truncation, not a parse.** `org.json`'s `Number.toInt()` *truncated*; `JsonPrimitive.intOrNull`
-  *parses*, so `optIntOrNull("fraction")` over `{"fraction":42.9}` went `42` -> `null`. Fixing it
-  by narrowing to `intOrNull` would have been the port; fixing it by reproducing AOSP's widths
-  (`Int`, then `Long`, then `Double`) is the port *plus* the behaviour, and **only the second one is
-  behaviour-preserving.**
+  truncation, not a parse.** `org.json`'s `Number.toInt()` truncated while `JsonPrimitive.intOrNull`
+  parses, so reproducing AOSP's widths (`Int`, then `Long`, then `Double`) is the port *plus* the
+  behaviour, and **only the second one is behaviour-preserving.**
 
 ### 3. Tests
 
