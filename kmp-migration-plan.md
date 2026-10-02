@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **137 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 137) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **138 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 138) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -118,7 +118,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **137** | **60** | **55** |
+| **`:app`** | **138** | **59** | **56** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -171,16 +171,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **137** | **60** |
-| **total** | **247** | **73** |
+| **`:app`** | **138** | **59** |
+| **total** | **248** | **72** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 137 of 197, i.e. **70%**, and
-the 60 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 138 of 197, i.e. **70%**, and
+the 59 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -273,13 +273,13 @@ one**, and a gate that emits plausible wrong lines gets switched off.
 
 What the script *can* decide without guessing is counted, and the buckets are a
 **lower bound**. The invariants it enforces are that every tracked file is
-classified (`60 == 60`), that the buckets sum, that every empty bucket is either
+classified (`59 == 59`), that the buckets sum, that every empty bucket is either
 allowlisted with the landing that emptied it or recorded as never having
 matched, and that the plan's own stated count still agrees with the tree:
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **38** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
+| **36** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
 | **6** | `androidx.navigation` | **the one thing gating desktop, and a DECISION not a port.** `NavHostController` is an Android `Activity`; the artifact itself is KMP. `CrispySharedTransitionLayout` is already in `commonMain` waiting for a graph that can reach it |
 | **6** | `androidx.media3` | no -- Media3 publishes no non-Android artifact |
 | **4** | a JVM-only member that needs **no import**, or an `R.<type>` reference | partly. `String.format` was one of these and it made a 442-line file pass a careful audit as clean |

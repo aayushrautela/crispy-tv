@@ -1,32 +1,42 @@
 package com.crispy.tv.accounts
 
-import android.content.Context
 import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.Profile
-import com.crispy.tv.images.clearImageCache
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * The keystore-backed implementation of [AccountBootstrapRepository], and the reason
- * that interface exists.
+ * The default implementation of [AccountBootstrapRepository].
  *
- * Two things here cannot travel: [SecureTokenStore] reaches `AndroidKeyStore`, and
- * [clearImageCache] reaches Coil. Neither is a reason the *interface* could not live
- * in `commonMain` — the previous KDoc on this class said both reasons "cannot be
- * engineered around", which was true of the class and false of its callers. The
- * previous version of this class is the fifth time this repo's shared-package trap has
- * cost a batch: `AppBootstrapViewModel` names this type, it is declared in the same
- * package, so it is referenced with no import, and no import audit can see it.
+ * This class used to be named `AndroidAccountBootstrapRepository` and was a fifth
+ * casualty of the shared-package trap: `AppBootstrapViewModel` names this type, it is
+ * declared in the same package, so it was referenced with no import and no import audit
+ * could see it. It also carried a KDoc saying two things "cannot travel" — that
+ * [SecureTokenStore] reaches `AndroidKeyStore`, and that `clearImageCache` reaches
+ * Coil — which was true of the class and false of its callers, because a *caller* can
+ * hold a keystore and a cache without being one.
+ *
+ * Both are now discharged at the boundary rather than in the body:
+ *
+ *  - `tokenStore` is typed [AccountSessionStore], a `com.crispy.tv.backend` port whose
+ *    only job is the three members this class calls. The keystore implementation still
+ *    exists and still implements it; a class that names the port cannot tell which.
+ *  - `clearImageCache` is a no-default `() -> Unit` slot. It has no default on purpose:
+ *    a no-op default would compile, look correct, and leave the signed-out profile's
+ *    bitmaps on screen, which is precisely the bug a default here would hide.
+ *
+ * The name changed with the pins, because "Android" on a class in `commonMain` would
+ * claim the thing the port now hides. Same rule as `StreamResolver` becoming
+ * `CachingStreamResolver`.
  */
-class AndroidAccountBootstrapRepository(
-    private val appContext: Context,
+class DefaultAccountBootstrapRepository(
+    private val clearImageCache: () -> Unit,
     private val supabase: AccountApi,
     private val backendContextResolver: BackendContextResolver,
     private val backendClient: BackendApi,
     private val activeProfileStore: ActiveProfileStore,
-    private val tokenStore: SecureTokenStore,
+    private val tokenStore: AccountSessionStore,
 ) : AccountBootstrapRepository {
     override suspend fun bootstrap(): BootstrapResult {
         val session = supabase.ensureValidSession()
@@ -80,7 +90,7 @@ class AndroidAccountBootstrapRepository(
             // hid the one dependency this class actually has.
             userId?.let { activeProfileStore.clear(it) }
             backendContextResolver.clear()
-            clearImageCache(appContext)
+            clearImageCache()
         }
     }
 }

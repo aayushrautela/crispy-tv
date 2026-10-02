@@ -32,8 +32,10 @@ import kotlinx.serialization.json.jsonArray
  *
  * The class is named for its persistence rather than reusing the port's name
  * because a class and an interface cannot share a fully-qualified name, which
- * is why [CachingStreamResolver] and [AndroidAccountBootstrapRepository] were
- * renamed the same way.
+ * is why [CachingStreamResolver] and `DefaultAccountBootstrapRepository` were
+ * renamed the same way. (Backticks, not a KDoc link: that class lives in
+ * `com.crispy.tv.accounts` and this file imports nothing from it, so a link
+ * never resolved. It is the same trap that file is named for.)
  */
 class SharedPreferencesSearchHistoryStore(context: Context) : SearchHistoryStore {
     private val prefs: SharedPreferences =

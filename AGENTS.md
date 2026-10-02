@@ -665,6 +665,20 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   widen `Nothing`, so making the class `open` was not enough. Declare the **interface's**
   return type and keep the throw (`): MetadataTitleExtrasResponse = unused("...")`). The throw
   is what the double is for; the wrong return type is what blocked reuse.
+- **An exhaustive double's shape must be READ, never recalled, because completeness is the only
+  property it has.** Four times this session a port's members were written from memory and the
+  compile rejected them: 52 `BackendApi` members, nine constructor arguments across `AddonStream`
+  / `StreamSubtitle` / `PlaybackIdentity`, and -- most recently -- six members of `AccountApi`,
+  where `signUpWithEmail` was declared returning `Session` when it returns **`SignUpResult`**, and
+  with `metadata: Map<String, String>` when it is **`Map<String, String?>`**, the nullable *value*
+  being the whole point because JSON metadata genuinely carries nulls. **A narrow double gets
+  away with being approximately right, because nobody claims it is complete; an exhaustive one
+  exists precisely because it is, so a wrong member is not a rough edge but the defect the class
+  is for.** The rule that follows from it: the compiler's `overrides nothing` error is not a
+  formatting nit -- it is the interface telling you the one thing the double exists to mirror, and
+  the fix is to open the file, not to adjust the declaration until it type-checks. **And a nullability
+  difference in a `Map` value type is the specific detail that survives recall most often**, because
+  `Map<String, String>` looks like a fair paraphrase of "metadata".
 - **Make the exhaustive double `open` rather than writing a second exhaustive one.** A `:app`
   consumer that needs one of the 52 `BackendApi` members answered would otherwise either
   duplicate 52 members (a copy that rots) or add a narrow port (worse: it never learns a new

@@ -1,6 +1,7 @@
 package com.crispy.tv.accounts
 
 import android.content.Context
+import com.crispy.tv.images.clearImageCache
 import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
@@ -89,12 +90,15 @@ object SupabaseServicesProvider {
     }
 
     fun bootstrapRepository(context: Context): AccountBootstrapRepository {
-        return AndroidAccountBootstrapRepository(
-            appContext = context.applicationContext,
+        return DefaultAccountBootstrapRepository(
+            clearImageCache = { clearImageCache(context.applicationContext) },
             supabase = accountClient(context.applicationContext),
             backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
             backendClient = BackendServicesProvider.backendClient(context.applicationContext),
             activeProfileStore = activeProfileStore(context.applicationContext),
+            // Still the keystore implementation. The repository now names the port, so this
+            // line is the one place that says which of the two it is, and it can change
+            // without the repository noticing.
             tokenStore = secureTokenStore(context.applicationContext),
         )
     }
