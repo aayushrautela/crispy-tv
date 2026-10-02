@@ -440,83 +440,56 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   can still be unpinnable, because the blocker can be a _type_**: `grep -rn "class X"` its distinctive
   types and read the owning module's `plugins { }` block. A plain `com.android.library` publishes no
   JVM variant, so no KMP `commonMain` can name its types however clean the code looks.
-  **The census that found this also became a trap, because a census answer of "one pin" is a
-  claim about the file that was scanned, not about the set the file belongs to.** A two-direction
-  scan reported **exactly four of 70** `:app` `androidMain` files with no hard pin; **all four are
-  now gone** — `HouseholdAddonsCloudSync.kt` moved (it was held by `MetadataAddonRegistry` and
-  `CloudAddonRow` declared in `:addons`' `androidMain`, reachable with **no import**, which is why
-  the forward scan could not see them and why two attempts produced 19 `Unresolved reference`
-  errors whose *first* named `com.crispy.tv.addons.registry` on a line that imports it — that is the
-  signature); the other three were never candidates, being `:native-engine`-pinned,
-  the `::englishDisplayNameForTag` platform answer, and a product decision.
-  **A full re-measurement of the remaining 68 then answered the question none of the per-file
-  scans was asking: *not one of them is movable*, `44 android.jar / 12 same-module declaration /
-  6 android.view interop / 4 R / 1 plain-library type / 1 java.*`, and three further buckets
-  measured at exactly **zero** — which is the finding, not a gap. Two consequences are worth more
-  than any single landing it stopped.** First, **25 of the 44 import nothing but
-  `android.content.Context`**: `fun create(context: Context)` *is* a composition root and a wiring
-  `Context` belongs in the factory, so `AppGraph` and the eleven service providers are the edge,
-  not work — **a bucket that lumps a wiring `Context` with real platform use reads as 44 blocked
-  files and is really one blocked file and 25 correct ones.** Second, **a first-match partition can
-  only report a file's _first_ pin**, so `PlayerSessionDecisions.kt` (imports only
-  `:native-engine` types, so it is *also* library-pinned) and `PersonDetailsRoute.kt` (in the
-  `java.time` bucket **and** the same-module bucket) each carry two and the row under-reports it —
-  so **a bucket is a floor, not a description, and a two-pin file needs a second look the output
-  cannot give it.**
-  **And the gate caught the census's own hole, which is the part to keep.** Its
-  `sibling declaration` rule first collected declarations from *other modules only*, so it reported
-  **10 files with no pin** — precisely the ten three earlier landings had recorded as held by a
-  **same-module** `androidMain` declaration reachable with no import. Adding `:app`'s own
-  `androidMain` dropped that bucket to zero. **A zero bucket is the most informative thing a
-  first-match partition produces, and it is a claim about a _rule_ before it is a claim about the
-  set** — the near-miss explanation ("`:addons` finished") was true of the *other-module* rule and
-  irrelevant to the hole, and the two rules look identical in the output. **So the gate must assert
-  every bucket is non-empty before it asserts they sum, and every empty bucket must be allowlisted
-  with the landing that emptied it** — otherwise the sum passes over a `Counter` that never
-  incremented, which is the `True`-checksum disaster wearing a different hat.
+  **A full re-measurement of the 68 `:app` `androidMain` files that remain answered the question no
+  per-file scan was asking: _not one of them is movable_** — `44 android.jar / 12 same-module
+  declaration / 6 android.view interop / 4 R / 1 plain-library type / 1 java.*`, with three further
+  buckets at exactly **zero**, which is the finding and not a gap. And **a census answer of "one pin"
+  is a claim about the file that was scanned, not about the set the file belongs to**: an earlier
+  four-of-70 scan offered four unpinned files, and all four are now either moved or shown to be
+  correctly placed.
+  Two consequences of the 68 are worth more than any landing they stopped. **25 of the 44 import
+  nothing but `android.content.Context`**, and `fun create(context: Context)` *is* a composition root
+  with the wiring `Context` belonging in the factory — so **a bucket that lumps a wiring `Context`
+  with real platform use reads as 44 blocked files and is really one blocked file and 25 correct
+  ones.** And **a first-match partition can only report a file's _first_ pin**, so
+  `PlayerSessionDecisions.kt` (also `:native-engine`-pinned) and `PersonDetailsRoute.kt` (in the
+  `java.time` bucket *and* the same-module bucket) each carry two — **a bucket is a floor, not a
+  description, and a two-pin file needs a second look the output cannot give it.**
+  **And the gate caught that census's own hole, which is the part to keep.** Its `sibling
+  declaration` rule first collected from *other modules only*, so it reported **10 files with no pin**
+  — precisely the ten three earlier landings had recorded as held by a **same-module** `androidMain`
+  declaration reachable with no import. Adding `:app`'s own `androidMain` dropped the bucket to zero.
+  **A zero bucket is the most informative thing a first-match partition produces, and it is a claim
+  about a _rule_ before it is a claim about the set** — the near-miss explanation ("`:addons`
+  finished") was true of the *other-module* rule and irrelevant to the hole, and the two rules look
+  identical in the output. **So the gate must assert every bucket is non-empty before it asserts they
+  sum, and every empty bucket must be allowlisted with the landing that emptied it** — otherwise the
+  sum passes over a `Counter` that never incremented, which is the `True`-checksum disaster wearing a
+  different hat. Three separate failures produced one wrong census and **all three manufactured
+  candidates rather than losing them**: a bash tally with space-containing bucket keys printed six
+  rows of zeros under a `True` checksum, a rule ordering let the coarse bucket absorb the navigation
+  files, and `set(hits) <= {"LocalContext","LocalConfiguration"}` classified every unpinned file as
+  Compose-local, because it is true of the empty set. **So a bucket name that asserts a negative is a
+  claim the measurement must TEST, not a label it may print; in a first-match partition the rules
+  after the first are never evaluated for the files the first one caught, so a sole-pin bucket cannot
+  be produced that way at all; and when a tally produces a bucket that looks like a finding, write
+  down what its rule _excludes_ first, then run the script that would refute it.** *A check that does
+  not run is not a weak check, it is no check.*
   **And a pin is per file, not per token — the token you hunted is rarely the one that decides
   whether the file moves, and a scan that tests for the tokens you are chasing is not a test for
   the pins you are not.** `DetailsRoute.kt`'s only `java.*` use was `Locale.US` at `:35`, which
   reads as the whole story; `LocalContext` at `:7` and `appGraph()` at `:10` are what actually kept
-  it in `androidMain`, and both were in the rows the scan had already printed.
-  `HouseholdAddonsCloudSync.kt` is the same shape behind `android.util.Log`. The scan's own output
-  held the refutation and the summary read past it to call `Locale` "the *sole* pin", which was
-  true and was the wrong question. **Read the whole import list of a file you are about to claim
-  you understand, and treat every second pin as the one that decides.**
-  **And when a whole family is being re-scanned token by token, the tokens are usually no
-  longer the wall — so measure the wall itself.** Four consecutive landings picked the next
-  `:app` file by scanning for `System.currentTimeMillis`, `java.util.Locale` and
-  `java.util.UUID`, and each found a real instance and each found it was **not** the pin:
-  a defaulted `clock` behind `LocalContext` and `paging-compose`, a screen reading the wall
-  clock behind `android.content.Intent`, a `Locale` argument behind `android.util.Log`. The
-  per-token census of all 77 files then answered the question none of the four was asking
-  — *what does this file import from a platform-only artifact?* — and the answer is that
-  **none of the 77 are movable by code work**: 54 behind `android.jar`, 7 player, 7 in the
-  nav layer (**whose dependency is now swapped and compiled — so the nav bucket is the
-  fifth census that manufactured candidates, and the correction is that a graph's second
-  pin arrives through a *call*, not an import**), 2 `paging-compose`, 2 behind
-  an `R` reference and already correct, 1 behind
-  `java.io.File`, 1 a service locator with 7 `androidMain` reader files, and 4 routes
-  behind a *second* pin each. **So classify a family by its blocker before choosing a file
-  in it, or each landing finds a different token and each finds it was not the pin** — and
-  when the census is near-zero, *recording the partition is worth an order of magnitude more
-  than a landing*, because the finding is what stops the work being re-attempted. The
-  remainder is therefore **a dependency decision, not a code one**, the same class of
+  it in `androidMain`, and both were in the rows the scan had already printed. **So read the whole
+  import list of a file you are about to claim you understand, and treat every second pin as the one
+  that decides.**
+  **And when a whole family is re-scanned token by token, the tokens are usually no longer the wall —
+  so classify a family by its blocker before choosing a file in it, or each landing finds a different
+  token and each finds it was not the pin** (a defaulted `clock` behind `LocalContext` and
+  `paging-compose`; a screen reading the wall clock behind `android.content.Intent`; a `Locale`
+  argument behind `android.util.Log`). **And when the census is near-zero, recording the partition is
+  worth an order of magnitude more than a landing**, because the finding is what stops the work being
+  re-attempted — and what remains is **a dependency decision, not a code one**, the same class of
   finding as the navigation wall.
-  **Three failures produced one wrong census, and all three went the same direction —
-  they manufactured candidates rather than losing them.** A bash tally reported six rows of
-  zeros under a `True` checksum (bucket keys contain spaces; `printf '%s\n' "${!bucket[@]}"`
-  word-splits them in the reporting loop while the counting loop is untouched). A Python
-  rewrite put `^import android\.` first, so the coarse bucket absorbed the navigation files.
-  And **the bucket that made it into the plan as a discovery was populated by
-  `set(hits) <= {"LocalContext","LocalConfiguration"}` — which is true for the empty set**,
-  so every file with no pins at all was classified as Compose-local-only. **So two rules:**
-  *a bucket name that asserts a negative — "and nothing else" — is a claim the measurement
-  must TEST, not a label it may print*, and *in a first-match-rule partition the rules after
-  the first are never evaluated for the files the first one caught, so a sole-pin bucket
-  cannot be produced that way at all.* **A check that does not run is not a weak check, it
-  is no check** — and when a tally produces a bucket that looks like a finding, write down
-  what its rule *excludes* first, then run the script that would refute it.
 - **A private decision is an untestable decision, and a private member is worse than a private
   function** — `private` is a property of the class, not of the file, so a `private` member cannot be
   named by a test in its own module either. Name it in production (`:tv`'s `CrispyTvDarkColors` was
