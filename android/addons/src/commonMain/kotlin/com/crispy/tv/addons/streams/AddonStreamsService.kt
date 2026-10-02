@@ -1,18 +1,21 @@
 package com.crispy.tv.addons.streams
 
-import android.content.Context
-import android.util.Log
 import com.crispy.tv.addons.registry.AddonManifestSeed
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
+import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.player.MetadataLabMediaType
-import kotlinx.coroutines.Dispatchers
+import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import com.crispy.tv.addons.optBooleanOrFalse
@@ -30,43 +33,77 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
-import java.util.Locale
-import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 private const val TAG = "CrispyAddonSubs"
 
 /**
  * Fetches the stream list for one provider and parses it.
  *
- * Stays in `androidMain`: `Context`, OkHttp and `org.json`, none of which has a
- * Kotlin/Native artifact. The value model it returns — `AddonStream`,
- * `StreamSubtitle`, `ProviderStreamsResult` and the magnet/torrent helpers — is
- * portable and now lives in `StreamModels.kt` in `commonMain`, in this same package,
- * so nothing here or in its callers changed an import.
+ * ## Why this file is in `commonMain`, and why the reason it gave was not a reason
+ *
+ * This KDoc used to say *"Stays in `androidMain`: `Context`, OkHttp and `org.json`,
+ * none of which has a Kotlin/Native artifact"*, and **all three were false**:
+ *
+ * - **`org.json` — never.** The JSON is `kotlinx.serialization`, which has always
+ *   been portable; the `org.json` sentence outlived the pins it counted, the same
+ *   way `LibraryDiskCacheStore`'s "60+ `org.json` touchpoints" outlived its own.
+ * - **OkHttp — never.** The file names no `okhttp3` type. Its collaborator is
+ *   `CrispyHttpClient`, which is `commonMain`'s own `interface` with
+ *   `data class CrispyHttpResponse(val code: Int, val body: String)` and
+ *   `data class HttpRequest(val method, val url: String, val headers: Map<String, String>, val body: String?)`.
+ *   `git grep -l 'import okhttp3' | grep '/src/commonMain/'` returns **zero hits
+ *   repo-wide**. That premise had already propagated to `StreamResolver`'s and
+ *   `CachingStreamResolver`'s KDocs, and `StreamResolver` cited it as the reason an
+ *   OkHttp-abstraction *would not* be implementable here — so the same false claim
+ *   was load-bearing in three files.
+ * - **`Context` — an argument.** It was read exactly once, in the constructor body,
+ *   to build the registry. That is wiring, so it became a constructor parameter instead: the
+ *   caller passes a `MetadataAddonRegistry`.
+ *
+ * So the file was never pinned by a platform type. **Two of the three reasons were
+ * a premise nobody had re-measured, and the third was a slot** — which is the
+ * recurring shape: a documented wall is the cheapest thing in a repository to
+ * believe and the most expensive to skip re-checking.
+ *
+ * The four pins that *were* real, and where each went: `Context` → the
+ * `addonRegistry` constructor parameter; `android.util.Log` → the `logger: AppLogger`
+ * parameter (`platform-core`'s port, already on this module's classpath);
+ * `java.util.Locale` → **deleted**, because the one use was
+ * `value.lowercase(Locale.US)` and Kotlin's `lowercase()` is locale-invariant — a
+ * locale is a *rendering* context, and a device in Turkish used to lower-case a
+ * media type into `ı`; and `Dispatchers.IO` → the `ioDispatcher` parameter, which
+ * cannot be defaulted because a `commonMain` file sees no `Dispatchers.IO` at all.
+ *
+ * The value model it returns — `AddonStream`, `StreamSubtitle`,
+ * `ProviderStreamsResult` and the magnet/torrent helpers — is portable and lives in
+ * `StreamModels.kt` in `commonMain`, in this same package, so nothing here or in its
+ * callers changed an import.
  *
  * The five mutable fields are per-request state (a cancellation flag and in-flight
  * bookkeeping), not shared service state, so this is a stateful class rather than a
  * singleton; the statefulness assessment the plan asked for found nothing that
- * blocks the port/adapter split. What blocks portability is the transport and the
- * JSON, not the state.
+ * blocks the port/adapter split. **What blocked portability was the four arguments
+ * above, not the state and not the transport.**
  */
 class AddonStreamsService(
-    context: Context,
+    addonRegistry: MetadataAddonRegistry,
     private val httpClient: CrispyHttpClient,
-) {
-    private val addonRegistry = metadataAddonRegistry(context.applicationContext)
+    private val logger: AppLogger,
+    private val ioDispatcher: CoroutineDispatcher,
+) : AddonStreamsLoader {
+    private val addonRegistry = addonRegistry
     private val manifestFetchSemaphore = Semaphore(6)
-    private val endpointsCacheLock = Any()
+    private val endpointsCacheLock = Mutex()
 
     @Volatile
     private var endpointsCache: EndpointsCache? = null
 
-    suspend fun loadStreams(
+    override suspend fun loadStreams(
         mediaType: MetadataLabMediaType,
         lookupId: String,
-        preferredProviderId: String? = null,
-        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)? = null,
-        onProviderResult: ((ProviderStreamsResult) -> Unit)? = null,
+        preferredProviderId: String?,
+        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)?,
+        onProviderResult: ((ProviderStreamsResult) -> Unit)?,
     ): List<ProviderStreamsResult> {
         val normalizedLookupId = lookupId.trim()
         if (normalizedLookupId.isBlank()) return emptyList()
@@ -84,7 +121,7 @@ class AddonStreamsService(
         )
         if (candidates.isEmpty()) return emptyList()
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             coroutineScope {
                 val channel = Channel<Pair<Int, ProviderStreamsResult>>(capacity = candidates.size)
                 candidates.forEachIndexed { index, endpoint ->
@@ -108,7 +145,7 @@ class AddonStreamsService(
         }
     }
 
-    suspend fun loadProviderStreams(
+    override suspend fun loadProviderStreams(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         providerId: String,
@@ -129,7 +166,7 @@ class AddonStreamsService(
             )
         }
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             fetchProviderStreams(endpoint, mediaType, normalizedLookupId)
         }
     }
@@ -147,7 +184,7 @@ class AddonStreamsService(
                 ).joinToString("#")
             }
 
-        synchronized(endpointsCacheLock) {
+        endpointsCacheLock.withLock {
             val cached = endpointsCache
             if (cached != null && cached.fingerprint == fingerprint) {
                 return cached.endpoints
@@ -158,7 +195,7 @@ class AddonStreamsService(
             coroutineScope {
                 seeds
                     .mapIndexed { index, seed ->
-                        async(Dispatchers.IO) {
+                        async(ioDispatcher) {
                             index to resolveEndpoint(seed)
                         }
                     }.awaitAll()
@@ -166,7 +203,7 @@ class AddonStreamsService(
                     .mapNotNull { it.second }
             }
 
-        synchronized(endpointsCacheLock) {
+        endpointsCacheLock.withLock {
             endpointsCache = EndpointsCache(fingerprint = fingerprint, endpoints = resolved)
         }
         return resolved
@@ -509,7 +546,7 @@ class AddonStreamsService(
         val out = LinkedHashSet<MetadataLabMediaType>()
         for (index in 0 until values.size) {
             val value = nonBlank(values.stringAtOrEmpty(index)) ?: continue
-            when (value.lowercase(Locale.US)) {
+            when (value.lowercase()) {
                 "movie" -> out += MetadataLabMediaType.MOVIE
                 "series", "show", "tv" -> out += MetadataLabMediaType.SERIES
                 "anime" -> out += MetadataLabMediaType.ANIME
@@ -642,7 +679,7 @@ class AddonStreamsService(
             )
     }
 
-    suspend fun fetchAddonSubtitles(
+    override suspend fun fetchAddonSubtitles(
         mediaType: MetadataLabMediaType,
         lookupId: String,
     ): List<AddonSubtitle> {
@@ -650,33 +687,33 @@ class AddonStreamsService(
         if (normalizedId.isBlank()) return emptyList()
 
         val endpoints = resolveSubtitleEndpoints()
-        Log.d(TAG, "fetchAddonSubtitles mediaType=$mediaType id=$normalizedId endpoints=${endpoints.size}")
+        logger.debug(TAG, "fetchAddonSubtitles mediaType=$mediaType id=$normalizedId endpoints=${endpoints.size}")
         if (endpoints.isEmpty()) return emptyList()
 
         val out = ArrayList<AddonSubtitle>()
         val seen = LinkedHashSet<String>()
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             for (endpoint in endpoints) {
                 if (!endpoint.supports(mediaType, normalizedId)) {
-                    Log.d(TAG, "subtitle endpoint skipped (type/prefix mismatch): ${endpoint.providerName}")
+                    logger.debug(TAG, "subtitle endpoint skipped (type/prefix mismatch): ${endpoint.providerName}")
                     continue
                 }
                 val url = buildSubtitleResourceUrl(endpoint, mediaType, normalizedId)
-                Log.d(TAG, "subtitle GET ${endpoint.providerName} -> $url")
+                logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> $url")
                 val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY)
                 if (json == null) {
-                    Log.d(TAG, "subtitle GET ${endpoint.providerName} -> null (failed/empty)")
+                    logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> null (failed/empty)")
                     continue
                 }
-                Log.d(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.size})")
+                logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.size})")
                 val subtitles = parseAddonSubtitles(json, endpoint.providerId, endpoint.providerName)
-                Log.d(TAG, "subtitle parsed ${endpoint.providerName} count=${subtitles.size}")
+                logger.debug(TAG, "subtitle parsed ${endpoint.providerName} count=${subtitles.size}")
                 for (subtitle in subtitles) {
                     if (seen.add(subtitle.id)) out += subtitle
                 }
             }
         }
-        Log.d(TAG, "fetchAddonSubtitles total=${out.size}")
+        logger.debug(TAG, "fetchAddonSubtitles total=${out.size}")
         return out
     }
 
@@ -685,15 +722,15 @@ class AddonStreamsService(
         return coroutineScope {
             seeds
                 .map { seed ->
-                    async(Dispatchers.IO) {
+                    async(ioDispatcher) {
                         val manifest = resolveManifest(seed) ?: return@async null
                         val resource = subtitleResourceFor(manifest) ?: run {
-                            Log.d(TAG, "subtitle endpoint dropped (no 'subtitles' resource): ${seed.addonIdHint}")
+                            logger.debug(TAG, "subtitle endpoint dropped (no 'subtitles' resource): ${seed.addonIdHint}")
                             return@async null
                         }
                         val providerId = nonBlank(manifest.optStringOrEmpty("id")) ?: seed.addonIdHint
                         val providerName = nonBlank(manifest.optStringOrEmpty("name")) ?: providerId
-                        Log.d(TAG, "subtitle endpoint kept: $providerName")
+                        logger.debug(TAG, "subtitle endpoint kept: $providerName")
                         SubtitleEndpoint(
                             providerId = providerId,
                             providerName = providerName,

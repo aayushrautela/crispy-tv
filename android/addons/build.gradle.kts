@@ -10,8 +10,13 @@ plugins {
  * `AddonStreamsService` is 1,068 lines and holds five mutable fields, but they are
  * per-request state — a cancellation flag and in-flight bookkeeping — not shared
  * service state. It is a stateful class, not a singleton, and the statefulness
- * turned out not to be what blocks portability. The blockers are `Context`, OkHttp
- * and `org.json`, exactly like every other module in this phase.
+ * turned out not to be what blocks portability. This paragraph used to name the blockers as
+ * `Context`, OkHttp and `org.json`, and **all three were false**: no file in the module
+ * imports `okhttp3` (the transport is `CrispyHttpClient`, which is `commonMain` and carries
+ * only `String` and `Map<String, String>`), no file names `org.json` (it is
+ * `kotlinx.serialization`), and `Context` was a constructor parameter or a slot. What actually
+ * blocked them, in every case, was a *default import* -- `android.util.Log`,
+ * `kotlin.jvm.*`, `java.util.Locale` -- which no import scan sees.
  *
  * So the split is by *file*, not by interface. The first 242 lines of
  * `AddonStreamsService.kt` were data classes and pure string helpers sharing a file
@@ -26,15 +31,17 @@ plugins {
  * | `MediaDetailMappings` | `commonMain` | was `androidMain` for the reason in this row's own earlier wording: every function is an extension *on* a nested backend type, and the nested types were pinned. The nested types were then lifted into `:android:backend` as `BackendTypes`, which is what freed the file — the extension receiver became a portable type. The bodies were always pure mapping code |
  * | `LookupIds`, `StreamLookupSupport`, `StreamSelectorState` | `commonMain` | used `Locale.US` in `lowercase`, which is exactly what Kotlin's locale-independent `lowercase()` already does |
  * | `RatingFormats` | `commonMain` | `String.format` is JVM-only; now uses `core-domain`'s `formatOneDecimal`, pinned against real `%.1f` output |
- * | `AddonStreamsService` | `androidMain` | `Context`, OkHttp, `org.json` |
- * | `StreamResolver` | `commonMain` | a type-level port over `CachingStreamResolver`, whose caching is the only thing the class adds and only `cachedStreams` can observe. It is **not** a transport abstraction: `AddonStreamsService` wraps `CrispyHttpClient`, which leaks `okhttp3` |
- * | `CachingStreamResolver` | `androidMain` | OkHttp, and `AddonStreamsService` is a final class built from a `Context` and an `okhttp3` client. It is also the class the port's KDoc points at — the port is the half that could travel, the cache is the half that cannot. Its `System.currentTimeMillis()` calls are a second, independent reason it could not move on its own merits |
+ * | `AddonStreamsService` | `commonMain` | listed here for "`Context`, OkHttp and `org.json`" and **none of the three was true**; the pins were `Log` (9 sites), `Dispatchers.IO` (3 `withContext` + 2 `async`), `@Volatile`, one `lowercase(Locale.US)` argument, and a `Context` read once to build the registry. All four are slots now, and the file is 904 lines in `commonMain`
+     * | `AddonStreamsLoader` | `commonMain` | new. `AddonStreamsService` is a **final class**, so the seam had to be a type rather than `open`. That was affordable only because the census found **1 caller, 3 members and 0 extension receivers** -- contrast `CrispyBackendClient`, whose 39 `internal fun CrispyBackendClient.parseX(...)` receivers are exactly what makes *its* receiver expensive. The interface carries `loadStreams`' defaults, so the three members are plain `override`s
+     * | `synchronized(lock) { }` | -- | not a file. `kotlin.synchronized` is an `actual`: present on the JVM, absent from common metadata, and needing no import of its own. `compileKotlinLinuxX64` is the only target in this module that says so, and both sites sat inside a `private suspend fun`, so `Mutex` + `withLock` cost no signature change |
+ * | `StreamResolver` | `commonMain` | a type-level port over `CachingStreamResolver`, whose caching is the only thing the class adds and only `cachedStreams` can observe. It is **not** a transport abstraction, and this row used to justify that by claiming `CrispyHttpClient` "leaks `okhttp3` types in its own signature". It does not -- `CrispyHttpResponse(code, body)` and `HttpRequest(..., url: String, headers: Map<String, String>, ...)` name no OkHttp type, and `git grep -l 'import okhttp3' | grep '/src/commonMain/'` returns nothing. The reason is simpler: it is a caching seam, not a transport one |
+ * | `CachingStreamResolver` | `commonMain` | this row claimed the blocker was OkHttp and that the class was "built from a `Context` and an `okhttp3` client` -- **both false**. The real pins were `AddonStreamsService` being a final class in the same package (hence a *type*, above), `Log`, `lowercase(Locale.US)`, and two `System.currentTimeMillis()` calls that became a `nowMs` slot -- which is what makes the TTL testable at all. Its eviction of an expired entry needed `internal fun cachedEntryCount()` to be observable at all, because `cachedStreams` answers `null` for a stale key whether or not the entry was removed | -- and `StreamResolver`'s KDoc had already cited this row's invented reason ("`CrispyHttpClient` leaks `okhttp3` types in its own signature") as a reason the port could not be implemented |
  * | `BackendEpisodeListProvider` | `commonMain` | moved once both of its parameters became `BackendApi` / `AccountApi` ports. It had no Android type of its own |
  * | `RemoteSupabaseSyncLabService` | `commonMain` | was listed here for "`Context` and `org.json`", and **neither was ever true**: it named no `org.json` type, and the `Context` was a parameter the class did not read, under a `@Suppress("UNUSED_PARAMETER")` that said so on the class itself. A parameter nobody consults is not a dependency, so deleting it -- rather than slotting it -- is what moved the file. `Dispatchers.IO` became an `ioDispatcher` with no default, and it is the second member of the interface that does *not* enter it (`syncNow`), which `commonTest` pins |
      * | `MetadataAddonRegistry` | `commonMain` | moved once its four pins were measured rather than described. `Context` -> `KeyValueStore` (`:platform-core`'s existing port; `metadataAddonRegistry(context)` in `androidMain` is the only place `SharedPreferences` is named), `System.currentTimeMillis()` -> a `nowMs` slot with no default -- **it needs no import, so no token scan can see it**, and it is the pin that survives a mechanical read of the import list -- `MessageDigest("SHA-1")` + `StandardCharsets` -> `ByteString.encodeUtf8().sha1()`, and `android.net.Uri` -> the `ManifestUri` below. Its `installationId` is **half of every persisted addon identity**, so merely-equivalent was not good enough and the ten goldens in `MetadataAddonRegistryTest` were produced by running the `MessageDigest` code on a JVM and printing it |
      * | `ManifestUri` | `commonMain` | new. The only URL parser in the repository, and it exists because there had to be one: no `commonMain` had any, and `core-domain`'s `normalizeAddonUrl` is a stricter *rule*, not a parser. Written against `UriBehaviourHostTest`'s 26-row table -- **`Uri.toString()` is the identity on every shape, so it carries the normalized string through and has no re-renderer**, which removes the whole class of bug where a port rebuilds a subtly different string from the same components |
      * | `JvmSynchronized` | `commonMain` + `androidMain` | `@OptionalExpectation`, typealiased to `kotlin.jvm.Synchronized` on Android. `kotlin.concurrent.Synchronized` **does not resolve at all** in Kotlin 2.4.10 and `kotlin.jvm.Synchronized` is rejected as an *error* by `compileKotlinLinuxX64`; this is the `Dispatchers.IO` rule through a different symbol |
-     * | `RemoteMetadataLabDataSource` | `androidMain` | `Context`, `URLEncoder`, `StandardCharsets`. Three of `:addons`' four remaining `androidMain` files |
+     * | `RemoteMetadataLabDataSource` | `androidMain` | `Context`, `URLEncoder`, `StandardCharsets`. **The last file here that is not a deliberate platform seam** -- everything else still in this module's `androidMain` is `ManifestUri`-shaped or two lines wide |
  */
 kotlin {
     jvmToolchain(21)
@@ -91,6 +98,19 @@ kotlin {
             // this and `:platform-android` one block down.
             api(project(":android:platform-core"))
 
+            // For `AddonStreamsService`: `CrispyHttpClient` is **`:network`'s own
+            // `commonMain` interface**, over
+            // `data class CrispyHttpResponse(val code: Int, val body: String)`, and
+            // `git grep -l 'import okhttp3' | grep '/src/commonMain/'` returns zero
+            // hits repo-wide -- so the module declares `api(libs.okhttp)` in its own
+            // `androidMain` "because there is no Native artifact to resolve", which
+            // is *why the transport is portable* rather than a reason it is not.
+            // It was reachable only from `androidMain` until this move, which is the
+            // same defect as `JsonAccessors.kt`'s `kotlinx.serialization`: pinning a
+            // dependency to a source set that no longer holds the file claims a
+            // portability nothing can see.
+            implementation(project(":android:network"))
+
             // For `MetadataAddonRegistry.installationId`: `MessageDigest("SHA-1")`
             // plus `StandardCharsets.UTF_8` is now `ByteString.encodeUtf8().sha1()`.
             // **okio reaches `:app` through `coil3` with no dependency line of its
@@ -141,7 +161,6 @@ kotlin {
 
         androidMain.dependencies {
 
-            implementation(project(":android:network"))
             implementation(project(":android:backend"))
 
             // `:platform-android` is a plain `com.android.library`, so it publishes

@@ -3,6 +3,7 @@ package com.crispy.tv.tv.di
 import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.addons.registry.metadataAddonRegistry
 import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.addons.streams.AddonStreamsService
 import com.crispy.tv.addons.streams.CachingStreamResolver
@@ -17,6 +18,7 @@ import com.crispy.tv.platform.android.AndroidMonotonicClock
 import com.crispy.tv.platform.android.AndroidTimeSource
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.tv.BuildConfig
+import kotlinx.coroutines.Dispatchers
 
 object TvServices {
     @Volatile
@@ -115,10 +117,15 @@ object TvServices {
             streamResolver?.let { return it }
             val appContext = context.applicationContext
             val created = CachingStreamResolver(
-                addonStreamsService = AddonStreamsService(
-                    context = appContext,
-                    httpClient = AppHttp.client(appContext),
-                ),
+                addonStreamsLoader =
+                    AddonStreamsService(
+                        addonRegistry = metadataAddonRegistry(appContext),
+                        httpClient = AppHttp.client(appContext),
+                        logger = AndroidAppLogger(appContext),
+                        ioDispatcher = Dispatchers.IO,
+                    ),
+                logger = AndroidAppLogger(appContext),
+                nowMs = System::currentTimeMillis,
             )
             streamResolver = created
             return created

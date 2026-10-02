@@ -796,6 +796,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **`:app` does not have** because it is a Compose module -- is what refused it. A `Mutex` was the
   portable alternative and was rejected on its merits rather than on a preference: `withLock`
   suspends, so it would have made all five public methods `suspend` and reached every caller.
+  **The same shape arrived a landing later as `synchronized(lock) { }`, and it is stronger: it is an
+  `actual` on the JVM and absent from common metadata altogether**, so the Linux gate answered
+  `Unresolved reference 'synchronized'` *plus* a cascading `'return' is prohibited here` that reads like a
+  control-flow bug. Like `Dispatchers.IO` it needs no import, so no scan can find it, and unlike the
+  annotation pair the portable answer is not a rename. `Mutex` cost nothing here **because both
+  guarded regions were inside a `private suspend fun`**: the `Mutex`-makes-everything-`suspend` bill
+  arrives with the *visibility* of the method holding the lock, not with the lock. `CachingStreamResolver`
+  in the same package already held a `Mutex`, so a replacement for a JVM call went in the file that
+  already replaces that library.
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
   interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
   member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can
@@ -1180,6 +1189,12 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `aPresentButUnreadableBooleanIsFalseAndNotNullBecauseNothingCanBeNullHere` and
   `theTwoWaysToGetNullAreBothAboutTheKeyAndNeitherIsAboutTheValue`, and both names state the old
   policy in prose, so both had to move with their bodies.
+  **The mirror image is a name WIDER than its body, where the code is right.** A case called
+  `anExpiredEntryIsGoneAndStaysGoneBecauseItIsRemoved` asserted that an expired cache entry is
+  *removed*, and `cachedStreams` answers `null` for a stale key whether or not it was evicted, so
+  **"answers null" and "does not keep the entry" are two different facts and a contract-only suite
+  cannot tell them apart.** Deleting `cache.remove(...)` left every one of 24 assertions green. The
+  name claimed a fact the body could not reach, and the fix was not to weaken the name.
 - **Robolectric's `android-all` lives in `~/.m2`, not in the Gradle cache, and a `find` in the
   wrong place is evidence of nothing.** `:backend`'s first host test wants a real `org.json` rather
   than a `Context`, and `find ~/.gradle/caches -iname '*android-all*'` returned **0 results** on
@@ -1301,6 +1316,13 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   guard is genuinely unreachable, keep it and write the measurement **at the guard**. **Two lines
   that look redundant and together cover one rule is the shape to watch for** — ask which one a
   reader would delete if the other were gone.
+  **A survivor is also reachable and merely *unobservable*, which is a different finding from an
+  unreachable guard.** Read the callee before either conclusion: this `cache.remove` was live, and
+  the alternative was to keep it untested. The answer is to **widen the observation rather than delete
+  the behaviour**, an `internal fun cachedEntryCount()` (the same move as widening a `private` member
+  to `internal`, which `internal` then keeps out of the consumer module), and then *re-run the same
+  mutation*, which failed exactly one case. Padding the driver with `expect_survive` here would have
+  recorded a real leak as an accepted risk.
 - **A set of names is derived by subtracting names, never values.** Ten of `CrispyPalette`'s 37
   roles share `0xFFFFFFFF`, so a value-based difference deleted the very roles the assertion was
   about and passed for the wrong reason. Because so many share a value, **no value assertion can
@@ -1328,6 +1350,15 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   "sound" cleanup rule once self-matched on its own package and deleted 140 live imports. For a
   mechanical change, let the compiler find the sites, or parse properly — the character-scanner
   lexer in `scripts/verify_kmp_outputs.py` is the model.
+  **The same class of self-reference is reachable from a KDoc, and it produced 47 cascading errors.**
+  Writing the pathspec literally as ``git grep -l 'import okhttp3' -- '*/src/commonMain'`` inside a
+  block comment closes it: the `*/` in `*/src/commonMain` **is a comment terminator**, so everything
+  after it was parsed as Kotlin and the file answered `Syntax error: Expecting a top level
+  declaration` from the line holding the KDoc. The fix is the form that also works anyway,
+  `git grep -l 'import okhttp3' | grep '/src/commonMain/'`, because `git grep -- '*/src/commonMain'`
+  matches *nothing* (the pathspec needs the `src/commonMain/` grep form or no leading `*`), so the
+  unrunnable command was also the useless one. **A command quoted into a comment is code, and `*/`
+  is in every glob.**
 - **A python patch must compute every new content before it opens any file for writing, assert each
   anchor exactly once, and read the region back afterwards.** Three failures, each of which
   destroyed something or hid it:
@@ -1366,6 +1397,15 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   sets. A revert that only compiles the source set you moved *from* proves nothing, and a partial
   revert looks exactly like a completed one. `git restore --staged --worktree <path>` is the
   reliable restore; the index is the part people forget.
+  **And the index is not a backup of your work, it is a backup of your last commit, which is why
+  `git checkout --` is the wrong tool for undoing a mutation.** Restoring a mutated file that has
+  *uncommitted rewrites* silently reverted the entire port, because the index still held the file as
+  it was at `git mv` time, which is the untouched `androidMain` original. Two tells, both printed and
+  both misread at the time: the restore script reported `0` for a grep it had expected to match, and
+  the next mutation's run came back `compileKotlinDesktop FAILED` **for a mutation that removes a
+  statement and therefore cannot fail to compile**. **Copy the file to `/tmp` before mutating and
+  copy it back after**, and `git restore --staged --worktree <path>` stays the right tool for the case
+  it is actually for: undoing a *revert*.
 
 ## Compose resources (Phase 4 Step 1)
 
