@@ -423,9 +423,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **A full re-measurement of the 68 `:app` `androidMain` files that remain answered the question no
   per-file scan was asking: _not one of them is movable_** — `44 android.jar / 12 same-module
   declaration / 6 android.view interop / 4 R / 1 plain-library type / 1 java.*`, with three further
-  buckets at exactly **zero**, which is the finding and not a gap. And **a census answer of "one pin"
-  is a claim about the file that was scanned, not about the set the file belongs to.**
-  Two consequences of the 68 are worth more than any landing they stopped. **25 of the 44 import
+  buckets at exactly **zero**, which is the finding and not a gap. Two consequences of the 68 are worth more than any landing they stopped. **25 of the 44 import
   nothing but `android.content.Context`**, and `fun create(context: Context)` *is* a composition root
   with the wiring `Context` belonging in the factory — so **a bucket that lumps a wiring `Context`
   with real platform use reads as 44 blocked files and is really one blocked file and 25 correct
