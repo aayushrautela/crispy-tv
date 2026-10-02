@@ -943,16 +943,9 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   as a negative result rather than left looking finished.** `AiInsightsRepository` is now
   `:app`'s `commonMain` and **nothing can test it**: its third collaborator is
   `CrispyBackendClient`, a `class` and not an `interface`, so a `commonTest` can neither
-  construct it nor stand in for it — and measured, it has **zero references anywhere in `:app`'s
-  `commonTest`**, so it was never nameable from there. Its other three seams are faked today
-  (`FakeAccountApi`; `ActiveProfileStore` over a `FakeKeyValueStore` in four suites; the
-  `AiInsightsCache` interface added alongside). **A suite that runs and a suite that could be
+  construct it nor stand in for it. **A suite that runs and a suite that could be
   written look identical in a build log, and the second is the one a reader counts as
-  progress** — so the landing's own test count staying at 475/513 is the *honest* number here,
-  and a same-day count is not evidence of coverage. *The fix is a type, not a test:* making
-  `CrispyBackendClient` an interface, whose own blocker is that 39 of
-  `CrispyBackendParsers.kt`'s 45 functions are `internal fun CrispyBackendClient.parseX(…)` —
-  *the receiver is the thing to change this time.*
+  progress.**
   **That wall is scoped to the module that owns the type, and a consumer outside it was never
   behind it at all.** Those 39 extensions are `internal` to `:backend`, so they block
   `:backend`'s own `commonTest` and nothing else — and `class CrispyBackendClient(...)` **is
