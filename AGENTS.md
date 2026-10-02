@@ -581,19 +581,13 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   module declares a target the workflow does not build, and the converse is deliberately unchecked
   because **removing a target is a product decision and a script has no business making one.**
   **An assertion nothing executes is not a weak assertion, it is no assertion** — and the gate needed
-  proving before it could be trusted (its first version built `compileKotliniosArm64` where the task is
-  `compileKotlinIosArm64` and reported all twenty tasks missing on a workflow that invoked every one).
-  **A gate that could not have been written is a stronger version of the same thing, and prose
-  about one reads exactly like prose about a weak one.** `LibraryDiskCacheJsonAccessors.kt`'s
-  KDoc deferred a consolidation on the grounds that *"`JsonAccessorsDivergenceTest` in
-  `androidHostTest` pins both sides of every row"* — and that suite does not exist: zero tracked
-  files match `Divergence`, and the only hit repo-wide is the KDoc line naming it. **Worse, it
-  could not exist where it was named**: both copies are `internal` in two different modules, so
-  `:app`'s tests cannot see `:backend`'s and vice versa, and no source set in the graph sees both.
-  The deferral's stated reason was *"a behaviour change on three call paths"*, which is the count
-  of the three **files** a consolidation would touch; the defective function had exactly **one**
-  call site. **A count in a KDoc is a claim about the code and re-measuring it is one command**,
-  and here the claim overstated the work by 3x while the gate it deferred to did not exist.
+  proving before it could be trusted (its first version named a task that does not exist and reported
+  every target missing). **A gate that could not have been written reads exactly like a weak one:**
+  a KDoc deferred a consolidation on a `DivergenceTest` suite that does not exist — zero tracked
+  files match, and both copies are `internal` in two different modules, so no source set in the
+  graph sees both, and the suite could not have existed where it was named. Its stated *"three call
+  paths"* were three **files**; the defective function had exactly **one** call site. **A count in a
+  KDoc is a claim about the code and re-measuring it is one command.**
 - **The Apple client is not this codebase, and a promise in a module's KDoc is not a plan.**
   `:platform-android`'s KDoc promised Apple port implementations "in Phase 6"; measured, there are
   **zero** Swift hits for all six ports, `ios/CrispyKit` is a 19-file Swift reimplementation of the
