@@ -485,26 +485,40 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   can still be unpinnable, because the blocker can be a _type_**: `grep -rn "class X"` its distinctive
   types and read the owning module's `plugins { }` block. A plain `com.android.library` publishes no
   JVM variant, so no KMP `commonMain` can name its types however clean the code looks.
-  **The same-package trap fired on the file this rule most obviously predicts, and
-  the census that found it is worth more than the landing it blocked.** A
-  two-direction scan of all 70 `:app` `androidMain` files reported **exactly four
-  with no hard pin**, and three of the four are not candidates at all:
-  `PlayerSessionSupport.kt` (50) names `:native-engine`'s `PlaybackSource`, so it
-  is the plain-`com.android.library` case above; `AndroidLanguageLabels.kt` (30) is
-  the **platform answer** that `commonMain`'s `languageLabelForCode` already takes
-  as a `::englishDisplayNameForTag` slot, so it is *correctly* in `androidMain` and
-  moving it would delete the platform step the slot exists to supply; and
-  `AppDistribution.kt` (77) is the recorded `:native-engine` product decision. The
-  fourth, `HouseholdAddonsCloudSync.kt` (143), looked like a one-pin move — eleven
-  `android.util.Log` calls and nothing else — and it is blocked one layer down:
-  `MetadataAddonRegistry` and `CloudAddonRow` are declared in **`android/addons/src/androidMain`**
-  and are reachable with **no import**, so the forward scan cannot see them. 19
-  `Unresolved reference` errors on `registry` and `reconcileCloudAddons` is what
-  says so, and the first of them names `com.crispy.tv.addons.registry` on a line
-  that imports it, which is the signature. **So a census answer of "one pin" is a
-  claim about the file that was scanned, not about the set the file belongs to, and
-  three of four is a partition worth writing down rather than four landings to
-  discover.**
+  **The census that found this also became a trap, because a census answer of "one pin" is a
+  claim about the file that was scanned, not about the set the file belongs to.** A two-direction
+  scan reported **exactly four of 70** `:app` `androidMain` files with no hard pin; **all four are
+  now gone** — `HouseholdAddonsCloudSync.kt` moved (it was held by `MetadataAddonRegistry` and
+  `CloudAddonRow` declared in `:addons`' `androidMain`, reachable with **no import**, which is why
+  the forward scan could not see them and why two attempts produced 19 `Unresolved reference`
+  errors whose *first* named `com.crispy.tv.addons.registry` on a line that imports it — that is the
+  signature); the other three were never candidates, being `:native-engine`-pinned,
+  the `::englishDisplayNameForTag` platform answer, and a product decision.
+  **A full re-measurement of the remaining 68 then answered the question none of the per-file
+  scans was asking: *not one of them is movable*, `44 android.jar / 12 same-module declaration /
+  6 android.view interop / 4 R / 1 plain-library type / 1 java.*`, and three further buckets
+  measured at exactly **zero** — which is the finding, not a gap. Two consequences are worth more
+  than any single landing it stopped.** First, **25 of the 44 import nothing but
+  `android.content.Context`**: `fun create(context: Context)` *is* a composition root and a wiring
+  `Context` belongs in the factory, so `AppGraph` and the eleven service providers are the edge,
+  not work — **a bucket that lumps a wiring `Context` with real platform use reads as 44 blocked
+  files and is really one blocked file and 25 correct ones.** Second, **a first-match partition can
+  only report a file's _first_ pin**, so `PlayerSessionDecisions.kt` (imports only
+  `:native-engine` types, so it is *also* library-pinned) and `PersonDetailsRoute.kt` (in the
+  `java.time` bucket **and** the same-module bucket) each carry two and the row under-reports it —
+  so **a bucket is a floor, not a description, and a two-pin file needs a second look the output
+  cannot give it.**
+  **And the gate caught the census's own hole, which is the part to keep.** Its
+  `sibling declaration` rule first collected declarations from *other modules only*, so it reported
+  **10 files with no pin** — precisely the ten three earlier landings had recorded as held by a
+  **same-module** `androidMain` declaration reachable with no import. Adding `:app`'s own
+  `androidMain` dropped that bucket to zero. **A zero bucket is the most informative thing a
+  first-match partition produces, and it is a claim about a _rule_ before it is a claim about the
+  set** — the near-miss explanation ("`:addons` finished") was true of the *other-module* rule and
+  irrelevant to the hole, and the two rules look identical in the output. **So the gate must assert
+  every bucket is non-empty before it asserts they sum, and every empty bucket must be allowlisted
+  with the landing that emptied it** — otherwise the sum passes over a `Counter` that never
+  incremented, which is the `True`-checksum disaster wearing a different hat.
   **And a pin is per file, not per token — the token you hunted is rarely the one that decides
   whether the file moves, and a scan that tests for the tokens you are chasing is not a test for
   the pins you are not.** `DetailsRoute.kt`'s only `java.*` use was `Locale.US` at `:35`, which
@@ -1477,7 +1491,7 @@ GitHub Actions (`.github/workflows/`), all `workflow_dispatch`-only by deliberat
   exactly the kind of pair a reader will collapse. *An `actual typealias` is the shape to check
   whenever an expect/actual pair lands, because it is the one declaration whose facade exists on one
   target and not on another.*
-- **Never rewrite source with a regex.** A regex applied to source files cannot see inside comments or string literals, so it silently corrupts or deletes code. This cost a full revert during the backend extraction: a "sound" cleanup rule matched any `com.crispy.tv.backend.X` import, self-matched on the import's own package, and deleted 140 live imports; a separate heuristic matched `User` inside the string `"User-Agent"` and added eight phantom imports. Neither failed loudly — the compiler did, which is the only reason the damage was caught. For a mechanical change, either let the compiler find the affected sites and fix them by hand, or parse properly (see the lexer in `scripts/verify_kmp_outputs.py` for what "properly" means: a character scanner, not a substitution chain). A regex is fine for *matching* a single line you then read; it is not fine for *rewriting*.
+- **Never rewrite source with a regex** — see §6, where the rule and the backend-extraction revert it caused are recorded. Kept here as a pointer because this is the section a workflow author reads first, and the rule has twice destroyed source while failing silently.
 - Names are platform + intent, not Gradle build type. Do not reintroduce `debug`/`release` into workflow names; "debug CI" and "debug build" are different things.
 - `verify_apk_distribution.py` reads the **dex** and is only valid on unminified builds, so it runs in `android.yml` (debug) and not in `android-release.yml`. Release asserts via `verifyDistributionExclusions`, which reads the dependency graph and is minification-proof.
 - **Flavors live only in `:androidApp`, and that is not negotiable.** AGP's `com.android.kotlin.multiplatform.library` has **no** `productFlavors` at all (unlike `com.android.library`/`com.android.application`), and a KMP library cannot even *consume* a flavored `com.android.library`: the library plugin is single-variant, so it states no preference between a dependency's `store*` and `sideload*` variants and Gradle fails with an ambiguous-variant error naming every candidate. Two modules were forced off that axis by this and both losses turned out to be dead weight: `:android:network` (the YouTube extractor, now the sideload-only module `:android:youtube-extractor` reached through the `TrailerExtractor` interface) and `:android:plugins`, whose entire `store` source set was one unread `internal val PluginsRuntimeSupported = false` that was never even compiled. Do not reintroduce `matchingFallbacks` to paper over this — it would compile `:app` against the store variant while a sideload APK shipped the sideload one, the same class of lie as the unwired torrent resolver fixed in `911f8d75`.

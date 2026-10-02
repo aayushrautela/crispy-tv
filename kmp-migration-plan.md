@@ -200,40 +200,98 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 72 that remain: **the leaves are the screens, and one of them has now moved**
+### The 68 that remain: **not one of them is movable, and that is measured rather than argued**
 
-**This section used to claim a taxonomy, then carried a census, then carried a wrong
-census, and the reason the third one was wrong is the most useful thing in it.** Every
-one of `:app`'s 77 `androidMain` files is now classified by *what it imports from a
-platform-only artifact* — comment lines stripped, first matching rule wins, and **the
-buckets sum to 77 with nothing unmatched**:
+**This section has carried a taxonomy, then a census, then a wrong census, and now a
+measured negative, and the reason the third was wrong is still the most useful thing in
+it.** Every earlier version classified files by **artifact family** — and the family a
+file belongs to is not a fact about the file, which is exactly the error the `paging`
+row recorded when it admitted that "a bucket measured by which artifacts a family
+imports is also a claim about which file in the family imports them". The current version
+classifies each of `:app`'s **68** `androidMain` files **individually, by its own import
+set** — comment lines stripped, first matching rule wins — under **four gates**: every
+tracked file is classified (`68 == 68`); the buckets sum; **at least one bucket is
+non-empty** (the all-zeros-under-a-`True`-checksum failure below); and **every empty bucket
+is on an allowlist carrying the landing that removed its wall**.
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **54** | `android.jar` itself | no — it is the platform |
-| **7** | the nav layer, and **the coordinate is already swapped** | no — see the note below: the *artifact* is no longer the pin, each file's second pin is an `androidMain` factory it **calls** |
-| **7** | the player and introskip (`playerui/`, `introskip/`) | no — a plain `com.android.library` publishing no JVM variant, **permanent by standing decision** |
-| **2** | the `paging` family, and **the Compose half is now on the `commonMain` classpath** | no — `paging-compose:3.5.1` is KMP and was declared, but `paging-runtime:3.5.1` is a real `.aar` depending on `androidx.recyclerview` and is pinned on `CatalogViewModel.kt` and `DiscoverScreen.kt`. `CatalogScreen.kt` and `LibraryRoute.kt` name **only** the Compose half and are still dead behind a *second* pin: `CatalogScreen.kt:58` writes `androidx.compose.ui.platform.LocalContext.current` **fully qualified with no import at all** and calls `CatalogViewModel.factory(context = ...)`; `LibraryRoute.kt` is behind `LocalContext:30`, `deviceUtcOffsetMillis:24` and `activeProfileLoader:36`. **A bucket measured by which artifacts a family imports is also a claim about which file in the family imports them, and the two can be different files.** |
-| **2** | an `R` reference | no, and **already correct**: both KDocs record that the pure half is in `commonMain` behind a no-default composable slot |
-| **1** | `java.io.File` + `Dispatchers.IO` — `optimistic/FileBackedPendingMutationStore.kt` | okio or `kotlin.io.path` — **a dependency decision**, and the store's own KDoc already says exactly this |
-| **1** | `appGraph()` + `LocalContext` — `DetailsRoute.kt` | no — a ViewModel-factory route |
-| **1** | `Dispatchers.IO` + `LocalContext` + `System.currentTimeMillis` + provider wiring — `CalendarScreen.kt` | no — a ViewModel-factory route |
-| **1** | `LocalContext` + `java.time.LocalDate` + `java.util.Locale` — `PersonDetailsRoute.kt` | no — the `java.time` port is not a one-liner |
-| **1** | the `androidMain` sibling `PlaybackDependencies` — `distribution/AppDistribution.kt` | no — a service locator with **7 `androidMain` reader files**, correct by its own KDoc |
+| **44** | `android.jar` proper — see the import-set breakdown below | no — it is the platform |
+| **12** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** — `CatalogScreen`, `DetailsRoute`, `AppDistribution`, `IntroSkipButtonOverlay`, `PersonDetailsRoute`, `PlayerSessionDecisions`, `PlayerTrackSheet`, `AppRoot`, `AppNavHost`, `DiscoverNavGraph`, `HomeNavGraph`, `SettingsNavGraph` | no — **the other half of the same-package trap**: a sibling in the same *module* is as reachable-without-import as one in the same package. **A first-match partition can only report a file's _first_ pin, so this row is a floor and not a description**: `PlayerSessionDecisions.kt` imports **only** `com.crispy.tv.nativeengine.playback.{NativePlaybackEngine, NativePlaybackEnginePreference, NativePlaybackError, NativePlaybackSnapshot, NativePlaybackState}` at `:3-7` — no `android.*`, no `java.*` — so it is *also* a `:native-engine` file and has **two** pins; `PlayerTrackSheet.kt` imports only `androidx.compose.*` (plus `androidx.annotation.DrawableRes`), so its one pin is invisible from the label and this row is the only place it is recorded. `PersonDetailsRoute.kt` is in this row **and** in the `java.*` bucket, for the same reason |
+| **6** | `android.view` interop — `YouTubeExtraVideoDialog`, `PlayerGestureController`, `PlayerOverlay`, `PlayerRoute`, `PlayerSessionViewModel`, `PlayerNavGraph` | no — Android `View`s embedded in Compose, which `android.jar` is the source of |
+| **4** | an `R` reference — `DetailsHero`, `DetailsRatingBadgeLogo`, `ReviewProviderBadge`, `PlayerOverlayControls` | no, and **already correct**: the pure half is in `commonMain` behind a no-default composable slot |
+| **1** | `:native-engine`'s types — `PlayerSessionSupport.kt` | no — a plain `com.android.library` publishes no JVM variant, so this is **structurally unreachable at any version** |
+| **1** | `java.util.Locale` alone — `AndroidLanguageLabels.kt` | no, and **correctly placed**: it is the platform answer `commonMain`'s `languageLabelForCode` takes as a `::englishDisplayNameForTag` slot, and moving it would delete the step the slot exists to supply |
+| **0** | `other-module androidMain declaration` | **empty because `:addons` reached 20 `commonMain` / 2 `androidMain`** and `MetadataAddonRegistry`/`CloudAddonRow` moved (`b9816f4c`) |
+| **0** | `default-import JVM call` — `synchronized(lock)`, `System.currentTimeMillis()` | **empty because both are gone** (`b43ea7ee`) |
+| **0** | **no hard pin at all** | **the point of the whole section, and the answer is zero** |
 
-**54 + 7 + 7 + 2 + 2 + 1 + 1 + 1 + 1 + 1 = 77, with nothing unmatched.**
+**44 + 12 + 6 + 4 + 1 + 1 = 68, nothing unmatched.**
 
-**No file is movable by code work, so the JVM-API token work in `:app` is finished.**
-`System.currentTimeMillis`, `java.util.Locale` and `java.util.UUID` have all been removed
-or reclassified across four consecutive landings, and **none of them is what stands
-between `:app` and `commonMain` any more.** What remains is `android.jar` itself, three
-Android-only `androidx` families, the player, and the composition roots — which are
-*correctly* Android-side, because a `Context` used for wiring belongs in the factory.
-**So the whole remainder is a dependency decision rather than a code one**, which is the
-same class of finding as the navigation wall below, now measured across a whole module
-instead of argued file by file.
+#### The 44's import sets, because "it imports `android.jar`" is not a finding
+
+Grouped by the file's **entire** import set rather than by family: **25 import nothing but
+`android.content.Context`** and nothing else at all; **3** are `Context` + `java.util.Locale`
+(`DetailsViewModelFactory`, `PersonDetailsViewModelFactory`, `SearchViewModelFactory`); and
+the rest are singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,
+`Context` + `SharedPreferences`, `Context` + `SharedPreferences` + `Locale`,
+`Context` + `Uri` + `Locale`, `Context` + `java.io.File`, `Context` + `Looper`,
+`Context` + `audio focus`, `Context` + `AtomicBoolean`, `Context` + `DateFormat`/
+`YearMonth`/`DateTimeFormatter`/`Locale`, `Context` + `URLEncoder`/`StandardCharsets`,
+`android.util.Log` + `URLEncoder`/`StandardCharsets`/`TimeUnit` (`IntroSkipService`),
+`java.time.LocalDate`/`DateTimeFormatter`/`Locale` (`PersonDetailsRoute`) — plus the
+**player cluster** (`PlayerHost`, `PlayerMediaSessionManager`, `PlayerPipController`,
+`PictureInPictureConfig`) and the **media3/`:native-engine` cluster**
+(`PlaybackSessionControllerPlayer`, `PlaybackDependencies`, `DistributionComponents`,
+`ProfileDataCloudSync`).
+
+**The 25 are the finding, and they are not work.** `fun create(context: Context)` **is** a
+composition root, and a `Context` used for wiring belongs in the factory — so
+**`AppGraph`, the eleven service providers and the ViewModel factories are not files
+waiting to move; they are the edge.** A count that lumps them in with `android.jar` reads
+as 44 blocked files and is really **1 blocked file and 25 correct ones.**
+
+#### Two buckets are empty, and each is a landing rather than an absence
+
+**A zero bucket is the most informative thing a first-match partition produces, and it is a
+claim about a _rule_ before it is a claim about the set.** The first version of this script
+collected sibling declarations from **other modules only**, and so reported
+**`compose-local only: 10`** — offering precisely the ten files that three earlier landings
+had already recorded as blocked by a **same-module** `androidMain` declaration reachable
+with no import. Adding `:app`'s own `androidMain` to that rule moved 10 of the 12 and
+dropped the bucket to **0**. **Two rules that look identical in the output answer different
+questions, so a zero has to be attributed to a specific rule before it is explained** — and
+the near-miss explanation ("`:addons` finished") was true of the *other-module* rule and
+had nothing to do with the hole.
+
+### The JVM-API token work in `:app` is finished, and the strongest evidence is a zero
+
+**Not one of the 68 files has no hard pin.** This section used to carry "exactly four files
+with no hard pin" and named all four; **every one has since either moved or been shown to
+be correctly placed** — `PlayerSessionSupport.kt` turned out to name `:native-engine` types,
+`AndroidLanguageLabels.kt` is a slot's platform answer, `AppDistribution.kt` is the service
+locator, and `HouseholdAddonsCloudSync.kt` moved as soon as its blocker did. This is the
+**seventh** stale premise in this census, and the seven were: the "60+ `org.json`
+touchpoints" note, the `CrispyHttpResponse`/`HttpUrl` transport note, the
+`RemoteSupabaseSyncLabService` build-file row, four `:addons` OkHttp KDocs, the
+`CrispyBackendClient` wall's module scope, the `DetailsHero`-is-just-`Dispatchers.IO`
+note, and now this table. **Every one was a note written about a file and never re-read.**
+
+`System.currentTimeMillis`, `java.util.Locale` and `java.util.UUID` have all been removed or
+reclassified across seven consecutive landings, and **none of them is what stands between
+`:app` and `commonMain` any more.** What remains is `android.jar` itself, Android-only
+Compose families, the player, the View-interop cluster, and the composition roots — which
+are *correctly* Android-side. **So the whole remainder is a dependency decision rather than
+a code one**, the same class of finding as the navigation wall below, now measured **per
+file** across a whole module instead of argued family by family.
 
 #### The three that were wrongly called movable, and the two rules the error earns
+
+**Two of the three have since moved, and that is the correction validated rather than
+repeated** — `DetailsRoute.kt` and `CalendarScreen.kt` each became movable at the moment
+their *second* pin was discharged, which is the only thing the error ever claimed would
+work. `PersonDetailsRoute.kt` is still `androidMain`, in both the `java.time` bucket and
+the same-module-declaration bucket, so it carries **two** pins today.
 
 An earlier version of this table claimed **three files behind `LocalContext` and nothing
 else** — `CalendarScreen.kt`, `DetailsRoute.kt`, `PersonDetailsRoute.kt` — and named the
@@ -278,7 +336,13 @@ jar-grep:
    and `IntroSkipInterval` are all `:android:native-engine`, which publishes no JVM
    variant. **Structurally unreachable at any version, so the files naming them are not
    candidates and should not be re-audited** — `PlayerSessionDecisions.kt` (162 lines)
-   and `PlayerTrackSheet.kt` (449 lines) are out of reach for good, not pending.
+   is out of reach for good, not pending.
+   **`PlayerTrackSheet.kt` (449 lines) was named here too, and that was the second copy of
+   the same half-false premise:** it imports **only** `androidx.compose.*` plus
+   `androidx.annotation.DrawableRes` at `:3` — **zero forbidden imports** — so its one pin
+   is `englishDisplayNameForTag`, which is mechanism **3** below. Both files are blocked,
+   by different mechanisms, and a note that put them in one bucket was a claim about a
+   *bucket* written where the measurement was per file.
 2. **Android-only Compose locals.** `LocalConfiguration` and **`LocalContext`** — the
    second of which this plan had never named. **No import scan and no jar-grep can see
    either**, because neither has a `commonMain` declaration anywhere in the repository.
