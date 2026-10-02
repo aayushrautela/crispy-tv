@@ -1178,6 +1178,19 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     and writing both loses the first — and every `occurs 1x` assertion still passes.
   - **A count assertion does not check the brackets around what it replaced**, and only `diff` sees
     a four-space shift.
+  - **A read-back asserting `count == 1` on a bare name is a claim about a *word*, not about a
+    declaration, and the name legitimately appears more than once.** Deleting the lifted playback
+    types out of `:native-engine`'s `PlaybackController.kt` and then reading back
+    `back.count("PlaybackSurfaceController") == 1` aborted on a file that was **correct** — the name
+    occurs twice, once as `interface PlaybackSurfaceController {` and once as the
+    `: PlaybackSurfaceController` supertype of `interface PlaybackController`. **A supertype
+    reference is a second legitimate occurrence of the name, and only the declaration form is
+    unique.** Scope the read-back the way the write guards were already scoped:
+    `count("interface PlaybackSurfaceController {") == 1`. This is the same rule as the guard
+    scoping below, and it is the reason the guard scoping had to be written down at all.
+  - **A read-back must skip a `count == 1` assertion when the new string is `""`** — asserting an
+    empty string occurs exactly once always fails, which reads as a broken write when the write was
+    a deletion and correct. Assert `old not in back` instead.
 - **Structural line-range edits must precede string replacements earlier in the same file.** A
   replacement changes the line count and moves the range out from under the edit.
 - **An anchor copied from a tool's rendered output can differ in one character** — the source had

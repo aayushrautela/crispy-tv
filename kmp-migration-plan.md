@@ -90,7 +90,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 
 | Module | `commonMain` | `androidMain` | `commonTest` |
 |---|---|---|---|
-| `core-domain` | 32 | 0 | 31 |
+| `core-domain` | 34 | 0 | 32 |
 | `platform-core` | 7 | 0 | 1 |
 | `sharedUI` | 5 | 0 | 1 |
 | `player` | 6 | 0 | 2 |
@@ -143,7 +143,7 @@ pinned until the receiver moved.**
 
 | Module | `commonMain` | `androidMain` |
 |---|---|---|
-| `core-domain` | 32 | 0 |
+| `core-domain` | 34 | 0 |
 | `platform-core` | 7 | 0 |
 | `sharedUI` | 5 | 0 |
 | `player` | 6 | 0 |
@@ -153,7 +153,7 @@ pinned until the receiver moved.**
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
 | **`:app`** | **134** | **63** |
-| **total** | **242** | **76** |
+| **total** | **244** | **76** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
@@ -233,7 +233,7 @@ is on an allowlist carrying the landing that removed its wall**.
 | **11** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** — `CatalogScreen`, `DetailsRoute`, `AppDistribution`, `PersonDetailsRoute`, `PlayerSessionDecisions`, `PlayerTrackSheet`, `AppRoot`, `AppNavHost`, `DiscoverNavGraph`, `HomeNavGraph`, `SettingsNavGraph` | no — **the other half of the same-package trap**: a sibling in the same *module* is as reachable-without-import as one in the same package. **A first-match partition can only report a file's _first_ pin, so this row is a floor and not a description**: `PlayerSessionDecisions.kt` imports **only** `com.crispy.tv.nativeengine.playback.{NativePlaybackEngine, NativePlaybackEnginePreference, NativePlaybackError, NativePlaybackSnapshot, NativePlaybackState}` at `:3-7` — no `android.*`, no `java.*` — so it is *also* a `:native-engine` file and has **two** pins; `PlayerTrackSheet.kt` imports only `androidx.compose.*` (plus `androidx.annotation.DrawableRes`), so its one pin is invisible from the label and this row is the only place it is recorded. `PersonDetailsRoute.kt` is in this row **and** in the `java.*` bucket, for the same reason |
 | **6** | `android.view` interop — `YouTubeExtraVideoDialog`, `PlayerGestureController`, `PlayerOverlay`, `PlayerRoute`, `PlayerSessionViewModel`, `PlayerNavGraph` | no — Android `View`s embedded in Compose, which `android.jar` is the source of |
 | **4** | an `R` reference — `DetailsHero`, `DetailsRatingBadgeLogo`, `ReviewProviderBadge`, `PlayerOverlayControls` | no, and **already correct**: the pure half is in `commonMain` behind a no-default composable slot |
-| **1** | `:native-engine`'s types — `PlayerSessionSupport.kt` | no — a plain `com.android.library` publishes no JVM variant, so this is **structurally unreachable at any version** |
+| **0** | `:native-engine`'s types | **empty because the landing that lifted the seven value types emptied it** — its only member was `PlayerSessionSupport.kt`, and a bucket that hits zero has to name the landing that emptied it rather than quietly shrink |
 | **1** | `java.util.Locale` alone — `AndroidLanguageLabels.kt` | no, and **correctly placed**: it is the platform answer `commonMain`'s `languageLabelForCode` takes as a `::englishDisplayNameForTag` slot, and moving it would delete the step the slot exists to supply |
 | **0** | `other-module androidMain declaration` | **empty because `:addons` reached 20 `commonMain` / 2 `androidMain`** and `MetadataAddonRegistry`/`CloudAddonRow` moved (`b9816f4c`) |
 | **0** | `default-import JVM call` — `synchronized(lock)`, `System.currentTimeMillis()` | **empty because both are gone** (`b43ea7ee`) |
