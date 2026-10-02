@@ -1059,31 +1059,20 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   **a codec's own decoder is the wrong instrument for a codec's property: it is a different
   decoder, with a different alphabet.**
 - **An assertion can describe a rule the code does not have, and the failure reads as a
-  production bug.** `theCachedListIsOnlyConsultedWhenTheCurrentOneHasNoAnswer` asserted that a
-  cached episode is *shadowed* by the current season's list, so it expected the current
-  list's answer when both held a match. The code does the opposite: it concatenates current
-  then cached and takes the **first** match, so "shadowing" would mean *dropping* the cached
-  answer — and the failure was `expected:<only> but was:<other>`, a pair of plausible episode
-  ids that reads as "the cache returned the wrong episode". It was entirely the assertion.
-  This is the `getOrElse` rule's other face: an empty or wrong-looking result proves nothing
-  until you have established **what the code's rule actually is**, and the cheapest way to
-  establish it is to read the body rather than infer the rule from the method's name — the
-  name here described an *intention* ("consulted only when…") while the code described an
-  *order*. **An assertion whose *type* contradicts its intent still compiles**, and the type
-  system is no help at all: `assertNull(value == false)` type-checks because `assertNull` takes
-  `Any?`, so a `Boolean` is an acceptable argument to an assertion about nullness. It then fails,
-  and the failure is the only witness — `null == false` is `false` in Kotlin, never a `null`.
-  The second half is that the *name* is a claim too, and a rename is part of a behaviour change
-  rather than a follow-up to it: two cases here were named
-  `aPresentButUnreadableBooleanIsFalseAndNotNullBecauseNothingCanBeNullHere` and
-  `theTwoWaysToGetNullAreBothAboutTheKeyAndNeitherIsAboutTheValue`, and both names state the old
-  policy in prose, so both had to move with their bodies.
-  **The mirror image is a name WIDER than its body, where the code is right.** A case called
-  `anExpiredEntryIsGoneAndStaysGoneBecauseItIsRemoved` asserted that an expired cache entry is
-  *removed*, and `cachedStreams` answers `null` for a stale key whether or not it was evicted, so
-  **"answers null" and "does not keep the entry" are two different facts and a contract-only suite
-  cannot tell them apart.** Deleting `cache.remove(...)` left every one of 24 assertions green. The
-  name claimed a fact the body could not reach, and the fix was not to weaken the name.
+  production bug.** `theCachedListIsOnlyConsultedWhenTheCurrentOneHasNoAnswer` asserted *shadowing*
+  by the current list; the code concatenates current then cached and takes the **first** match, so
+  "shadowing" would mean *dropping* the cached answer -- entirely the assertion. This is the
+  `getOrElse` rule's other face: establish **what the code's rule actually is** by reading the
+  body rather than inferring it from the method's name, whose *intention* ("consulted only when...")
+  the code's *order* did not share. **An assertion whose *type* contradicts its intent still
+  compiles**: `assertNull(value == false)` type-checks because `assertNull` takes `Any?`, then
+  fails, and the failure is the only witness. And the *name* is a claim too, so a rename is part
+  of a behaviour change rather than a follow-up to it.
+  **The mirror image is a name WIDER than its body, where the code is right.** `cachedStreams`
+  answers `null` for a stale key whether or not it was evicted, so **"answers null" and "does
+  not keep the entry" are two different facts and a contract-only suite cannot tell them
+  apart** -- deleting `cache.remove(...)` left every one of 24 assertions green, and the fix was
+  not to weaken the name.
 - **A path that returns early does not run the shared tail, so a suite written from the method's
   *name* asserts a completion the code never logs.** `pullToLocal`'s "no active session" arm
   logs one line and returns; `logOutcome` sits after the `try`, so a skip produces **no** `pull
