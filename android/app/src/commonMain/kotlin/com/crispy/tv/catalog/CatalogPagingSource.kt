@@ -25,6 +25,13 @@ class CatalogPagingSource(
     private val ioDispatcher: CoroutineDispatcher,
 ) : PagingSource<Int, CatalogItem>() {
 
+    /**
+     * Keys already handed to the grid, for the reason
+     * `CatalogItem.lazyKey` records: an add-on's pages overlap, and a repeated
+     * key in a lazy grid is a crash rather than a duplicate card.
+     */
+    private val acceptedKeys = mutableSetOf<String>()
+
     override fun getRefreshKey(state: PagingState<Int, CatalogItem>): Int? {
         return state.anchorPosition?.let { anchorPosition ->
             val anchorPage = state.closestPageToPosition(anchorPosition)
@@ -44,10 +51,13 @@ class CatalogPagingSource(
                     pageSize = pageSize
                 )
             }
-            val items = result.items
-            val nextKey = if (items.size < pageSize) null else page + 1
+            // Measured on the page the add-on returned, not on what survives the
+            // filter: a full page of already-seen titles still means there is a
+            // page 3, and reading the filtered size here would end the list one
+            // screen early.
+            val nextKey = if (result.items.size < pageSize) null else page + 1
             LoadResult.Page(
-                data = items,
+                data = acceptedKeys.acceptFirstCatalogItems(result.items),
                 prevKey = if (page == 1) null else page - 1,
                 nextKey = nextKey
             )

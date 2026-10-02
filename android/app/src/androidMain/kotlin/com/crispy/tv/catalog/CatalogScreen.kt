@@ -116,7 +116,7 @@ fun CatalogRoute(
                     } else {
                         items(
                             count = pagingItems.itemCount,
-                            key = pagingItems.itemKey { "${it.type}:${it.id}" },
+                            key = pagingItems.itemKey { it.lazyKey() },
                             contentType = { "poster" }
                         ) { index ->
                             val item = pagingItems[index] ?: return@items

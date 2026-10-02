@@ -70,6 +70,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.catalog.lazyKey
 import com.crispy.tv.search.SearchGenreSuggestion
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
@@ -470,24 +471,24 @@ private fun DiscoverScreen(
                 } else {
                     items(
                         count = pagingItems.itemCount,
-                        key = pagingItems.itemKey { "${it.type}:${it.id}" },
+                        key = pagingItems.itemKey { it.lazyKey() },
                         contentType = { "poster" }
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
                         val key = "discover-${item.itemId}-${index}"
-                          LandscapeCard(
-                              title = item.title,
-                              artworkUrl = item.artworkUrl,
-                              logoUrl = item.logoUrl,
-                              artwork = item.artwork,
-                              logo = item.logo,
-                             rating = item.rating,
-                             year = item.year,
-                             genre = item.genre,
-                             onClick = { onItemClick(item, key) },
-                             itemId = item.itemId,
-                             sharedElementKey = key,
-                         )
+                        LandscapeCard(
+                            title = item.title,
+                            artworkUrl = item.artworkUrl,
+                            logoUrl = item.logoUrl,
+                            artwork = item.artwork,
+                            logo = item.logo,
+                            rating = item.rating,
+                            year = item.year,
+                            genre = item.genre,
+                            onClick = { onItemClick(item, key) },
+                            itemId = item.itemId,
+                            sharedElementKey = key,
+                        )
                     }
                 }
 

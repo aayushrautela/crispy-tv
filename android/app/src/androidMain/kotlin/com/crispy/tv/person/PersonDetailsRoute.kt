@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.crispy.tv.backend.PersonSocials
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.catalog.lazyKey
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.domain.person.KnownForRail
 import com.crispy.tv.home.HomeCatalogPosterCard
@@ -63,6 +64,7 @@ import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.ui.components.initials
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.components.withDuplicateSafeLazyKeys
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
@@ -471,15 +473,20 @@ private fun PersonKnownForRailView(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )
+        // The same shape `CrispyShelfSection` applies, and for the same reason:
+        // an add-on can list a title twice, and a repeated `key` in a lazy list
+        // throws rather than drawing a second card.
+        val entries = rail.items.withDuplicateSafeLazyKeys { it.lazyKey() }
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = horizontalPadding)
         ) {
             items(
-                items = rail.items,
-                key = { "${it.type}:${it.id}" },
+                items = entries,
+                key = { entry -> entry.lazyKey },
                 contentType = { "poster" }
-            ) { item ->
+            ) { entry ->
+                val item = entry.value
                 val key = "person-knownFor-${item.itemId}"
                 HomeCatalogPosterCard(
                     item = item,

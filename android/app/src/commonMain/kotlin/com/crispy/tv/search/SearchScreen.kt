@@ -56,6 +56,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.accounts.ActiveProfileInfo
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.catalog.lazyKey
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyShelfSection
 import com.crispy.tv.ui.components.LandscapeCard
@@ -459,7 +460,7 @@ private fun SearchSectionRow(
         title = title,
         entries = items,
         itemSpacing = 12.dp,
-        key = { "${it.type}:${it.id}" },
+        key = { it.lazyKey() },
         itemContent = { item ->
             val sharedElementKey = "search-${title}-${item.itemId}"
             LandscapeCard(
@@ -489,7 +490,7 @@ private fun SearchPeopleRow(
         title = "People",
         entries = items,
         itemSpacing = 12.dp,
-        key = { "${it.type}:${it.id}" },
+        key = { it.lazyKey() },
         itemContent = { item ->
             val sharedElementKey = PersonProfileSharedKeys.forPerson(item.itemId)
             PersonCircleCard(
