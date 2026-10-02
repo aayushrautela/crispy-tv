@@ -655,13 +655,11 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   own optional-expectation annotation and actualize it with a typealias"* -- which is
   `JvmSynchronized`, an `@OptionalExpectation` annotation typealiased on Android. **So the newer name
   is the one that does not exist and the older name is the one that is forbidden**, and *the
-  migration a symbol's name suggests was not available*. A `Mutex` was the portable alternative and
-  was rejected on its merits: `withLock` suspends, so it would have reached every caller.
+  migration a symbol's name suggests was not available*. A `Mutex` was rejected because `withLock` suspends, so it would have reached every caller.
   **`synchronized(lock) { }` is the strongest instance of the family: an `actual` on the JVM and
   absent from common metadata altogether**, so the Linux gate answered `Unresolved reference
   'synchronized'` *plus* a cascading `'return' is prohibited here` that reads like a control-flow
-  bug. Like `Dispatchers.IO` it needs no import, and unlike the annotation pair the portable answer
-  is not a rename -- but `Mutex` cost nothing **because both guarded regions were inside a `private
+  bug. The portable answer is not a rename -- but `Mutex` cost nothing **because both guarded regions were inside a `private
   suspend fun`**: *the `Mutex`-makes-everything-`suspend` bill arrives with the **visibility** of the
   method holding the lock, not with the lock.*
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
