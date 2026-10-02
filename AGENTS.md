@@ -206,43 +206,19 @@ where that gets answered.
 | `:android:plugins` | plain Android lib | QuickJS bridge, `store` source set unread on purpose |
 | `android/torrent-engine`, `android/plugins`, `android/tv` | plain Android | **a plain `com.android.library` cannot be consumed from a KMP `commonMain` at all** |
 
-**`CrispySharedTransitionLayout` is the shared host, and it is in `commonMain` because the mechanism
-is not navigation.** 14 `commonMain` files read `LocalSharedTransitionScope`, a
-`staticCompositionLocalOf<SharedTransitionScope?> { null }`. The single provider used to be two lines
-inside `AppNavHost.kt` — in a package called `ui/navigation`, which is why it read as navigation-bound,
-and **neither of those two lines named navigation.** Its `content` slot has **no default**, so a caller
-cannot obtain a provider that provides nothing. **`SearchNavGraph.kt`, `AuthNavGraph.kt` and
-`LibraryNavGraph.kt` are now in `commonMain`** and the other four graphs are still in `androidMain`
--- and the finding is that **the graphs are no longer the unit of work: a file can move once its
-_callees_ are in `commonMain`, so movement propagates upward from the leaves, and the leaves are
-the screens.** `LibraryRoute.kt` (247) moved on exactly that evidence, and every one of its
-callees -- `currentMonthKeyOf`, `LibraryFiltersRow`, `LibraryStatusMessage`, `LibraryEmptyState`,
-`LibraryAppendState`, `historyItems`, `CrispyScreen`, `ProfileIconButton`, `ItemActionSheet`,
-`StandardTopAppBar`, `topLevelAppBarColors`, `responsivePageHorizontalPadding`,
-`appBarScrollBehavior` -- was already in `commonMain`. **The reason recorded here for years was
-wrong three times before it was right.** It said the graphs stay because `androidx.navigation` has
-no KMP artifact -- true of Google's artifact, and false once `:app` swapped to
-`org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` (measured across five
-`.module` links, and **compiled**; the fork keeps the `androidx.navigation.compose` package, so not
-one import changed). Then it said each graph calls a `Context`-taking `androidMain` factory, which
-is why three of them needed seven, five and six no-default slots respectively.
-**And it said `AppNavHost` names every graph so the layer moves as a unit or not at all -- which
-three graphs have now refuted by moving one at a time.** *A set moves as a unit only when the
-references are mutual, and a graph calling a route is a one-way edge*: `androidMain` sees
-`commonMain`, so a route moves out from under a graph that has not moved yet. That is the whole
-reason `LibraryNavGraph` could move at all -- **its only pin was a `Log.d`, and it moved because
-`LibraryRoute` below it had already moved.**
-`SearchNavGraph` reached `commonMain` for a different reason, and both are worth keeping: it came
-once **two pins below its imports** were discharged, and a pin that arrives through a *call* is
-invisible to every import scan. The two were
-`coil3.compose.LocalPlatformContext.current.applicationContext` and the two factory functions
-themselves; the graph now takes `searchViewModelFactory: ViewModelProvider.Factory` and
-`loadProfile: suspend () -> ActiveProfileInfo?` as **no-default slots carrying the product, not a
-lambda producing it** -- *a slot its caller must `remember` is the product type*, since the caller is
-a composable. And the fourth pin was neither an import nor a call in the graph: it was the four
-**route builders** in `androidMain`, reachable with no import because they are extensions on
-`AppRoutes`. *A file in a package can be pinned by a sibling in the same package, and no scan of any
-kind will say so.*
+**`CrispySharedTransitionLayout` is in `commonMain` because the mechanism is not navigation.** 14
+`commonMain` files read `LocalSharedTransitionScope`, a `staticCompositionLocalOf<SharedTransitionScope?>
+{ null }` whose `content` slot has **no default**, so a caller cannot obtain a provider that provides
+nothing. Three of the nine nav graphs are in `commonMain` and the rest are still in `androidMain`, and
+the finding is that **the graphs were never the unit of work: a file can move once its _callees_ are
+in `commonMain`, so movement propagates upward from the leaves, and the leaves are the screens.**
+**A set moves as a unit only when the references are mutual, and a graph calling a route is a one-way
+edge** -- `androidMain` sees `commonMain`, so a route moves out from under a graph that has not moved
+yet, which is why `LibraryNavGraph` could move at all once `LibraryRoute` below it had. The two other
+ways a graph was pinned are the nav half of §1's *run the audit in both directions*: **a pin that
+arrives through a _call_ is invisible to every import scan**, and **a file in a package can be pinned
+by a sibling in the same package with no import at all.** The three landings' narratives are in the
+git history.
 
 **An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two
 halves belong in opposite source sets.** `:app` has **zero** `expect`/`actual`, so introducing one for
@@ -320,26 +296,19 @@ repo-wide**) and a `:core-domain` type of our own, and an untyped `Any?` tree ca
 null distinguishable from an absent key, and a node type we wrote ourselves would be a parser we then have
 to test as carefully as the one it replaces. It was already versioned in `libs.versions.toml` with zero
 consumers, so adopting it is a declaration rather than a version resolution.
-**`WatchProgressStore.kt` was the first file it moved**, and it is worth reading as the shape of the rest:
-405 lines of `androidMain` that imported **not one `android.*` type** because it already took the four
-`:platform-core` ports as constructor parameters, so the JSON node type was the only thing pinning it.
-That produced two behaviour changes, and **the existing suite caught both — which is what the suite was
-characterised for.**
-  - **A stored JSON null `remoteImdbId` now reads as `null`** rather than the four characters `"null"`.
-    The old answer was a platform rendering leaking through a string accessor, and the bug it produces is
-    a remote id of literally `null` reaching the backend. A *non-string* primitive still goes through
-    `contentOrNull` and is trimmed the same way, so `remoteImdbId: 4242` still reads `"4242"` — that
-    second half is the discriminator, and it is why the code is `contentOrNull` rather than a
-    `jsonPrimitive.string` cast that would throw.
-  - **A stored `Long.MIN_VALUE` tombstone is now kept, and only a non-numeric entry is dropped.** The old
-    reader used `optLong(key, MIN)` as its accept filter, and `optLong` answers its default for anything
-    unreadable — so a sentinel was the *only* way to detect a non-number, and a real `Long.MIN_VALUE` was
-    indistinguishable from one and silently dropped. `jsonPrimitive.longOrNull` needs no sentinel.
-    **The masking did not vanish, it moved:** `setWatchProgress` still uses `Long.MIN_VALUE` as one, on a
-    `Map<String, Long>` rather than on JSON, so the reader now hands back a real `Long.MIN_VALUE` that the
-    gate reads as "no tombstone at all". Benign, because timestamps are `nowMs()` — and recorded in both
-    the test and the production KDoc, because **two sentinels on opposite sides of one value is the shape
-    to watch for when a type change removes one of them.**
+**`WatchProgressStore.kt` was the first file that moved, and its two behaviour changes are the shape of
+the rest.** 405 lines of `androidMain` imported **not one `android.*` type** because it already took the
+four `:platform-core` ports as constructor parameters, so the JSON node type was the only pin. **A stored
+JSON null `remoteImdbId` now reads as `null`** rather than the four characters `"null"` — the old answer
+was a platform rendering leaking through a string accessor — while a *non-string* primitive still goes
+through `contentOrNull`, which is why the code is `contentOrNull` and not a `jsonPrimitive.string` cast
+that would throw. **A stored `Long.MIN_VALUE` tombstone is now kept and only a non-numeric entry is
+dropped**, because the old reader used `optLong(key, MIN)` as its accept filter and `optLong` answers
+its default for anything unreadable — so a sentinel was the *only* way to detect a non-number and a real
+`MIN_VALUE` was indistinguishable from one. **The masking did not vanish, it moved** (a `Long` map, not
+JSON), so the reader now hands back a real `MIN_VALUE` the gate reads as "no tombstone" — benign,
+because timestamps are `nowMs()`, and **two sentinels on opposite sides of one value is the shape to
+watch for when a type change removes one of them.**
 **A file's dependency belongs in the source set the file is in, not where it used to be.** Moving the
 store cost 29 errors, all member-level on the four ports, because `:platform-core` was reachable only
 through `:platform-android` in `androidMain.dependencies` — a plain `com.android.library`, which publishes
@@ -370,12 +339,9 @@ the existing replacement before writing a second one in the same repo. **`okio` 
 `FileBackedPendingMutationStore` uses it with **no dependency line of its own** — so
 `desktopCompileClasspath | grep -c okio` answers "is it there" and
 `dependencyInsight --dependency com.squareup.okio` answers "from where" in two commands. **Its
-`commonMain` API is smaller than the JVM jar suggests, and the extra classes are the point**: okio 3.17.0
-has `source`/`sink`/`metadataOrNull`/`createDirectories`/`Path.parent` and **no `read`/`write` String
-overloads at all** (the older `-read(Path, readerAction)` and `-write(Path, mustCreate, writerAction)` are
-the internal inline forms, and calling them fails with `No value passed for parameter 'readerAction'`).
-**There are no `okio.FileSystemKt` / `Okio__OkioKt` String helpers to find** — a sorted `javap` sweep over
-all 88 top-level classes is what settled it, and the two probes that *did* resolve are the whole API.
+`commonMain` API is smaller than the JVM jar suggests** (no `read`/`write` String overloads at all, and
+no String-helper file to find), so *the surface is in the file, not here* — the two probes that resolve
+are the whole API, and the older `readerAction`/`writerAction` overloads are internal inline forms.
 **The test half is a separate artifact and does need declaring**: `okio-fakefilesystem` (version-matched
 to the `okio` that resolves, because a `FileSystem` subclass compiled against a different okio is an
 abstract-method error at best) is the only reason `FileBackedPendingMutationStore`'s wire format has any
@@ -383,17 +349,17 @@ coverage, and it is what caught the `flush`/`close` bug below. **A strict in-mem
 worth a test dependency for one reason: it fails where `FileSystem.SYSTEM` succeeds.** `FileSystem.SYSTEM`
 wrote a file that `readText` then read as `""`, and every green test in the world would have said the
 store worked. **And okio discharges two more pins, both of which were believed to have no KMP answer
-at all.** `ByteString.Companion.encodeUtf8().sha256().hex()` replaces `MessageDigest.getInstance("SHA-256")`
-plus a hand-rolled nibble loop, and `.md5()` is there too — **so "no `java.security` equivalent" is the
-same shape of false premise as "`java.util.UUID` has no Kotlin/Native equivalent", and the two claims
-were in the same class of file.** A digest that is merely *equivalent* is not good enough, though: see
-the golden rule below. **`delete` answers `Unit` where `java.io.File.delete()` answered `Boolean`**, and
+at all.** `ByteString.encodeUtf8().sha256().hex()` replaces `MessageDigest.getInstance("SHA-256")` plus a
+hand-rolled nibble loop, and `.md5()` is there too — **so "no `java.security` equivalent" is the same
+shape of false premise as "`java.util.UUID` has no Kotlin/Native equivalent"**, and the two claims were
+in the same class of file. A digest that is merely *equivalent* is not good enough, though: see the
+golden rule below. **`delete` answers `Unit` where `java.io.File.delete()` answered `Boolean`**, and
 `LibraryDiskCache.invalidate` returns `Result<Boolean>`, so the answer has to be *reconstructed* with a
 `metadataOrNull` first — `mustExist = true` throws for an absent file and `false` silently succeeds, and
-**neither is the old answer.** The compiler catches this one for free (`Result<Unit>` is not a
-`Result<Boolean>`), which is the strongest argument for reproducing a signature verbatim: the
-mismatch is a red build rather than a caller that quietly stops being able to see whether a delete
-happened. **And `use` needs `import okio.use`, not the stdlib's** — on the JVM okio's `Closeable` *is*
+**neither is the old answer.** The compiler catches this one for free, which is the strongest argument
+for reproducing a signature verbatim: the mismatch is a red build rather than a caller that quietly
+stops being able to see whether a delete happened. **And `use` needs `import okio.use`, not the stdlib's**
+— on the JVM okio's `Closeable` *is*
 `java.io.Closeable`, so `kotlin.io.use` applies and every local gate compiles it, while on Native
 `BufferedSink` is not an `AutoCloseable` and the stdlib overload has no applicable candidate. **That
 is the `Dispatchers.IO` rule arriving through a different symbol, and it cost a red `apple.yml` run
