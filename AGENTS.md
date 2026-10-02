@@ -916,7 +916,7 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   established the double answered, and for the right call number.
 - **A name that excludes N and a body that does not is the same defect twice, and the fix is
   one shared constant both use.** A test called `everyRoleExceptTheAccentAndTheErrorIsAGrey`
-  listed 35 roles *including* `errorContainer`, `onErrorContainer` and `inverseSurface` — and
+  listed 35 roles *including* three excluded ones — and
   the rewritten version had the identical bug, iterating all 37 unfiltered. Two tests each
   spelling out the excluded set is two places to forget to update, and the failure mode is a
   test that **skips** a role rather than a test that fails. Declare the set once
