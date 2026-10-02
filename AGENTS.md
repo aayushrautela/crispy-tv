@@ -519,10 +519,9 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   already done. **Split it into what is still true and what is done, keeping the numbering**, so item 6
   reads as half-done rather than the reader guessing from its first half.
 - **Re-test a premise this file or a build file states as settled.** **Measure the artifact you are
-  about to declare, never the family -- and the recorded answer here was itself half false**:
-  `LocalWindowInfo` does not exist in any resolved Compose artifact and `LocalConfiguration` is
+  about to declare, never the family**: `LocalWindowInfo` does not exist in any resolved Compose artifact and `LocalConfiguration` is
   Android-only in `ui-android`, yet `paging-common` is KMP, `paging-runtime` really is Android-only, and
-  **`paging-compose` is KMP**, which this sentence used to deny. And **a KDoc sentence about one caller
+  **`paging-compose` is KMP**. And **a KDoc sentence about one caller
   is not a statement about the function** -- a comment explaining *why* one caller behaves unusually is
   a comment about that caller.
   **A build file's per-file table is the same kind of premise, and it was wrong about both of the
