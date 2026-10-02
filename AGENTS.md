@@ -985,33 +985,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   as one named predicate each clause is separately testable.
 - **A fixture that equals its own transformation is a vacuous assertion.** Asserting
   `"8.4"` for a rating proved the standard library, because `formatOneDecimal(8.4)` is also `"8.4"`;
-  use `"10"` → `"10.0"`. Same shape: a cap case whose fixture was already sorted could not see a
-  cap applied *before* the sort. **When a normaliser has an identity input, that is the input to
+  use `"10"` → `"10.0"`. **When a normaliser has an identity input, that is the input to
   avoid in the fixture meant to prove the normaliser ran.**
   **The same defect has a counting shape, and it fires when the number is written from memory.**
-  Nine error messages in a service class asserted as a set — and the *count* was asserted from
-  recall as 7 when the answer is **8**, because `initialize`'s string differs from `syncNow`'s by one
-  inserted word, which is precisely the copy-paste pair the suite exists to catch. *A count is a
-  claim about the code; read the strings before asserting how many there are.*
+  *A count is a claim about the code; read the strings before asserting how many there are.*
   **The defaulted-expected-value shape is the same defect wearing a default argument, and it fails
-  *en masse* rather than one case at a time.** `ManifestUriTest` has a `row(raw, host, baseUrl,
-  pathSegments = emptyList(), encodedQuery = null)` helper over a 26-row measured table, and the
-  default asserted that **every** row's path is empty. Thirteen cases failed together with
-  `expected:<[]> but was:<[manifest.json]>`, and only the four rows written out disagreed with the
-  default. **A defaulted expected value is a fixture that agrees with every case it was not given
-  to**, so the fix is no default at all: every row states it, and a row added later cannot inherit a
-  wrong one. Read together with the counting shape above, the pattern is that **a value the author
-  filled in from memory is a value about the code rather than about the case** — `7` when the answer
-  was `8`, `emptyList()` when the answer was `["manifest.json"]`, and `Example.COM` when the answer was
-  `example.com` because the id lowercases the hint. **Three defaults, three wrong, and in each case
-  the fixture was the defect and the production code was right.**
-  **And a list built eagerly is already cumulative by the time a loop reads it** — the
-  dispatcher-slot test built all nine results first, so the counter a `RecordingDispatcher` was
-  holding had already reached 8 when the loop inspected its first member, and the failure
-  (`expected:<1> but was:<8>`) read like a production bug. **When the property under test is a
-  running total, the collection has to be invoked member-by-member and measured by a before/after
-  delta** — a counter asserted against a pre-collected result list proves nothing about ordering,
-  and it fails with a number that looks like a defect in the code rather than in the test.
+  *en masse* rather than one case at a time.** Thirteen cases failed together with
+  `expected:<[]> but was:<[manifest.json]>`, because a `row(...)` helper defaulted the expected
+  path to empty. **A defaulted expected value is a fixture that agrees with every case it was not given
+  to**, so the fix is no default at all. **A value the author fills in from memory is a value about
+  the code rather than about the case, and in each case the fixture was the defect and the
+  production code was right.**
+  **And a list built eagerly is already cumulative by the time a loop reads it** -- a counter
+  asserted against a pre-collected result list proves nothing about ordering. **When the property
+  under test is a running total, the collection has to be invoked member-by-member and measured
+  by a before/after delta.**
 - **A test asserting a guard's *reason* needs the two answers to differ in exactly one respect.**
   Write down what each world would answer; if the strings are equal, the case is decoration.
 - **A stub cannot be evidence about the value it replaces.** Assert on what production computed
