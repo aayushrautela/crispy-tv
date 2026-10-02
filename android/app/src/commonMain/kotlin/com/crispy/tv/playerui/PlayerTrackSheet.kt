@@ -1,6 +1,5 @@
 package com.crispy.tv.playerui
 
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,11 +61,14 @@ private data class LanguageGroup<T>(
     val items: List<T>,
 )
 
-private fun groupAudioByLanguage(tracks: List<NativeTrack>): List<LanguageGroup<NativeTrack>> {
+private fun groupAudioByLanguage(
+    tracks: List<NativeTrack>,
+    displayName: (String) -> String,
+): List<LanguageGroup<NativeTrack>> {
     if (tracks.isEmpty()) return emptyList()
     return tracks
         .groupBy { normalizeLang(it.language) }
-        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, ::englishDisplayNameForTag), items) }
+        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, displayName), items) }
         .sortedBy { it.label }
 }
 
@@ -82,30 +84,35 @@ private sealed interface SubtitleOption {
 private data class EngineSubtitleOption(
     val track: NativeTrack,
     override val isSelected: Boolean,
+    private val displayName: (String) -> String,
 ) : SubtitleOption {
     override val key = track.id
-    override val label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, ::englishDisplayNameForTag)
+    override val label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, displayName)
     override val language = track.language
-    override val subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, ::englishDisplayNameForTag) }
+    override val subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, displayName) }
     override val trackId = track.id
 }
 
 private data class CatalogSubtitleOption(
     val addonSubtitle: AddonSubtitle,
+    private val displayName: (String) -> String,
 ) : SubtitleOption {
     override val key = externalSubtitleTrackId(addonSubtitle.url)
-    override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language, ::englishDisplayNameForTag) }
+    override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language, displayName) }
     override val language = addonSubtitle.language
     override val subtitle = addonSubtitle.addonName?.takeIf { it.isNotBlank() }
     override val isSelected = false
     override val trackId = key
 }
 
-private fun groupSubtitlesByLanguage(options: List<SubtitleOption>): List<LanguageGroup<SubtitleOption>> {
+private fun groupSubtitlesByLanguage(
+    options: List<SubtitleOption>,
+    displayName: (String) -> String,
+): List<LanguageGroup<SubtitleOption>> {
     if (options.isEmpty()) return emptyList()
     return options
         .groupBy { normalizeLang(it.language) }
-        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, ::englishDisplayNameForTag), items) }
+        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, displayName), items) }
         .sortedBy { it.label }
 }
 
@@ -116,13 +123,14 @@ internal fun PlayerAudioSheet(
     audioTracks: List<NativeTrack>,
     selectedAudioTrackId: String?,
     palette: DetailsPaletteColors,
+    displayName: (String) -> String,
     onSelectAudioTrack: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-    val groups = groupAudioByLanguage(audioTracks)
+    val groups = groupAudioByLanguage(audioTracks, displayName)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -152,8 +160,8 @@ internal fun PlayerAudioSheet(
                     items(group.items, key = { it.id }) { track ->
                         val title = track.title?.takeIf { it.isNotBlank() }
                         TrackRow(
-                            label = title ?: languageLabelForCode(track.language, ::englishDisplayNameForTag),
-                            subtitle = title?.let { languageLabelForCode(track.language, ::englishDisplayNameForTag) },
+                            label = title ?: languageLabelForCode(track.language, displayName),
+                            subtitle = title?.let { languageLabelForCode(track.language, displayName) },
                             isSelected = track.id == selectedAudioTrackId,
                             palette = palette,
                             leadingIcon = if (track.language == null) Res.drawable.ic_music_note_filled else Res.drawable.ic_graphic_eq_filled,
@@ -176,6 +184,7 @@ internal fun PlayerSubtitleSheet(
     addonSubtitlesLoading: Boolean,
     addonSubtitlesError: String?,
     palette: DetailsPaletteColors,
+    displayName: (String) -> String,
     onSelectSubtitleTrack: (String?) -> Unit,
     onRefreshAddonSubtitles: () -> Unit = {},
     onDismiss: () -> Unit,
@@ -188,14 +197,14 @@ internal fun PlayerSubtitleSheet(
     val options =
         buildList<SubtitleOption> {
             subtitleTracks.forEach { track ->
-                add(EngineSubtitleOption(track, isSelected = track.id == selectedSubtitleTrackId))
+                add(EngineSubtitleOption(track, isSelected = track.id == selectedSubtitleTrackId, displayName = displayName))
             }
             addonSubtitles
                 .distinctBy { externalSubtitleTrackId(it.url) }
                 .filter { externalSubtitleTrackId(it.url) !in engineTrackIds }
-                .forEach { subtitle -> add(CatalogSubtitleOption(subtitle)) }
+                .forEach { subtitle -> add(CatalogSubtitleOption(subtitle, displayName)) }
         }
-    val groups = groupSubtitlesByLanguage(options)
+    val groups = groupSubtitlesByLanguage(options, displayName)
     val languagePills = groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) }
     var selectedLang by remember { mutableStateOf<String?>(null) }
     val visibleOptions =

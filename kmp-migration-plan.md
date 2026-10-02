@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **133 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 133) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **134 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 134) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -90,7 +90,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 
 | Module | `commonMain` | `androidMain` | `commonTest` |
 |---|---|---|---|
-| `core-domain` | 30 | 0 | 30 |
+| `core-domain` | 32 | 0 | 31 |
 | `platform-core` | 7 | 0 | 1 |
 | `sharedUI` | 5 | 0 | 1 |
 | `player` | 6 | 0 | 2 |
@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **133** | **64** | **52** |
+| **`:app`** | **134** | **63** | **52** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -143,7 +143,7 @@ pinned until the receiver moved.**
 
 | Module | `commonMain` | `androidMain` |
 |---|---|---|
-| `core-domain` | 30 | 0 |
+| `core-domain` | 32 | 0 |
 | `platform-core` | 7 | 0 |
 | `sharedUI` | 5 | 0 |
 | `player` | 6 | 0 |
@@ -152,16 +152,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **133** | **64** |
-| **total** | **238** | **78** |
+| **`:app`** | **134** | **63** |
+| **total** | **242** | **76** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 133 of 197, i.e. **68%**, and
-the 64 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 134 of 197, i.e. **68%**, and
+the 63 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -187,7 +187,7 @@ of a mistake recorded here deliberately**, because the previous version of this 
 130, and it only moved them, so the denominator stayed at 196 exactly. **A count computed from
 the moved file instead of measured is wrong even when the move is the one being described, and
 a landing that moves a file is net-zero on the sum that is the denominator.** It is
-`133 of 197` = **68%** now that the landing which *moved* `ImageCacheUtils` out of
+`134 of 197` = **68%** now that the landing which *moved* `ImageCacheUtils` out of
 `androidMain` has moved two more files across, so the numerator rose by two and **the denominator
 did not move at all** -- a *move* is net-zero on the sum, which is the entire content of the next
 sentence, and this is now the second landing running into that sentence from opposite ends: one
@@ -223,7 +223,7 @@ row recorded when it admitted that "a bucket measured by which artifacts a famil
 imports is also a claim about which file in the family imports them". The current version
 classifies each of `:app`'s **66** `androidMain` files **individually, by its own import
 set** — comment lines stripped, first matching rule wins — under **four gates**: every
-tracked file is classified (`64 == 64`); the buckets sum; **at least one bucket is
+tracked file is classified (`63 == 63`); the buckets sum; **at least one bucket is
 non-empty** (the all-zeros-under-a-`True`-checksum failure below); and **every empty bucket
 is on an allowlist carrying the landing that removed its wall**.
 
@@ -239,7 +239,10 @@ is on an allowlist carrying the landing that removed its wall**.
 | **0** | `default-import JVM call` — `synchronized(lock)`, `System.currentTimeMillis()` | **empty because both are gone** (`b43ea7ee`) |
 | **0** | **no hard pin at all** | **the point of the whole section, and the answer is zero** |
 
-**41 + 11 + 6 + 4 + 1 + 1 = 64, nothing unmatched.**
+**41 + 11 + 6 + 4 + 0 + 1 = 63, nothing unmatched.** The fifth bucket is now **zero**: the
+landing which lifted `NativeTrack` and `externalSubtitleTrackId` into `:core-domain`
+emptied it, because its only member was `PlayerTrackSheet.kt`, and a bucket that hits
+zero has to name the landing that emptied it rather than quietly shrink.
 
 #### The 41's import sets, because "it imports `android.jar`" is not a finding
 

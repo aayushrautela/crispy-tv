@@ -395,6 +395,10 @@ internal fun PlayerOverlay(
             audioTracks = uiState.audioTracks,
             selectedAudioTrackId = uiState.selectedAudioTrackId,
             palette = palette,
+            // Same package as `AndroidLanguageLabels.kt`, so no import: the sheet's
+            // `displayName` slot is filled with the Android implementation here, at the
+            // one place that is allowed to know it exists.
+            displayName = ::englishDisplayNameForTag,
             onSelectAudioTrack = {
                 resetControlsTimer()
                 onSelectAudioTrack(it)
@@ -410,6 +414,7 @@ internal fun PlayerOverlay(
             addonSubtitlesLoading = uiState.addonSubtitlesLoading,
             addonSubtitlesError = uiState.addonSubtitlesError,
             palette = palette,
+            displayName = ::englishDisplayNameForTag,
             onSelectSubtitleTrack = {
                 resetControlsTimer()
                 onSelectSubtitleTrack(it)

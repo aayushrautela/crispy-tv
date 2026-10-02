@@ -39,15 +39,26 @@ private val ISO639_2_TO_1 =
  * The label to show for a track language tag, or "Unknown" when there is nothing to
  * show.
  *
- * ## What moved here and what did not
+ * ## Why the sheet is not where this used to be
  *
- * This used to live at the bottom of `PlayerTrackSheet.kt` alongside the sheet, and
- * the sheet **cannot move**: it names `NativeTrack` and `externalSubtitleTrackId`,
- * both declared in `:android:native-engine`, which is a plain `com.android.library`
- * and therefore unreachable from a KMP `commonMain` whatever this file looks like.
- * That is a Phase 5/6 decision about the media engine, and it is the same wall
- * `PlayerSessionViewModel` is behind. This function is not behind it -- it is pure
- * data over a string plus a table -- so it moves and the sheet stays.
+ * This used to live at the bottom of `PlayerTrackSheet.kt`, and the sheet could not
+ * follow it: the sheet names `NativeTrack` and `externalSubtitleTrackId`, and both
+ * were declared in `:android:native-engine` -- a plain `com.android.library`, and so
+ * unreachable from a KMP `commonMain` whatever the sheet itself looks like.
+ *
+ * **Both of those two names have since been lifted into `:android:core-domain`'s
+ * `commonMain` under this same package**, and the sheet moved. That is the whole
+ * mechanism, and it is worth naming because the first version of this note claimed
+ * the opposite: the sheet was not stuck behind a Phase 5/6 media-engine decision,
+ * it was stuck behind **two value types that had no business living in an Android
+ * library**, and a five-field data class plus a hash helper do not need a player to
+ * be defined in terms of. `PlayerResizeMode` escaped the same way before it.
+ *
+ * The lesson is the one `:core-domain`'s `PlayerResizeMode.kt` was created to
+ * record, and it cuts the opposite way from "the sheet is too Android": **a file can
+ * be portable in every line it writes and still be unpinnable, and the thing that
+ * decides is the *kind* of the names it mentions, not how much platform API it
+ * calls.**
  *
  * The one thing it could not keep is [englishDisplayName], and that is the slot.
  * `Locale.forLanguageTag(tag).getDisplayLanguage(Locale.ENGLISH)` is genuinely
