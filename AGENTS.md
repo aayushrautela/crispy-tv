@@ -1235,9 +1235,8 @@ GitHub Actions (`.github/workflows/`), all `workflow_dispatch`-only by deliberat
   naming: the dot handling above was already correct, and the file that broke it had no dot in it.**
   `actual typealias JvmSynchronized = kotlin.jvm.Synchronized` in `JvmSynchronizedAndroid.kt` emitted
   `JvmSynchronizedAndroidKt`, and the gate reported that class as a stale output on a tree where
-  nothing was stale. Two independent reasons, either of which alone is enough: **`TYPEALIAS` matched
-  `^typealias` and not `^actual typealias`**, so the line fell through *every* branch — not
-  `TYPEALIAS`, not `EXPECT`, not `DECL`, not `TOP_LEVEL_MEMBER` — and `has_facade` stayed false; and
+  nothing was stale. Two independent reasons: **`TYPEALIAS` matched `^typealias` and not
+  `^actual typealias`**, so the line fell through every branch and `has_facade` stayed false; and
   **the rule itself was wrong**, because a top-level `typealias` declares no type and no property and
   *still* emits a facade. **`expect annotation class` was measured and deliberately still skipped** —
   `JvmSynchronized.kt` declares one and emitted no facade on Android, because nothing actualizes it
