@@ -783,23 +783,15 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   to edit.
 - **Generalised: it was not one member. 36 of the double's 51 members returned `Nothing`, so
   `open` bought almost nothing.** Every one was rewritten to the interface's declared return
-  type, which is scriptable off `BackendApi.kt` but has a consequence worth stating: **`Nothing`
-  needed no imports, and the real types do.** The rewrite surfaced 18 unresolved names, and
-  finding each one's package by `grep -rl … | head -1` picked the **wrong** `ProfileSettings` --
-  there are two, `com.crispy.tv.backend` and `com.crispy.tv.domain.account`, and the interface has
-  no import for it, which is how you tell that its type is same-package. **Two declarations share
-  a simple name; the package that has to win is the one the *interface* imports, not the one the
-  first grep hit.** **And the two copies can be in different *modules*, where a name-only grep is
-  worse than a wrong package: it answers about the wrong declaration and the count looks
-  plausible.** `:addons`' `JsonAccessors.kt` and `:app`'s `LibraryDiskCacheJsonAccessors.kt` declare
-  `optStringOrThrow`, `optBooleanOrThrow`, `optIntOrNull` and seven more under **identical simple
-  names**, so grepping the three accessors that `:addons` turned out not to call returns **five
-  `:app` call sites and zero `:addons` ones** -- the names are live, the declarations are not. The
-  only sound scope is the **one compilation unit that can see an `internal` declaration at all**,
-  and the asymmetry is the other half of the finding: `:app`'s copy is a superset of **thirteen**,
-  all thirteen called, while `:addons`'s eleven had **eight** called. So the stale copy was the
-  small one, and *consolidating the two is a port only after the bodies are diffed* -- `:app` and
-  `:backend` already hold two `optNullableString` copies that disagree.
+  type, and **`Nothing` needed no imports, while the real types do** — the rewrite surfaced 18
+  unresolved names, and `grep -rl … | head -1` picked the **wrong** one of two `ProfileSettings`.
+  **The package that has to win is the one the *interface* imports, not the one the first grep
+  hit.** **And the two copies can be in different *modules*, where a name-only grep answers about
+  the wrong declaration and the count looks plausible.** The only sound scope is the **one
+  compilation unit that can see an `internal` declaration at all** — `:app`'s thirteen-accessor copy
+  superseded `:addons`' eleven, so the stale copy was the small one — and *consolidating two copies
+  is a port only after the bodies are diffed*, since `:app` and `:backend` already hold two
+  `optNullableString` copies that disagree.
 - **A caller that already collapses every failure into one answer does not need a port to
   distinguish them; a caller that answers two different ways does.** This is the same rule as the
   bullet below, applied to a port's *shape*. Three call sites held `toHttpUrlOrNull()` when
