@@ -526,45 +526,38 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   about to declare, never the family -- and the recorded answer here was itself half false**:
   `LocalWindowInfo` does not exist in any resolved Compose artifact and `LocalConfiguration` is
   Android-only in `ui-android`, yet `paging-common` is KMP, `paging-runtime` really is Android-only, and
-  **`paging-compose` is KMP**, which this sentence used to deny. Three siblings, one family, three
-  different answers. And **a KDoc sentence about one caller is not a statement about the function** --
-  a comment explaining *why* one caller behaves unusually is a comment about that caller.
+  **`paging-compose` is KMP**, which this sentence used to deny. And **a KDoc sentence about one caller
+  is not a statement about the function** -- a comment explaining *why* one caller behaves unusually is
+  a comment about that caller.
   **A build file's per-file table is the same kind of premise, and it was wrong about both of the
   entries it listed for one file.** `:addons`' table said `RemoteSupabaseSyncLabService` was in
   `androidMain` for "`Context` and `org.json`". It named no `org.json` type at all, and the `Context`
   was a constructor parameter **the class never read** -- it had been under a
   `@Suppress("UNUSED_PARAMETER")` the whole time. **So the pin was a parameter nobody consulted, and
   the fix was to DELETE it rather than slot it: a wrapper's parameter list pins a file exactly as
-  hard as its imports do, and an import scan cannot see it.** The same file in `:app` had a second
-  one (`watchHistoryService`), and removing it from the private function *and* from the public hook's
-  type changed nothing else -- the hook had zero users outside the file, which is what you measure
-  before deciding a type can change. **Read the property initialisers of a wrapper before planning its
-  port, not its import list and not its KDoc row.**
+  hard as its imports do, and an import scan cannot see it.** **Read the property initialisers of a
+  wrapper before planning its port, not its import list and not its KDoc row.**
   **A premise about the *ecosystem* ages in one direction, so "no equivalent exists" is the version
   that rots.** Three KDocs asserted "`java.util.UUID` has no Kotlin/Native equivalent", and it was true
   when written: `kotlin.uuid` did not exist. It is now `Uuid.random()`, **stable** in the resolved
   Kotlin 2.4.10 stdlib -- and *stable* is a measurement, not a version number: the class carries
   `kotlin.WasExperimental`, and of the companion's members **only `generateV4` still carries
-  `kotlin.uuid.ExperimentalUuidApi`**. `javap` and the constant pool answer the opt-in question a
-  version number cannot, and the compile answers the rest. **One of the three claims was in
-  `commonMain`**, so a `commonMain` reader was being told a `commonMain` file could not exist. **When
-  a KDoc names a platform capability as the reason a file cannot move, re-run that claim against the
-  resolved artifact before planning the file, and correct every copy in the same commit: a corrected
-  premise with two surviving copies is worse than the original, because the next reader finds both.**
+  `kotlin.uuid.ExperimentalUuidApi`**. **One of the three claims was in `commonMain`**, so a `commonMain`
+  reader was being told a `commonMain` file could not exist. **When a KDoc names a platform capability
+  as the reason a file cannot move, re-run that claim against the resolved artifact before planning
+  the file, and correct every copy in the same commit: a corrected premise with two surviving copies
+  is worse than the original, because the next reader finds both.**
   **And one of those copies can be the GATE itself, so a coordinate swap's blast radius is every token
   list that mentions the old one, not only the prose.** `f1c5b4ff` corrected seven doc claims and
   missed `scripts/check_common_purity.py`, whose `FORBIDDEN_PREFIXES` still forbade
   `androidx.navigation`; `54f0189c` then went **red on BOTH workflows** on a build that compiles and
   tests clean locally, because both run that gate. *A stale document misleads a reader; a stale gate
-  fails the build.* **So after any swap, grep the scripts, not just the docs** -- and the gate had
-  **already had this fix applied twice** (`androidx.paging`, `androidx.lifecycle`), so the third case
-  was a copy nobody made rather than a situation nobody met. The fix is the file's **own** pattern
-  (remove the prefix, add the measured comment, give the re-add trigger) and **not an allowlist entry
-  for the offending file** -- a safety gate that fires on correct code gets switched off. **Re-prove a
-  gate you have changed by violating its premise and confirming it still fires**: injecting
-  `androidx.room` and `androidx.media3` imports each returned exit 1, the restore returned 0, and the
-  file was byte-identical afterwards. *Removing a token is not the same evidence as the gate still
-  working, and only the second one is a measurement.*
+  fails the build.* **So after any swap, grep the scripts, not just the docs.** The fix is the file's
+  **own** pattern (remove the prefix, add the measured comment, give the re-add trigger) and **not
+  an allowlist entry for the offending file** -- a safety gate that fires on correct code gets switched
+  off. **Re-prove a gate you have changed by violating its premise and confirming it still fires**:
+  *removing a token is not the same evidence as the gate still working, and only the second one is a
+  measurement.*
 - **A count written about a set that later grows is stale silently, and re-measuring it is one
   command.** Three undercounts, each making work look smaller than it is, and each corrected twice
   over (a plan said 28 shared-transition files, then "10 across 6", and the measurement was **27**).
