@@ -695,49 +695,42 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   had a test that ran the shared code directly. A rule both implementations depend on and
   neither tests needs its own suite; it does not come free with the constant.
 - **`Dispatchers.IO` does not exist in `commonMain`.** It is declared in the JVM and Native
-  source sets, so a `commonMain` file sees only `Dispatchers.Default` and `Dispatchers.Main`.
-  A `commonMain` class doing blocking work therefore needs a **no-default** `ioDispatcher`
-  slot rather than a defaulted one: defaulting to `Dispatchers.Default` compiles on every
-  target and silently puts blocking I/O on a CPU-sized pool. Measured when
-  `DetailsMetadataLoader` moved to `commonMain`; the view model passes `Dispatchers.IO`.
-  **The rule was right and the commit that broke on it quoted the import list as evidence
-  that it did not apply — so the missing half is the mechanism, not the rule.** `Dispatchers.IO`
-  is `public` on the JVM and **`internal` on Kotlin/Native**, so the compiler says *"Cannot access
-  'val IO: CoroutineDispatcher': it is internal in `kotlinx.coroutines.Dispatchers`"* rather than
-  `Unresolved reference`, **and `Dispatchers.IO` needs no import of its own** — `Dispatchers` is
-  the import, so an import scan is structurally incapable of finding the use. **Every local gate in
-  this repository compiles it as public**: `desktopTest` compiles `commonMain`+`desktop`,
-  `androidHostTest` compiles `commonMain`+`androidMain`, and both are JVM. **A green desktop compile
-  is therefore not evidence about a `commonMain` file**, and this cost **three red `apple.yml` runs**
-  on **one line** — `CatalogPagingSource.kt:26:50`, `2b4c5033`, fixed in the landing after it.
-  **`apple.yml` on a macOS runner is the only gate that can see this class of error, so a dispatched
-  run has to be *read*: 204 means accepted, not green, and dispatching and forgetting it is what let
-  three consecutive red runs sit unread.**
-  **The same error arrives through a symbol that was never an import, and the two halves of one file
-  can need different packages.** `MetadataAddonRegistry` used `@Volatile` and `@Synchronized` with
-  **no import at all** — they resolved from the JVM's default import of `kotlin.jvm.*`, which a
-  `commonMain` file does not get, so a scan cannot see either. Their replacements do **not** come
-  from the same place: `@Volatile` is `kotlin.concurrent.Volatile` and works, while
-  **`kotlin.concurrent.Synchronized` does not resolve at all** in Kotlin 2.4.10
-  (`Unresolved reference 'Synchronized'`) and **`kotlin.jvm.Synchronized` resolves on the JVM and is
-  rejected as an `error` by `compileKotlinLinuxX64`**. The answer the compiler itself prints is
-  *"introduce your own optional-expectation annotation and actualize it with a typealias"* — which is
+  source sets, so a `commonMain` file sees only `Dispatchers.Default` and `Dispatchers.Main`, and a
+  class doing blocking work therefore needs a **no-default** `ioDispatcher` slot rather than a
+  defaulted one: defaulting to `Dispatchers.Default` compiles on every target and silently puts
+  blocking I/O on a CPU-sized pool.
+  **The rule was right and the commit that broke on it quoted the import list as evidence that it
+  did not apply, so the missing half is the mechanism, not the rule.** `Dispatchers.IO` is `public`
+  on the JVM and **`internal` on Kotlin/Native**, so the compiler says *"Cannot access 'val IO:
+  CoroutineDispatcher': it is internal in `kotlinx.coroutines.Dispatchers`"* rather than `Unresolved
+  reference` -- **and it needs no import of its own**, `Dispatchers` is the import, so an import scan
+  is structurally incapable of finding the use. **Every local gate compiles it as public**
+  (`desktopTest` and `androidHostTest` are both JVM), so **a green desktop compile is not evidence
+  about a `commonMain` file**; this cost **three red `apple.yml` runs** on **one line**. **`apple.yml`
+  on a macOS runner is the only gate that can see this class of error, so a dispatched run has to be
+  *read*: 204 means accepted, not green.**
+  **The same error arrives through symbols that were never imports, and the two halves of one file can
+  need different packages.** `MetadataAddonRegistry` used `@Volatile` and `@Synchronized` with **no
+  import at all** -- they resolved from the JVM's default import of `kotlin.jvm.*`, which a
+  `commonMain` file does not get. Their replacements do **not** come from the same place:
+  `@Volatile` is `kotlin.concurrent.Volatile` and works, while **`kotlin.concurrent.Synchronized` does
+  not resolve at all** in Kotlin 2.4.10 and **`kotlin.jvm.Synchronized` resolves on the JVM and is
+  rejected as an `error` by `compileKotlinLinuxX64`**. The compiler's own answer is *"introduce your
+  own optional-expectation annotation and actualize it with a typealias"* -- which is
   `JvmSynchronized`, an `@OptionalExpectation` annotation typealiased on Android. **So the newer name
   is the one that does not exist and the older name is the one that is forbidden**, and *the
-  migration a symbol's name suggests was not available*. Note which gate saw each: `compileKotlinDesktop`
-  and `compileAndroidMain` were **green** on the rejected import, and `compileKotlinLinuxX64` -- a target
-  **`:app` does not have** because it is a Compose module -- is what refused it. A `Mutex` was the
-  portable alternative and was rejected on its merits rather than on a preference: `withLock`
-  suspends, so it would have made all five public methods `suspend` and reached every caller.
-  **The same shape arrived a landing later as `synchronized(lock) { }`, and it is stronger: it is an
-  `actual` on the JVM and absent from common metadata altogether**, so the Linux gate answered
-  `Unresolved reference 'synchronized'` *plus* a cascading `'return' is prohibited here` that reads like a
-  control-flow bug. Like `Dispatchers.IO` it needs no import, so no scan can find it, and unlike the
-  annotation pair the portable answer is not a rename. `Mutex` cost nothing here **because both
-  guarded regions were inside a `private suspend fun`**: the `Mutex`-makes-everything-`suspend` bill
-  arrives with the *visibility* of the method holding the lock, not with the lock. `CachingStreamResolver`
-  in the same package already held a `Mutex`, so a replacement for a JVM call went in the file that
-  already replaces that library.
+  migration a symbol's name suggests was not available*. A `Mutex` was the portable alternative and
+  was rejected on its merits rather than a preference: `withLock` suspends, so it would have reached
+  every caller.
+  **`synchronized(lock) { }` is the strongest instance of the family: an `actual` on the JVM and
+  absent from common metadata altogether**, so the Linux gate answered `Unresolved reference
+  'synchronized'` *plus* a cascading `'return' is prohibited here` that reads like a control-flow
+  bug. Like `Dispatchers.IO` it needs no import, and unlike the annotation pair the portable answer
+  is not a rename -- but `Mutex` cost nothing **because both guarded regions were inside a `private
+  suspend fun`**: *the `Mutex`-makes-everything-`suspend` bill arrives with the **visibility** of the
+  method holding the lock, not with the lock.* And the portable lock was already in the sibling class
+  in the same package, so a replacement for a JVM call went in the file that already replaces that
+  library.
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
   interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
   member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can
