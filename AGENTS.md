@@ -386,6 +386,21 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   command). **A green compile of the wrong source set is worse than a red one, because it is read as
   evidence** — and it was only caught by noticing that the *fix* I had just made was in a file that task
   does not see. **Before trusting a compile, check which source sets it names.**
+- **`:app` does have a local gate for its `commonMain`, and it is neither of the two the checklist
+  names — so the claim that it has none was wrong, and a third task fixes it.**
+  **`:android:app:compileCommonMainKotlinMetadata`** compiles `commonMain` against the
+  **metadata variant** of every dependency, which carries *only common declarations*.
+  `compileKotlinDesktop` resolves the **jvm** variant and `compileAndroidMain` the **android**
+  one, so **each of the two catches an Android-only symbol and misses a JVM-only one, and only
+  the metadata task catches both.** That is the task that settled the whole Coil question in
+  one landing: `coil3.imageLoader` and `coil3.SingletonImageLoader` are Android/JVM-resolvable
+  but neither is common, and the one error that *proved* a symbol was common
+  (`'operator' modifier is required on 'fun get(context: PlatformContext): ImageLoader'`) is an
+  error that can only be produced by a metadata compilation. It needs no Kotlin/Native toolchain,
+  so unlike `linuxX64` it runs on Linux — **which means the bullet above this one, that a gate
+  which cannot reach a module "is no gate", was answering a question nobody needed to ask: the
+  gate existed, it was simply unnamed.** A `find`-and-`grep` answer to "is there a gate for this?"
+  is a claim about search results, and `:app:tasks --all` is the measurement.
 - **The explanation for one module's gap does not generalise, and assuming it does hides the more
   useful cause.** `:addons` had no test source set because five of its files are `Context`/OkHttp
   adapters and a test directory for one file in an Android-shaped module reads as wrong. **`:player`
@@ -1342,6 +1357,7 @@ Python (tooling):
 - `python3 scripts/validate_workflows.py`
 - `./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest`
 - `./gradlew :android:app:testAndroidHostTest` (the composition root; this is the gate before touching `PlaybackDependencies`, `AppDistribution` or the two service providers)
+- `./gradlew :android:app:compileCommonMainKotlinMetadata` (`:app`'s `commonMain` against the **metadata** variant of every dependency, so it is the only task that catches a *JVM-only* symbol in `commonMain`; `compileKotlinDesktop` and `compileAndroidMain` each miss one. The gate before moving any file into `:app`'s `commonMain`.)
 - `./gradlew :android:app:desktopTest` (`:app`'s `commonTest`; the gate before touching the settings repositories, the date formatting, or any other `commonMain` file in `:app`)
 - `./gradlew :android:backend:desktopTest` (the port tests; the gate before changing `BackendApi` or `AccountApi`, since `UnusedBackendApi` fails to compile on a new member)
 - `./gradlew :android:home:desktopTest :android:home:testAndroidHostTest` (`:home`'s moved home services; the gate before touching `CalendarService` or `UpNextService`)

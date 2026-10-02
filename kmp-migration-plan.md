@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **131 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 131) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **132 of 197 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 132) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -99,7 +99,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **131** | **66** | **51** |
+| **`:app`** | **132** | **65** | **51** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -152,7 +152,7 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **131** | **66** |
+| **`:app`** | **132** | **65** |
 | **total** | **237** | **79** |
 
 **`:app` is no longer the only module that matters, and every other module is now
@@ -160,7 +160,7 @@ pinned until the receiver moved.**
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 131 of 197, i.e. **66%**, and
+than by anything structural. `:app` is 132 of 197, i.e. **67%**, and
 the 66 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
@@ -187,9 +187,11 @@ of a mistake recorded here deliberately**, because the previous version of this 
 130, and it only moved them, so the denominator stayed at 196 exactly. **A count computed from
 the moved file instead of measured is wrong even when the move is the one being described, and
 a landing that moves a file is net-zero on the sum that is the denominator.** It is
-`131 of 197` = **66%** now that the landing which *wired* intro skip up *added* a mapper to
-`commonMain` -- **a numerator change that did not move the percentage by a single point**, which
-is the "or by adding a file" case in the next sentence happening again one landing later.
+`132 of 197` = **67%** now that the landing which *moved* `ImageCacheUtils` out of
+`androidMain` has moved one more file across, so the numerator rose by one and **the denominator
+did not move at all** -- a *move* is net-zero on the sum, which is the entire content of the next
+sentence, and this is now the second landing running into that sentence from opposite ends: one
+*added* a file and moved the denominator, this one *moved* a file and left it alone.
 **The 321-line move was the first landing in seven whose denominator changed at all.** It was
 195 for six, the seventh moved it to 196, and this one moved it again to 197, for the same
 reason it did the first time, which is that a landing can move a file and *add* one and the
@@ -221,7 +223,7 @@ row recorded when it admitted that "a bucket measured by which artifacts a famil
 imports is also a claim about which file in the family imports them". The current version
 classifies each of `:app`'s **66** `androidMain` files **individually, by its own import
 set** — comment lines stripped, first matching rule wins — under **four gates**: every
-tracked file is classified (`66 == 66`); the buckets sum; **at least one bucket is
+tracked file is classified (`65 == 65`); the buckets sum; **at least one bucket is
 non-empty** (the all-zeros-under-a-`True`-checksum failure below); and **every empty bucket
 is on an allowlist carrying the landing that removed its wall**.
 
@@ -237,14 +239,17 @@ is on an allowlist carrying the landing that removed its wall**.
 | **0** | `default-import JVM call` — `synchronized(lock)`, `System.currentTimeMillis()` | **empty because both are gone** (`b43ea7ee`) |
 | **0** | **no hard pin at all** | **the point of the whole section, and the answer is zero** |
 
-**43 + 11 + 6 + 4 + 1 + 1 = 66, nothing unmatched.**
+**42 + 11 + 6 + 4 + 1 + 1 = 65, nothing unmatched.**
 
-#### The 43's import sets, because "it imports `android.jar`" is not a finding
+#### The 42's import sets, because "it imports `android.jar`" is not a finding
 
-Grouped by the file's **entire** import set rather than by family: **17 import nothing but
-`android.content.Context`** and nothing else at all; **3** are `Context` + `java.util.Locale`
-(`DetailsViewModelFactory`, `PersonDetailsViewModelFactory`, `SearchViewModelFactory`); and
-the rest are singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,
+Grouped by the file's **entire** import set rather than by family — and the grouping is worth
+printing for exactly one reason, which is that **the case this section used to lead with is
+empty**: **no file imports `android.content.Context` and nothing else at all**, measured `0` of
+`65`, and **none** is exactly `Context` + `java.util.Locale` either, which an earlier draft of
+this sentence claimed of three named files. Every one of them reaches for something else as well,
+and several reach for two or three. So there are no singletons in that sense, only near-
+singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,
 `Context` + `SharedPreferences`, `Context` + `SharedPreferences` + `Locale`,
 `Context` + `Uri` + `Locale`, `Context` + `java.io.File`, `Context` + `Looper`,
 `Context` + `audio focus`, `Context` + `AtomicBoolean`, `Context` + `DateFormat`/
@@ -255,12 +260,25 @@ the rest are singletons — `Context` + `Intent` + `Uri`, `Context` + `Intent`,
 (`PlaybackSessionControllerPlayer`, `PlaybackDependencies`, `DistributionComponents`,
 `ProfileDataCloudSync`).
 
-**The 17 are the finding, and they are not work.** `fun create(context: Context)` **is** a
-composition root, and a `Context` used for wiring belongs in the factory — so
-**`AppGraph`, the eleven service providers and the ViewModel factories are not files
-waiting to move; they are the edge.** A count that lumps them in with `android.jar` reads
-as 43 blocked files and is really **17 correct ones and 26 files that reach the platform
-for something other than wiring.**
+**What supports that conclusion is a role predicate, not an import set.** `fun create(context:
+Context)` **is** a composition root, and a `Context` used for wiring belongs in the factory.
+Measured over the 65 files of `androidMain`, **31 declare a `*Provider`/`*Factory`/`*Graph`
+type or a function taking a `Context`**; the other 34 are files that reach the platform for
+something other than wiring. Those 31 are not files waiting to move; they are the edge.
+
+**The predicate is stated inline because the import-set framing it replaced was not
+re-measurable, and that is why it drifted.** An earlier draft of this section led with a
+count of files importing nothing but `Context`, gave it a number, and named three files as
+being `Context` + `Locale`; run against the definition the sentence itself states, both
+figures are **zero**, and the number in the prose matched neither reading available. The
+conclusion was right and the evidence for it was the part that rotted. Two further reasons
+not to quote an import-set count here: it changes meaning every time a file is ported to a
+library accessor rather than an `android.*` one -- `ImageCacheUtils` reached for Coil, not
+`android.jar`, and its departure is invisible to the rule -- and a broad `androidx.` prefix
+is unsafe to quote at all, because CMP 1.11.x ships real `androidx.compose.*` KMP artifacts.
+**The 31 does not partition the 42 either**, and is not meant to: the census above is a
+first-match partition under its own rules, and this is a separate measurement over the whole
+source set. Substituting one for the other would imply they were the same thing.
 
 #### Two buckets are empty, and each is a landing rather than an absence
 
