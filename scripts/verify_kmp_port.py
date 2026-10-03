@@ -84,6 +84,25 @@ PIN_EXTERNAL = (
     ("androidx.paging.compose", "paging-compose (KMP; runtime is not)"),
     ("androidx.activity.compose", "activity-compose (KMP artifact, Android Host)"),
     ("androidx.core.", "androidx-core (KMP artifact, Android Host)"),
+    # `LocalContext` and `LocalConfiguration` are the two commonest Android pins in
+    # `:app` and NEITHER was in this table until this landing, which is only visible
+    # because it produced the module's first file whose ONLY pin is one of them.
+    #
+    # Every earlier user was masked: the partition is first-match, so any file that also
+    # imported something an earlier rule matched landed in that bucket and nobody saw
+    # that the token was missing. `AppRoot.kt` is the clearest case -- it was filed
+    # under `navigation` on `NavGraph.Companion.findStartDestination`, which is a COMMON
+    # declaration and therefore not a pin at all, so its `LocalContext` never surfaced
+    # either. **A first-match partition can report a bucket as carrying the pin when the
+    # token that caught it is not one, and it will keep doing that until a file forces
+    # each rule to be the *first* thing that matched.**
+    #
+    # Both are `android.jar` proper: `LocalContext.current` IS a `Context`, and
+    # `LocalConfiguration` is declared in `ui-android`. (`LocalDensity` and
+    # `LocalLayoutDirection` live in the same package and are genuinely common, which
+    # is why this is two exact tokens and not a package prefix.)
+    ("androidx.compose.ui.platform.LocalContext", "android.jar"),
+    ("androidx.compose.ui.platform.LocalConfiguration", "android.jar"),
     ("android.", "android.jar"),
 )
 

@@ -769,6 +769,25 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `Uri`'s dead scheme-override branch was *deleted* rather than reproduced: `UriBehaviourHostTest`
   had already measured it unreachable in `:addons`'s copy of the same rules, and the
   normalization above it guarantees a scheme on every path.
+- **A census rule list is a claim about the rules, and `no-pin-found: 0` was the weakest evidence
+  in the repository -- it took a landing that produced a file whose *only* pin was missing from
+  the table to show it.** `verify_kmp_port.py`'s eleven rules are matched by import prefix, and
+  the `android.jar` rule is the literal `"android."`, which **never matches `androidx.`**. So
+  `androidx.compose.ui.platform.LocalContext` and `LocalConfiguration` -- the two commonest
+  Android pins in `:app` -- were invisible to the census entirely. **Every earlier user was
+  masked**, because the partition is first-match: any file also importing something an earlier
+  rule matched landed in *that* bucket and nobody saw the token was absent. `AppRoot.kt` is the
+  clearest case, and it is a case AGENTS already records from the other side: it was filed under
+  `navigation` on `NavGraph.Companion.findStartDestination`, which **is** a COMMON declaration, so
+  the token that caught it was not a pin and its `LocalContext` never surfaced either. Two
+  independent errors in one file, and one of them was hiding the other.
+  **The general form is the one already recorded for empty buckets, arriving at the rule list
+  instead: a bucket that asserts a negative is a claim the measurement must TEST, and a
+  first-match partition reports "every file carries a pin" just as happily when every file
+  carries a pin the scanner cannot name.** The fix is two *exact* tokens rather than the
+  `androidx.compose.ui.platform.` prefix -- `LocalDensity` and `LocalLayoutDirection` live in that
+  package and are genuinely common -- and the re-proof is that `AndroidAppRoot.kt` moved from
+  `no-pin-found` into `android.jar` while the partition still summed to 48.
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
   interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
   member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can
@@ -876,12 +895,44 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   genuine reading of a platform value and belongs at the edge, while
   `DateTimeFormatter.ofPattern(…, Locale.getDefault())` is a genuine *formatting* locale that
   `kotlinx-datetime` cannot express the same way.
+- **A registration function crossing as a function needs *both* the receiver and the controller,
+  and `::name` is not a shortcut for either.** `addPlayerDestination` is
+  `internal fun NavGraphBuilder.addPlayerDestination(navController: NavHostController)`, and it
+  is the one destination `PlayerNavGraph` still owns, so `AppNavHost` had to take it as a slot.
+  Three shapes, two of which do not compile: `::addPlayerDestination` fails because a first-class
+  reference to an *extension* needs its receiver and there is no standalone function to point at;
+  `NavGraphBuilder.() -> Unit` compiled as neither a receiver nor a plain function and answered
+  **`No value passed for parameter 'p1'` at the call site** -- which is worth recognising on sight,
+  because **`p1` is a synthesised parameter name, so its appearance means the compiler read a plain
+  `Function1` where an extension function type was declared**. The working shape is
+  `(builder: NavGraphBuilder, navController: NavHostController) -> Unit`, and it is the honest one:
+  the extension receiver is `NavGraphBuilder` and not `NavHostController`, and the builder exists at
+  all **only inside `NavHost`'s content lambda**. **So a slot for a graph-registration function is a
+  two-argument slot, and one of the arguments is a scope that only exists inside the file asking
+  for it** -- which is the same constraint the `@Composable` slots in `SettingsNavDependencies` and
+  `HomeNavDependencies` satisfy differently, because those name arguments rather than a receiver.
 - **A duplicate body is a signal one copy needs a caller.** `episodeHeaderMetadata` and
   `episodeRowMeta` assembled the same string byte-identically in two files with no dependency
   between them; letting one delegate **reversed the package dependency** in the better direction.
 - **A wrapper's `if` decides whether the shared body runs at all**, so collapsing it into `?:`
   silently adds a fallback the original never had. A null *from the body* is not the same event as
   a null *input*.
+- **When the object cannot be built by the caller, the slot is `@Composable () -> T` and not `T`,
+  and that is a fourth slot shape rather than another instance of an existing one.** `AppNavHost`
+  needs ~40 platform products and two of the inputs to building them are composition locals, so the
+  bundle cannot be constructed by a `commonMain` caller that has no context. The seam is therefore
+  a *producer* -- `dependencies: @Composable () -> AppNavHostDependencies` -- rather than a value,
+  and `AppNavHost` invokes it inside `CrispySharedTransitionLayout`. **The part that is easy to get
+  wrong is where it is invoked: `NavHost`'s content lambda is not a composable scope**, so calling
+  the producer there would put a `remember` in a non-composable scope and fail the same way the
+  search graph's first hoisting attempt did. `AppRoot` passes the producer down as the same slot
+  type rather than calling it, so there is exactly one composable scope in the chain that owns the
+  `remember`s, and it is in the file that knows how to build each value.
+  **Compare with the slots already in this codebase: `@Composable (Args) -> Unit` is a rendering
+  seam, `(text: String) -> Unit` is a capability, and `@Composable () -> T` is a wiring seam.** The
+  question that separates them is not "is it a lambda" but **who has to be a composable for it to
+  work** -- and a producer slot is the one whose caller must be a composable, which makes it a
+  constraint on the *callee's* body and not only on its signature.
 - **A `create`-style factory is not a reason a class cannot be portable; it is a reason the factory
   has to live somewhere else.** Make it a top-level function, never a cached object — caching
   would be a behaviour change dressed as a refactor.

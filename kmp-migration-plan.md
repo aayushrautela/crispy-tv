@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **160 of 208 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 160) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **164 of 212 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 164) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -118,7 +118,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **160** | **48** | **73** |
+| **`:app`** | **164** | **48** | **74** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -171,15 +171,15 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **160** | **48** |
-| **total** | **270** | **61** |
+| **`:app`** | **164** | **48** |
+| **total** | **274** | **61** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 160 of 208, i.e. **77%**, and
+than by anything structural. `:app` is 164 of 212, i.e. **77%**, and
 the 48 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
@@ -279,8 +279,8 @@ matched, and that the plan's own stated count still agrees with the tree:
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **32** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
-| **3** | `androidx.navigation` | **the one thing gating desktop, and a DECISION not a port.** `NavHostController` is an Android `Activity`; the artifact itself is KMP. `CrispySharedTransitionLayout` is already in `commonMain` waiting for a graph that can reach it |
+| **33** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
+| **2** | `androidx.navigation` | **not a port, and not a decision either -- a Bundle.** `PlayerNavGraph.kt` (16 `navArgument(` declarations, 4 bundle reads) and `AppNavHostDependenciesAndroid.kt` (the three route-argument readers) both read `NavBackStackEntry.arguments`, whose member returns `android.os.Bundle` on every platform. The artifact is KMP and the graph type is common-declared, so **a token in an import line says nothing about whether the declaration is common**: this bucket was once 3 because `AppRoot.kt` was filed here on `NavGraph.Companion.findStartDestination`, which is *also* common-declared and was never a pin |
 | **6** | `androidx.media3` | no -- Media3 publishes no non-Android artifact |
 | **4** | a JVM-only member that needs **no import**, or an `R.<type>` reference | partly. `String.format` was one of these and it made a 442-line file pass a careful audit as clean |
 | **1** | `androidx.activity.compose` | the artifact is KMP; the pin is the Android `Host` |
@@ -288,7 +288,7 @@ matched, and that the plan's own stated count still agrees with the tree:
 | **0** | `androidx.paging.compose` | the artifact is KMP; `paging-runtime` is not, and is the pin where it appears |
 | **1** | `androidx.core` | the artifact is KMP; the pin is `ContextCompat` |
 
-**32 + 3 + 6 + 4 + 1 + 1 + 0 + 1 = 48, nothing unmatched.** Every file carries at
+**33 + 2 + 6 + 4 + 1 + 1 + 0 + 1 = 48, nothing unmatched.** Every file carries at
 least one pin, so the residual bucket is **zero**; it emptied when the
 `R.<lowercase>` rule began matching `R.raw.*`, which is what the two
 provider-badge files use.

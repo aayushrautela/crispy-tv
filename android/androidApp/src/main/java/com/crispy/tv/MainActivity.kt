@@ -23,7 +23,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.playerui.ComponentActivityPlayerHost
 import com.crispy.tv.playerui.LocalPlayerHost
 import com.crispy.tv.startup.AppStartup
-import com.crispy.tv.ui.AppRoot
+import com.crispy.tv.ui.AndroidAppRoot
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
 
 
@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        AppRoot()
+                        AndroidAppRoot()
                     }
                 }
             }

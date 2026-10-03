@@ -16,38 +16,71 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.delay
 import com.crispy.tv.accounts.AppBootstrapViewModel
-import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.AuthRoute
-import com.crispy.tv.accounts.authViewModelFactory
-import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.accounts.BootstrapState
 import com.crispy.tv.accounts.ProfileSelectorRoute
 import com.crispy.tv.ui.brand.CrispyIntroSplash
 import com.crispy.tv.ui.edge_to_edge.LocalBottomBarOverlayPadding
 import com.crispy.tv.ui.navigation.AppNavHost
+import com.crispy.tv.ui.navigation.AppNavHostDependencies
 import com.crispy.tv.ui.navigation.AppRoutes
 import com.crispy.tv.ui.navigation.FloatingBarBottomMargin
 import com.crispy.tv.ui.navigation.FloatingBarHeight
 import com.crispy.tv.ui.navigation.FloatingBottomBar
 import com.crispy.tv.ui.navigation.TopLevelDestination
+import kotlinx.coroutines.delay
 
 private const val IntroTimeoutMs = 3_000L
 
+/**
+ * The app's root composable: intro, then auth, then profile selection, then the shell.
+ *
+ * ## What crossed out
+ *
+ * Exactly two things, and neither of them is a decision.
+ *
+ * `LocalContext` was read for one purpose -- deriving an application `Context` to hand to
+ * three factories -- so **the three factories crossed and the read died with them.** That is
+ * the same shape as `AddonsSettingsViewModel`'s factory extraction: a `Context` read only
+ * to reach a factory disappears without needing a slot of its own, and so does the
+ * `remember` that existed only for it.
+ *
+ * The screen-size of the app is not read here at all; it crossed into
+ * [AppNavHostDependencies] as two `Int`s, because `LocalConfiguration` has no `commonMain`
+ * counterpart by that name and the shared file needs the numbers rather than the local.
+ *
+ * ## Why `navHostDependencies` is a producer slot
+ *
+ * `AppNavHost` needs roughly forty platform products, and two of the inputs to building
+ * them are composition locals, so the object cannot be built by a caller that has no
+ * context -- which is what this file now is. The slot is invoked inside `AppNavHost`'s own
+ * composable scope, so the `remember`s it uses are still *someone's* remembers: the ones in
+ * the Android file, keyed on the Android values. Nothing here reads a platform type.
+ *
+ * ## `findStartDestination` is not a pin
+ *
+ * Worth recording because the census filed this file under `navigation` on this import.
+ * `NavGraph.Companion.findStartDestination` is declared in `navigation-common`'s **`commonMain`**
+ * metadata, so it is available on every target and this call site compiles everywhere as it
+ * stands. **A token in an import line says nothing about whether its declaration is common** --
+ * that is the import audit's version of "a census bucket is a floor, not a description".
+ */
 @Composable
-fun AppRoot() {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val bootstrapViewModel: AppBootstrapViewModel =
-        viewModel(factory = remember(appContext) { appBootstrapViewModelFactory(appContext) })
+internal fun AppRoot(
+    bootstrapViewModelFactory: ViewModelProvider.Factory,
+    authViewModelFactory: ViewModelProvider.Factory,
+    profileListViewModelFactory: ViewModelProvider.Factory,
+    navHostDependencies: @Composable () -> AppNavHostDependencies,
+) {
+    val bootstrapViewModel: AppBootstrapViewModel = viewModel(factory = bootstrapViewModelFactory)
     val state by bootstrapViewModel.state.collectAsStateWithLifecycle()
     var introDone by rememberSaveable { mutableStateOf(false) }
 
@@ -68,24 +101,30 @@ fun AppRoot() {
         state == BootstrapState.NeedsAuth -> {
             AuthRoute(
                 onSignedIn = { bootstrapViewModel.refresh() },
-                viewModelFactory = remember(appContext) { authViewModelFactory(appContext) },
+                viewModelFactory = authViewModelFactory,
             )
         }
         state == BootstrapState.NeedsProfileSelection -> {
             ProfileSelectorRoute(
                 onComplete = { bootstrapViewModel.refresh() },
                 onBack = { bootstrapViewModel.onSignedOut() },
-                viewModelFactory = remember(appContext) { profileListViewModelFactory(appContext) },
+                viewModelFactory = profileListViewModelFactory,
             )
         }
         state == BootstrapState.Ready -> {
-            MainAppShell(onSignedOut = { bootstrapViewModel.onSignedOut() })
+            MainAppShell(
+                onSignedOut = { bootstrapViewModel.onSignedOut() },
+                navHostDependencies = navHostDependencies,
+            )
         }
     }
 }
 
 @Composable
-private fun MainAppShell(onSignedOut: () -> Unit) {
+private fun MainAppShell(
+    onSignedOut: () -> Unit,
+    navHostDependencies: @Composable () -> AppNavHostDependencies,
+) {
     val navController = rememberNavController()
     val destinations = remember { TopLevelDestination.entries }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -139,6 +178,7 @@ private fun MainAppShell(onSignedOut: () -> Unit) {
                     navController = navController,
                     modifier = Modifier.fillMaxSize(),
                     onSignedOut = onSignedOut,
+                    dependencies = navHostDependencies,
                 )
                 if (showBar) {
                     FloatingBottomBar(
