@@ -10,8 +10,13 @@ package com.crispy.tv.ai
  * `commonMain` — so the only thing that pinned it to `androidMain` was the
  * concrete `AiInsightsCacheStore` in its constructor, a `Context` +
  * `SharedPreferences` holder. *A file whose parameter names a concrete
- * `Context` holder cannot be read from `commonMain` no matter how portable its
  * own body is*, which is why this is an interface and not a moved class.
+ *
+ * **That reason is now discharged.** `AiInsightsCacheStore` takes a
+ * `KeyValueStore`, so what this interface says is "somewhere that persists
+ * strings" and the class above is free to be any of them -- Android's
+ * `SharedPreferences` today, and the same key-value port `:platform-desktop`
+ * already implements over files the moment a consumer there asks for one.
  *
  * The cache key is a **BCP-47 tag string**, not a `Locale`. That is the value
  * the wire already speaks (`backend.getAiInsights(locale = …)`) and the value

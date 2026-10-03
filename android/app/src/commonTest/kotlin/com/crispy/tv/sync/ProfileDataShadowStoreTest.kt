@@ -1,57 +1,24 @@
 package com.crispy.tv.sync
 
-import com.crispy.tv.platform.KeyValueStore
+import com.crispy.tv.platform.RecordingKeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
+ /**
  * `ProfileDataShadowStore` had no coverage in any source set, because reaching it meant
  * constructing a real `SharedPreferences`. Its JSON *policies* were already lifted to
  * `ProfileDataShadowJsonAccessors.kt` and tested; what is left here is the read/write
  * orchestration and the key format, and both are now reachable from `commonTest` because
  * the store takes a `KeyValueStore` rather than a `Context`.
  *
- * The double below records every call, because the port's own contract says two stores for
- * the same backend must not observe each other's keys -- so a test that only checked the
- * round trip would pass even if the store reached into a *shared* preference file.
+ * The `KeyValueStore` double this file used to declare privately now lives in
+ * `com.crispy.tv.platform.RecordingKeyValueStore`, because the search and AI stores took the
+ * same port in the same landing and a second copy of an interface implementation is a copy
+ * that rots.
  */
-private class RecordingKeyValueStore(
-    initial: Map<String, String> = emptyMap(),
-) : KeyValueStore {
-    val values = LinkedHashMap<String, String>(initial)
-    val calls = mutableListOf<String>()
-
-    override fun getString(key: String, defaultValue: String?): String? {
-        calls += "getString($key)"
-        return values[key] ?: defaultValue
-    }
-
-    override fun putString(key: String, value: String) {
-        calls += "putString($key)"
-        values[key] = value
-    }
-
-    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-    override fun putBoolean(key: String, value: Boolean) = Unit
-    override fun getInt(key: String, defaultValue: Int): Int = defaultValue
-    override fun putInt(key: String, value: Int) = Unit
-    override fun getFloat(key: String, defaultValue: Float): Float = defaultValue
-    override fun putFloat(key: String, value: Float) = Unit
-    override fun contains(key: String): Boolean = values.containsKey(key)
-    override fun keys(): Set<String> = values.keys
-    override fun remove(key: String) {
-        calls += "remove($key)"
-        values.remove(key)
-    }
-
-    override fun clear() {
-        calls += "clear()"
-        values.clear()
-    }
-}
 
 class ProfileDataShadowStoreRoundTripTest {
     private fun snapshot(

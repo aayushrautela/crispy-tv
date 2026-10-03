@@ -1224,6 +1224,12 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     and writing both loses the first — and every `occurs 1x` assertion still passes.
   - **A count assertion does not check the brackets around what it replaced**, and only `diff` sees
     a four-space shift.
+  - **A structural slice must preserve the syntax around the retained region, including comment
+    delimiters.** Extracting the shared `RecordingKeyValueStore` double by line boundaries consumed
+    the opening `/**` and left the closing `*/` behind, so the next test file failed to parse. The
+    replacement body was correct; the slice was not. When a range edit crosses a KDoc or string,
+    assert the opening and closing delimiters in the new file before writing, rather than relying on
+    the compiler to identify which boundary the edit removed.
   - **A read-back asserting `count == 1` on a bare name is a claim about a *word*, not about a
     declaration, and the name legitimately appears more than once.** Deleting the lifted playback
     types out of `:native-engine`'s `PlaybackController.kt` and then reading back

@@ -3,6 +3,7 @@ package com.crispy.tv.ai
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 
 /**
  * The `androidMain` construction site for [AiInsightsRepository] — the same role
@@ -28,6 +29,7 @@ fun aiInsightsRepository(context: Context): AiInsightsRepository {
         supabase = SupabaseServicesProvider.accountClient(appContext),
         activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
         backend = BackendServicesProvider.backendClient(appContext),
-        cache = AiInsightsCacheStore(appContext),
+        cache =
+            AiInsightsCacheStore(SharedPreferencesKeyValueStore(appContext, "ai_insights_cache")),
     )
 }

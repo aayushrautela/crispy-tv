@@ -111,9 +111,9 @@ class HouseholdAddonsCloudSync(
             // would key differently on a Turkish device and every sync would
             // install and uninstall the same addon. `String.lowercase()` with
             // no argument is locale-invariant, which is the same contract
-            // `Locale.ROOT` states -- and `SharedPreferencesSearchHistoryStore`
-            // was already using `Locale.ROOT` for its own dedupe key, so this
-            // is the fourth instance of one rule rather than a fifth spelling.
+            // `Locale.ROOT` states -- and the search history store's dedupe key
+            // now uses that same spelling, so these are one rule rather than two
+            // that agree by coincidence.
             val serverByUrl = knownStremio.associateBy { it.manifestUrl.lowercase() }
             val localByUrl = localRows.associateBy { it.manifestUrl.lowercase() }
 

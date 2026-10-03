@@ -3,6 +3,7 @@ package com.crispy.tv.search
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 
@@ -17,8 +18,11 @@ import kotlinx.coroutines.Dispatchers
  * - it supplies `languageTagProvider`, which is new. The viewmodel no longer
  *   decides the language; the platform does, here, and the value crosses into it
  *   as the BCP-47 tag the backend already speaks.
- * - it constructs `SharedPreferencesSearchHistoryStore`, the renamed
- *   [SearchHistoryStore] implementation, because the port took the type's name.
+ * - it constructs `KeyValueSearchHistoryStore`, the [SearchHistoryStore]
+ *   implementation. The port took the implementation's original name, and when the
+ *   store itself moved to `commonMain` it took the *port's* name instead: it had
+ *   stopped naming `SharedPreferences`, which is still the name of the file on
+ *   disk and the one thing the class no longer knows.
  * - it no longer passes a locale to the repositories: `BackendSearchRepository`
  *   never used the one it was given and its parameter has been deleted, and
  *   `AiSearchRepository` now takes the tag directly.
@@ -34,7 +38,10 @@ fun searchViewModelFactory(appContext: Context): ViewModelProvider.Factory {
             val viewModel = SearchViewModel(
                 searchRepository = backendSearchRepository(context),
                 aiSearchRepository = aiSearchRepository(context),
-                searchHistoryStore = SharedPreferencesSearchHistoryStore(context),
+                searchHistoryStore =
+                    KeyValueSearchHistoryStore(
+                        SharedPreferencesKeyValueStore(context, "search_preferences"),
+                    ),
                 languageTagProvider = { Locale.getDefault().toLanguageTag() },
                 ioDispatcher = Dispatchers.IO,
             )

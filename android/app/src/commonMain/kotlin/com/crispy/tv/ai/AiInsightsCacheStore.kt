@@ -1,8 +1,7 @@
 package com.crispy.tv.ai
 
-import android.content.Context
-import android.content.SharedPreferences
 import com.crispy.tv.backend.parseAiInsightsSlides
+import com.crispy.tv.platform.KeyValueStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
@@ -11,19 +10,42 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * The `SharedPreferences` implementation of [AiInsightsCache], and the reason
- * the repository needed an interface rather than a moved class: this holds a
- * `Context` for its whole life.
+ * The [AiInsightsCache] implementation, persisted behind a [KeyValueStore], and
+ * therefore reachable from `commonMain`.
  *
- * It is left with **no `java.*` use at all** — `keyFor` used to call
+ * **This class is why [AiInsightsRepository] is an interface, and that reason is now
+ * discharged rather than merely described.** The repository is platform-free -- its
+ * three other collaborators all live in `:backend`'s `commonMain` -- and what would
+ * have pinned it to `androidMain` is this class being named in its constructor while
+ * holding a `Context` + `SharedPreferences` for its whole life. *A file whose
+ * parameter names a concrete `Context` holder cannot be read from `commonMain` however
+ * portable its own body is*, which is why the fix was a port and not a moved class:
+ * what [AiInsightsCache] now says is "somewhere that persists strings", and this
+ * class is free to be any of them.
+ *
+ * It is left with **no `java.*` use at all** -- [keyFor] used to call
  * `locale.toLanguageTag()` on the `Locale` it was handed, so the cache key was
- * already a tag. Taking the tag directly does not change a single stored key:
- * the string that reaches `prefs.getString` is the same string, so a device
- * that upgrades reads the entries it wrote before.
+ * already a tag. Taking the tag directly does not change a single stored key: the
+ * string that reaches the store is the same string, so a device that upgrades reads
+ * the entries it wrote before.
+ *
+ * ## `purgeLegacyEntries` lost its guard, and its batch
+ *
+ * The original opened one editor, removed every legacy key through it, and called
+ * `apply()` once, behind an `if (legacyKeys.isEmpty()) return` that existed only to
+ * skip a pointless editor round trip. [KeyValueStore] has no editor, so it is now one
+ * `remove` call per key over `keys()`. **That is N writes where there was one**, and
+ * for `SharedPreferences` they coalesce into the same single disk flush, so the
+ * observable behaviour is unchanged; a file-backed store does not coalesce them, which
+ * is the one place this landing costs anything -- and it runs once per store instance,
+ * over a prefix last written by a version from before the key format changed.
+ *
+ * **The guard is gone because "no keys" is now genuinely free**, not because it was
+ * forgotten: an empty `forEach` makes no calls, where the old code needed the guard to
+ * avoid building an editor and applying an empty change to it.
  */
-class AiInsightsCacheStore(context: Context) : AiInsightsCache {
-    private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+class AiInsightsCacheStore(private val store: KeyValueStore) : AiInsightsCache {
 
     init {
         purgeLegacyEntries()
@@ -35,7 +57,7 @@ class AiInsightsCacheStore(context: Context) : AiInsightsCache {
     ): AiInsightsResult? {
         val normalizedItemId = itemId.trim()
         if (normalizedItemId.isBlank()) return null
-        val raw = prefs.getString(keyFor(normalizedItemId, languageTag), null) ?: return null
+        val raw = store.getString(keyFor(normalizedItemId, languageTag)) ?: return null
         // **Only the reader used to convert**, and that sentence is what this
         // port deletes: `save` below now builds with `buildJsonObject` too, so
         // both sides of the boundary are `JsonElement` and the note that
@@ -96,20 +118,17 @@ class AiInsightsCacheStore(context: Context) : AiInsightsCache {
         }
         val json = buildJsonObject { put("slides", array) }
 
-        prefs.edit().putString(keyFor(normalizedItemId, languageTag), json.toString()).apply()
+        store.putString(keyFor(normalizedItemId, languageTag), json.toString())
     }
 
     private fun purgeLegacyEntries() {
-        val legacyKeys = prefs.all.keys.filter { it.startsWith(LEGACY_CACHE_PREFIX) }
-        if (legacyKeys.isEmpty()) return
-        prefs.edit().also { editor -> legacyKeys.forEach(editor::remove) }.apply()
+        store.keys().filter { it.startsWith(LEGACY_CACHE_PREFIX) }.forEach(store::remove)
     }
 
     private fun keyFor(itemId: String, languageTag: String): String =
         "$CACHE_PREFIX${itemId}_${languageTag.ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
-        private const val PREFS_NAME = "ai_insights_cache"
         private const val CACHE_PREFIX = "ai_ins_v3_"
         private const val LEGACY_CACHE_PREFIX = "ai_ins_v2_"
         private const val DEFAULT_LOCALE_TAG = "en-US"
