@@ -310,6 +310,14 @@ EMPTY_ALLOWED: dict[str, str] = {
     # matching `R.raw.*` and moved the two provider-badge files out of it.
     "no-pin-found": "emptied by the `R.<lowercase>` rule, which began matching "
                     "`R.raw.*`; every :app/androidMain file now carries a pin",
+    # `paging-compose` is KMP -- only `paging-runtime` is an `.aar` -- so it is a
+    # LOW-BOUND bucket: it fires on the *coordinate*, and the one :app/androidMain
+    # file that used to carry it (`DiscoverScreen.kt`) moved to commonMain, taking
+    # the rule with it.  That is not a claim that no remaining file touches Paging;
+    # it is a claim that no remaining file does so from androidMain.
+    "paging-compose (KMP; runtime is not)":
+        "emptied when `DiscoverScreen.kt` moved to commonMain (see "
+        "`paging-runtime` below for why the KMP half was ever a bucket at all)",
 }
 
 NEVER_MATCHED: set[str] = {

@@ -56,7 +56,7 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **154 of 205 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 154) |
+| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **156 of 206 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 156) |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
@@ -67,7 +67,7 @@ which is which is **measured by `scripts/verify_kmp_port.py`** rather than
 maintained here by hand -- the hand-maintained version of this very table had
 drifted from its own prose twice. That script also asserts the count stated in
 this document, so a landing that moves a file without refreshing the plan is a
-red gate rather than a quietly wrong paragraph. See **"The 51 that remain"** for
+red gate rather than a quietly wrong paragraph. See **"The 50 that remain"** for
 the buckets and, just as importantly, for the *method* the buckets are allowed to
 use: an earlier attempt resolved each type name to its declaring module and was
 discarded, because it produced confident nonsense (`Int declared in android/tv`,
@@ -118,7 +118,7 @@ was missing and is the reason four modules held untested `commonMain`; `git ls-f
 | `home` | 13 | 5 | 6 |
 | `network` | 3 | 4 | 1 |
 | `watchhistory` | 5 | 1 | 3 |
-| **`:app`** | **154** | **51** | **68** |
+| **`:app`** | **156** | **50** | **69** |
 
 **Seven of these ten rows were wrong when this table was last refreshed, and
 the total was wrong in both directions.** `backend` was three landings stale, `home`
@@ -171,16 +171,16 @@ pinned until the receiver moved.**
 | `home` | 13 | 5 |
 | `network` | 3 | 4 |
 | `watchhistory` | 5 | 1 |
-| **`:app`** | **154** | **51** |
-| **total** | **264** | **64** |
+| **`:app`** | **156** | **50** |
+| **total** | **266** | **63** |
 
 **`:app` is no longer the only module that matters, and every other module is now
 *finished* rather than "near its resting point".** `addons`, `backend`, `home`,
 `network` and `watchhistory` have all crossed over — `home` and `backend` have more
 files in `commonMain` than in `androidMain`, and `backend` and `watchhistory` are
 down to **one** `androidMain` file each, both of them pinned by a transport rather
-than by anything structural. `:app` is 154 of 205, i.e. **75%**, and
-the 51 that remain are behind the walls listed in the table above.
+than by anything structural. `:app` is 156 of 206, i.e. **76%**, and
+the 50 that remain are behind the walls listed in the table above.
 
 **The file that took `:app` to 128/68 was `HouseholdAddonsCloudSync`, and its only forbidden
 token was eleven `android.util.Log` calls.** Every one of its four collaborators was *already*
@@ -245,7 +245,7 @@ every number in it is being corrected — and then move when nothing it describe
 died on a 1-file one, so neither its stability nor its movement says anything about
 the work.**
 
-### The 51 that remain, measured by `scripts/verify_kmp_port.py`
+### The 50 that remain, measured by `scripts/verify_kmp_port.py`
 
 **This table used to be maintained by hand, and it drifted from its own prose
 twice** -- once because a row was not updated when its bucket lost a member, and
@@ -273,22 +273,22 @@ one**, and a gate that emits plausible wrong lines gets switched off.
 
 What the script *can* decide without guessing is counted, and the buckets are a
 **lower bound**. The invariants it enforces are that every tracked file is
-classified (`51 == 51`), that the buckets sum, that every empty bucket is either
+classified (`50 == 50`), that the buckets sum, that every empty bucket is either
 allowlisted with the landing that emptied it or recorded as never having
 matched, and that the plan's own stated count still agrees with the tree:
 
 | n | what pins it | can code work move it? |
 |---|---|---|
-| **31** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
-| **6** | `androidx.navigation` | **the one thing gating desktop, and a DECISION not a port.** `NavHostController` is an Android `Activity`; the artifact itself is KMP. `CrispySharedTransitionLayout` is already in `commonMain` waiting for a graph that can reach it |
+| **32** | `android.jar` proper | no -- it is the platform. Mostly composition roots whose only import is `android.content.Context`, which is correct: `fun create(context: Context)` *is* a composition root, and desktop needs its own |
+| **5** | `androidx.navigation` | **the one thing gating desktop, and a DECISION not a port.** `NavHostController` is an Android `Activity`; the artifact itself is KMP. `CrispySharedTransitionLayout` is already in `commonMain` waiting for a graph that can reach it |
 | **6** | `androidx.media3` | no -- Media3 publishes no non-Android artifact |
 | **4** | a JVM-only member that needs **no import**, or an `R.<type>` reference | partly. `String.format` was one of these and it made a 442-line file pass a careful audit as clean |
 | **1** | `androidx.activity.compose` | the artifact is KMP; the pin is the Android `Host` |
 | **1** | a declaration in `:app`'s **own** `androidMain`, reached with **no import** | no -- **the same-package trap inside one module**: a sibling in the same *module* is as reachable-without-import as one in the same package |
-| **1** | `androidx.paging.compose` | the artifact is KMP; `paging-runtime` is not, and is the pin where it appears |
+| **0** | `androidx.paging.compose` | the artifact is KMP; `paging-runtime` is not, and is the pin where it appears |
 | **1** | `androidx.core` | the artifact is KMP; the pin is `ContextCompat` |
 
-**31 + 6 + 6 + 4 + 1 + 1 + 1 + 1 = 51, nothing unmatched.** Every file carries at
+**32 + 5 + 6 + 4 + 1 + 1 + 0 + 1 = 50, nothing unmatched.** Every file carries at
 least one pin, so the residual bucket is **zero**; it emptied when the
 `R.<lowercase>` rule began matching `R.raw.*`, which is what the two
 provider-badge files use.
@@ -333,8 +333,8 @@ singletons — `Context` + `Locale`, `Context` + `Locale` + `Uri`,
 
 **What supports that conclusion is a role predicate, not an import set.** `fun create(context:
 Context)` **is** a composition root, and a `Context` used for wiring belongs in the factory.
-Measured over the 51 files of `androidMain`, **31 declare a `*Provider`/`*Factory`/`*Graph`
-type or a function taking a `Context`**; the other 20 are files that reach the platform for
+Measured over the 50 files of `androidMain`, **31 declare a `*Provider`/`*Factory`/`*Graph`
+type or a function taking a `Context`**; the other 19 are files that reach the platform for
 something other than wiring. Those 31 are not files waiting to move; they are the edge.
 
 **The predicate is stated inline because the import-set framing it replaced was not
@@ -347,7 +347,7 @@ not to quote an import-set count here: it changes meaning every time a file is p
 library accessor rather than an `android.*` one -- `ImageCacheUtils` reached for Coil, not
 `android.jar`, and its departure is invisible to the rule -- and a broad `androidx.` prefix
 is unsafe to quote at all, because CMP 1.11.x ships real `androidx.compose.*` KMP artifacts.
-**The 31 does not partition the 51 either**, and is not meant to: the census above is a
+**The 31 does not partition the 50 either**, and is not meant to: the census above is a
 first-match partition under its own rules, and this is a separate measurement over the whole
 source set. Substituting one for the other would imply they were the same thing.
 

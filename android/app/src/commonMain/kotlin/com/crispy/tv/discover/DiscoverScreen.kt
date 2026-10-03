@@ -1,6 +1,5 @@
 package com.crispy.tv.discover
 
-import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,7 +46,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,7 +66,7 @@ import androidx.paging.cachedIn
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import com.crispy.tv.accounts.activeProfileLoader
+import com.crispy.tv.accounts.ActiveProfileInfo
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.lazyKey
 import com.crispy.tv.search.SearchGenreSuggestion
@@ -123,6 +121,22 @@ data class DiscoverUiState(
         get() = "${typeFilter.value}|${genreKey.orEmpty()}|${sortFilter.value}"
 }
 
+/**
+ * The browse list's filter state and the pager that answers it.
+ *
+ * This class used to carry a `companion object { fun factory(context: Context) }` that
+ * built it. That was an extraction, not a move: the factory is now
+ * [discoverViewModelFactory] in `androidMain`, which is the one place that knows how to
+ * turn a `Context` into a [BackendBrowseRepository]. The class itself names no platform
+ * type, so it reaches `commonMain` with the file.
+ *
+ * **It is not testable yet, and the reason is its constructor.** [BackendBrowseRepository]
+ * is a `class`, not an `interface` (`discover/BackendBrowseRepository.kt:27`), so a
+ * `commonTest` can neither construct it nor stand in for it — the same wall
+ * `AiInsightsRepository` hits. Its three `set*Filter` methods are therefore still only
+ * reachable through the screen. [DiscoverUiState.comboKey] has no collaborator at all and
+ * is covered separately, because it is the string that decides when the pager restarts.
+ */
 class DiscoverViewModel(
     private val repository: BackendBrowseRepository,
 ) : ViewModel() {
@@ -172,54 +186,42 @@ class DiscoverViewModel(
     fun setSortFilter(filter: DiscoverSortFilter) {
         _uiState.update { it.copy(sortFilter = filter) }
     }
-
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return DiscoverViewModel(
-                            repository = backendBrowseRepository(appContext)
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
 }
 
 private const val PAGE_SIZE = 60
 
+/**
+ * The Discover tab: a type filter, a genre chip and a sort, over one pager.
+ *
+ * `viewModelFactory` and `loadProfile` are the two things this screen used to reach the
+ * platform for. Both are **required with no default**, which is the point: the file is in
+ * `commonMain` now, and a defaulted capability would let a call site silently render a
+ * screen with no way to load a profile or build its ViewModel.
+ *
+ * `loadProfile` crosses as a **lambda** rather than as a `ProfileLoader`, because its
+ * consumer keys a `produceState` on the instance's identity, and `viewModelFactory`
+ * crosses as the **product** because nothing keys on it. `AppNavHost` supplies both, and
+ * supplies each graph its own loader for the identity reason recorded at its own call site.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverRoute(
+    viewModelFactory: ViewModelProvider.Factory,
+    loadProfile: suspend () -> ActiveProfileInfo?,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: DiscoverViewModel =
-        viewModel(
-            factory = remember(appContext) {
-                DiscoverViewModel.factory(appContext)
-            }
-        )
+    // Both crossings are products, not lambdas: nothing here stores either, and the
+    // caller has to `remember` them anyway. `AppNavHost` builds them before `NavHost`'s
+    // builder lambda, which is not itself a @Composable scope, so a `remember` inside
+    // that lambda would not be one either -- the same reason it reads the platform
+    // context in its own body.
+    val viewModel: DiscoverViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val scrollBehavior = appBarScrollBehavior()
-
-    // Hoisted out of the app bar's `actions` slot, and out of `remember` too: neither
-    // that lambda nor `remember`'s calculation is a @Composable scope, so
-    // `LocalContext.current` has to be read here in the composable body. These screens are
-    // androidMain and already hold a Context, so building the loader here is cheaper than
-    // threading a slot through each public signature.
-    val profileContext = LocalContext.current
-    val loadProfile = remember(profileContext) { activeProfileLoader(profileContext.applicationContext) }
 
     Scaffold(
         modifier = Modifier
@@ -232,11 +234,16 @@ fun DiscoverRoute(
                     CrispySectionAppBarTitle(label = "Discover")
                 },
                 actions = {
-ProfileIconButton(
+                    ProfileIconButton(
                         onClick = onOpenAccountsProfiles,
-                        // Built here rather than passed in: these three screens are
-                        // androidMain, so they already hold a Context, and threading a
-                        // slot through each of their public signatures would be churn.
+                        // Passed in, not built here. This used to read `LocalContext`
+                        // itself, on the reasoning that the screen was androidMain and
+                        // already held a Context. That was true and it was the wrong
+                        // trade twice over: it pinned the file, and it meant each screen
+                        // built its OWN loader -- and `ProfileIconButton` keys a
+                        // `produceState` on the lambda's identity, so one shared loader
+                        // would let a recomposition in one screen restart another's
+                        // load. The caller gives each graph its own.
                         loadProfile = loadProfile,
                     )
                 },

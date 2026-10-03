@@ -21,6 +21,7 @@ import com.crispy.tv.details.localeDateFormatters
 import com.crispy.tv.library.deviceUtcOffsetMillis
 import com.crispy.tv.library.libraryViewModelFactory
 import com.crispy.tv.platform.android.AndroidAppLogger
+import com.crispy.tv.discover.discoverViewModelFactory
 import com.crispy.tv.search.searchViewModelFactory
 
 private const val TopLevelNavigationDurationMillis = 200
@@ -99,6 +100,19 @@ fun AppNavHost(
         val libraryUtcOffset = remember { { deviceUtcOffsetMillis() } }
         val libraryProfileLoader = remember(appContext) { activeProfileLoader(appContext) }
         val libraryLogger = remember(appContext) { AndroidAppLogger(appContext) }
+
+        // `addDiscoverNavGraph` is the same shape a fourth time, and the smallest of
+        // the four: one factory and one profile loader. `discoverProfileLoader` is a
+        // FOURTH `activeProfileLoader(appContext)` instance rather than a reuse of the
+        // three above, on exactly the grounds they each have their own -- the Discover
+        // screen used to build its own loader inside its composable body, and
+        // `ProfileIconButton` keys a `produceState` on the loader's identity, so
+        // sharing one instance would let a recomposition on the Discover tab
+        // restart a load another tab is waiting on. That build-in-the-screen shape
+        // was also the last thing pinning `DiscoverRoute` and this graph to
+        // `androidMain`; the graph never touched a platform type itself.
+        val discoverFactory = remember(appContext) { discoverViewModelFactory(appContext) }
+        val discoverProfileLoader = remember(appContext) { activeProfileLoader(appContext) }
         NavHost(
             navController = navController,
             startDestination = TopLevelDestination.Home.route,
@@ -166,7 +180,11 @@ fun AppNavHost(
                 searchViewModelFactory = searchFactory,
                 loadProfile = profileLoader,
             )
-            addDiscoverNavGraph(navController)
+            addDiscoverNavGraph(
+                navController = navController,
+                viewModelFactory = discoverFactory,
+                loadProfile = discoverProfileLoader,
+            )
             addLibraryNavGraph(
                 navController = navController,
                 viewModelFactory = libraryFactory,

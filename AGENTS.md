@@ -189,15 +189,19 @@ where that gets answered.
 **`CrispySharedTransitionLayout` is in `commonMain` because the mechanism is not navigation.** 14
 `commonMain` files read `LocalSharedTransitionScope`, a `staticCompositionLocalOf<SharedTransitionScope?>
 { null }` whose `content` slot has **no default**, so a caller cannot obtain a provider that provides
-nothing. Three of the nine nav graphs are in `commonMain` and the rest are still in `androidMain`, and
-the finding is that **the graphs were never the unit of work: a file can move once its _callees_ are
+nothing. Four of the ten nav graphs are in `commonMain` -- `AuthNavGraph`, `LibraryNavGraph`,
+`SearchNavGraph` and, since the Discover landing, `DiscoverNavGraph` -- and the rest are still in
+`androidMain`, and the
+finding is that **the graphs were never the unit of work: a file can move once its _callees_ are
 in `commonMain`, so movement propagates upward from the leaves, and the leaves are the screens.**
 **A set moves as a unit only when the references are mutual, and a graph calling a route is a one-way
 edge** -- `androidMain` sees `commonMain`, so a route moves out from under a graph that has not moved
-yet, which is why `LibraryNavGraph` could move at all once `LibraryRoute` below it had. The two other
+yet, which is why `LibraryNavGraph` could move at all once `LibraryRoute` below it had, and why
+`DiscoverNavGraph.kt` moved the moment `DiscoverRoute` did: **that file imported no `Context`, no
+`android.*` and nothing platform-shaped at all**, and its only pin was its callee. The two other
 ways a graph was pinned are the nav half of §1's *run the audit in both directions*: **a pin that
 arrives through a _call_ is invisible to every import scan**, and **a file in a package can be pinned
-by a sibling in the same package with no import at all.** The three landings' narratives are in the
+by a sibling in the same package with no import at all.** The landings' narratives are in the
 git history.
 
 **An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two
@@ -463,6 +467,20 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `LocalContext` and `appGraph()` are what actually kept it in `androidMain`. **So read the whole
   import list of a file you are about to claim you understand, and treat every second pin as the one
   that decides.**
+  **And a family can be filed by hand under a claim you never measured.** For most of this migration
+  I reported the six `androidMain` navigation files as "a DECISION gating desktop, not a port" -- a
+  product-shaped judgement about whether a desktop entry point should exist at all, offered as an
+  explanation for a set I had never re-counted. Measured, **four of the ten nav graphs were already in
+  `commonMain`** (`AuthNavGraph`, `LibraryNavGraph`, `SearchNavGraph`, and `DiscoverNavGraph`, which
+  moved this landing), so a proven shape existed the whole time and Discover was the next item in it.
+  What remained genuinely hard is four files, not six: `AppNavHost` (the androidMain root), `HomeNavGraph`
+  (433 lines), `PlayerNavGraph`, `SettingsNavGraph`. **A bucket explained by a decision is the shape
+  that never gets re-measured, because the explanation feels like a finding** -- and the test is the
+  one already stated above it: *re-measure rather than trust it*, and here the cheap measurement was
+  `git ls-files` on two directories. **A pin that arrives through a _call_ also means a nav graph's
+  pin can be its callee and nothing else**: `DiscoverNavGraph.kt` imports no `Context`, no `android.*`
+  and nothing platform-shaped, so it was portable in every line it wrote and still unpinnable --
+  movement propagates upward from the leaves, and a graph is a leaf's caller.
   **And when a whole family is re-scanned token by token, the tokens are usually no longer the wall —
   so classify a family by its blocker before choosing a file in it, or each landing finds a different
   token and each finds it was not the pin.** **And when the census is near-zero, recording the partition is
