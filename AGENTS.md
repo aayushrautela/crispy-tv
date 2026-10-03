@@ -961,6 +961,19 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   of its words are accepted values *on their own*, so it is the one input an `any { it in accepted }`
   rewrite would let through. *And a case that contradicts another case in the same file is a defect in
   the fixture, not in the code — read the failing row's neighbours before editing production.*
+- **A fixture that seeds a value into a store and then asserts that value comes back is reading two
+  sources.** Two cases failed together, `expected:<[fals]e> but was:<[tru]e>`, because I wrote the
+  expected pushed value from what I had seeded into the shadow store — while the code reads
+  `playbackSettings.settings.value`, and **`PlaybackSettings()`'s defaults are `skipIntroEnabled =
+  true, trailerAutoplayEnabled = true, trailerMuted = false`, not all-false.** So the case asserted a
+  value from the store the code does not read, and it would have passed for a push that forwarded the
+  shadow verbatim. **Which side a value was read from decides what the assertion proves, and a
+  two-source value is the case where that is easiest to get wrong** — the two disagree the moment the
+  store and the live snapshot do. The fix is not a looser expectation: the unrelated-keys case now
+  seeds the baseline with **all three keys at the opposite of the local defaults**, so a push that
+  forwarded the baseline verbatim fails three assertions rather than passing on the keys it happens to
+  agree about. **And a default is a value nobody measured** — read the data class before writing the
+  expectation, the same way a golden must be measured through the function.
 - **A stub cannot be evidence about the value it replaces.** Assert on what production computed
   (`askedFor`), never on a string the stub invented.
 - **Read a `data class` end to end before writing a fixture,** closing paren included. And check for
@@ -1313,6 +1326,39 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     the table's arithmetic**, parsing the rows and the sum line separately and requiring
     them to agree *and* to equal each other. **A count nobody recomputes is a claim, and
     "the gate passed" is not a recomputation of a number the gate never looked at.**
+  - **The skipped sentence kept rotting, so the second gate is `scripts/verify_plan_remainder.py`,
+    and its finding is the general rule.** Having added the census gate, the remainder section
+    *below* the census still quoted **four mutually inconsistent totals** — `34 of the 55`, `0 of 61`,
+    `over the 65 files`, `does not partition the 42` — while every gate stayed green, and it named
+    three files that had left `androidMain` or never had the import set attributed to them. **So the
+    fix was not a better gate for the same sentence; it was a gate for a different one**, and the
+    lesson is that **a gate's coverage of a document is a claim about the document, so the set of
+    sentences a document states in numbers needs enumerating rather than assuming.** The new gate
+    reads the section's role sentence, asserts the section's central `Context`-only claim is still
+    zero, and reports a finding if a count reappears in a heading that deliberately quotes none —
+    a heading naming one of two numbers is a claim a reader cannot check.
+  - **A proof harness can be the thing that is wrong, and the tell is that it made the input
+    UNPARSEABLE instead of stale.** Two of eleven assertions failed: one `sed` replacement carried a
+    stray leading backtick, so the sentence's count moved behind a `` ` `` that broke the gate's own
+    regex and it answered **2** — and **2 was the right answer** for prose it could no longer read,
+    which is the whole reason exit 2 exists. `mkdir -p` was missing before writing the proof file,
+    so a `No such file` from the shell was scored as a gate failure. **And the harness's first run
+    refused to start**: `cd "$(dirname "$0")/.."` resolves to `/tmp` for a harness living in `/tmp`,
+    and the resulting `cp: cannot stat` reads like the gate finding something rather than like a
+    harness that never reached the repository. **A harness that cannot distinguish "the gate is
+    broken" from "I corrupted the wrong thing" proves nothing**, and the way to tell is to make each
+    assertion corrupt its input in the *shape the drift actually took* — so a stale count must stay a
+    stale count, and the unparseable case must be a separate assertion.
+- **A patch guard must ask "does this need changing?", never "is this already right?" —
+    `patch_counts.py` skipped two edits for two consecutive landings because it asked the second
+    question.** Its condition was `if m and m.group(1) != OLD_AM` — *was this already correct for the
+    value I was told?* — when the heading and the line-70 cross-reference needed rewriting because they
+    quoted the **old truth** and the value I was told happened to equal what the heading already said.
+    Fixed to compare against `NEW_AM`, it now prints `NOTE: heading says 52, it must say 51` and
+    emits 9 anchors where it emitted 7. **The two questions coincide for every count except the ones
+    that are already stale, which is exactly the set the guard exists for** — so a guard written in
+    the second form is silently blind in precisely the case it was written for, and the sign is that
+    the script *did not have to touch a place a reader knows is out of date*.
 - **Turning a POSITIONAL call into named arguments is a claim about the signature, not a
   refactor, and a wrong claim type-checks.** `DetailsRoute` called
   `appGraph().detailsViewModelFactory(itemId, normalizedType, runtimeEntry)` positionally, where

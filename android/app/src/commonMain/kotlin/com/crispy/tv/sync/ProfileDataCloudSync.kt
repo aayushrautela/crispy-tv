@@ -1,25 +1,49 @@
 package com.crispy.tv.sync
 
-import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.AccountApi
-import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.BackendApi
 import com.crispy.tv.settings.PlaybackSettingsRepository
-import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 
+/**
+ * Keeps one profile's backend settings and the device's local playback settings
+ * in step, in both directions.
+ *
+ * ## What keeps this file in `commonMain`
+ *
+ * Nothing, now. It was `androidMain` for two reasons and both are gone.
+ *
+ * The `Context` went first and it was never a property: it appeared only in the
+ * default values of [activeProfileStore] and [shadowStore], so it was the
+ * *composition root* of this class wearing a constructor's clothes. A `Context`
+ * used to open two stores is wiring, and wiring belongs in the factory that
+ * builds this class -- `SupabaseServicesProvider.createProfileDataCloudSync` now
+ * names both stores and their backing files. The same shape was discharged
+ * twice before, by `ProfileDataShadowStore` and by `DefaultAccountBootstrapRepository`.
+ *
+ * The concrete `CrispyBackendClient` went second, and it went for a different
+ * reason: **the class is already in `:android:backend`'s `commonMain`**, so the
+ * only thing the type cost was the inability to *test* this class, because a
+ * `commonTest` has no way to construct a client that needs an HTTP transport.
+ * Typing the parameter to [BackendApi] -- the interface the client already
+ * implements with its body unchanged -- makes the whole decision surface
+ * reachable, and it is the same move as `ProfileDataShadowStore` taking a
+ * `KeyValueStore` rather than opening its own preferences.
+ *
+ * ## What the sync actually decides
+ *
+ * Every rule below is now covered by `ProfileDataCloudSyncTest` from
+ * `commonTest`: a signed-out user is a no-op rather than an error, a blank
+ * profile id is refused before either request is made, a push without a local
+ * baseline fetches one first and writes it, and an unreadable value in the
+ * payload leaves the local setting alone instead of guessing.
+ */
 class ProfileDataCloudSync(
-    // Not a property: only the default values below need a `Context`, and
-    // leaving it out of the field set says so. The two collaborators that
-    // actually persist something take a [com.crispy.tv.platform.KeyValueStore]
-    // or a repository now, so this class opens no preferences of its own.
-    context: Context,
     private val supabase: AccountApi,
-    private val backend: CrispyBackendClient,
+    private val backend: BackendApi,
     private val playbackSettings: PlaybackSettingsRepository,
-    private val activeProfileStore: ActiveProfileStore =
-        ActiveProfileStore(SharedPreferencesKeyValueStore(context, "supabase_sync_lab")),
-    private val shadowStore: ProfileDataShadowStore =
-        ProfileDataShadowStore(SharedPreferencesKeyValueStore(context, "profile_data_shadow")),
+    private val activeProfileStore: ActiveProfileStore,
+    private val shadowStore: ProfileDataShadowStore,
 ) {
     suspend fun pullForActiveProfile(): Result<Unit> {
         val session =
@@ -152,7 +176,13 @@ class ProfileDataCloudSync(
     }
 }
 
-private fun parseBooleanSetting(raw: String?): Boolean? {
+/**
+ * Parses the backend's boolean spelling without turning an unknown value into a guess.
+ *
+ * The backend is stringly typed, so whitespace and case are normalised, but every other
+ * spelling stays `null` and therefore leaves the current local setting untouched.
+ */
+internal fun parseBooleanSetting(raw: String?): Boolean? {
     return when (raw?.trim()?.lowercase()) {
         "true" -> true
         "false" -> false

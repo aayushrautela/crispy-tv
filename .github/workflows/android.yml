@@ -79,6 +79,14 @@ jobs:
         # failure a moved file silently causes.
         run: python3 scripts/verify_kmp_port.py
 
+      - name: Check the plan's remainder section still describes the tree
+        # verify_kmp_port.py reads the plan's census identity and its bucket table,
+        # and nothing else. The remainder section further down quotes two more
+        # whole-source-set counts no gate read, and they drifted to four mutually
+        # inconsistent totals in a single section while every gate stayed green --
+        # so the section that skips a sentence is the sentence that rots.
+        run: python3 scripts/verify_plan_remainder.py
+
       - name: Validate contract fixtures
         run: python scripts/validate_contracts.py
 

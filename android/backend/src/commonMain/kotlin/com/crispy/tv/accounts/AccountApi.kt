@@ -8,20 +8,31 @@ package com.crispy.tv.accounts
  * The account surface is a sibling of [com.crispy.tv.backend.BackendApi] and
  * exists for the same reason. Every type it exchanges is already portable --
  * [Session] and [SignUpResult] are plain data in `commonMain`, and the only
- * strings in between are strings. The one thing that is *not* portable is the
- * transport: `SupabaseAccountClient` speaks OkHttp and `org.json` and is
- * therefore `androidMain`.
+ * strings in between are strings. This interface was introduced because the one
+ * thing that was *not* portable was the implementation: `SupabaseAccountClient`
+ * spoke OkHttp and `org.json` and was therefore `androidMain`.
  *
- * `SupabaseAccountClient` implements this with its body unchanged, so this is a
- * type-level port, not a transport port. No request or response handling moved.
+ * **That reason is gone.** The client is in `commonMain` now, behind the
+ * [com.crispy.tv.network.CrispyHttpClient] port and answering `JsonObject`, and
+ * [SecureTokenStore] is the only file this module still keeps in `androidMain`
+ * because Android Keystore has no portable form. The interface is still the
+ * right thing for `commonMain` callers to name, for the same reason as its
+ * sibling: **it is what a `commonTest` can stand in for.**
+ *
+ * `SupabaseAccountClient` implements this with its body unchanged, so introducing
+ * it was a type-level port, not a transport port. No request or response
+ * handling moved.
  *
  * ## What this is not
  *
- * There is no `HttpClientPort` here, for the same reason there is none on
- * [com.crispy.tv.backend.BackendApi]: [com.crispy.tv.network.CrispyHttpClient]
- * leaks `okhttp3.HttpUrl` and `Headers` in its own signature, so it is a wrapper
- * around OkHttp rather than an abstraction of it. Every OkHttp and `org.json`
- * type in the client is `private`, so none of them reach this interface.
+ * The transport is [com.crispy.tv.network.CrispyHttpClient], one level down, and
+ * it is a genuine port. **This KDoc previously claimed there was no
+ * `HttpClientPort` here because that port "leaks `okhttp3.HttpUrl` and `Headers`
+ * in its own signature", and that was false** -- the same invented reason as on
+ * [com.crispy.tv.backend.BackendApi], which is how one false premise ended up
+ * load-bearing in three sibling KDocs. It leaked nothing, and no `commonMain`
+ * file in this repository imports `okhttp3`. What stays true: no `okhttp3` or
+ * `org.json` type reaches this interface.
  *
  * ## Errors
  *

@@ -17,13 +17,15 @@ data class RemoteTrailerDto(
 /**
  * Talks to the Crispy backend.
  *
- * **Both reasons this class was `androidMain` are gone, and it has not moved yet.**
- * OkHttp went when the transport became the `CrispyHttpClient` port, and
- * `org.json` went when [requireSuccess] started answering `JsonObject`. What
- * still holds it in `androidMain` is `CrispyBackendParsers.kt`'s 39
- * `internal fun CrispyBackendClient.parseX(...)` extensions — **a file whose
- * receiver is pinned cannot be freed by changing its arguments**, so the parsers
- * moved first to being node-neutral and the client is what remains.
+ * **Both reasons this class was once `androidMain` are gone, and the class is
+ * now in `commonMain`.** OkHttp went when the transport became the
+ * `CrispyHttpClient` port, and `org.json` went when [requireSuccess] started
+ * answering `JsonObject`. The 39 `internal fun CrispyBackendClient.parseX(...)`
+ * extensions in `CrispyBackendParsers.kt` moved with it after their receiver
+ * became node-neutral -- **a file whose receiver is pinned cannot be freed by
+ * changing its arguments**, so the receiver's declaration had to move first.
+ * The Android-only transport adapters are separate implementations behind the
+ * common `BackendApi` surface.
  *
  * The types it exchanges are not pinned at all: they are pure data and live in
  * `commonMain`, in `BackendTypes.kt`, so that `commonMain` code on every target

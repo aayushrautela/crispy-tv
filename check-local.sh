@@ -123,6 +123,15 @@ fi
 # approach was built and discarded, and the module docstring records why.
 "$PY" scripts/verify_kmp_port.py
 
+# The census gate above reads the plan's identity and its bucket table. The
+# remainder section further down quotes two MORE whole-source-set numbers that
+# verify_kmp_port.py never looks at -- and they had drifted too, to four mutually
+# inconsistent totals in one section, while every gate stayed green. A gate that
+# checks one sentence of a document has not checked the document, and the part it
+# skips is the part that rots. This reads that section, so it lives next to the
+# gate that reads the same file.
+"$PY" scripts/verify_plan_remainder.py
+
 # JVM args (including MaxMetaspaceSize=1g for the Kotlin/Native compiler) are
 # set in ~/.gradle/gradle.properties. Passing -Dorg.gradle.jvmargs here would
 # spawn a second daemon with different opts, so we let the user-level config apply.

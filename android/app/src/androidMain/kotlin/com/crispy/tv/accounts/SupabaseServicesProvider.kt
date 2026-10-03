@@ -14,6 +14,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.PluginSyncBridgeProvider
 import com.crispy.tv.sync.ProfileDataCloudSync
+import com.crispy.tv.sync.ProfileDataShadowStore
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.platform.android.AndroidTimeSource
@@ -130,16 +131,28 @@ object SupabaseServicesProvider {
         }
     }
 
+    /**
+     * Builds the profile-settings sync, naming both of the stores it persists through.
+     *
+     * The two store names are the only thing this factory knows that `ProfileDataCloudSync`
+     * does not: that file is `commonMain` and holds no `Context`, so it is here that
+     * "the active-profile key lives in `supabase_sync_lab`" and "the shadow lives in
+     * `profile_data_shadow`" are stated. The active-profile store is the cached one from
+     * [activeProfileStore]; the shadow store was a second construction inside the sync's own
+     * default argument until the class moved.
+     */
     fun createProfileDataCloudSync(
         context: Context,
     ): ProfileDataCloudSync {
         val appContext = context.applicationContext
         return ProfileDataCloudSync(
-            context = appContext,
             supabase = accountClient(appContext),
             backend = BackendServicesProvider.backendClient(appContext),
             playbackSettings = PlaybackSettingsRepositoryProvider.get(appContext),
             activeProfileStore = activeProfileStore(appContext),
+            shadowStore = ProfileDataShadowStore(
+                SharedPreferencesKeyValueStore(appContext, "profile_data_shadow"),
+            ),
         )
     }
 

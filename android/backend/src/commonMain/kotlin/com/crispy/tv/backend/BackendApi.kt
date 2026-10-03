@@ -8,26 +8,41 @@ import com.crispy.tv.ai.AiInsightsResult
  * ## Why this exists
  *
  * Every type this interface exchanges is pure data and already lives in
- * `commonMain` ([BackendTypes], [BackendPayloads], `AiInsightsResult`). The one
- * thing that is *not* portable is the transport: `CrispyBackendClient` speaks
- * OkHttp and `org.json` and is therefore `androidMain`. That split is what this
- * interface makes addressable -- the surface becomes nameable off Android while
- * the implementation stays where it is.
+ * `commonMain` ([BackendTypes], [BackendPayloads], `AiInsightsResult`). This
+ * interface was introduced because the one thing that was *not* portable was
+ * the implementation: `CrispyBackendClient` spoke OkHttp and `org.json` and was
+ * therefore `androidMain`.
  *
- * `CrispyBackendClient` implements this with its body unchanged. The fifty
- * methods here are the same fifty it already had, so this is a type-level port,
- * not a transport port, and no request or response handling moved.
+ * **Both of those reasons are gone, so this KDoc's original justification no
+ * longer describes anything.** OkHttp went when the transport became the
+ * [com.crispy.tv.network.CrispyHttpClient] port and `org.json` went when the
+ * client started answering `JsonObject`; `CrispyBackendClient`, its 39 receiver
+ * extensions and every JSON accessor are in `commonMain` now. The interface
+ * outlived its reason and earns its place differently: **it is the seam a
+ * `commonTest` can stand in for.** A test can construct an interface and cannot
+ * construct a class that needs an HTTP transport, so `ProfileDataCloudSync`
+ * names this type rather than the client, which is what made that file's own
+ * suite writable at all. A `commonMain` file that names the concrete client is a
+ * file nothing can test.
+ *
+ * `CrispyBackendClient` implements this with its body unchanged, so introducing
+ * it was a type-level port, not a transport port, and no request or response
+ * handling moved.
  *
  * ## What this is not
  *
- * This is deliberately **not** a transport abstraction. There is no
- * `HttpClientPort` here, and the OkHttp types are not wrapped behind one:
- * `CrispyHttpClient` leaks `okhttp3.HttpUrl`, `Headers` and `Request` in its own
- * signature, so it is a wrapper around OkHttp rather than an abstraction of it.
- * Porting the transport is a separate and much larger job, and nothing in the
- * seam needs it. The only OkHttp and `org.json` types in
- * `CrispyBackendClient` are `internal`, or the return type of a `private`
- * helper, so none of them reach this interface.
+ * The transport is [com.crispy.tv.network.CrispyHttpClient], and it is the real
+ * port: `HttpRequest` describes a request and the implementation owns building
+ * it. **This KDoc previously justified *not* abstracting the transport here by
+ * claiming `CrispyHttpClient` "leaks `okhttp3.HttpUrl`, `Headers` and `Request`
+ * in its own signature", and that was false** -- it leaked nothing, and
+ * `git grep -l 'import okhttp3' | grep '/src/commonMain/'` returns zero hits
+ * repo-wide. The same invented reason was load-bearing in
+ * [com.crispy.tv.accounts.AccountApi] and in
+ * `com.crispy.tv.addons.streams.StreamResolver`, so one premise needed
+ * correcting in three files. What remains true and worth keeping: no `okhttp3`
+ * or `org.json` type reaches this interface, because `CrispyBackendClient` names
+ * neither.
  *
  * ## Errors
  *
