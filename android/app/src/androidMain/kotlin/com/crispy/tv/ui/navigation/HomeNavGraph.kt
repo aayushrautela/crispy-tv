@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.catalog.catalogViewModelFactory
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.details.DetailsRatingBadgeLogo
 import com.crispy.tv.details.DetailsRoute
@@ -183,9 +184,15 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 presentation = com.crispy.tv.domain.home.HomeCatalogPresentation.RAIL,
                 title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
             )
+        // `CatalogRoute` takes its view model's factory as a slot, so the `Context`
+        // is read here -- the same shape as the `CalendarRoute` block above. The
+        // `remember` keys include `section`, which the factory closes over, so a
+        // route argument that changes the section rebuilds the factory with it.
+        val appContext = navController.context.applicationContext
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             CatalogRoute(
                 section = section,
+                viewModelFactory = remember(appContext, section) { catalogViewModelFactory(appContext, section) },
                 onBack = { navController.popBackStack() },
                 onItemClick = { item, sharedElementKey ->
                     navController.navigate(

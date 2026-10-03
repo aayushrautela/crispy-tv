@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -51,12 +52,20 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun CatalogRoute(
     section: CatalogSectionRef,
+    /**
+     * The view model's factory crosses as a value with no default, for the reason
+     * `HomeRoute`'s does: the `Context` it needs is read by the navigation graph,
+     * which is the one place in this chain where a platform value is available.
+     *
+     * A default could not be written here in any case, since there is no portable
+     * way to build one — so a call site that forgot it fails to compile rather than
+     * quietly fetching nothing.
+     */
+    viewModelFactory: ViewModelProvider.Factory,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit
 ) {
-    val viewModel: CatalogViewModel = viewModel(
-        factory = CatalogViewModel.factory(context = androidx.compose.ui.platform.LocalContext.current, section = section)
-    )
+    val viewModel: CatalogViewModel = viewModel(factory = viewModelFactory)
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
