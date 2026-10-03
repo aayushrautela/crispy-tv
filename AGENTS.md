@@ -719,6 +719,26 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   without a slot of its own, and a `remember` that existed only for it goes too.
   **A pin that vanishes when the thing that read it moves is not visible as a pin at all while both
   halves sit in the same file.**
+- **A slot must cross EVERY hop between where it is decided and where it is used, and the
+  compiler only names the deepest one.** Threading `formatBirthday` into
+  `PersonDetailsRoute` and `PersonBody` compiled to a single error —
+  `Unresolved reference 'formatBirthday'` at the `PersonBody(` call site — because the file
+  has **three** levels (`PersonDetailsRoute` → `PersonDetailsScreen` → `PersonBody`) and I
+  threaded two of them. The message points at the *use*, so the fix is at the **signature of
+  the level that owns the use**, and then you walk *back down* the call chain adding the
+  parameter to each level in between. **"Unresolved reference" at a call site means the
+  parameter is missing from a signature above it, not from the thing that calls it.** The
+  shape to expect is one error per un-threaded level, not one per missing hop, so a single
+  error here is not evidence that only one hop is broken.
+  **And the payload's unit is part of the slot's contract, so pick the one the file's other
+  slots already use.** This one takes `(epochMillis: Long) -> String`; epoch *days* would have
+  been the smaller number and the natural output of a date parser, but
+  `LocaleDateFormatters.date` and `.time` already take epoch millis, and three
+  `(Long) -> String` parameters in one codebase that differ in unit is a trap nobody can see
+  at the call site. **A `java.time` type in a slot signature is the pin the slot was opened
+  to discharge**, which is why the calendar date crosses as a number and the `java.time` work
+  happens on the far side — the same reason `monthName: (String) -> String` takes a
+  `"yyyy-MM"` key rather than a `YearMonth`.
 - **No-default slots for anything a call site must not forget.** A defaulted capability lets a call
   site silently hide a row the build ships.
 - **When a platform composition local is unreachable, the answer is usually a value the caller

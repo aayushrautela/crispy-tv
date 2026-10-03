@@ -42,12 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -71,26 +71,28 @@ import com.crispy.tv.ui.navigation.animateContentAlpha
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_arrow_back
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import org.jetbrains.compose.resources.painterResource
 
 private val PersonAvatarSize = 120.dp
 private val TopAppBarClearanceHeight = 64.dp
 
 @Composable
-fun PersonDetailsRoute(
+internal fun PersonDetailsRoute(
     personId: String,
+    // The `Context` is read by the caller, not here: `personDetailsViewModelFactory`
+    // needs one, and it is the one thing in this file that did. No default on either
+    // slot -- a factory is a wiring decision and a `Locale` is a rendering one, so
+    // neither is something a call site may forget it owns.
+    viewModelFactory: ViewModelProvider.Factory,
+    formatBirthday: (epochMillis: Long) -> String,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
     initialProfileUrl: String? = null,
 ) {
-    val context = LocalContext.current
     val viewModel: PersonDetailsViewModel =
         viewModel(
             key = personId,
-            factory = personDetailsViewModelFactory(context, personId)
+            factory = viewModelFactory
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -100,6 +102,7 @@ fun PersonDetailsRoute(
         initialProfileUrl = initialProfileUrl,
         onBack = onBack,
         onItemClick = onItemClick,
+        formatBirthday = formatBirthday,
     )
 }
 
@@ -110,6 +113,7 @@ private fun PersonDetailsScreen(
     initialProfileUrl: String?,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
+    formatBirthday: (epochMillis: Long) -> String,
 ) {
     val listState = rememberLazyListState()
     val topBarAlpha by remember {
@@ -165,6 +169,7 @@ private fun PersonDetailsScreen(
                         person = person,
                         isLoading = uiState.isLoading,
                         onItemClick = onItemClick,
+                        formatBirthday = formatBirthday,
                     )
                 }
             }
@@ -350,7 +355,8 @@ private fun PersonSocialsRow(socials: PersonSocials?) {
 private fun PersonBody(
     person: PersonDetails?,
     isLoading: Boolean,
-    onItemClick: (CatalogItem, String?) -> Unit
+    onItemClick: (CatalogItem, String?) -> Unit,
+    formatBirthday: (epochMillis: Long) -> String,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
     val showPlaceholders = person == null && isLoading
@@ -387,7 +393,7 @@ private fun PersonBody(
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            val born = formatBirthday(person?.birthday)
+            val born = birthdayText(person?.birthday, formatBirthday)
             val from = person?.placeOfBirth?.trim()?.takeIf { it.isNotEmpty() }
             if (born != null || from != null) {
                 Spacer(modifier = Modifier.height(6.dp))
@@ -531,14 +537,3 @@ private fun PersonMeta(label: String, value: String, modifier: Modifier = Modifi
     }
 }
 
-private fun formatBirthday(value: String?): String? {
-    val raw = value?.trim().orEmpty()
-    if (raw.isEmpty()) {
-        return null
-    }
-
-    return runCatching {
-        LocalDate.parse(raw)
-            .format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.getDefault()))
-    }.getOrElse { raw }
-}

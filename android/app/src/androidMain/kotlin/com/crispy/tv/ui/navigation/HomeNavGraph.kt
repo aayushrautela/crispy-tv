@@ -31,6 +31,8 @@ import com.crispy.tv.home.homeSelectorViewModelFactory
 import com.crispy.tv.home.homeViewModelFactory
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.person.PersonDetailsRoute
+import com.crispy.tv.person.formatBirthdayDate
+import com.crispy.tv.person.personDetailsViewModelFactory
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 
@@ -368,11 +370,28 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         )
     ) { entry ->
         val personId = entry.arguments?.getString(AppRoutes.PersonDetailsPersonIdArg).orEmpty()
+        // `NavHostController.context` is an Android property reached through the
+        // expression, so nothing here *names* `android.content.Context` -- the
+        // capability this file has by being `androidMain` at all.
+        val appContext = navController.context.applicationContext
         val profileUrl = entry.arguments?.getString(AppRoutes.PersonDetailsProfileUrlArg).orEmpty()
             .takeIf { it.isNotBlank() }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             PersonDetailsRoute(
                 personId = personId,
+                // The same two slots `HomeRoute` and `DetailsRoute` take, for the same
+                // reason: `personDetailsViewModelFactory` needs a `Context` and
+                // `formatBirthdayDate`'s pattern follows the device's language, so both
+                // are resolved here and neither is named inside the route.
+                //
+                // `personId` is in the `remember` keys because the factory closes over it.
+                // The original called it fresh on every recomposition, which was harmless
+                // only because `viewModel()` keys on `personId` too -- so a cached factory
+                // whose `personId` lagged is the thing the keys are here to prevent.
+                viewModelFactory = remember(appContext, personId) {
+                    personDetailsViewModelFactory(appContext, personId)
+                },
+                formatBirthday = ::formatBirthdayDate,
                 initialProfileUrl = profileUrl,
                 onBack = { navController.popBackStack() },
                 onItemClick = { item, sharedElementKey ->
