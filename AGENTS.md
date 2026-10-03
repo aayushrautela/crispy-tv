@@ -720,6 +720,55 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   'synchronized'` *plus* a cascading `'return' is prohibited here` that reads like a control-flow
   bug. The portable answer is not a rename -- but `Mutex` cost nothing **because both guarded regions were inside a `private suspend fun`**.
   **And the family has a member with no symbol at all, which is why a census reported `PlayerOverlayControls.kt` as having no forbidden import.** Its two clock decisions were rendered with `"%d:%02d".format(...)`, and **`kotlin.text.String.format` is a JVM-only extension**: it is not declared in `commonMain`, it needs no import to write, and it is invisible to every import scan, to `check_common_purity.py`, and to a hand-read import list. So a 442-line file passed a careful audit as clean and then failed `compileCommonMainKotlinMetadata` with two `Unresolved reference 'format'` errors. **A pin can arrive through a *member function on a value*, and the only instrument that finds it is the metadata compilation** -- which is why that task is on the single-change checklist and why "the import list is clean" is not a measurement. The fix was to inline the padding as a `private fun twoDigits(Int)`, and **the replacement is smaller than the import it removed.**
+- **The stdlib is a pin source too, and the member-function family now has four members rather
+  than one.** `rowsByUrl.putIfAbsent(key, value)` in a 995-line screen passed an import audit,
+  passed `check_common_purity.py`, and failed `compileCommonMainKotlinMetadata` with
+  `Unresolved reference 'putIfAbsent'`: `MutableMap.putIfAbsent` is declared for the JVM only.
+  It is the same shape as `String.format` and `Dispatchers.IO` -- needs no import to write, so
+  no token scan and no hand-read import list can see it -- and **the fix was to spell the rule
+  out** (`if (!rowsByUrl.containsKey(key)) rowsByUrl[key] = …`) rather than to find a wrapper,
+  because there was nothing to wrap: the stdlib extension *is* the implementation. **A gate
+  that scans imports cannot see any of this family, so `compileCommonMainKotlinMetadata` is not
+  a formality before a landing -- it is the only thing standing between a clean import list and
+  a `commonMain` file that does not compile.**
+- **A guard on a bare token is satisfied by the legal replacement that discharges it, and this
+  has now happened three times.** `ManifestUri.parse(` **contains** `Uri.parse(`; `newFixture(`
+  contains `Fixture(`; and the two earlier instances in this repository are
+  `DrawableResource`/`DrawableRes` and `LocalViewConfiguration`/`ViewConfiguration`. Each one
+  reported a correct port as broken. **The fix is a word boundary, and `\b` is what makes it
+  work**: there is no boundary inside `ManifestUri` because `t` before `U` is a word character,
+  so `r"\bUri\.parse\("` matches the android type and not the commonMain one. **The sharper half
+  is the second instance, where the replacement is *named after* the thing it replaces** --
+  `ManifestUri` is the successor to `Uri`, so the successor's name contains the predecessor's,
+  and that is a property of good naming rather than of this one port. So a "must be gone" guard
+  on a type or function name is a guard that will keep firing on correct code, which is how a
+  safety gate gets switched off.** Scope it to the *call form* as well where the declaration
+  must survive: `r"\bFixture\(syncFails"` distinguishes the two call shapes being removed from
+  `private class Fixture(`, which is still supposed to be there.
+- **Widening a proven port beats writing a private copy of it, and the reason is that a port
+  with measured edge cases is a specification.** `:app`'s `AddonsSettingsScreen.kt` parsed
+  add-on urls in four helpers; `:addons` already had `ManifestUri` in `commonMain`, validated
+  against 26 Robolectric shapes by `UriBehaviourHostTest`, and it was `internal` -- so `:app`
+  could not see it. The alternative was a private copy in `:app`, and that is worse than a
+  duplicate: **the interesting behaviour of a URL parser is in the mismatches between
+  `android.net.Uri` and the portable type** (it normalizes nothing; a bare word parses as a
+  host; `toString()` is the identity), none of it is in the easy parsing, and none of it survives
+  being copied. So the change was `internal` -> `public` plus a KDoc saying why, and the copy
+  never existed. **A port's width should follow its callers, and a second caller appearing is the
+  signal to widen rather than to fork -- `internal` was correct while `MetadataAddonRegistry` was
+  the only thing in `:addons` that parsed an add-on url.** The companion decision is the test
+  split, and it is what made the widening honest: `ManifestUriTest` keeps covering the type
+  against `Uri`, and the new `:app` `AddonsSettingsUrlTest` covers the four *decisions* `:app`
+  layers on top of it. **Widening a port widens a specification; forking one copies the easy
+  half and loses the measured half.**
+- **A port is often already the answer to the problem in front of you, so look for it before
+  writing the replacement.** The four helpers here needed a portable URL parser and the instinct
+  is to write one; the repository already contained one, in the module that owns the domain,
+  already carrying a Robolectric-measured table of what the platform type actually does. **A new
+  parser is new surface with no golden, and a port that exists has one** -- which is also why
+  `Uri`'s dead scheme-override branch was *deleted* rather than reproduced: `UriBehaviourHostTest`
+  had already measured it unreachable in `:addons`'s copy of the same rules, and the
+  normalization above it guarantees a scheme on every path.
 - **A double whose member returns `Nothing` cannot be subclassed, and `Nothing` is a lie the
   interface never declared.** `RecordingBackendApi` answered every unstubbed `BackendApi`
   member with `): Nothing = unused("name")`, which is subtype-narrowing -- and no override can
@@ -971,6 +1020,37 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   `searchItemKey`, `watchCtaSubtext`, `selectedSeasonOrFirst`, `visibleEpisodes` and about a dozen
   others were `private` and are now `internal`. A test's own private re-implementation of a decision
   is *worse* than no test: everything about it is correct and it proves the suite, not the code.
+- **A fixture that builds its own copy of the double the cases assert on passes for the wrong
+  reason, and the symptom looks like a green suite.** `AddonsSettingsViewModelTest`'s `Fixture`
+  created a `ManifestHttpClient` in its body while every case seeded and asserted on the
+  *enclosing class's* `http`. So the ViewModel read a response map nobody wrote, answered 404 to
+  everything, and every `assertEquals(emptyList(), http.requestedUrls)` passed — **because
+  nothing was wired, not because a guard ran before the fetch.** Those assertions are the whole
+  reason the double records requests: "the guard is before the network" is not observable from
+  `uiState` at all, because a rejection and a failed fetch both end with an error message. **So
+  the fix is structural, not a matter of discipline: the double became a constructor parameter of
+  the fixture and `newFixture(...)` became the only way to build one**, which makes the
+  disagreement impossible to express rather than merely discouraged. **A recording double passed
+  by anything other than the object under test is a double nobody is watching.**
+- **A production registry that seeds a row for itself makes every "the list is empty" assertion
+  false, and the failure reads as a production bug.** Two cases asserted `emptyList()` for the
+  installed add-ons and failed with `[https://opensubtitles-v3.strem.io/manifest.json]` — the row
+  `MetadataAddonRegistry` always contains whether or not anything put it there.
+  `HouseholdAddonsCloudSyncTest` already recorded this in its own `localAddonUrls()`, which
+  filters that url out. **The question each case was really asking is "is there anything *other
+  than the seed*", and `emptyList()` asked a different one** — so the fix is a named helper
+  (`installedUrlsOf(viewModel)`) that filters the seed, not a looser expectation. **This is the
+  `expected:<[]> but was:<[manifest.json]>` shape from the defaulted-argument bullet again: a
+  fixture that asserts an absolute value where the code answers a filtered one agrees with
+  nothing, and the seed is a fact about the production default, not about the case.**
+- **An exhaustive double's shape must be READ, and the compiler is the only thing that will tell
+  you — but the error names the member, not the rule.** This double declared a `patch` override,
+  written from memory; `CrispyHttpClient` has five members (`execute`, `get`, `getOrNull`,
+  `postJson`, `delete`) and no `patch`, and the compiler answered `'patch' overrides nothing`.
+  **A member a double invents is a claim about the interface that nothing checks** until someone
+  happens to compile, which is why "the double is exhaustive" is a property that has to be
+  re-measured rather than recalled. **The comment that replaced it names all five**, so the next
+  reader is told the count and where it came from.
 - **Moving a file into `commonMain` does not make it testable — a _concrete class_ in its
   constructor does, and a file whose only untestable collaborator is a class has to be recorded
   as a negative result rather than left looking finished.** `AiInsightsRepository` is now
@@ -1317,6 +1397,64 @@ Every rule here is also stated in each driver's docstring, because a driver runs
   - **A read-back must skip a `count == 1` assertion when the new string is `""`** — asserting an
     empty string occurs exactly once always fails, which reads as a broken write when the write was
     a deletion and correct. Assert `old not in back` instead.
+  - **A read-back for a deletion whose sign is inverted reports a correct write as broken, and the
+    write is right every time — so the cost is a debugging session, not a corrupted file.** The
+    loop was `elif old and old not in back: FAIL`, which is TRUE exactly when the deletion
+    *worked*. `grep` confirmed the extracted factory was gone from the file while the read-back
+    insisted it had survived. **And an `edit`'s `oldString` can silently swallow text it matched,
+    and a patch script's read-back can silently swallow a correct edit, and the two failures look
+    nothing alike** — which is why this one is worth writing down rather than fixing quietly.
+    **The sign error is the third this session, after an `Edit` consuming a `/**` and
+    `patch_counts.py` asking "is this already right?", and the common shape is that a wrong sign
+    still *runs*: it just answers the opposite question, so it produces a confident wrong answer
+    rather than a crash.**
+  - **The correct read-back condition is derived, not remembered: `old not in new`.** A
+    replacement whose new text *contains* its own old text is legitimate —
+    `import kotlinx.coroutines.Dispatchers` → `…CoroutineDispatcher\nimport …Dispatchers` — and
+    "the old must not survive" is false for it. So assert the old is gone **only when the
+    replacement genuinely removed it**, and make that a function of the pair rather than a fact
+    about each edit: adding an edit to the list cannot then get it wrong. **This is the
+    one-object form of the "phase 1 asserts uniqueness in the ORIGINAL" rule: both questions are
+    about the relationship between the two strings, so both are answered by comparing them.**
+  - **Two edits anchored on the same line collide in phase 2 even though both are unique in the
+    original, and the collision is reachable from either direction.** Deleting
+    `import kotlinx.coroutines.Dispatchers` *and* replacing it with
+    `import kotlinx.coroutines.CoroutineDispatcher` are two edits on one anchor; phase 1 passes
+    (each is 1x in the original), and phase 2 then finds the second 0x because the first already
+    consumed the line. **This is the "an anchor a previous edit introduces is 0x by construction"
+    rule arriving from the other side** — there, a later anchor did not yet exist; here, an
+    earlier one has already gone. The fold is one edit whose replacement is both the deletion and
+    the addition, which is what the two edits meant anyway.
+  - **A "must be gone" guard has three ways to be wrong, and all three fired on this landing.**
+    It can fire on **prose** the new KDoc wrote on purpose (the rewrite's whole point is to record
+    what each pin was, so the comment names `Uri.parse`, `buildUpon`, `Locale.US`), in which case
+    the guard must strip `/** */` **and** `//` before asserting. It can fire on a **substring of
+    the legal replacement** — `ManifestUri.parse(` contains `Uri.parse(`, `newFixture(` contains
+    `Fixture(` — which is what the `\b` in the §1 bullet is for. And it can fire on a
+    **declaration that is supposed to survive**: `ManifestHttpClient()` occurs 3x in the original
+    (the class field, the `Fixture` property, the ViewModel's `httpClient`) and exactly 1x after
+    — the field — so `!= 0` is the wrong assertion and `== 1` plus "the survivor is the field" is
+    the right one. **Write "must be gone" as "is exactly the thing that should remain", and a
+    guard that cannot distinguish a correct edit from a broken one is a guard that gets switched
+    off.**
+  - **A guard list that mixes "an import line" with "a bare token" cannot be written as one
+    list, and the failure is that the correct edit is reported broken.** `import …` lines are not
+    comments and must be asserted on the raw text; bare tokens the new prose quotes must be
+    asserted on comment-stripped text. One list forces one of the two to be wrong.
+  - **An assertion on a name a patch introduced cannot be a phase-1 "unique in the ORIGINAL"
+    anchor at all, so such an edit needs counted handling rather than a stricter assert.** Two
+    calls both read `Fixture(syncFails = false)`-shaped text — 12 of one form, 2 of another, 1 of a
+    third — and a patch that asserted `count == 8` was wrong by four. **The two forms here are
+    disjoint strings** (`Fixture(syncFails = false)` closes the paren; the other continues with
+    `, signedIn = false`), so their counts are independent, which is measurable and worth
+    measuring rather than assuming from the prefix. **Phase 1 should print the count of every
+    anchor and assert only `>= 1` for the multi-occurrence ones**, with the exact numbers in the
+    result line, so a stale figure shows up as a diff in the output instead of as an abort.
+  - **A no-op edit in an edit list is a landmine, and phase 1 catches it as a duplicate
+    anchor.** A pair `("    private const val ", "    private const val ")` — added by accident
+    alongside a real edit that anchors on the same text — made phase 1 report `2x` and abort on a
+    patch that was otherwise entirely correct. **An edit whose replacement equals its anchor is
+    never harmless: it consumes the anchor's uniqueness for every other edit that wants it.**
   - **An anchor that a PREVIOUS edit introduces is 0x in the original by construction, so phase 1
     will abort on a patch that is entirely correct.** `patch_home_details.py` had one edit add
     `import com.crispy.tv.details.DetailsRatingBadgeLogo` and a later edit anchor on that same line to

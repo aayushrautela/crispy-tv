@@ -1,7 +1,5 @@
 package com.crispy.tv.settings
 
-import android.content.Context
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,19 +40,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.crispy.tv.addons.registry.ManifestUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.addons.registry.CloudAddonRow
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.ui.components.CrispyIcon
@@ -68,8 +64,7 @@ import com.crispy.tv.ui.resources.ic_extension
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
-import java.util.Locale
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -86,7 +81,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import com.crispy.tv.addons.registry.metadataAddonRegistry
 
 @Immutable
 internal data class InstalledAddonUi(
@@ -131,6 +125,7 @@ internal class AddonsSettingsViewModel(
     private val addonRegistry: MetadataAddonRegistry,
     private val httpClient: CrispyHttpClient,
     private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddonsSettingsUiState())
@@ -205,7 +200,7 @@ internal class AddonsSettingsViewModel(
             }
 
             val manifest =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     httpGetJson(httpClient, manifestUrl)
                 }
             if (manifest == null) {
@@ -252,9 +247,19 @@ internal class AddonsSettingsViewModel(
                 .exportCloudAddons()
                 .sortedBy { row -> row.sortOrder }
                 .forEach { row ->
-                    rowsByUrl.putIfAbsent(row.manifestUrl.lowercase(Locale.US), row.manifestUrl)
+                    // `putIfAbsent` spelled out, because the stdlib extension is declared
+                    // only for the JVM and so does not resolve in `commonMain`. It is a pin
+                    // with no import: it needs no import to write, no import scan can see
+                    // it, and `check_common_purity.py` has nothing to match. Only the
+                    // metadata compilation finds one, which is why that task is the gate
+                    // before moving any file into `commonMain`. The behaviour is identical
+                    // -- keep the first spelling seen for a lowercased url.
+                    val key = row.manifestUrl.lowercase()
+                    if (!rowsByUrl.containsKey(key)) {
+                        rowsByUrl[key] = row.manifestUrl
+                    }
                 }
-            rowsByUrl[pending.manifestUrl.lowercase(Locale.US)] = pending.manifestUrl
+            rowsByUrl[pending.manifestUrl.lowercase()] = pending.manifestUrl
 
             val rows =
                 rowsByUrl.values.mapIndexed { index, manifestUrl ->
@@ -419,41 +424,14 @@ internal class AddonsSettingsViewModel(
             manifestJson = manifest.toString()
         )
     }
-
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(AddonsSettingsViewModel::class.java)) {
-                        val httpClient = AppHttp.client(appContext)
-                        val addonRegistry =
-                            metadataAddonRegistry(appContext)
-                        @Suppress("UNCHECKED_CAST")
-                        return AddonsSettingsViewModel(
-                            addonRegistry = addonRegistry,
-                            httpClient = httpClient,
-                            householdAddonsCloudSync =
-                                SupabaseServicesProvider.createHouseholdAddonsCloudSync(appContext, addonRegistry),
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
 }
 
 @Composable
-fun AddonsSettingsRoute(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: AddonsSettingsViewModel =
-        viewModel(
-            factory = remember(appContext) {
-                AddonsSettingsViewModel.factory(appContext)
-            }
-        )
+fun AddonsSettingsRoute(
+    onBack: () -> Unit,
+    viewModelFactory: ViewModelProvider.Factory,
+) {
+    val viewModel: AddonsSettingsViewModel = viewModel(factory = viewModelFactory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     AddonsSettingsScreen(
@@ -871,12 +849,53 @@ private fun parseManifestResources(manifest: JsonObject?): List<String> {
     return values.toList()
 }
 
-private fun addonIdFromUrl(manifestUrl: String): String {
-    val uri = Uri.parse(manifestUrl)
-    return uri.host?.trim().orEmpty()
+/**
+ * The add-on's own id, read off its manifest url.
+ *
+ * The old answer was `Uri.parse(url).host?.trim().orEmpty()`, and `Uri.parse` never
+ * returns null and treats a bare word as a host -- so `"foo"` answered `"foo"`. This
+ * asks `ManifestUri.parse`, which requires `://` and a non-blank host, so a row whose
+ * manifest url is broken now reports an *unknown* id rather than adopting the whole
+ * string as its id. That is the better answer for this caller specifically: the string
+ * is not an id, and an id is what it is being asked for.
+ */
+internal fun addonIdFromUrl(manifestUrl: String): String {
+    return ManifestUri.parse(manifestUrl)?.host?.trim().orEmpty()
 }
 
-private fun normalizeManifestUrl(raw: String): String? {
+/**
+ * The segments a manifest is expected to sit at: the ones the url already has, plus
+ * `manifest.json` unless the last already names it.
+ *
+ * This was inline in [normalizeManifestUrl], where it was unreachable by any test
+ * because the only way in was through a whole url. It is named so `commonTest` can ask
+ * what happens to a url that *already* ends in the manifest -- the case a user hits by
+ * pasting the manifest url they were handed, which must not gain a second
+ * `manifest.json`.
+ */
+internal fun manifestSegments(pathSegments: List<String>): List<String> =
+    if (pathSegments.lastOrNull().equals(MANIFEST_SEGMENT, ignoreCase = true)) {
+        pathSegments
+    } else {
+        pathSegments + MANIFEST_SEGMENT
+    }
+
+/**
+ * The base a relative asset url resolves against: the segments with a trailing
+ * `manifest.json` removed, so the result is the add-on's *directory* rather than the
+ * manifest file. Named for the same reason as [manifestSegments], and deliberately
+ * kept separate from it: one adds a segment and one removes one, and folding them
+ * into a single `withManifest(present: Boolean)` would make both call sites read the
+ * caller's flag rather than their own intent.
+ */
+internal fun baseSegments(pathSegments: List<String>): List<String> =
+    if (pathSegments.lastOrNull().equals(MANIFEST_SEGMENT, ignoreCase = true)) {
+        pathSegments.dropLast(1)
+    } else {
+        pathSegments
+    }
+
+internal fun normalizeManifestUrl(raw: String): String? {
     val input = raw.trim()
     if (input.isEmpty()) {
         return null
@@ -889,81 +908,64 @@ private fun normalizeManifestUrl(raw: String): String? {
             else -> "https://$input"
         }
 
-    val parsedUri = Uri.parse(normalizedInput)
-    val uri =
-        when (parsedUri.scheme?.lowercase(Locale.US)) {
-            null, "", "stremio" -> parsedUri.buildUpon().scheme("https").build()
-            else -> parsedUri
-        }
-
-    val host = uri.host?.takeIf { value -> value.isNotBlank() } ?: return null
-    val pathSegments = uri.pathSegments.filter { segment -> segment.isNotBlank() }.toMutableList()
-    if (!pathSegments.lastOrNull().equals("manifest.json", ignoreCase = true)) {
-        pathSegments += "manifest.json"
-    }
-
-    val builder =
-        Uri.Builder()
-            .scheme(uri.scheme ?: "https")
-            .encodedAuthority(uri.encodedAuthority ?: host)
-    pathSegments.forEach { segment -> builder.appendPath(segment) }
-    uri.encodedQuery?.let { encodedQuery ->
-        if (encodedQuery.isNotBlank()) {
-            builder.encodedQuery(encodedQuery)
-        }
-    }
-
-    return builder.build().toString()
+    // All three branches above emit `://`, and the first one has already rewritten any
+    // `stremio://`, so the scheme can no longer be null, blank or `stremio`. The old
+    // code still rebuilt the uri through a `when (scheme) { null, "", "stremio" ->
+    // buildUpon().scheme("https") }` arm, and that arm was dead before this port began:
+    // UriBehaviourHostTest found the same dead branch in :addons' copy of these rules.
+    // It is deliberately NOT carried across. Reproducing it would be porting dead code,
+    // and it is the kind of arm that reads as a live guard to whoever edits this next.
+    //
+    // The `uri.encodedAuthority ?: host` fallback is dead for the same reason:
+    // `ManifestUri.parse` already rejects a blank host, so the fallback cannot fire.
+    val uri = ManifestUri.parse(normalizedInput) ?: return null
+    val url = uri.baseUrlFor(manifestSegments(uri.pathSegments))
+    val query = uri.encodedQuery?.takeIf { encodedQuery -> encodedQuery.isNotBlank() }
+    return if (query == null) url else "$url?$query"
 }
 
-private fun addonBaseUrl(manifestUrl: String): String {
-    val uri = Uri.parse(manifestUrl)
-    val pathSegments = uri.pathSegments.filter { segment -> segment.isNotBlank() }
-    val baseSegments =
-        if (pathSegments.lastOrNull().equals("manifest.json", ignoreCase = true)) {
-            pathSegments.dropLast(1)
-        } else {
-            pathSegments
-        }
-
-    val builder =
-        Uri.Builder()
-            .scheme(uri.scheme ?: "https")
-            .encodedAuthority(uri.encodedAuthority)
-    baseSegments.forEach { segment -> builder.appendPath(segment) }
-    return builder.build().toString().trimEnd('/')
+internal fun addonBaseUrl(manifestUrl: String): String {
+    // A url `ManifestUri` declines to parse used to reach `Uri.Builder` with a null
+    // scheme and a null authority, which emitted `scheme:/...`-shaped nonsense instead of
+    // the input. It now comes back as the input with its trailing slash trimmed -- which
+    // is all the caller does with it anyway, since the only uses are joining and
+    // trimming. Returning the input beats returning a mangled version of it.
+    val uri = ManifestUri.parse(manifestUrl) ?: return manifestUrl.trimEnd('/')
+    return uri.baseUrlFor(baseSegments(uri.pathSegments))
 }
 
-private fun resolveAddonAssetUrl(baseUrl: String, rawAssetUrl: String?): String? {
+internal fun resolveAddonAssetUrl(baseUrl: String, rawAssetUrl: String?): String? {
     val assetUrl = rawAssetUrl?.trim().orEmpty()
     if (assetUrl.isEmpty()) {
         return null
     }
-    val assetUri = Uri.parse(assetUrl)
-    if (assetUri.scheme != null) {
+
+    // The old first arm was `Uri.parse(assetUrl).scheme != null`, and it is NOT
+    // reproducible with `ManifestUri.parse`: that requires `://` and a non-blank host, so
+    // a `data:` or `mailto:` asset would fall through and get joined onto the base url,
+    // turning an absolute asset into a path under the add-on's manifest. The question
+    // being asked is only "does this string name its own scheme", so it is asked with a
+    // scheme pattern rather than with a parser -- and the pattern is what keeps the
+    // schemeless forms (`//host/x`, `/x`, `x`) falling through to the three relative
+    // arms, which is the behaviour being preserved.
+    if (ABSOLUTE_URL_SCHEME_REGEX.containsMatchIn(assetUrl)) {
         return assetUrl
     }
 
-    val baseUri = Uri.parse(baseUrl)
+    val baseUri = ManifestUri.parse(baseUrl)
+    val baseScheme = baseUri?.scheme ?: "https"
+    val authority = baseUri?.encodedAuthority.orEmpty()
     return when {
-        assetUrl.startsWith("//") -> "${baseUri.scheme ?: "https"}:$assetUrl"
-        assetUrl.startsWith("/") -> {
-            Uri.Builder()
-                .scheme(baseUri.scheme ?: "https")
-                .encodedAuthority(baseUri.encodedAuthority)
-                .encodedPath(assetUrl)
-                .build()
-                .toString()
-        }
-
-        else -> {
-            val normalizedBase = baseUrl.trimEnd('/')
-            "$normalizedBase/$assetUrl"
-        }
+        // The old middle arm used `Uri.Builder().encodedPath(assetUrl)`, which takes the
+        // path already encoded and does not encode it -- so composing the string is the
+        // same work, not a shortcut past it.
+        assetUrl.startsWith("//") -> "$baseScheme:$assetUrl"
+        assetUrl.startsWith("/") -> "$baseScheme://$authority$assetUrl"
+        else -> "${baseUrl.trimEnd('/')}/$assetUrl"
     }
 }
 
-private fun manifestUrlsMatch(left: String, right: String): Boolean {
+internal fun manifestUrlsMatch(left: String, right: String): Boolean {
     return left.trim().equals(right.trim(), ignoreCase = true)
 }
 
@@ -993,3 +995,15 @@ private fun nonBlank(value: String?): String? {
 }
 
 private val URI_SCHEME_REGEX = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+/**
+ * A scheme with no `://`, which [URI_SCHEME_REGEX] deliberately does not match.
+ *
+ * `resolveAddonAssetUrl` has to recognise an asset that names its own scheme without
+ * requiring `://`, because `data:` and `mailto:` do not carry one and must still be
+ * treated as absolute. That is the one question a parser answers worse than a pattern
+ * does, which is why this is a second pattern rather than a reach for `ManifestUri`.
+ */
+private val ABSOLUTE_URL_SCHEME_REGEX = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:")
+
+private const val MANIFEST_SEGMENT = "manifest.json"

@@ -13,6 +13,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.accounts.ProfileManagementRoute
 import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.settings.AddonsSettingsRoute
+import com.crispy.tv.settings.addonsSettingsViewModelFactory
 import com.crispy.tv.settings.ImageQuality
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import com.crispy.tv.settings.ImageSettingsScreen
@@ -51,7 +52,18 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
     }
 
     composable(AppRoutes.AddonsSettingsRoute) {
-        AddonsSettingsRoute(onBack = { navController.popBackStack() })
+        // The factory crosses rather than the screen reading a Context: the screen is in
+        // `commonMain` now. `remember` is keyed on the app context so the factory is built
+        // once per app context rather than per recomposition -- `ViewModel` already caches
+        // by class, so the key is about not rebuilding the factory, not about the
+        // ViewModel's identity. Read inside this block, like every other destination here,
+        // because the builder lambda is not a composable scope.
+        val context = LocalContext.current
+        val appContext = remember(context) { context.applicationContext }
+        AddonsSettingsRoute(
+            onBack = { navController.popBackStack() },
+            viewModelFactory = remember(appContext) { addonsSettingsViewModelFactory(appContext) },
+        )
     }
 
     // The plugins destination is registered only when the build has a plugins

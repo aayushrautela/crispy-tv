@@ -1,8 +1,18 @@
 package com.crispy.tv.addons.registry
 
 /**
- * The part of `android.net.Uri` that `MetadataAddonRegistry` reads, in
- * `commonMain`.
+ * The part of `android.net.Uri` that the add-on domain reads, in `commonMain`.
+ *
+ * **It was `internal` and is now `public`.** It was written for
+ * `MetadataAddonRegistry`, which is the only thing in `:addons` that parsed an add-on URL,
+ * so module scope was the right width for the original caller. `:app`'s
+ * `AddonsSettingsScreen.kt` then turned out to parse the *same* URLs four more times
+ * (`addonIdFromUrl`, `normalizeManifestUrl`, `addonBaseUrl`, `resolveAddonAssetUrl`), and
+ * a private copy of this parser in `:app` would have been a second answer to a question
+ * this file already answers -- and one that rots, because the interesting behaviour is
+ * in the measured mismatches between `Uri` and this type, not in the easy parsing.
+ * **`ManifestUriTest` covers the class itself; `:app`'s `AddonsSettingsUrlTest` covers the
+ * four call sites**, so widening it widened a specification rather than duplicated one.
  *
  * ## Why this exists rather than a `java.net.URI` or an okio type
  *
@@ -43,7 +53,7 @@ package com.crispy.tv.addons.registry
  * and port included, IPv6 brackets included), each *decoded* segment is re-encoded
  * as a path segment, and the query and fragment are dropped.
  */
-internal class ManifestUri private constructor(
+class ManifestUri private constructor(
     val raw: String,
     val scheme: String,
     val encodedAuthority: String,
@@ -159,7 +169,7 @@ private fun Char.isUnreserved(): Boolean =
  * multi-byte character written as `%C3%A9` reads as `é` and not as two Latin-1
  * characters.
  */
-internal fun percentDecode(value: String): String {
+fun percentDecode(value: String): String {
     if ('%' !in value) return value
 
     val bytes = ArrayList<Byte>(value.length)
@@ -185,7 +195,7 @@ internal fun percentDecode(value: String): String {
  * `Uri.Builder`'s path-segment encode: the unreserved set passes through and
  * every byte of anything else becomes `%XX` with upper-case hex.
  */
-internal fun percentEncodeSegment(value: String): String {
+fun percentEncodeSegment(value: String): String {
     if (value.isEmpty()) return value
     val out = StringBuilder(value.length)
     for (byte in value.encodeToByteArray()) {
