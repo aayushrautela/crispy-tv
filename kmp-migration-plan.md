@@ -37,7 +37,16 @@ Windows, macOS and Linux are **one** target, not three: they all run on the JVM,
 
 ## 1. Status — what is actually done
 
-Verified against the working tree, not remembered. **Last reconciled 2026-09-30.**
+Verified against the working tree, not remembered. **Last reconciled 2026-10-03.**
+
+**Every number in this section that describes a source set is produced by
+`scripts/update_plan_counts.py`, which derives them from the tree and from
+`scripts/verify_kmp_port.py` rather than from anyone's memory — run it without
+`--write` to see what is stale, and with `--write` to repair it.** That script
+exists because a landing put two files into `commonMain`, one figure was passed on
+a command line instead of measured, and the plan read 160 while the tree said 161 —
+with `verify_kmp_port.py` green throughout, because it reads the `androidMain`
+identity and cannot see a `commonMain` change at all.
 
 **Read the counts below as of the reconciliation date and re-measure before
 planning.** They are the one part of this file that is *meant* to go stale —
@@ -56,13 +65,13 @@ git ls-files android/app/src/androidMain | grep -c '\.kt$'
 | 1 — Shells + prove the seam | **done** — `:androidApp` split off, contract suite in `core-domain/commonTest`, desktop seam proof |
 | 2 — Data layer | **done** — all six modules KMP; no `java.time`, no inline clocks, 9 `commonMain` source sets clean |
 | 3 — Flavors + config | **done** — one source of truth for the version across `:androidApp` and generated `AppConfig` |
-| 4 — Shared UI | **in progress** — resources done, `commonMain` path proven; **164 of 212 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 164) |
+| 4 — Shared UI | **the file-move phase is CLOSED** — resources done, `commonMain` path proven, **164 of 212 `:app` files in `commonMain`** (`find` and `git ls-files` agree on 164). Re-audited 2026-10-03 in both directions (forbidden imports, then subtracting every type declared in any module's `commonMain`): **0 of the 48 remaining files are movable.** The remainder is composition roots and platform code, not a backlog — see **"Where `:app` stands"** below |
 | 5 — Desktop, full | **started** — `:desktopApp` depends on `:app` and renders **two** of its `commonMain` screens, `ContinueWatchingRail` and `ImageSettingsScreen`, and constructs **all six** `platform-core` ports through `:android:platform-desktop`, so the seam is no longer a claim about compilation. It is still 3 screens' worth of code, not an app: no navigation seam, and the settings screen is reachable only from a placeholder affordance in the window |
 | 6 — iOS + Liquid Glass | SwiftUI shell exists; never built against shared code. `CrispyUI` is built and exported and **nothing imports it** — `grep -rn "import CrispyUI" ios/` returns nothing |
 | 7 — Harden | Apple CI done; the rest not |
 
-**Where `:app` stands, and the honest shape of the remainder.** The 60 files still in
-its `androidMain` are **not** 61 independent jobs, and the partition that says
+**Where `:app` stands, and the honest shape of the remainder.** The 48 files still in
+its `androidMain` are **not** 48 independent jobs, and the partition that says
 which is which is **measured by `scripts/verify_kmp_port.py`** rather than
 maintained here by hand -- the hand-maintained version of this very table had
 drifted from its own prose twice. That script also asserts the count stated in
@@ -74,16 +83,28 @@ discarded, because it produced confident nonsense (`Int declared in android/tv`,
 every declaration site reported as pinned by itself) rather than because the
 question was wrong.
 
-**The remainder is dominated by two things, and neither is a pile of small
-files.** The first is `android.jar` itself, 51 of the 51 -- and most of those are
-composition roots whose only import is `android.content.Context`, which is
-**correct placement** rather than work: `fun create(context: Context)` *is* a
-composition root, and `:desktopApp` will need its own. The second is
-`androidx.navigation`, 6 files, and that is **the one thing gating the desktop
-app, and it is a decision rather than a port**: `NavHostController` is an Android
-`Activity`, while the artifact itself is KMP, so the question is what a
-non-Android target navigates with. `CrispySharedTransitionLayout` is already in
-`commonMain` waiting for a graph that can reach it.
+**The remainder is not a backlog, and this is the measured verdict rather than a
+claim.** Re-audited 2026-10-03 in **both directions** -- forbidden platform
+imports first, then subtracting every type declared in every module's
+`commonMain` from the capitalised identifiers each file uses, so a declaration
+reached with *no import* (a sibling in the same package, or another module's
+`androidMain`) is visible too -- **0 of the 48 have no pin.** The shape:
+
+| What the 48 are | Files | Is that work? |
+|---|---|---|
+| Composition roots whose **only** forbidden import is `android.content.Context` | **11** | **no -- correct placement.** `fun create(context: Context)` *is* a composition root, and `:desktopApp` gets its own wiring from `:platform-desktop` rather than by moving these |
+| `androidx.media3` | **6** | no -- Media3 publishes no non-Android artifact, and the engine is out of scope by decision |
+| Bundle-bound navigation | **2** | no -- `NavBackStackEntry.arguments` returns `android.os.Bundle` on every platform, which is a *member's return type*, not a port |
+| Genuinely `android.jar` / `androidx` platform code, including `:app`'s own `androidMain` type reached with no import | **29** | no -- `ContextCompat`, an `R.<type>` reference, `java.util.Locale` |
+
+**So `:app`'s file-move phase is closed, and the two claims that said otherwise
+were both measured at 120 files and falsified 72 times over.** The earlier text
+claimed `androidx.navigation` was "6 files, and the one thing gating the desktop
+app, and it is a decision rather than a port": it is **2 files**, they are
+Bundle-bound, and the `decision rather than a port` framing was the *bucket
+explained by a decision* -- the shape that never gets re-measured because the
+explanation feels like a finding. `CrispySharedTransitionLayout` is already in
+`commonMain` and is reached by six graphs that did move.
 
 Two earlier claims in this paragraph are worth keeping because they were
 *reversed* by measurement rather than merely superseded. `paging-compose` is KMP
@@ -1220,15 +1241,21 @@ clean.
 Then the two questions that were being answered by guesswork were measured, and the
 answer changes what the rest of Phase 4 is:
 
-**1. Can any further `:app` file move? No.** Two independently written analyzers agree,
-and a third that peels transitively agrees: **0 of the files remaining in `:app`'s
-`androidMain` are movable as they stand.** (The bucket table below was measured when 120
-remained; it is now 80, and the *conclusion* is unchanged while the per-file counts are
-stale — treat the table as the shape of the problem, not its current size.) Every one is
-either behind a hard wall or waiting on a declaration that is itself in some other
-module's `androidMain`. A naive "this declaration blocks N files" ranking badly overstates
-the payoff, because a file with three blockers is not unblocked by removing one — so the
-ranking used below is a transitive peel, not a count.
+**1. Can any further `:app` file move? Yes, and this section was wrong about it for
+months.** Two independently written analyzers agreed, and a third that peels
+transitively agreed: **0 of the files remaining in `:app`'s `androidMain` are movable
+as they stand.** Measured when **120** remained. **It is now 48, and 72 of those files
+moved** -- `9bf0b769` was the thirteenth, then every subsequent landing moved more. So
+the conclusion *was* not stable, and this paragraph is the record of the error: **three
+analyzers agreeing is not evidence when the question is re-asked after the tree changes.**
+Each move falsified it for its own file, because a "hard wall" is nearly always a
+constructor parameter or a helper the landing has not written yet.
+
+The bucket table below was measured when 120 remained. Treat it as the shape of the
+problem, not its current size -- §1's table is the live one. A naive "this declaration
+blocks N files" ranking badly overstates the payoff, because a file with three blockers
+is not unblocked by removing one, so the ranking used below is a transitive peel, not a
+count.
 
 **1a. Re-measured 2026-09-30, the other direction.** A *reverse* audit — forbidden
 imports and tokens first, then subtracting every type declared in every module's

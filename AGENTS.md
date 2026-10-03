@@ -173,7 +173,7 @@ where that gets answered.
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | shared UI and presentation. 128 `commonMain` / 68 `androidMain`. See the table in `android/app/build.gradle.kts` for what holds what |
+| `:android:app` | KMP + Compose | shared UI and presentation. **164 `commonMain` / 48 `androidMain`**, and the 48 are re-audited rather than queued: **0 of them are movable** (composition roots by role, Media3, and Bundle-bound navigation). See the table in `android/app/build.gradle.kts` for what holds what |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -186,12 +186,16 @@ where that gets answered.
 | `:android:plugins` | plain Android lib | QuickJS bridge, `store` source set unread on purpose |
 | `android/torrent-engine`, `android/plugins`, `android/tv` | plain Android | **a plain `com.android.library` cannot be consumed from a KMP `commonMain` at all** |
 
-**`CrispySharedTransitionLayout` is in `commonMain` because the mechanism is not navigation.** 14
-`commonMain` files read `LocalSharedTransitionScope`, a `staticCompositionLocalOf<SharedTransitionScope?>
+**`CrispySharedTransitionLayout` is in `commonMain` because the mechanism is not navigation.** 8
+`commonMain` files name `LocalSharedTransitionScope`, a `staticCompositionLocalOf<SharedTransitionScope?>
 { null }` whose `content` slot has **no default**, so a caller cannot obtain a provider that provides
-nothing. Five of the eleven nav graphs are in `commonMain` -- `AuthNavGraph`, `LibraryNavGraph`,
-`SearchNavGraph`, `DiscoverNavGraph`, and, since the Home landing, `HomeNavGraph` -- and the rest are
-still in `androidMain`, and the
+nothing. **Six of the seven `*NavGraph.kt` files are in `commonMain`** -- `AuthNavGraph`,
+`LibraryNavGraph`, `SearchNavGraph`, `DiscoverNavGraph`, `HomeNavGraph`, `SettingsNavGraph` -- and the
+**only** one left in `androidMain` is `PlayerNavGraph.kt`, which is the one genuinely Bundle-bound
+graph (16 `navArgument(` declarations, 4 bundle reads). **The count went *down* from an earlier
+14-and-five reading, and that is the direction AGENTS' count rule does not mention: a count written
+about a set that later *shrinks* goes stale silently too, because files leaving `androidMain` are
+never described as an event.** The
 finding is that **the graphs were never the unit of work: a file can move once its _callees_ are
 in `commonMain`, so movement propagates upward from the leaves, and the leaves are the screens.**
 **A set moves as a unit only when the references are mutual, and a graph calling a route is a one-way
@@ -1522,6 +1526,20 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     *above* it". **So the question to ask about a deleted import is "what syntax needs this
     name", not "what block did I delete next to it", and the compiler names the deepest failure
     rather than the shallowest cause.**
+  - **A proof harness that restores from git will discard hand edits to the same file, and it
+    reports success while doing it.** The first version of the harness proving
+    `scripts/update_plan_counts.py` restored `kmp-migration-plan.md` with
+    `git checkout --`, which is *correct for the corruption it caused* and *catastrophic for
+    anything else*: five finished edits to that plan were silently gone, and the run printed
+    **"all 9 proofs passed"** — because the harness had destroyed the work and then verified
+    the tree it had destroyed. The standing rule already says `git checkout --` is the wrong
+    tool for undoing a mutation, and it arrives here in a place the rule does not obviously
+    cover: **a restore looks obviously safe when the harness is the only thing that appears
+    to have touched the file.** The fix is to back the file up when the harness starts and
+    restore from the backup, and the check becomes *"the file is byte-identical to the
+    pre-run backup"* rather than `git diff --quiet` — which would have called the correct
+    restore destructive, because a hand edit surviving is the *expected* outcome.
+    **A harness that can silently undo your work is a harness whose green means nothing.**
   - **A guard list that mixes "an import line" with "a bare token" cannot be written as one
     list, and the failure is that the correct edit is reported broken.** `import …` lines are not
     comments and must be asserted on the raw text; bare tokens the new prose quotes must be
