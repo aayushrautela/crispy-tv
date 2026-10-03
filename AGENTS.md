@@ -189,9 +189,9 @@ where that gets answered.
 **`CrispySharedTransitionLayout` is in `commonMain` because the mechanism is not navigation.** 14
 `commonMain` files read `LocalSharedTransitionScope`, a `staticCompositionLocalOf<SharedTransitionScope?>
 { null }` whose `content` slot has **no default**, so a caller cannot obtain a provider that provides
-nothing. Four of the ten nav graphs are in `commonMain` -- `AuthNavGraph`, `LibraryNavGraph`,
-`SearchNavGraph` and, since the Discover landing, `DiscoverNavGraph` -- and the rest are still in
-`androidMain`, and the
+nothing. Five of the eleven nav graphs are in `commonMain` -- `AuthNavGraph`, `LibraryNavGraph`,
+`SearchNavGraph`, `DiscoverNavGraph`, and, since the Home landing, `HomeNavGraph` -- and the rest are
+still in `androidMain`, and the
 finding is that **the graphs were never the unit of work: a file can move once its _callees_ are
 in `commonMain`, so movement propagates upward from the leaves, and the leaves are the screens.**
 **A set moves as a unit only when the references are mutual, and a graph calling a route is a one-way
@@ -201,8 +201,31 @@ yet, which is why `LibraryNavGraph` could move at all once `LibraryRoute` below 
 `android.*` and nothing platform-shaped at all**, and its only pin was its callee. The two other
 ways a graph was pinned are the nav half of §1's *run the audit in both directions*: **a pin that
 arrives through a _call_ is invisible to every import scan**, and **a file in a package can be pinned
-by a sibling in the same package with no import at all.** The landings' narratives are in the
-git history.
+by a sibling in the same package with no import at all.**
+
+**And a nav graph that *reads* a route argument cannot move at all, because `NavBackStackEntry` is
+`commonMain`-declared but its `arguments` member returns `android.os.Bundle` on every platform.**
+Measured, not inferred: `navigation-common:2.10.0`'s metadata jar contains `NavBackStackEntry`,
+`NavType`, `navArgument` and `composable` but the string `getString` in **no** source set, and
+`javap` on the `.aar` answers `public final android.os.Bundle getArguments()`. So this is a *fourth*
+kind of pin -- not an import, not a callee, not a module, but **a member whose return type is a
+platform type**. The census that settles it, measured over the graph files:
+
+| graph | `navArgument(` declarations | bundle accessors | state |
+|---|---|---|---|
+| `AuthNavGraph`, `LibraryNavGraph`, `SearchNavGraph`, `DiscoverNavGraph` | 0 | 0 | commonMain |
+| `HomeNavGraph` | 13 | **0** | commonMain, reads through three injected readers |
+| `SettingsNavGraph` | 0 | 0 | androidMain -- blocked by its callee `AddonsSettingsRoute` |
+| `PlayerNavGraph` | 16 | 4 | androidMain -- the one graph genuinely Bundle-bound |
+
+**So it is the READ, never the declaration**: `HomeNavGraph` kept all thirteen `navArgument(...)`
+declarations (they are `commonMain`-declared) and moved once its three destinations stopped reading
+the bundle. **The fix is the port's usual one and it is not new**: `AppNavHost` builds three
+`(NavBackStackEntry) -> HomeXxxRouteArgs` closures that pull raw values out of the bundle and decide
+nothing, and the graph keeps every rule about what a blank means -- including
+`runtimeDetailsEntryOrNull`, which was a seven-line `takeIf` inside a composable and is now named and
+tested. **What crossed is the platform step; what stayed is the decision.** The landings' narratives
+are in the git history.
 
 **An `R` reference blocks a file completely but usually blocks only a few lines of it, and the two
 halves belong in opposite source sets.** `:app` has **zero** `expect`/`actual`, so introducing one for
@@ -472,15 +495,35 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   product-shaped judgement about whether a desktop entry point should exist at all, offered as an
   explanation for a set I had never re-counted. Measured, **four of the ten nav graphs were already in
   `commonMain`** (`AuthNavGraph`, `LibraryNavGraph`, `SearchNavGraph`, and `DiscoverNavGraph`, which
-  moved this landing), so a proven shape existed the whole time and Discover was the next item in it.
-  What remained genuinely hard is four files, not six: `AppNavHost` (the androidMain root), `HomeNavGraph`
+  moved that landing), so a proven shape existed the whole time and Discover was the next item in it.
+  What remained genuinely hard was four files, not six: `AppNavHost` (the androidMain root), `HomeNavGraph`
   (433 lines), `PlayerNavGraph`, `SettingsNavGraph`. **A bucket explained by a decision is the shape
   that never gets re-measured, because the explanation feels like a finding** -- and the test is the
   one already stated above it: *re-measure rather than trust it*, and here the cheap measurement was
   `git ls-files` on two directories. **A pin that arrives through a _call_ also means a nav graph's
   pin can be its callee and nothing else**: `DiscoverNavGraph.kt` imports no `Context`, no `android.*`
   and nothing platform-shaped, so it was portable in every line it wrote and still unpinnable --
-  movement propagates upward from the leaves, and a graph is a leaf's caller.
+  movement propagates upward from the leaves, and a graph is a leaf's caller. **And the re-measurement
+  then paid for itself twice more**: `HomeNavGraph` moved the next landing, and what stopped it was a
+  *fourth* kind of pin -- not an import, not a callee, not a module, but **a member whose return type
+  is a platform type** (`NavBackStackEntry.arguments` returns `android.os.Bundle`), which the
+  Project Layout's nav paragraph records with the census that settles it.
+  **A dead import reports itself as a pin, and the shape is common enough to be worth a standing
+  rule.** `PlayerTrackSheet.kt`'s only recorded obstacle was `androidx.annotation.DrawableRes`, which
+  nothing used; `HomeNavGraph.kt` carried `CanonicalContinueWatchingItem` and `CalendarSeriesItem`,
+  each occurring **exactly once** in the file -- the import line. Both were counted, both were
+  reported, and neither was real. **The measurement is one command**: an import whose simple name
+  occurs once in the file is dead, and `CalendarEpisodeItem` -- which occurs twice, import plus one
+  use -- is the control that shows the rule is not "delete anything seen once". **A token scan counts
+  an import whether or not anything uses it, so it cannot tell a used import from a dead one.**
+  **And a guard scoped to a _form_ is a claim about that form.** After moving the two bundle reads
+  that were written `entry.arguments?.getString(...)`, the guard asserted exactly that string was
+  gone -- and it passed, over a third live bundle read in the same file written
+  `val args = entry.arguments` followed by `args?.getString(...)`. **The compiler caught it, not the
+  guard.** The fix is to scope a "must be gone" guard to the *member name* (`getString`, `getBoolean`)
+  rather than to the expression that calls it, because the expression is the part a file is free to
+  rewrite and the name is not. **A pin is per file; a guard is per spelling unless you make it per
+  name.**
   **And when a whole family is re-scanned token by token, the tokens are usually no longer the wall —
   so classify a family by its blocker before choosing a file in it, or each landing finds a different
   token and each finds it was not the pin.** **And when the census is near-zero, recording the partition is
@@ -1284,7 +1327,15 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     import into the edit that needs it. *A second draft of the same script failed differently, with
     the Edit tool putting the replacement text where the anchor belonged and leaving the old text
     behind, which is the "count the brackets" failure above wearing a different hat: after any manual
-    Edit to a patch script, re-read the edit list before running it.*
+    Edit to a patch script, re-read the edit list before running it.* **And it recurred with the
+    opposite sign, which is the half worth keeping**: repairing an anchor whose trailing newline
+    turned out to be absent from the file, the Edit *consumed* the `/**` that began the next
+    declaration, and the file then compiled to **111 errors, every one of them
+    `Syntax error: Expecting a top level declaration`**. **A syntax-error cascade is one missing
+    delimiter**, so resolve the distinct *names* in it before reading any of it -- here one line at
+    `HomeNavDependencies.kt:124` explained all 111, and the cheap instrument is a two-number
+    comparison (`grep -c '^/\*\*'` against `grep -c '^ \*/'`), which answers "are the comment
+    delimiters balanced" without reading a single error.
 - **A gate that parses a sentence it does not own must FAIL when it cannot find
     it -- and a literal space in that regex is a silent off switch.** `verify_kmp_port.py`
     reads the census size out of `kmp-migration-plan.md` with

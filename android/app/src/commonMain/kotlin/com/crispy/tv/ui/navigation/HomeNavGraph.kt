@@ -1,69 +1,43 @@
 package com.crispy.tv.ui.navigation
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalConfiguration
-import com.crispy.tv.accounts.activeProfileLoader
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.catalog.catalogViewModelFactory
-import com.crispy.tv.app.appGraph
-import com.crispy.tv.details.DetailsRatingBadgeLogo
 import com.crispy.tv.details.DetailsRoute
-import com.crispy.tv.details.HeroTrailerLayer
-import com.crispy.tv.details.ReviewProviderBadge
-import com.crispy.tv.details.YouTubeExtraVideoDialog
-import com.crispy.tv.details.localeDateFormatters
 import com.crispy.tv.details.normalizedDetailsItemType
-import com.crispy.tv.details.rememberSeedColor
-import com.crispy.tv.details.shareOnCrispy
-import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.home.CalendarEpisodeItem
 import com.crispy.tv.home.CalendarRoute
-import com.crispy.tv.home.CalendarSeriesItem
 import com.crispy.tv.home.HomeRoute
-import com.crispy.tv.home.calendarViewModelFactory
-import com.crispy.tv.home.homeSelectorViewModelFactory
-import com.crispy.tv.home.homeViewModelFactory
-import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.person.PersonDetailsRoute
-import com.crispy.tv.person.formatBirthdayDate
-import com.crispy.tv.person.personDetailsViewModelFactory
-import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 
-internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
+internal fun NavGraphBuilder.addHomeNavGraph(
+    navController: NavHostController,
+    dependencies: HomeNavDependencies,
+) {
     composable(AppRoutes.HomeRoute) { entry ->
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
-            // `HomeRoute` takes its two factories and its profile loader as slots, so
-            // this is where the `Context` is read now. Nothing here *names*
-            // `android.content.Context`: `NavHostController.context` is an Android
-            // property reached through the expression, which is exactly the
-            // capability this file has by being `androidMain` at all.
-            //
-            // The `remember` keys are load-bearing, not tidiness.
-            // `activeProfileLoader`'s own KDoc records that its return value is a
-            // `produceState` key, so a fresh lambda on every recomposition would
-            // restart the profile load each time -- the same identity the deleted
-            // comment was protecting when it read `LocalContext.current` here.
-            val appContext = navController.context.applicationContext
+            // All three of `HomeRoute`'s crossings arrive in `dependencies`, built by
+            // `AppNavHost` -- the last graph still reading a `Context` for itself, and
+            // the same shape the other four took before it. The `remember` keys that
+            // used to sit here are the caller's now, and `AppNavHost`'s comment says
+            // why its `activeProfileLoader` instances are separate rather than shared.
             HomeRoute(
-                viewModelFactory = remember(appContext) { homeViewModelFactory(appContext) },
-                selectorViewModelFactory = remember(appContext) { homeSelectorViewModelFactory(appContext) },
-                loadProfile = remember(appContext) { activeProfileLoader(appContext) },
-                // The `< 600` threshold lived in `HomeStreamSelector` while it also read
-                // `LocalConfiguration` itself. `LocalConfiguration` is Android-only --
-                // `ui-android`'s `AndroidCompositionLocals_androidKt` -- so a
-                // `commonMain` composable cannot name it and no static scan can see the
-                // dependency at all. **So the value crosses and the decision stays here**,
-                // which is the one place in this chain where a platform value is
-                // available: this file already reads `navController.context`.
-                isCompact = LocalConfiguration.current.screenWidthDp < 600,
+                viewModelFactory = dependencies.homeViewModelFactory,
+                selectorViewModelFactory = dependencies.homeSelectorViewModelFactory,
+                loadProfile = dependencies.loadProfile,
+                // `LocalConfiguration` is Android-only -- it lives in `ui-android`'s
+                // `AndroidCompositionLocals_androidKt`, so a `commonMain` composable
+                // cannot name it and no static scan can see the dependency at all.
+                // **So the value crosses and the decision stays**, as the named
+                // threshold it has become: the width arrives, and `isCompactWidth`
+                // answers. The details block calls the same rule again, separately.
+                isCompact = isCompactWidth(dependencies.screenWidthDp),
                 onHeroClick = { hero, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
@@ -137,13 +111,11 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
 
     composable(AppRoutes.CalendarRoute) {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
-            // `CalendarRoute` is in `commonMain` and its only platform value was a
-            // `Context` read to reach the factory, so the read moved here with the
-            // factory. Same shape as the `HomeRoute` block above, and the
-            // `remember` is the one `CalendarScreen` used to own, kept so this is a
-            // port rather than a behaviour change: without it the service graph is
-            // rebuilt on every recomposition.
-            val appContext = navController.context.applicationContext
+            // `CalendarRoute` is in `commonMain` and its only crossing was the factory
+            // it used to reach through a `Context`, so the factory arrives in
+            // `dependencies` instead. Same shape as the `HomeRoute` block above; the
+            // `remember` that guarded the service graph is the caller's now, and it is
+            // still a `remember` -- without one the graph is rebuilt every recomposition.
             CalendarRoute(
                 onBack = { navController.popBackStack() },
                 onEpisodeClick = { item, sharedElementKey ->
@@ -159,7 +131,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         )
                     )
                 },
-                viewModelFactory = remember(appContext) { calendarViewModelFactory(appContext) },
+                viewModelFactory = dependencies.calendarViewModelFactory,
             )
         }
     }
@@ -172,8 +144,11 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navArgument(AppRoutes.CatalogTitleArg) { type = NavType.StringType; defaultValue = "" }
             )
     ) { entry ->
-        val args = entry.arguments
-        val catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty()
+        // The first of the three destinations that reads arguments, and the one that
+        // made the shape obvious: this block used to bind the bundle to a local before
+        // reading it, so an import-shaped guard found nothing here at all.
+        val catalogArgs = dependencies.catalogArguments(entry)
+        val catalogId = catalogArgs.catalogId.orEmpty()
         val catalogIdentifier =
             com.crispy.tv.domain.home.parseHomeCatalogId(catalogId)
         val section =
@@ -182,17 +157,19 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 source = catalogIdentifier?.source ?: com.crispy.tv.domain.home.HomeCatalogSource.PERSONAL,
                 kind = catalogIdentifier?.kind.orEmpty(),
                 presentation = com.crispy.tv.domain.home.HomeCatalogPresentation.RAIL,
-                title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
+                title = catalogArgs.title.orEmpty(),
             )
-        // `CatalogRoute` takes its view model's factory as a slot, so the `Context`
-        // is read here -- the same shape as the `CalendarRoute` block above. The
-        // `remember` keys include `section`, which the factory closes over, so a
-        // route argument that changes the section rebuilds the factory with it.
-        val appContext = navController.context.applicationContext
+        // `CatalogRoute` takes its view model's factory as a slot, and that factory
+        // closes over `section` -- a value read from *this* route's arguments. So the
+        // crossing is a function of the section rather than a product, and the
+        // `remember` below keys on `section`, so a route argument that changes it
+        // rebuilds the factory with it.
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             CatalogRoute(
                 section = section,
-                viewModelFactory = remember(appContext, section) { catalogViewModelFactory(appContext, section) },
+                viewModelFactory = remember(dependencies.catalogViewModelFactory, section) {
+                    dependencies.catalogViewModelFactory(section)
+                },
                 onBack = { navController.popBackStack() },
                 onItemClick = { item, sharedElementKey ->
                     navController.navigate(
@@ -222,32 +199,33 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navArgument(AppRoutes.HomeDetailsSharedElementKeyArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
-        val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
-        val itemType = entry.arguments?.getString(AppRoutes.HomeDetailsItemTypeArg).orEmpty()
-        val highlightEpisodeId = entry.arguments?.getString(AppRoutes.HomeDetailsHighlightEpisodeIdArg)?.ifBlank { null }
-        val autoOpenEpisode = entry.arguments?.getBoolean(AppRoutes.HomeDetailsAutoOpenEpisodeArg) == true
-        val runtimeEntry = RuntimeDetailsEntry(
-            seasonNumber = entry.arguments?.getString(AppRoutes.HomeDetailsRuntimeSeasonNumberArg)?.toIntOrNull(),
-            episodeNumber = entry.arguments?.getString(AppRoutes.HomeDetailsRuntimeEpisodeNumberArg)?.toIntOrNull(),
-            absoluteEpisodeNumber = entry.arguments?.getString(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg)?.toIntOrNull(),
-        ).takeIf {
-            it.seasonNumber != null || it.episodeNumber != null || it.absoluteEpisodeNumber != null
-        }
-        val initialArtworkUrl = entry.arguments?.getString(AppRoutes.HomeDetailsArtworkUrlArg)?.ifBlank { null }
-        val sharedElementKey = entry.arguments?.getString(AppRoutes.HomeDetailsSharedElementKeyArg)?.ifBlank { null }
+        // Reading a route argument is `android.os.Bundle`, so the read crosses and the
+        // decisions do not. `entry` is declared `commonMain`; `entry.arguments` is not.
+        //
+        // Every line below the reader is the rule that was already here: a missing id is
+        // an empty string, a blank optional is absent, and the runtime entry exists only
+        // if one of its three numbers was reported. Nothing is decided by the reader.
+        val detailsArgs = dependencies.detailsArguments(entry)
+        val itemId = detailsArgs.itemId.orEmpty()
+        val itemType = detailsArgs.itemType.orEmpty()
+        val highlightEpisodeId = detailsArgs.highlightEpisodeId?.ifBlank { null }
+        val autoOpenEpisode = detailsArgs.autoOpenEpisode
+        val runtimeEntry = runtimeDetailsEntryOrNull(
+            seasonNumber = detailsArgs.runtimeSeasonNumber,
+            episodeNumber = detailsArgs.runtimeEpisodeNumber,
+            absoluteEpisodeNumber = detailsArgs.runtimeAbsoluteEpisodeNumber,
+        )
+        val initialArtworkUrl = detailsArgs.initialArtworkUrl?.ifBlank { null }
+        val sharedElementKey = detailsArgs.sharedElementKey?.ifBlank { null }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
-            // `DetailsRoute` is `commonMain` now, so this file is where every platform
-            // value it needs is read. `navController.context` is an Android property
-            // reached through an expression rather than a named type, which is exactly
-            // the capability this file has by being `androidMain` at all -- the same
-            // shape as the `appContext` three blocks above, for `HomeRoute`.
-            val appContext = navController.context.applicationContext
-            // `remember`, because `LocaleDateFormatters` re-reads the device's date-order
-            // and 12/24-hour settings when it is built, and the screen reads the two
-            // formatters on every recomposition. A fresh instance per recomposition would
-            // be a fresh formatter per recomposition.
-            val localeFormatters = remember(appContext) { localeDateFormatters(appContext) }
-            val configuration = LocalConfiguration.current
+            // `DetailsRoute` is `commonMain`, and this block used to be where all
+            // thirteen of the values it takes were read. They arrive in
+            // `dependencies` now, so this is the fourth block above that names
+            // nothing platform-shaped at all.
+            //
+            // `normalizedDetailsItemType` is the one decision that stays here rather
+            // than crossing: it is pure, it was extracted when the route moved, and the
+            // factory below is keyed on its answer.
             val normalizedItemType = remember(itemType) { normalizedDetailsItemType(itemType) }
             DetailsRoute(
                 itemId = itemId,
@@ -298,7 +276,9 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 //     No parameter with name 'normalizedType' found.
                 //     No value passed for parameter 'itemType'.
                 //
-                // So the normalization is spelled on the right side of the `itemType =`.
+                // So the normalization is spelled in the SECOND POSITIONAL SLOT, which is
+                // the one the member names `itemType` -- and note that the crossing is a
+                // value of function type now, which cannot take named arguments at all.
                 //
                 // And the `remember` keys name the *normalized* value, not the raw one, to
                 // keep the factory's identity byte-identical to what the route produced.
@@ -306,62 +286,52 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 // `viewModelKey`, not on the factory, so a rebuilt factory is only ever
                 // used on a cache miss and then behaves the same -- but "harmless" is a
                 // claim, and one line is cheaper than having to argue it later.
-                detailsViewModelFactory = remember(appContext, itemId, normalizedItemType, runtimeEntry) {
-                    appContext.appGraph().detailsViewModelFactory(
-                        itemId = itemId,
-                        itemType = normalizedItemType,
-                        runtimeEntry = runtimeEntry,
+                //
+                // The crossing is a function rather than a product because the factory
+                // closes over the item, which is read from this route's arguments.
+                detailsViewModelFactory = remember(
+                    dependencies.detailsViewModelFactory,
+                    itemId,
+                    normalizedItemType,
+                    runtimeEntry,
+                ) {
+                    dependencies.detailsViewModelFactory(
+                        itemId,
+                        normalizedItemType,
+                        runtimeEntry,
                     )
                 },
-                playbackSettingsRepository = remember(appContext) {
-                    PlaybackSettingsRepositoryProvider.get(appContext)
-                },
-                // `appContext`, not a composition-local context: `shareOnCrispy`
-                // documents that the chooser needs `FLAG_ACTIVITY_NEW_TASK` because a
-                // composition-local context is not necessarily the application context.
-                // The screen used to build its own inline copy of this call and read the
-                // latter, which is what made that copy a latent crash.
-                shareText = { text -> shareOnCrispy(context = appContext, text = text) },
-                dateFormat = localeFormatters.date,
-                timeFormat = localeFormatters.time,
-                clock = { System.currentTimeMillis() },
-                // Two deliberately separate decisions over one read. This file already
-                // reads `LocalConfiguration` for `HomeRoute`'s `isCompact` three blocks
-                // above, so the second read costs a line and not a dependency.
-                isWideScreen = configuration.screenWidthDp >= 768 &&
-                    configuration.screenHeightDp < configuration.screenWidthDp,
-                isCompact = configuration.screenWidthDp < 600,
-                screenHeightDp = configuration.screenHeightDp,
-                youtubeTrailerPlaybackSupported = AppDistribution.current.capabilities
-                    .youtubeInHeroPlaybackSupported,
-                // `rememberSeedColor`'s own nullability meets the screen's
-                // `?: fallbackSeed` here, so the screen never has to know it is nullable.
-                imageSeedColor = { imageUrl, fallbackSeed ->
-                    rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed).value
-                        ?: fallbackSeed
-                },
-                // The one place the Android trailer surface is named. The layer's own
-                // nine parameters are reproduced verbatim, so this is an unpack rather
-                // than a reshape: `HeroTrailerLayerArgs` exists only to keep the seam one
-                // parameter wide.
-                heroTrailerLayer = { args ->
-                    HeroTrailerLayer(
-                        modifier = args.modifier,
-                        trailer = args.trailer,
-                        viewportWidthPx = args.viewportWidthPx,
-                        viewportHeightPx = args.viewportHeightPx,
-                        shouldPlay = args.shouldPlay,
-                        isMuted = args.isMuted,
-                        onFirstFrameRendered = args.onFirstFrameRendered,
-                        onPlaybackState = args.onPlaybackState,
-                        onFocusLossPause = args.onFocusLossPause,
-                    )
-                },
-                reviewProviderBadge = { provider -> ReviewProviderBadge(provider = provider) },
-                ratingBadgeLogo = { logo -> DetailsRatingBadgeLogo(logo = logo) },
-                youTubeExtraVideoDialog = { video, onDismiss ->
-                    YouTubeExtraVideoDialog(video = video, onDismiss = onDismiss)
-                },
+                playbackSettingsRepository = dependencies.playbackSettingsRepository,
+                // `shareText` is built by the caller with an *application* context.
+                // `shareOnCrispy`'s own KDoc records that the chooser needs
+                // `FLAG_ACTIVITY_NEW_TASK` because a composition-local context is not
+                // necessarily the application context -- which is what made the screen's
+                // own inline copy of this call, that read the latter, a latent crash.
+                shareText = dependencies.shareText,
+                dateFormat = dependencies.dateFormat,
+                timeFormat = dependencies.timeFormat,
+                clock = dependencies.clock,
+                // Two deliberately separate decisions, over one crossing rather than the
+                // one read they shared before it. The home block above asks
+                // `isCompactWidth` the same question and gets the same answer, but the
+                // two screens may move their thresholds independently and both rules now
+                // live here, where a test can reach them.
+                isWideScreen = isWideScreenLayout(
+                    screenWidthDp = dependencies.screenWidthDp,
+                    screenHeightDp = dependencies.screenHeightDp,
+                ),
+                isCompact = isCompactWidth(dependencies.screenWidthDp),
+                screenHeightDp = dependencies.screenHeightDp,
+                youtubeTrailerPlaybackSupported = dependencies.youtubeTrailerPlaybackSupported,
+                imageSeedColor = dependencies.imageSeedColor,
+                // The Android surfaces -- the Media3 trailer layer and the three badge
+                // composables -- are named by the caller now. `HeroTrailerLayerArgs`
+                // exists only to keep that seam one parameter wide, so the unpack that
+                // used to sit here is over there, unchanged.
+                heroTrailerLayer = dependencies.heroTrailerLayer,
+                reviewProviderBadge = dependencies.reviewProviderBadge,
+                ratingBadgeLogo = dependencies.ratingBadgeLogo,
+                youTubeExtraVideoDialog = dependencies.youTubeExtraVideoDialog,
             )
         }
     }
@@ -376,29 +346,32 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             }
         )
     ) { entry ->
-        val personId = entry.arguments?.getString(AppRoutes.PersonDetailsPersonIdArg).orEmpty()
-        // `NavHostController.context` is an Android property reached through the
-        // expression, so nothing here *names* `android.content.Context` -- the
-        // capability this file has by being `androidMain` at all.
-        val appContext = navController.context.applicationContext
-        val profileUrl = entry.arguments?.getString(AppRoutes.PersonDetailsProfileUrlArg).orEmpty()
-            .takeIf { it.isNotBlank() }
+        // The fifth destination, and the third that reads arguments; see the catalog
+        // block for why the read crosses and the rule stays. This one uses
+        // `isNotBlank` where the details block uses `ifBlank { null }`, which is not the
+        // same shape for the same reason twice -- the profile url is passed to
+        // `PersonDetailsRoute` as a fallback for a value the backend may replace, so an
+        // empty string is a *worse* answer than no string, while the details block's
+        // optionals are simply absent when blank.
+        val personArgs = dependencies.personArguments(entry)
+        val personId = personArgs.personId.orEmpty()
+        val profileUrl = personArgs.profileUrl.orEmpty().takeIf { it.isNotBlank() }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             PersonDetailsRoute(
                 personId = personId,
-                // The same two slots `HomeRoute` and `DetailsRoute` take, for the same
-                // reason: `personDetailsViewModelFactory` needs a `Context` and
+                // The same two crossings `HomeRoute` and `DetailsRoute` take, for the
+                // same reason: `personDetailsViewModelFactory` needs a `Context` and
                 // `formatBirthdayDate`'s pattern follows the device's language, so both
-                // are resolved here and neither is named inside the route.
+                // are resolved by the caller and neither is named inside the route.
                 //
                 // `personId` is in the `remember` keys because the factory closes over it.
                 // The original called it fresh on every recomposition, which was harmless
                 // only because `viewModel()` keys on `personId` too -- so a cached factory
                 // whose `personId` lagged is the thing the keys are here to prevent.
-                viewModelFactory = remember(appContext, personId) {
-                    personDetailsViewModelFactory(appContext, personId)
+                viewModelFactory = remember(dependencies.personViewModelFactory, personId) {
+                    dependencies.personViewModelFactory(personId)
                 },
-                formatBirthday = ::formatBirthdayDate,
+                formatBirthday = dependencies.formatBirthday,
                 initialProfileUrl = profileUrl,
                 onBack = { navController.popBackStack() },
                 onItemClick = { item, sharedElementKey ->
