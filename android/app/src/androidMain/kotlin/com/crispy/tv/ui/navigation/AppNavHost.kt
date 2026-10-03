@@ -30,6 +30,7 @@ import com.crispy.tv.details.localeDateFormatters
 import com.crispy.tv.details.rememberSeedColor
 import com.crispy.tv.details.shareOnCrispy
 import com.crispy.tv.discover.discoverViewModelFactory
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.home.calendarViewModelFactory
 import com.crispy.tv.home.homeSelectorViewModelFactory
@@ -40,7 +41,9 @@ import com.crispy.tv.person.formatBirthdayDate
 import com.crispy.tv.person.personDetailsViewModelFactory
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.search.searchViewModelFactory
+import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
+import com.crispy.tv.settings.addonsSettingsViewModelFactory
 
 private const val TopLevelNavigationDurationMillis = 200
 private const val TopLevelNavigationOffsetDivisor = 8
@@ -202,6 +205,45 @@ fun AppNavHost(
             { text: String -> shareOnCrispy(context = appContext, text = text) }
         }
         val homeFormatters = remember(appContext) { localeDateFormatters(appContext) }
+
+        // The Settings graph's seven crossings, built here for the same reason the Home
+        // graph's twenty-one are: each one used to be constructed inside its own
+        // destination's `composable` block, and this file is the composition root that
+        // owns them. [SettingsNavDependencies]'s KDoc states the consequence honestly --
+        // seven things are now built when the graph is built rather than on first
+        // navigation -- and it is worth reading before adding an eighth, because the
+        // honest version of this block's cost is "whatever those factory bodies cost"
+        // rather than "nothing".
+        //
+        // The two repositories and the cloud sync were already singletons per app
+        // context, so for those three this changes *when* the instance is made and not
+        // how many. The two `ViewModelProvider.Factory`s likewise: `ViewModel` caches by
+        // class, so the per-destination `remember` was never carrying the ViewModel's
+        // identity -- it was only avoiding rebuilding the factory on recomposition,
+        // which a single `remember` here still does.
+        //
+        // `AppDistribution` is read into a local rather than twice, so the object whose
+        // `capabilities` getter can `check` is answered once for both halves. This is a
+        // *third* read of `AppDistribution.current` in the file -- `homeYoutubeTrailer`
+        // below is the second -- and it is left that way deliberately rather than hoisted
+        // once for the whole file: the two uses sit in different graphs, and one local
+        // spanning both would make the home graph's capabilities read depend on where in
+        // this composition the settings block happens to be.
+        val settingsDistribution = AppDistribution.current
+        val settingsPluginsScreen = settingsDistribution.pluginsSettingsScreen
+        val settingsPluginsUiSupported = settingsDistribution.capabilities.pluginsUiSupported
+        val addonsSettingsFactory = remember(appContext) { addonsSettingsViewModelFactory(appContext) }
+        val settingsImageSettings = remember(appContext) { ImageSettingsRepositoryProvider.get(appContext) }
+        // The Home graph already needed this repository, and this is the *same* instance
+        // rather than a second `remember` of the same provider call. Unlike the
+        // `profileListFactory` block above -- which deliberately keeps three separate
+        // remembers so two graphs cannot share one lambda identity -- a repository is a
+        // store rather than a callback, and two stores for one app context would be two
+        // sources of truth for the same setting.
+        val settingsPlaybackSettings = homePlaybackSettings
+        val settingsProfileDataCloudSync = remember(appContext) {
+            SupabaseServicesProvider.createProfileDataCloudSync(appContext)
+        }
         val homeClock = remember { { System.currentTimeMillis() } }
         val homeConfiguration = LocalConfiguration.current
         // `AppDistribution.current` is read once here rather than inside the graph,
@@ -382,7 +424,18 @@ fun AppNavHost(
                 loadProfile = libraryProfileLoader,
                 logger = libraryLogger,
             )
-            addSettingsNavGraph(navController)
+            addSettingsNavGraph(
+                navController = navController,
+                dependencies = SettingsNavDependencies(
+                    pluginsUiSupported = settingsPluginsUiSupported,
+                    pluginsSettingsScreen = settingsPluginsScreen,
+                    profileListViewModelFactory = profileListFactory,
+                    addonsSettingsViewModelFactory = addonsSettingsFactory,
+                    imageSettingsRepository = settingsImageSettings,
+                    playbackSettingsRepository = settingsPlaybackSettings,
+                    profileDataCloudSync = settingsProfileDataCloudSync,
+                ),
+            )
             addAccountNavGraph(
                 navController = navController,
                 onSignedOut = onSignedOut,

@@ -1,37 +1,35 @@
 package com.crispy.tv.ui.navigation
 
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
-import coil3.compose.LocalPlatformContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.accounts.ProfileManagementRoute
-import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.settings.AddonsSettingsRoute
-import com.crispy.tv.settings.addonsSettingsViewModelFactory
 import com.crispy.tv.settings.ImageQuality
-import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import com.crispy.tv.settings.ImageSettingsScreen
-import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
-import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
-internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostController) {
-    // Read once here rather than per-destination: this function runs while the
-    // graph is being built, and the components are installed in
-    // CrispyApplication.onCreate, well before any NavHost exists.
-    val distribution = AppDistribution.current
+internal fun NavGraphBuilder.addSettingsNavGraph(
+    navController: NavHostController,
+    dependencies: SettingsNavDependencies,
+) {
+    // `AppDistribution` used to be read here, once, and its two halves are now two
+    // members of [SettingsNavDependencies]: `pluginsUiSupported` as the plain
+    // `Boolean` it always was, and `pluginsSettingsScreen` as the nullable composable
+    // slot it also always was. The `?.let` below is why that second one is a *slot*
+    // rather than a screen -- see the comment on the plugins destination, which keeps
+    // the rule in the graph because deciding whether a destination exists is a
+    // navigation decision and not a wiring one.
 
     composable(AppRoutes.SettingsRoute) { entry ->
         SettingsScreen(
-            pluginsUiSupported = distribution.capabilities.pluginsUiSupported,
+            pluginsUiSupported = dependencies.pluginsUiSupported,
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
             },
@@ -52,45 +50,31 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
     }
 
     composable(AppRoutes.AddonsSettingsRoute) {
-        // The factory crosses rather than the screen reading a Context: the screen is in
-        // `commonMain` now. `remember` is keyed on the app context so the factory is built
-        // once per app context rather than per recomposition -- `ViewModel` already caches
-        // by class, so the key is about not rebuilding the factory, not about the
-        // ViewModel's identity. Read inside this block, like every other destination here,
-        // because the builder lambda is not a composable scope.
-        val context = LocalContext.current
-        val appContext = remember(context) { context.applicationContext }
         AddonsSettingsRoute(
             onBack = { navController.popBackStack() },
-            viewModelFactory = remember(appContext) { addonsSettingsViewModelFactory(appContext) },
+            viewModelFactory = dependencies.addonsSettingsViewModelFactory,
         )
     }
 
     // The plugins destination is registered only when the build has a plugins
     // screen. On store there is no screen to show, and an always-registered
     // destination would let a deep link to it land on a blank page.
-    distribution.pluginsSettingsScreen?.let { pluginsScreen ->
+    dependencies.pluginsSettingsScreen?.let { pluginsScreen ->
         composable(AppRoutes.PluginsSettingsRoute) {
             pluginsScreen { navController.popBackStack() }
         }
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {
-        val context = LocalPlatformContext.current
-        val appContext = remember(context) { context.applicationContext }
         ProfileManagementRoute(
             onBack = { navController.popBackStack() },
             onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
-            viewModelFactory = remember(appContext) { profileListViewModelFactory(appContext) },
+            viewModelFactory = dependencies.profileListViewModelFactory,
         )
     }
 
     composable(AppRoutes.ImageSettingsRoute) {
-        val context = LocalContext.current
-        val appContext = remember(context) { context.applicationContext }
-        val imageSettingsRepository = remember(appContext) {
-            ImageSettingsRepositoryProvider.get(appContext)
-        }
+        val imageSettingsRepository = dependencies.imageSettingsRepository
         val imageSettings by imageSettingsRepository.settings.collectAsStateWithLifecycle()
 
         ImageSettingsScreen(
@@ -103,15 +87,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
     }
 
     composable(AppRoutes.PlaybackSettingsRoute) {
-        val context = LocalContext.current
-        val appContext = remember(context) { context.applicationContext }
         val coroutineScope = rememberCoroutineScope()
 
-        val cloudSync = remember(appContext) { SupabaseServicesProvider.createProfileDataCloudSync(appContext) }
-
-        val playbackSettingsRepository = remember(appContext) {
-            PlaybackSettingsRepositoryProvider.get(appContext)
-        }
+        val cloudSync = dependencies.profileDataCloudSync
+        val playbackSettingsRepository = dependencies.playbackSettingsRepository
         val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
 
         PlaybackSettingsScreen(

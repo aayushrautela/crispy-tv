@@ -1051,6 +1051,26 @@ The per-landing narrative this replaced is in the git history, where it belongs.
   happens to compile, which is why "the double is exhaustive" is a property that has to be
   re-measured rather than recalled. **The comment that replaced it names all five**, so the next
   reader is told the count and where it came from.
+- **A registration function is not testable because its decisions are named, and the reason is
+  the harness rather than the collaborator -- so it is a negative result, not a gap.**
+  `SettingsNavGraph.kt` moved to `commonMain` and its one real decision is which
+  destinations get registered: `pluginsSettingsScreen == null` must omit
+  `AppRoutes.PluginsSettingsRoute`, non-null must register it. Measured with `javap`:
+  **`androidx.navigation.NavGraphBuilder` is a _class_, not an interface** (`public class
+  NavGraphBuilder extends NavDestinationBuilder<NavGraph>`), its constructors both take a
+  `NavigatorProvider`, and `composable(route) { }` is an *extension* on it that resolves
+  `ComposeNavigator` out of that provider (`provider[ComposeNavigator.Destination.key]`). So
+  observing the registrations means standing up a real `NavigatorProvider` with a real
+  `ComposeNavigator` in it -- a navigation harness, which `commonTest` has no path to.
+  **This is the `AiInsightsRepository` shape with a different cause** (there the wall was a
+  concrete collaborator; here nothing in the file is untestable, the *question* needs a
+  runtime), and it is worth separating the two explicitly, because the fix for the first --
+  change a constructor parameter type -- does nothing for the second. **And the landing that
+  moved `HomeNavGraph` is not the precedent it looks like:** `HomeNavLayoutTest` drives pure
+  functions the landing *extracted* (`isWideScreenLayout(...)`), never `NavGraphBuilder`.
+  **A neighbouring suite in the same package is evidence about that suite, not about what the
+  harness can do** -- which is the `HomeNavGraph`-bundle instance of "a family can be filed by
+  hand under a claim you never measured".
 - **Moving a file into `commonMain` does not make it testable — a _concrete class_ in its
   constructor does, and a file whose only untestable collaborator is a class has to be recorded
   as a negative result rather than left looking finished.** `AiInsightsRepository` is now
@@ -1437,6 +1457,20 @@ Every rule here is also stated in each driver's docstring, because a driver runs
     the right one. **Write "must be gone" as "is exactly the thing that should remain", and a
     guard that cannot distinguish a correct edit from a broken one is a guard that gets switched
     off.**
+  - **Deleting a `remember` block does not make a `remember`-adjacent import dead, and the three
+    errors that follow name none of the real cause.** Moving three `remember(appContext)` calls
+    out of a nav graph's destinations deleted `import androidx.compose.runtime.getValue`
+    alongside `remember`, on the entirely reasonable reading that it was "part of the `remember`
+    imports". **`getValue` is the `by`-delegate operator for `State`, so it dies with the `by`
+    and not with the `remember`** -- and the file still had two `by … collectAsStateWithLifecycle()`
+    delegates. The cascade was `Property delegate must have a 'getValue(Nothing?, KProperty0<*>)'
+    method` twice, then `Unresolved reference 'playbackEnginePreference'` at a call site that
+    was entirely correct. **Three errors, one cause, and the cause is an import that has
+    nothing to do with the construct it was filed under** -- which is the same shape as
+    "an `Unresolved reference` at a call site means the parameter is missing from a signature
+    *above* it". **So the question to ask about a deleted import is "what syntax needs this
+    name", not "what block did I delete next to it", and the compiler names the deepest failure
+    rather than the shallowest cause.**
   - **A guard list that mixes "an import line" with "a bare token" cannot be written as one
     list, and the failure is that the correct edit is reported broken.** `import …` lines are not
     comments and must be asserted on the raw text; bare tokens the new prose quotes must be
