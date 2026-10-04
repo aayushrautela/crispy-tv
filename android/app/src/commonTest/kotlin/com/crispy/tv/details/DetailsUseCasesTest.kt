@@ -362,7 +362,7 @@ class DetailsUseCasesTest {
     }
 
     @Test
-    fun `the runtime target is null without an entry, without videos, or without a match`() = runTest {
+    fun `the runtime target is null without an entry without videos or without a match`() = runTest {
         val useCases = useCases(RecordingCatalogRepository())
         val videos = listOf(episodeVideo("e1", season = 2, episode = 7))
 

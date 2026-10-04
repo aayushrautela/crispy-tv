@@ -86,7 +86,7 @@ class RecommendationCatalogDiskCacheStoreTest {
     }
 
     @Test
-    fun `the envelope on disk is a timestamp and a payload, and the payload is trimmed`() = runTest {
+    fun `the envelope on disk is a timestamp plus a payload and the payload is trimmed`() = runTest {
         // Both ends trim and they are not the same trim. `write` stores the trimmed payload,
         // so a caller handing over a padded snapshot does not leave a file whose bytes
         // differ from every other file's for a reason no reader could see.
@@ -112,7 +112,7 @@ class RecommendationCatalogDiskCacheStoreTest {
     }
 
     @Test
-    fun `the file lands under the cache directory, named by its digest`() = runTest {
+    fun `the file lands under the cache directory named by its digest`() = runTest {
         store().write(KEY, PAYLOAD)
 
         // The directory name is a stored-format contract of its own: renaming it orphans

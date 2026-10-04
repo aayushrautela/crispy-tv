@@ -466,7 +466,7 @@ class UserMutationOutboxTest {
     private fun UserMutationOutbox.store(): List<UserMutation> = allMutations()
 
     @Test
-    fun `every commit is persisted, so a process death cannot lose an intent`() = runTest {
+    fun `every commit is persisted so a process death cannot lose an intent`() = runTest {
         val store = RecordingStore()
         val box = outbox(store, RecordingExecutor(), scope(testScheduler), { 0L })
 

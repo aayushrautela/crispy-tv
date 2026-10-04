@@ -274,7 +274,7 @@ class AccountViewModelsTest {
     // ---------------------------------------------------------------- the load
 
     @Test
-    fun `load publishes the pricing tier, the list access and the connected provider`() = runTest {
+    fun `load publishes the pricing tier plus the list access and the connected provider`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         try {
             signedIn()
