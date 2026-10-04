@@ -315,7 +315,7 @@ internal fun RandomWheelRoute(
                 val now = clock.markNow()
                 if (now - lastTick >= RandomDetentInterval) {
                     lastTick = now
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                 }
             }
     }
@@ -334,7 +334,7 @@ internal fun RandomWheelRoute(
                     rowPx = rowPx,
                     durationMs = durationMs,
                 )
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 launch {
                     landing.snapTo(0f)
                     landing.animateTo(
