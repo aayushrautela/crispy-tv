@@ -30,3 +30,8 @@ __pycache__/
 .venv/
 venv/
 
+# Scratch takeout notes: written for a new chat session, never part of the project record
+TAKEOUT.md
+phase1-split-plan.md
+phase2-data-layer-plan.md
+

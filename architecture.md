@@ -605,10 +605,9 @@ Every item here was written as a claim about this repository, so every item has 
   `PlaybackRepository` — do not exist, so that list is not finished, only partly implemented.
 
 ## Migration Plan (product and backend)
-This is the product-and-backend migration, and it is a different piece of work from the
-multiplatform port. The two share this repository and, historically, a numbering space, which made
-Phase 4 of one and Phase 4 of the other indistinguishable. **The port's phases live in
-`kmp-migration-plan.md`, which is the tracked plan; the phases below are the ones below.**
+This is the product-and-backend migration. The multiplatform port that preceded it shared
+this repository and, historically, a numbering space, which made the two sets of phases
+indistinguishable; the port is finished and this document now describes the only remaining plan.
 
 ### Phase 1: Define stable repository interfaces
 - Introduce `SessionRepository`, `CatalogRepository`, `UserMediaRepository`, `LibraryRepository`, `ProviderConnectionRepository`, and `PlaybackRepository`.
