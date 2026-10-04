@@ -82,19 +82,9 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                         )
                     )
                 },
-                // The same route `onCatalogItemClick` opens. `sharedElementKey` is null
-                // because the wheel did not come from the row it replaces, so there is no
-                // element on screen for the transition to hand over to.
-                onRandomPick = { candidate ->
-                    navController.navigate(
-                        AppRoutes.homeDetailsRoute(
-                            itemId = candidate.itemId,
-                            itemType = candidate.type,
-                            artworkUrl = candidate.artworkUrl,
-                            sharedElementKey = null,
-                        )
-                    )
-                },
+                // The wheel is its own destination: home paints the dice button and this
+                // decides where it lands, rather than home owning the overlay again.
+                onOpenRandomWheel = { navController.navigate(AppRoutes.RandomWheelRoute) },
                 onCatalogSeeAllClick = { section ->
                     navController.navigate(AppRoutes.catalogListRoute(section))
                 },

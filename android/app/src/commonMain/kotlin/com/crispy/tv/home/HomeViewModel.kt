@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.domain.home.HomeRandomCandidate
 import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.player.WatchHistoryService
@@ -86,16 +85,6 @@ class HomeViewModel internal constructor(
     private var hasAttemptedInitialLoad = false
 
     private var watchSyncSource: WatchSyncSource? = null
-
-    /**
-     * The random-pick wheel's candidates, loaded at most once per home snapshot.
-     *
-     * A `var` and not a flow: nothing on screen watches it, so a state holder
-     * would add a subscription that has to be invalidated in two places. It is
-     * invalidated in exactly one -- [applyPrimarySnapshot], the only place home
-     * data is replaced.
-     */
-    private var randomCandidatesMemo: List<HomeRandomCandidate>? = null
 
     init {
         viewModelScope.launch {
@@ -258,7 +247,6 @@ coroutineScope {
     }
 
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
-        randomCandidatesMemo = null
         catalogSectionLayoutMeta = snapshot.catalogSections.map { sectionUi ->
             CatalogSectionLayoutMeta(
                 key = sectionUi.section.key,
@@ -277,31 +265,6 @@ coroutineScope {
                 ),
             )
         }
-    }
-
-    /**
-     * Every home item the random-pick wheel may land on, or an empty list if the
-     * load failed.
-     *
-     * Empty rather than throwing, and empty rather than an error event: the wheel
-     * has its own empty state for "nothing to pick from", and a snackbar behind a
-     * full-screen overlay would be invisible anyway. A failure that leaves the
-     * memo empty means the next open retries, which is what a wheel wants.
-     */
-    suspend fun randomCandidates(): List<HomeRandomCandidate> {
-        randomCandidatesMemo?.let { return it }
-        val candidates = withContext(ioDispatcher) {
-            try {
-                refreshCoordinator.loadRandomCandidates()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                logger.warn(TAG, "Random candidate load failed", error)
-                emptyList()
-            }
-        }
-        randomCandidatesMemo = candidates
-        return candidates
     }
 
     private fun applyWideRailSection(section: HomeWideRailSectionUi) {

@@ -57,8 +57,6 @@ class HomeViewModelTest {
         var cachedFeed: HomePrimaryFeedLoadResult? = null
         var expiresAtMs: Long? = null
         var primaryLoads: Int = 0
-        var randomCandidates: List<HomeRandomCandidate> = emptyList()
-        var randomCandidateLoads: Int = 0
 
         override suspend fun loadPrimaryHomeFeed(sectionLimit: Int): HomePrimaryFeedLoadResult {
             primaryLoads++
@@ -75,10 +73,7 @@ class HomeViewModelTest {
 
         override suspend fun cachedHomeExpiresAtMs(): Long? = expiresAtMs
 
-        override suspend fun loadRandomCandidates(): List<HomeRandomCandidate> {
-            randomCandidateLoads++
-            return randomCandidates
-        }
+        override suspend fun loadRandomCandidates(): List<HomeRandomCandidate> = emptyList()
     }
 
     private class FakeSyncSource : WatchSyncSource {
@@ -135,16 +130,6 @@ class HomeViewModelTest {
 
     private fun feedWith(vararg ids: String): HomePrimaryFeedLoadResult =
         HomePrimaryFeedLoadResult(heroResult = HomeHeroLoadResult(items = ids.map(::hero)))
-
-    private fun randomCandidate(itemId: String): HomeRandomCandidate =
-        HomeRandomCandidate(
-            itemId = itemId,
-            title = "Title $itemId",
-            type = "movie",
-            genre = "action",
-            rating = 7.5,
-            artworkUrl = null,
-        )
 
     private class Harness(val clock: FakeTimeSource = FakeTimeSource(nowMs = 5_000L)) {
         val catalog = FakeCatalogService()
@@ -206,7 +191,7 @@ class HomeViewModelTest {
     // ------------------------------------------------------------------ load
 
     @Test
-    fun `the cached snapshot paints first, then the primary load replaces it`() = runTest {
+    fun `the cached snapshot paints first and then the primary load replaces it`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         lateinit var viewModel: HomeViewModel
         try {
@@ -419,7 +404,7 @@ class HomeViewModelTest {
     // ---------------------------------------------------------------- removal
 
     @Test
-    fun `removing an item suppresses it, drops it from the rail and persists`() = runTest {
+    fun `removing an item suppresses it drops it from the rail and persists`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         lateinit var viewModel: HomeViewModel
         try {
@@ -574,69 +559,6 @@ class HomeViewModelTest {
             // `collect` never wakes to notice, so one harmless event is emitted
             // to flush the parked collectors while `Main` is still set, and only
             // then is it reset. `RatingsChanged` is the no-op branch.
-            viewModel.viewModelScope.cancel()
-            HomeRefreshBus.emit(HomeRefreshEvent.RatingsChanged)
-            advanceUntilIdle()
-            Dispatchers.resetMain()
-        }
-    }
-
-    // ------------------------------------------------------------ random pick
-
-    @Test
-    fun `the random candidates are loaded once and then served from the memo`() = runTest {
-        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        lateinit var viewModel: HomeViewModel
-        try {
-            val harness = Harness()
-            harness.catalog.randomCandidates = listOf(randomCandidate("movie-1"))
-            viewModel = runLoaded(harness)
-
-            assertEquals(listOf("movie-1"), viewModel.randomCandidates().map { it.itemId })
-
-            // Moving the double's answer is what makes the count a claim about
-            // the memo rather than about the fixture: a second load answers
-            // `movie-2`, so the expectation below can only hold if no load ran.
-            harness.catalog.randomCandidates = listOf(randomCandidate("movie-2"))
-            assertEquals(listOf("movie-1"), viewModel.randomCandidates().map { it.itemId })
-
-            assertEquals(1, harness.catalog.randomCandidateLoads)
-        } finally {
-            // Same teardown as the cases above; the refresh bus is process-wide.
-            viewModel.viewModelScope.cancel()
-            HomeRefreshBus.emit(HomeRefreshEvent.RatingsChanged)
-            advanceUntilIdle()
-            Dispatchers.resetMain()
-        }
-    }
-
-    @Test
-    fun `a refetched primary feed drops the random candidate memo`() = runTest {
-        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        lateinit var viewModel: HomeViewModel
-        try {
-            val harness = Harness()
-            harness.catalog.randomCandidates = listOf(randomCandidate("movie-1"))
-            viewModel = runLoaded(harness)
-
-            // `onHomeVisible()` is what registers the sync callback: `harness.syncEffect`
-            // starts as a no-op and is only assigned inside that call. Without it the
-            // `RefetchHome` below reaches nothing and the memo is never dropped, so the
-            // case would pass for a reason that has nothing to do with the memo. The case
-            // that asserts the registration itself is the one asserting
-            // `harness.syncFactoryCalls`.
-            viewModel.onHomeVisible()
-            advanceUntilIdle()
-            assertEquals(listOf("movie-1"), viewModel.randomCandidates().map { it.itemId })
-
-            harness.syncEffect(WatchSyncEffect.RefetchHome)
-            advanceUntilIdle()
-            harness.catalog.randomCandidates = listOf(randomCandidate("movie-2"))
-
-            assertEquals(listOf("movie-2"), viewModel.randomCandidates().map { it.itemId })
-            assertEquals(2, harness.catalog.randomCandidateLoads)
-        } finally {
-            // Same teardown as the cases above; the refresh bus is process-wide.
             viewModel.viewModelScope.cancel()
             HomeRefreshBus.emit(HomeRefreshEvent.RatingsChanged)
             advanceUntilIdle()

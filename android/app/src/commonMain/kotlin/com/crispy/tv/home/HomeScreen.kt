@@ -26,9 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.domain.home.HomeRandomCandidate
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.brand.CrispyWordmark
@@ -73,17 +70,18 @@ internal fun HomeRoute(
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem, String?) -> Unit,
     /**
-     * Opens the details page for a wheel pick.
+     * Navigates to the random-pick wheel.
      *
-     * A slot rather than a reuse of [onCatalogItemClick]: the wheel picks a
-     * [HomeRandomCandidate] straight off the whole home snapshot, so it holds none of the
-     * arguments a `CatalogItem` does -- there is no section, no variant and no shared
-     * element to forward. Forcing it through [onCatalogItemClick] would mean inventing a
-     * `CatalogItem` at the call site, which is the shape the call site cannot see.
+     * A capability slot rather than a local `remember`ed boolean, for the same reason
+     * this file takes every other destination as a slot: the wheel is a nav route
+     * (`AppRoutes.RandomWheelRoute`, an `NavigationRole.Overlay` destination like
+     * search), so opening it is a navigation decision and belongs to whoever owns the
+     * `NavHostController`. Home paints the dice button; `HomeNavGraph` decides where it
+     * goes.
      *
      * No default, for the reason every other slot on this signature has none.
      */
-    onRandomPick: (HomeRandomCandidate) -> Unit,
+    onOpenRandomWheel: () -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     onOpenPlayer: (PlaybackIdentity, Long, String?, String?, String?) -> Unit,
@@ -166,17 +164,6 @@ internal fun HomeRoute(
     val layoutState = uiState.layoutState
     val wideRailSections = uiState.wideRailSections
     val catalogSections = uiState.catalogSections
-
-    var randomOpen by remember { mutableStateOf(false) }
-    var randomCandidates by remember { mutableStateOf<List<HomeRandomCandidate>?>(null) }
-
-    // Loaded on open, not on composition: the whole point of memoising the list in the
-    // ViewModel is that the cost is paid once, and opening the overlay is what pays it.
-    LaunchedEffect(randomOpen) {
-        if (randomOpen && randomCandidates == null) {
-            randomCandidates = viewModel.randomCandidates()
-        }
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         CrispyScreen(
@@ -299,27 +286,15 @@ internal fun HomeRoute(
 
     HomeStreamSelector(viewModel = selectorViewModel, isCompact = isCompact)
 
-        if (randomOpen) {
-            HomeRandomOverlay(
-                candidates = randomCandidates.orEmpty(),
-                isLoading = randomCandidates == null,
-                onPick = { candidate ->
-                    randomOpen = false
-                    onRandomPick(candidate)
-                },
-                onClose = { randomOpen = false },
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = Dimensions.PageHorizontalPaddingCompact,
-                        bottom = safeBottomPadding(Dimensions.PageBottomPadding),
-                    ),
-            ) {
-                HomeRandomPickButton(onClick = { randomOpen = true })
-            }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = Dimensions.PageHorizontalPaddingCompact,
+                    bottom = safeBottomPadding(Dimensions.PageBottomPadding),
+                ),
+        ) {
+            HomeRandomPickButton(onClick = onOpenRandomWheel)
         }
     }
 }

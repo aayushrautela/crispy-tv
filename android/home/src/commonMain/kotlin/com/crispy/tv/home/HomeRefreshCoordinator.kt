@@ -1,6 +1,5 @@
 package com.crispy.tv.home
 
-import com.crispy.tv.domain.home.HomeRandomCandidate
 import com.crispy.tv.platform.TimeSource
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
@@ -18,17 +17,6 @@ class HomeRefreshCoordinator(
 
     suspend fun cachedHomeExpiresAtMs(): Long? {
         return homeCatalogService.cachedHomeExpiresAtMs()
-    }
-
-    /**
-     * The random-pick wheel's candidates, straight from the coordinator's service.
-     *
-     * A delegating hop rather than a widened constructor, because
-     * `homeCatalogService` is private here and handing `HomeViewModel` a second
-     * service reference would be a wiring decision made for one caller's benefit.
-     */
-    suspend fun loadRandomCandidates(): List<HomeRandomCandidate> {
-        return homeCatalogService.loadRandomCandidates()
     }
 
     suspend fun loadCachedPrimarySnapshot(): HomePrimarySnapshot? {

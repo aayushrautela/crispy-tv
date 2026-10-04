@@ -11,6 +11,10 @@ object AppRoutes {
     const val CalendarRoute = "calendar"
     const val SettingsRoute = "settings"
 
+    // An overlay rather than a top-level destination: it is reached from home, takes no tab
+    // position, and gets the same slide-in-from-right treatment search does.
+    const val RandomWheelRoute = "randomwheel"
+
     const val HomeDetailsRoute = "home/details"
     const val HomeDetailsItemIdArg = "itemId"
     const val HomeDetailsItemTypeArg = "itemType"

@@ -23,6 +23,7 @@ import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.home.calendarViewModelFactory
 import com.crispy.tv.home.homeSelectorViewModelFactory
 import com.crispy.tv.home.homeViewModelFactory
+import com.crispy.tv.home.randomWheelViewModelFactory
 import com.crispy.tv.library.deviceUtcOffsetMillis
 import com.crispy.tv.library.libraryViewModelFactory
 import com.crispy.tv.person.formatBirthdayDate
@@ -70,6 +71,9 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     // ---- search -----------------------------------------------------------------
     val searchViewModelFactory = remember(appContext) { searchViewModelFactory(appContext) }
     val searchLoadProfile = remember(appContext) { graph.activeProfileLoader() }
+
+    // ---- random wheel -----------------------------------------------------------
+    val randomWheelViewModelFactory = remember(appContext) { randomWheelViewModelFactory(appContext) }
 
     // ---- account ----------------------------------------------------------------
     // `accountLoadProfile` is a SECOND instance rather than a reuse of
@@ -167,6 +171,7 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     return AppNavHostDependencies(
         searchViewModelFactory = searchViewModelFactory,
         searchLoadProfile = searchLoadProfile,
+        randomWheelViewModelFactory = randomWheelViewModelFactory,
         profileListFactory = profileListFactory,
         accountSettingsFactory = accountSettingsFactory,
         accountLoadProfile = accountLoadProfile,

@@ -39,7 +39,11 @@ internal enum class NavigationRole { TopLevel, Overlay, Detail }
 internal fun roleOf(route: String?): NavigationRole {
     return when {
         topLevelRouteIndices.containsKey(route) -> NavigationRole.TopLevel
+        // Both home overlays. The wheel took the local-boolean route in its first
+        // version and read as a sheet parked at the top edge rather than a page, which
+        // is the same reason search never was one either.
         route == AppRoutes.SearchRoute -> NavigationRole.Overlay
+        route == AppRoutes.RandomWheelRoute -> NavigationRole.Overlay
         else -> NavigationRole.Detail
     }
 }
@@ -183,6 +187,10 @@ internal fun AppNavHost(
                 navController = navController,
                 searchViewModelFactory = d.searchViewModelFactory,
                 loadProfile = d.searchLoadProfile,
+            )
+            addRandomWheelNavGraph(
+                navController = navController,
+                randomWheelViewModelFactory = d.randomWheelViewModelFactory,
             )
             addDiscoverNavGraph(
                 navController = navController,

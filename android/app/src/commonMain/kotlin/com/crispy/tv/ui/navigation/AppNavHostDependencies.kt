@@ -83,6 +83,10 @@ class AppNavHostDependencies(
     // ---- search -----------------------------------------------------------------
     val searchViewModelFactory: ViewModelProvider.Factory,
     val searchLoadProfile: suspend () -> ActiveProfileInfo?,
+    // ---- random wheel -----------------------------------------------------------
+    // The wheel reads the same snapshot the home screen does, so its factory takes the
+    // same `HomeCatalogService` instance as everything else in this bundle.
+    val randomWheelViewModelFactory: ViewModelProvider.Factory,
     // ---- account ----------------------------------------------------------------
     val profileListFactory: ViewModelProvider.Factory,
     val accountSettingsFactory: ViewModelProvider.Factory,
