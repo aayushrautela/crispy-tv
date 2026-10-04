@@ -82,6 +82,19 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                         )
                     )
                 },
+                // The same route `onCatalogItemClick` opens. `sharedElementKey` is null
+                // because the wheel did not come from the row it replaces, so there is no
+                // element on screen for the transition to hand over to.
+                onRandomPick = { candidate ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = candidate.itemId,
+                            itemType = candidate.type,
+                            artworkUrl = candidate.artworkUrl,
+                            sharedElementKey = null,
+                        )
+                    )
+                },
                 onCatalogSeeAllClick = { section ->
                     navController.navigate(AppRoutes.catalogListRoute(section))
                 },

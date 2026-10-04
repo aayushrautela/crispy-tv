@@ -3,6 +3,7 @@ package com.crispy.tv.catalog
 import androidx.paging.PagingSource
 import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogSource
+import com.crispy.tv.domain.home.HomeRandomCandidate
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.home.HomePrimaryFeedLoadResult
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,8 @@ class CatalogPagingSourceTest {
         override suspend fun loadCachedPrimaryHomeFeed(sectionLimit: Int): HomePrimaryFeedLoadResult? = null
 
         override suspend fun cachedHomeExpiresAtMs(): Long? = null
+
+        override suspend fun loadRandomCandidates(): List<HomeRandomCandidate> = emptyList()
     }
 
     // --- fixtures -------------------------------------------------------------

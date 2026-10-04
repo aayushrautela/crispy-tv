@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -15,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
 
 import androidx.compose.material3.SnackbarHostState
@@ -23,10 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.accounts.ActiveProfileInfo
 import androidx.lifecycle.ViewModelProvider
@@ -34,19 +41,26 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.domain.home.HomeRandomCandidate
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_dice
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.compose.resources.painterResource
 
+private val HomeRandomPickButtonSize = 56.dp
 private val HomeContentSectionSpacing = 24.dp
 private val HomeTopSectionSpacing = 16.dp
 
@@ -58,6 +72,18 @@ internal fun HomeRoute(
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem, String?) -> Unit,
+    /**
+     * Opens the details page for a wheel pick.
+     *
+     * A slot rather than a reuse of [onCatalogItemClick]: the wheel picks a
+     * [HomeRandomCandidate] straight off the whole home snapshot, so it holds none of the
+     * arguments a `CatalogItem` does -- there is no section, no variant and no shared
+     * element to forward. Forcing it through [onCatalogItemClick] would mean inventing a
+     * `CatalogItem` at the call site, which is the shape the call site cannot see.
+     *
+     * No default, for the reason every other slot on this signature has none.
+     */
+    onRandomPick: (HomeRandomCandidate) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     onOpenPlayer: (PlaybackIdentity, Long, String?, String?, String?) -> Unit,
@@ -141,125 +167,184 @@ internal fun HomeRoute(
     val wideRailSections = uiState.wideRailSections
     val catalogSections = uiState.catalogSections
 
-    CrispyScreen(
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    CrispyWordmark(
-                        modifier = Modifier
-                            .width(164.dp)
-                            .height(36.dp),
-                    )
-                },
-                actions = {
-ProfileIconButton(
-                        onClick = onOpenAccountsProfiles,
-                        // Built here rather than passed in: these three screens are
-                        // androidMain, so they already hold a Context, and threading a
-                        // slot through each of their public signatures would be churn.
-                        loadProfile = loadProfile,
-                    )
-                },
-                scrollBehavior = scrollBehavior,
-                colors = topLevelAppBarColors(),
-            )
-        },
-        nestedScrollConnection = scrollBehavior.nestedScrollConnection,
-        horizontalPadding = 0.dp,
-        snackbarHostState = snackbarHostState,
-        topPadding = 0.dp,
-        bottomPaddingExtra = Dimensions.PageBottomPadding,
-        verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
-        listState = lazyListState,
-    ) {
-        item(key = "topHeader", contentType = "topHeader") {
-            Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
-                Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                    HomeHeaderSectionsItem(
-                        sections = headerPills,
-                        onSectionClick = onCatalogSeeAllClick,
-                    )
-                }
-                HomeHeroSection(
-                    state = heroState,
-                    onHeroClick = onHeroClick,
-                    modifier = Modifier.padding(horizontal = horizontalPadding),
-                )
-            }
-        }
+    var randomOpen by remember { mutableStateOf(false) }
+    var randomCandidates by remember { mutableStateOf<List<HomeRandomCandidate>?>(null) }
 
-        if (layoutState.blocks.isNotEmpty()) {
-            items(
-                items = layoutState.blocks,
-                key = { it.key },
-                contentType = {
-                    when (it) {
-                        is HomeWideRailLayoutUi -> it.kind.name
-                        is HomeCatalogRowSectionUi -> "catalogSection"
-                        is HomeCollectionShelfSectionUi -> "collectionShelf"
-                    }
-                },
-            ) { block ->
-                when (block) {
-                    is HomeCatalogRowSectionUi -> {
-                        val sectionUi = catalogSections[block.sectionKey]
-                        if (sectionUi != null) {
-                            if (isTop10ListKey(sectionUi.section.kind)) {
-                                HomeTop10SectionRow(
-                                    sectionUi = sectionUi,
-                                    horizontalPadding = horizontalPadding,
-                                    onItemClick = onCatalogItemClick,
-                                )
-                            } else {
-                                val onSeeAll = remember(sectionUi.section) {
-                                    { onCatalogSeeAllClick(sectionUi.section) }
-                                }
-                                HomeCatalogSectionRow(
-                                    sectionUi = sectionUi,
-                                    horizontalPadding = horizontalPadding,
-                                    onSeeAllClick = onSeeAll,
-                                    onItemClick = onCatalogItemClick,
-                                )
-                            }
-                        }
-                    }
-
-                    is HomeCollectionShelfSectionUi -> {
-                        val sectionUis = remember(block.sectionKeys, catalogSections) {
-                            block.sectionKeys.mapNotNull(catalogSections::get)
-                        }
-                        if (sectionUis.isNotEmpty()) {
-                            HomeCollectionSectionRow(
-                                sectionUis = sectionUis,
-                                horizontalPadding = horizontalPadding,
-                                onCollectionClick = onCatalogSeeAllClick,
-                            )
-                        }
-                    }
-
-                    is HomeWideRailLayoutUi -> {
-                        val section = wideRailSections[block.key]
-                        if (section != null) {
-                            val onViewAll = remember(block.kind) {
-                                if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null
-                            }
-                            HomeWideRailSection(
-                                section = section,
-                                horizontalPadding = horizontalPadding,
-                                onContinueWatchingClick = { item, _ -> selectorViewModel.openFor(item) },
-                                onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
-                                onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
-                                onThisWeekClick = onThisWeekClick,
-                                onViewAllClick = onViewAll,
-                            )
-                        }
-                    }
-                }
-            }
+    // Loaded on open, not on composition: the whole point of memoising the list in the
+    // ViewModel is that the cost is paid once, and opening the overlay is what pays it.
+    LaunchedEffect(randomOpen) {
+        if (randomOpen && randomCandidates == null) {
+            randomCandidates = viewModel.randomCandidates()
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
+        CrispyScreen(
+            topBar = {
+                StandardTopAppBar(
+                    title = {
+                        CrispyWordmark(
+                            modifier = Modifier
+                                .width(164.dp)
+                                .height(36.dp),
+                        )
+                    },
+                    actions = {
+                        ProfileIconButton(
+                            onClick = onOpenAccountsProfiles,
+                            // Built here rather than passed in: these three screens are
+                            // androidMain, so they already hold a Context, and threading a
+                            // slot through each of their public signatures would be churn.
+                            loadProfile = loadProfile,
+                        )
+                    },
+                    scrollBehavior = scrollBehavior,
+                    colors = topLevelAppBarColors(),
+                )
+            },
+            nestedScrollConnection = scrollBehavior.nestedScrollConnection,
+            horizontalPadding = 0.dp,
+            snackbarHostState = snackbarHostState,
+            topPadding = 0.dp,
+            bottomPaddingExtra = Dimensions.PageBottomPadding,
+            verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
+            listState = lazyListState,
+        ) {
+            item(key = "topHeader", contentType = "topHeader") {
+                Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
+                    Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                        HomeHeaderSectionsItem(
+                            sections = headerPills,
+                            onSectionClick = onCatalogSeeAllClick,
+                        )
+                    }
+                    HomeHeroSection(
+                        state = heroState,
+                        onHeroClick = onHeroClick,
+                        modifier = Modifier.padding(horizontal = horizontalPadding),
+                    )
+                }
+            }
+
+            if (layoutState.blocks.isNotEmpty()) {
+                items(
+                    items = layoutState.blocks,
+                    key = { it.key },
+                    contentType = {
+                        when (it) {
+                            is HomeWideRailLayoutUi -> it.kind.name
+                            is HomeCatalogRowSectionUi -> "catalogSection"
+                            is HomeCollectionShelfSectionUi -> "collectionShelf"
+                        }
+                    },
+                ) { block ->
+                    when (block) {
+                        is HomeCatalogRowSectionUi -> {
+                            val sectionUi = catalogSections[block.sectionKey]
+                            if (sectionUi != null) {
+                                if (isTop10ListKey(sectionUi.section.kind)) {
+                                    HomeTop10SectionRow(
+                                        sectionUi = sectionUi,
+                                        horizontalPadding = horizontalPadding,
+                                        onItemClick = onCatalogItemClick,
+                                    )
+                                } else {
+                                    val onSeeAll = remember(sectionUi.section) {
+                                        { onCatalogSeeAllClick(sectionUi.section) }
+                                    }
+                                    HomeCatalogSectionRow(
+                                        sectionUi = sectionUi,
+                                        horizontalPadding = horizontalPadding,
+                                        onSeeAllClick = onSeeAll,
+                                        onItemClick = onCatalogItemClick,
+                                    )
+                                }
+                            }
+                        }
+
+                        is HomeCollectionShelfSectionUi -> {
+                            val sectionUis = remember(block.sectionKeys, catalogSections) {
+                                block.sectionKeys.mapNotNull(catalogSections::get)
+                            }
+                            if (sectionUis.isNotEmpty()) {
+                                HomeCollectionSectionRow(
+                                    sectionUis = sectionUis,
+                                    horizontalPadding = horizontalPadding,
+                                    onCollectionClick = onCatalogSeeAllClick,
+                                )
+                            }
+                        }
+
+                        is HomeWideRailLayoutUi -> {
+                            val section = wideRailSections[block.key]
+                            if (section != null) {
+                                val onViewAll = remember(block.kind) {
+                                    if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null
+                                }
+                                HomeWideRailSection(
+                                    section = section,
+                                    horizontalPadding = horizontalPadding,
+                                    onContinueWatchingClick = { item, _ -> selectorViewModel.openFor(item) },
+                                    onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
+                                    onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
+                                    onThisWeekClick = onThisWeekClick,
+                                    onViewAllClick = onViewAll,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
     HomeStreamSelector(viewModel = selectorViewModel, isCompact = isCompact)
+
+        if (randomOpen) {
+            HomeRandomOverlay(
+                candidates = randomCandidates.orEmpty(),
+                isLoading = randomCandidates == null,
+                onPick = { candidate ->
+                    randomOpen = false
+                    onRandomPick(candidate)
+                },
+                onClose = { randomOpen = false },
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = Dimensions.PageHorizontalPaddingCompact,
+                        bottom = safeBottomPadding(Dimensions.PageBottomPadding),
+                    ),
+            ) {
+                HomeRandomPickButton(onClick = { randomOpen = true })
+            }
+        }
+    }
+}
+
+/**
+ * The entry point to the random-pick wheel.
+ *
+ * A sibling of [CrispyScreen] rather than inside it, because its content slot is a
+ * `LazyListScope` -- there is no box to put a floating button in. [safeBottomPadding] already
+ * carries the floating nav bar's height and margin, so nothing here restates them.
+ */
+@Composable
+private fun HomeRandomPickButton(onClick: () -> Unit) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(HomeRandomPickButtonSize)
+            .semantics { contentDescription = "Random pick" },
+    ) {
+        CrispyIcon(
+            painter = painterResource(Res.drawable.ic_dice),
+            contentDescription = null,
+            modifier = Modifier.size(Dimensions.IconSize),
+        )
+    }
 }
 
 @Composable
