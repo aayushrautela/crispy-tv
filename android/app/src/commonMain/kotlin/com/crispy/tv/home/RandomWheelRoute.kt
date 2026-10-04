@@ -1,12 +1,16 @@
 package com.crispy.tv.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +30,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -39,13 +42,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,9 +66,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.GraphicsLayerScope
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -86,8 +95,10 @@ import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.genreIcon
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.resources.Res
-import com.crispy.tv.ui.resources.ic_close
+import com.crispy.tv.ui.resources.ic_arrow_back
+import com.crispy.tv.ui.resources.ic_dice
 import com.crispy.tv.ui.resources.ic_layers
+import com.crispy.tv.ui.resources.ic_play_arrow_filled
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -108,12 +119,6 @@ private const val RandomTurnDurationMs = 320
 
 private val RandomRowHeight = 100.dp
 private val RandomDiscSize = 72.dp
-private val RandomCentredRowWidth = 300.dp
-private val RandomRestingRowWidth = 220.dp
-private val RandomChipOuterCorner = 18.dp
-private val RandomChipJoinCorner = 4.dp
-private val RandomChipHeight = 40.dp
-private val RandomChipIconSize = 18.dp
 
 // The 3D face. The numbers are transcribed from the reference project's drum, which was tuned by
 // eye against a running app; nothing here is derived from first principles. They are all
@@ -190,8 +195,8 @@ internal fun randomSpinDurationMs(steps: Int): Int = (1700 + steps * 24).coerceA
  * ## It does not navigate on landing
  *
  * Landing changes nothing but what the centre row reads. The wheel settles, the centred item
- * becomes the pick, and **Play** -- which has been visible the whole time -- is what carries it to
- * the details page. The first version navigated in a `LaunchedEffect` the instant the wheel
+ * becomes the pick, and **Play** -- which sits on the centred row -- is what carries it to the
+ * details page. The first version navigated in a `LaunchedEffect` the instant the wheel
  * stopped, so the result was never seen.
  *
  * **The `armed` gate the first version needed is gone with it.** It existed only to stop the
@@ -207,13 +212,14 @@ internal fun randomSpinDurationMs(steps: Int): Int = (1700 + steps * 24).coerceA
  * it). Adding a second request path to buy a cache hit would duplicate the builder that keeps the
  * cache correct, so there is no second path. At most the rows on screen are in flight.
  *
- * ## The buttons are ours
+ * ## The layout is the reference project's
  *
- * `FilledTonalButton`, `Button`, `FilterChip`, `IconButton` + `CrispyIcon` -- the vocabulary the
- * rest of the app uses. Only the geometry and the feel came from the reference project: the
- * full-height drum, the row-unit face maths, and the per-slot detent.
+ * The header (back button + title), the connected genre pills, the full-height drum with the
+ * Spin button floating over its faded foot, and the Play button sitting on the centred row are
+ * all transcribed from the reference project's wheel. Only the vocabulary is ours: [CrispyIcon]
+ * and the project's drawables instead of Material Icons, and [Dimensions] for the page padding.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RandomWheelRoute(
     viewModelFactory: ViewModelProvider.Factory,
@@ -242,6 +248,7 @@ internal fun RandomWheelRoute(
 
     var isSpinning by remember { mutableStateOf(false) }
     var unfolded by remember { mutableStateOf(false) }
+    val dice = remember { Animatable(0f) }
 
     val chosenIndex by remember {
         derivedStateOf {
@@ -315,10 +322,13 @@ internal fun RandomWheelRoute(
         isSpinning = true
         scope.launch {
             val steps = randomSpinSteps(pool.size, Random.Default)
+            val durationMs = randomSpinDurationMs(steps)
+            // The die turns with the wheel and slows with it.
+            launch { dice.animateTo(dice.value + 720f, tween(durationMs, easing = CubicBezierEasing(0.12f, 0.72f, 0.18f, 1f))) }
             listState.randomSpinBy(
                 steps = steps,
                 rowPx = rowPx,
-                durationMs = randomSpinDurationMs(steps),
+                durationMs = durationMs,
             )
             isSpinning = false
         }
@@ -343,7 +353,7 @@ internal fun RandomWheelRoute(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .background(MaterialTheme.colorScheme.background)
             // The whole point of the page, and the one thing the first version omitted entirely:
             // a destination has to clear the system bars. Background first so it reaches the
             // edges, insets after so only the content is pushed in.
@@ -357,29 +367,46 @@ internal fun RandomWheelRoute(
             ),
         verticalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing),
     ) {
+        // Back and the title share one row: every dp the header does not take is a dp of wheel.
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 20.dp, top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing),
         ) {
+            FilledIconButton(
+                onClick = onClose,
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.size(44.dp),
+            ) {
+                CrispyIcon(
+                    painter = painterResource(Res.drawable.ic_arrow_back),
+                    contentDescription = "Back",
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Spin",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = "Let the wheel pick what plays next",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onClose) {
-                CrispyIcon(
-                    painter = painterResource(Res.drawable.ic_close),
-                    contentDescription = "Close",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+
+        Spacer(Modifier.height(12.dp))
 
         RandomChipRow(
             genres = genres,
@@ -387,91 +414,130 @@ internal fun RandomWheelRoute(
             onGenreSelected = { selectedGenre = it },
         )
 
-        Spacer(modifier = Modifier.height(Dimensions.SmallSpacing))
-
         // The drum takes the rest of the column, so it is as tall as the device rather than a
         // fixed three rows -- and `contentPadding` makes the list's own first and last slots sit
         // on the centre line, which is what lets an end slot land in the middle.
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.Center,
+                .weight(1f)
+                .fillMaxWidth(),
         ) {
-            val edge = ((maxHeight - RandomRowHeight) / 2).coerceAtLeast(0.dp)
-            when {
-                uiState.isLoading -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                val edge = ((maxHeight - RandomRowHeight) / 2).coerceAtLeast(0.dp)
+                when {
+                    uiState.isLoading -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
 
-                pool.isEmpty() -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = Dimensions.CardInternalPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Nothing to spin from yet.",
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = edge),
-                    flingBehavior = rememberSnapFlingBehavior(
-                        lazyListState = listState,
-                        snapPosition = SnapPosition.Center,
-                    ),
-                ) {
-                    items(
-                        count = RandomWheelLaps * pool.size,
-                        key = { index -> index },
-                        // One composition serves every slot. Without it the list composes a fresh
-                        // row for each of 400 laps' worth of keys it never reuses.
-                        contentType = { 0 },
-                    ) { index ->
-                        RandomWheelRow(
-                            candidate = pool[index % pool.size],
-                            index = index,
-                            listState = listState,
-                            rowPx = rowPx,
-                            density = localDensity.density,
-                            unfold = unfold,
-                            landing = landing.value,
-                            isCentred = index == chosenIndex,
-                            onClick = { turnTo(index % pool.size) },
+                    pool.isEmpty() -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = Dimensions.CardInternalPadding),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Nothing to spin from yet.",
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                    }
+
+                    else -> LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = edge),
+                        flingBehavior = rememberSnapFlingBehavior(
+                            lazyListState = listState,
+                            snapPosition = SnapPosition.Center,
+                        ),
+                    ) {
+                        items(
+                            count = RandomWheelLaps * pool.size,
+                            key = { index -> index },
+                            // One composition serves every slot. Without it the list composes a fresh
+                            // row for each of 400 laps' worth of keys it never reuses.
+                            contentType = { 0 },
+                        ) { index ->
+                            val candidate = pool[index % pool.size]
+                            RandomWheelRow(
+                                candidate = candidate,
+                                isCentred = index == chosenIndex,
+                                onPlay = { onPlay(candidate) },
+                                onClick = { turnTo(index % pool.size) },
+                                modifier = Modifier
+                                    .height(RandomRowHeight)
+                                    .graphicsLayer {
+                                        // Read inside the layer rather than in the composable body on purpose. The body's
+                                        // offset changes on every scroll frame, and reading it there would recompose every
+                                        // visible row -- and re-run its image request -- sixty times a second mid-spin,
+                                        // which is what the reference project learned the hard way.
+                                        randomWheelFace(
+                                            distanceInRows = listState.randomDistanceFromCenter(index, rowPx),
+                                            unfold = unfold,
+                                            landing = landing.value,
+                                            density = localDensity.density,
+                                            rowPx = rowPx,
+                                        )
+                                    },
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing)) {
-            FilledTonalButton(
-                onClick = ::spin,
-                enabled = pool.isNotEmpty() && !isSpinning,
-                modifier = Modifier.weight(1f),
+            // The button floats over the wheel's faded foot rather than taking a band of its
+            // own. The scrim has no click of its own, so a drag that starts on it still turns
+            // the wheel.
+            val page = MaterialTheme.colorScheme.background
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to page.copy(alpha = 0f),
+                            0.45f to page.copy(alpha = 0.9f),
+                            1f to page,
+                        )
+                    )
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 32.dp, bottom = 8.dp),
             ) {
-                Text(if (isSpinning) "Spinning…" else "Spin")
-            }
-            Button(
-                onClick = { picked?.let(onPlay) },
-                enabled = picked != null && !isSpinning,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Play")
+                Button(
+                    onClick = { spin() },
+                    enabled = pool.isNotEmpty() && !isSpinning,
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                ) {
+                    CrispyIcon(
+                        painter = painterResource(Res.drawable.ic_dice),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .graphicsLayer { rotationZ = dice.value },
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = if (isSpinning) "Spinning…" else "Spin",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RandomChipRow(
     genres: List<HomeRandomGenre>,
@@ -486,77 +552,64 @@ private fun RandomChipRow(
         genres.forEach { add(it.genre to genreIcon(it.genre)) }
     }
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         options.forEachIndexed { index, (genre, icon) ->
-            FilterChip(
-                selected = genre != null && genre.equals(selectedGenre, ignoreCase = true),
-                onClick = { onGenreSelected(genre) },
-                modifier = Modifier.height(RandomChipHeight),
-                label = {
+            ToggleButton(
+                checked = genre != null && genre.equals(selectedGenre, ignoreCase = true),
+                onCheckedChange = { onGenreSelected(genre) },
+                colors = ToggleButtonDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    checkedContainerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    checkedContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    CrispyIcon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
                     Text(
                         text = genre ?: "All",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                },
-                leadingIcon = {
-                    CrispyIcon(
-                        painter = painterResource(icon),
-                        contentDescription = null,
-                        modifier = Modifier.size(RandomChipIconSize),
-                    )
-                },
-                shape = randomChipShape(index, options.size),
-                border = null,
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
+                }
+            }
         }
     }
 }
 
 /**
- * The connected-segment shape, written out rather than taken from a button-group helper.
+ * One drum row: a circular cover beside the title and the type/genre line, and -- once the
+ * wheel settles on it -- a Play button.
  *
- * The row reads as one control because its neighbours share an edge, and that is four corner
- * radii. There is no behaviour here worth an API this project has never exercised.
- */
-private fun randomChipShape(index: Int, count: Int): Shape {
-    val start = if (index == 0) RandomChipOuterCorner else RandomChipJoinCorner
-    val end = if (index == count - 1) RandomChipOuterCorner else RandomChipJoinCorner
-    return RoundedCornerShape(topStart = start, topEnd = end, bottomEnd = end, bottomStart = start)
-}
-
-/**
- * One drum row: a circular cover beside the title and the type/genre line.
- *
- * [rowPx] is passed as a number because [GraphicsLayerScope] is not a composable, so it cannot
- * read `LocalDensity` for itself, and [unfold] and [landing] are passed already animated because
- * one animation drives every visible row rather than each row running its own.
+ * The pill behind the row is drawn in [drawBehind] and clipped to a stadium, exactly as the
+ * reference project draws it: the row reads as a pill that grows around the centred slot.
  */
 @Composable
 private fun RandomWheelRow(
     candidate: HomeRandomCandidate,
-    index: Int,
-    listState: LazyListState,
-    rowPx: Float,
-    density: Float,
-    unfold: Float,
-    landing: Float,
     isCentred: Boolean,
+    onPlay: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val pillWidth by animateDpAsState(
-        targetValue = if (isCentred) RandomCentredRowWidth else RandomRestingRowWidth,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f),
-        label = "randomRowWidth",
+    // Kept as a State and read only in draw and layer lambdas, so the pill growing is a redraw,
+    // not a recomposition per frame.
+    val pill by animateFloatAsState(
+        targetValue = if (isCentred) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
+        label = "randomPill",
     )
     val coverModel = rememberCrispyImageModel(
         url = candidate.artworkUrl,
@@ -567,72 +620,91 @@ private fun RandomWheelRow(
         randomTypeLabel(candidate.type),
         candidate.genre?.takeIf { it.isNotBlank() },
     ).joinToString(" · ")
+    val pillColor = MaterialTheme.colorScheme.surfaceContainerHigh
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(RandomRowHeight)
-            .graphicsLayer {
-                // Read inside the layer rather than in the composable body on purpose. The body's
-                // offset changes on every scroll frame, and reading it there would recompose every
-                // visible row -- and re-run its image request -- sixty times a second mid-spin,
-                // which is what the reference project learned the hard way.
-                randomWheelFace(
-                    distanceInRows = listState.randomDistanceFromCenter(index, rowPx),
-                    unfold = unfold,
-                    landing = landing,
-                    density = density,
-                    rowPx = rowPx,
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            modifier = Modifier
-                .width(pillWidth)
-                .clip(CircleShape)
-                .background(
-                    if (isCentred) {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0f)
-                    },
-                )
-                .clickable(onClick = onClick)
-                .padding(horizontal = RandomRowHeight / 8),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing * 2),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(RandomDiscSize)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                AsyncImage(
-                    model = coverModel,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .drawBehind {
+                val p = pill
+                if (p > 0.01f) {
+                    drawRoundRect(
+                        color = pillColor.copy(alpha = p),
+                        cornerRadius = CornerRadius(size.height / 2f),
+                    )
+                }
             }
-            Column {
-                Text(
-                    text = candidate.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            .clip(RoundedCornerShape(percent = 50))
+            .clickable(onClick = onClick)
+            .padding(start = 8.dp, end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(RandomDiscSize)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = coverModel,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = candidate.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        AnimatedVisibility(
+            visible = isCentred,
+            enter = scaleIn(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                initialScale = 0.6f,
+            ) + fadeIn(tween(150)),
+            exit = scaleOut(targetScale = 0.6f) + fadeOut(tween(120)),
+        ) {
+            Surface(
+                onClick = onPlay,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 12.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CrispyIcon(
+                        painter = painterResource(Res.drawable.ic_play_arrow_filled),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Play",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
     }
@@ -696,11 +768,12 @@ private fun GraphicsLayerScope.randomWheelFace(
 
 /** The item whose middle sits nearest the viewport's centre, or -1 before the list has measured. */
 private fun LazyListState.randomCenteredIndex(): Int {
-    val centre = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset) / 2
-    return layoutInfo.visibleItemsInfo
-        .minByOrNull { item -> abs(item.offset + item.size / 2 - centre) }
+    val info = layoutInfo
+    val middle = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    return info.visibleItemsInfo
+        .minByOrNull { item -> abs(item.offset + item.size / 2f - middle) }
         ?.index
-        ?: -1
+        ?: firstVisibleItemIndex
 }
 
 /**
@@ -712,11 +785,12 @@ private fun LazyListState.randomCenteredIndex(): Int {
  * is why the caller can be this loose about it.
  */
 private fun LazyListState.randomDistanceFromCenter(index: Int, rowPx: Float): Float {
-    if (rowPx <= 0f) return 8f
-    val centre = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset) / 2
-    val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-        ?: return 8f
-    return (item.offset + item.size / 2 - centre) / rowPx
+    if (rowPx <= 0f) return 6f
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+        ?: return if (index < firstVisibleItemIndex) -6f else 6f
+    val middle = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    return (item.offset + item.size / 2f - middle) / rowPx
 }
 
 /**
