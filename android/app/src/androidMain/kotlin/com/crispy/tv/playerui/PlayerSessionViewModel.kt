@@ -10,8 +10,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.media3.ui.PlayerView
 import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
@@ -52,7 +51,6 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.TorrentResolver
 import com.crispy.tv.settings.PlaybackSettingsRepository
-import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamResolver
@@ -86,8 +84,8 @@ class PlayerSessionViewModel(
     private val chosenStreamStableKey = chosenStreamStableKey?.trim()?.takeIf { it.isNotBlank() }
     private val chosenProviderId = chosenProviderId?.trim()?.takeIf { it.isNotBlank() }
     private val chosenStreamHandoffKey = chosenStreamHandoffKey?.trim()?.takeIf { it.isNotBlank() }
-    private val supabase = SupabaseServicesProvider.accountClient(this.appContext)
-    private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(this.appContext)
+    private val supabase = this.appContext.appGraph().graph.accountClient
+    private val backendClient: CrispyBackendClient = this.appContext.appGraph().graph.backendClient
     private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
     private val streamResolver: StreamResolver = PlaybackDependencies.streamResolverFactory(this.appContext)
     // Not cancelled in onCleared: bounded reporting jobs must finish flushing after clearing.
@@ -99,7 +97,7 @@ class PlayerSessionViewModel(
     private val audioFocusManager = PlaybackDependencies.getAudioFocusManager(this.appContext)
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
-        PlaybackSettingsRepositoryProvider.get(this.appContext)
+        this.appContext.appGraph().graph.playbackSettingsRepository
     /**
      * The fetch scope is this view model's own, not one the repository creates.
      *

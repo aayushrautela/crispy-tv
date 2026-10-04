@@ -6,16 +6,20 @@ plugins {
 /**
  * HTTP transport and the trailer-extraction seam.
  *
- * ## Why this module is mostly `androidMain`
+ * ## Why there is a `jvmCommonMain` here
  *
- * OkHttp publishes **no Kotlin/Native artifact**, and plan §5.3's constraint says
- * Android and desktop JVM cannot share an intermediate source set. So there is no
- * source set that both can put the OkHttp implementation in, which is a property
- * of the dependency rather than a choice. Everything that touches OkHttp or
- * `android.content.Context` therefore lives in `androidMain`, permanently for now,
- * and the desktop adapter arrives in Phase 5 when there is a desktop caller.
+ * OkHttp publishes no Kotlin/Native artifact, but Android and the desktop are both
+ * JVM, so the implementation belongs in a source set they share rather than in
+ * `androidMain`. `jvmCommonMain` is that set: `androidMain` and `desktopMain` both
+ * depend on it, and it holds the three OkHttp-backed files. `commonMain` keeps only
+ * the `CrispyHttpClient` interface, which is the name portable consumers use.
  *
- * ## No flavour axis, and no `HttpClientPort` yet
+ * The only thing the factory needed from `Context` was `context.cacheDir`, so it
+ * takes a `File` instead: `AppHttp` supplies a directory under the Android cache
+ * root and the desktop adapter supplies its own. That is the whole platform
+ * difference.
+ *
+ * ## No flavour axis
  *
  * This module used to carry `store` / `sideload` so `YouTubeTrailerExtractor` could
  * have two implementations and NewPipeExtractor could be declared
@@ -24,26 +28,6 @@ plugins {
  * plugin is single-variant, so it expressed no preference between
  * `storeDebugApiElements` and `sideloadDebugApiElements` and Gradle failed with an
  * ambiguous-variant error. The axis now lives only in `:androidApp`.
- *
- * Plan §6 Phase 2 also called for an `HttpClientPort` here. It is deliberately not
- * added yet. A port designed now would be designed against nothing: no portable
- * caller exists, so its shape -- whether it needs multipart bodies, how headers
- * are represented without OkHttp's `Headers`, whether a URL is a `String` or
- * something structured -- would be guesswork, and the first module that actually
- * uses it would redesign it. The call sites today are 14 files across six modules
- * -- `:android:addons`, `:android:app`, `:android:backend`, `:android:network`,
- * `:android:tv`, `:android:watchhistory` -- and every one of them is in a
- * non-`commonMain` source set. They read `code`, `body`, `headers`, `isSuccessful`
- * and `url` off the response and pass `CrispyHttpClient` itself into constructors,
- * which is the shape a port would have to answer to. (The two `commonMain` files
- * that mention `CrispyHttpClient` are the port KDocs saying why `BackendApi` and
- * `AccountApi` are not transport abstractions, so they are not call sites and are
- * not counted. An earlier version of this comment published per-member counts; they
- * were removed rather than re-derived, because no reader could reproduce the command
- * that produced them. Count with
- * `grep -rl --include=*.kt 'CrispyHttpClient\|httpClient\.' android | grep -v src/commonMain`.)
- * The port lands with the first consumer in the `:android:watchhistory` step, with a
- * real implementation and real call sites behind it.
  */
 kotlin {
     jvmToolchain(21)
@@ -80,6 +64,25 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
+        // Android and desktop are both JVM, so the OkHttp implementation is shared
+        // here instead of living in androidMain. No Kotlin/Native target depends on
+        // this set, because there is no OkHttp artifact to resolve for it.
+        val jvmCommonMain =
+            create("jvmCommonMain") {
+                dependsOn(commonMain.get())
+
+                dependencies {
+                    // `api`, and deliberately so: five modules -- :app, :tv,
+                    // :watchhistory, :backend and :addons -- import okhttp3 without
+                    // declaring it, relying on this module re-exporting it.
+                    api(libs.okhttp)
+                    implementation(libs.okhttp.logging.interceptor)
+                    implementation(libs.coroutines.core)
+                }
+            }
+        androidMain.get().dependsOn(jvmCommonMain)
+        named("desktopMain").get().dependsOn(jvmCommonMain)
+
         commonTest.dependencies {
             implementation(kotlin("test"))
             // No `libs.coroutines.test`, unlike `:app`, `:home` and `:player`: both
@@ -90,15 +93,6 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.coroutines.android)
-
-            // `api`, and deliberately so: five modules -- :app, :tv,
-            // :watchhistory, :backend and :addons -- import okhttp3 without declaring
-            // it, relying on this module re-exporting it. Declared in `androidMain`
-            // rather than `commonMain` because there is no Native artifact to
-            // resolve; Android consumers are unaffected, since androidMain's `api`
-            // lands on the same android variant configurations it did before.
-            api(libs.okhttp)
-            implementation(libs.okhttp.logging.interceptor)
         }
     }
 }

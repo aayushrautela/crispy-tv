@@ -3,8 +3,7 @@ package com.crispy.tv.person
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.app.appGraph
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 
@@ -12,10 +11,11 @@ import kotlinx.coroutines.Dispatchers
  * Builds the `ViewModelProvider.Factory` for [PersonDetailsViewModel].
  *
  * This is the whole reason the viewmodel's class body is in `commonMain` and this
- * function is not: it is the only place that needs a `Context`, and the `Context`
- * exists here so it can reach `SupabaseServicesProvider` and
- * `BackendServicesProvider`. The viewmodel itself depends on nothing but a
- * `suspend` loader and a language tag, both of which are portable.
+ * function is not: it is the only place that names a `Context`. **The two clients used to
+ * be the reason; they are not any more** — they come from the `commonMain` graph, and what
+ * is left here is `Locale.getDefault()` and `Dispatchers.IO`, both of which cannot be
+ * written in `commonMain` at all. The viewmodel itself depends on nothing but a `suspend`
+ * loader and a language tag, both of which are portable.
  *
  * The loader takes the person id and a **BCP-47 tag string**, not a `Locale`. The
  * backend has always wanted a tag, so converting here -- at the platform edge --
@@ -28,8 +28,9 @@ fun personDetailsViewModelFactory(
     personId: String,
 ): ViewModelProvider.Factory {
     val context = appContext.applicationContext
-    val supabase = SupabaseServicesProvider.accountClient(context)
-    val backend = BackendServicesProvider.backendClient(context)
+    val graph = context.appGraph().graph
+    val supabase = graph.accountClient
+    val backend = graph.backendClient
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (!modelClass.isAssignableFrom(PersonDetailsViewModel::class.java)) {

@@ -21,11 +21,14 @@ data class HomePrimaryFeedLoadResult(
 /**
  * The home catalog, as its callers see it.
  *
- * The implementation stays in `androidMain` permanently, and not because
- * anything about fetching is Android-specific: it maps the wire through
- * `org.json`, which is a class of the Android platform supplied by
- * `android.jar` rather than a dependency of this project, so a KMP source set
- * does not have it at all. The interface travels; the mapping does not.
+ * The implementation is portable. What is not is the snapshot cache it writes
+ * through: [HomeCatalogSnapshotCache] has two members, and its real
+ * implementation maps the snapshot to and from JSON. That mapping was
+ * `androidMain` because it was `org.json` -- a class of the Android platform
+ * supplied by `android.jar` rather than a dependency of this project -- and it
+ * moved to `commonMain` with `kotlinx.serialization`, which is a dependency of
+ * every target here. The interface and its implementation now travel together;
+ * a platform with no snapshot storage passes [NoHomeCatalogSnapshotCache].
  *
  * Named after the class it replaces, so the existing consumers --
  * `HomeRefreshCoordinator`, `CatalogPagingSource`, `CatalogViewModel` and
@@ -58,5 +61,4 @@ interface HomeCatalogService {
      * backend and a later one does too unless the caller memoises the result.
      */
     suspend fun loadRandomCandidates(): List<HomeRandomCandidate>
-}
 }

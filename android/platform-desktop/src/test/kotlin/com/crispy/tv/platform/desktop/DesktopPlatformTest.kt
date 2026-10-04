@@ -8,6 +8,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -145,5 +146,26 @@ class DesktopCapabilitiesAndPathsTest {
             environment = mapOf("XDG_CONFIG_HOME" to "/custom/config"),
         )
         assertTrue(resolved.path.startsWith("/custom/config"), resolved.path)
+    }
+
+    @Test
+    fun `XDG_CACHE_HOME takes precedence over the default cache location`() {
+        val resolved = DesktopPaths.cacheDirectory(
+            home = File("/home/tester"),
+            environment = mapOf("XDG_CACHE_HOME" to "/custom/cache"),
+        )
+        assertTrue(resolved.path.startsWith("/custom/cache"), resolved.path)
+    }
+
+    @Test
+    fun `the cache root is not the data root, so a cleanup tool cannot delete user state`() {
+        val home = File("/home/tester")
+        val environment = emptyMap<String, String>()
+        val data = DesktopPaths.applicationDataDirectory(home, environment)
+        val cache = DesktopPaths.cacheDirectory(home, environment)
+        assertNotEquals(data, cache)
+        // Both keep the platform convention's directory name.
+        assertTrue(data.path.endsWith("Crispy"), data.path)
+        assertTrue(cache.path.endsWith("Crispy"), cache.path)
     }
 }

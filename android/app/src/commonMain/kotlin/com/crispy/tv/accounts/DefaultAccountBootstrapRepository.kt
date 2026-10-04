@@ -85,7 +85,7 @@ class DefaultAccountBootstrapRepository(
             val userId = supabase.currentSession()?.userId?.takeIf { it.isNotBlank() }
             runCatching { supabase.signOut() }
             tokenStore.clear()
-            // The injected store, not a second lookup through SupabaseServicesProvider: it is
+            // The injected store, not a second lookup through the service graph: it is
             // the same instance the constructor was given, and reaching for the global here
             // hid the one dependency this class actually has.
             userId?.let { activeProfileStore.clear(it) }

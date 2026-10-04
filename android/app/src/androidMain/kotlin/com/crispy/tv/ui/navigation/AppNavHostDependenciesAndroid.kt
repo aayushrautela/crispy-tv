@@ -6,9 +6,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import com.crispy.tv.accounts.accountSettingsViewModelFactory
-import com.crispy.tv.accounts.activeProfileLoader
+import com.crispy.tv.accounts.launchUrl
 import com.crispy.tv.accounts.profileListViewModelFactory
-import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.catalog.catalogViewModelFactory
@@ -31,8 +30,6 @@ import com.crispy.tv.person.formatBirthdayDate
 import com.crispy.tv.person.personDetailsViewModelFactory
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.search.searchViewModelFactory
-import com.crispy.tv.settings.ImageSettingsRepositoryProvider
-import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.addonsSettingsViewModelFactory
 
 /**
@@ -67,10 +64,13 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     // renders an image.
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
+    // The portable half, read off the `Application` rather than built here: one set of
+    // services per process, and the factories below must agree about which set that is.
+    val graph = remember(appContext) { appContext.appGraph().graph }
 
     // ---- search -----------------------------------------------------------------
     val searchViewModelFactory = remember(appContext) { searchViewModelFactory(appContext) }
-    val searchLoadProfile = remember(appContext) { activeProfileLoader(appContext) }
+    val searchLoadProfile = remember(appContext) { graph.activeProfileLoader() }
 
     // ---- account ----------------------------------------------------------------
     // `accountLoadProfile` is a SECOND instance rather than a reuse of
@@ -78,9 +78,14 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     // own screen, and `ProfileIconButton` keys a `produceState` on the loader's identity,
     // so one shared instance would let a recomposition on one tab restart a load another
     // tab is waiting on. Separate remembers, deliberately, in every case below.
-    val profileListFactory = remember(appContext) { profileListViewModelFactory(appContext) }
-    val accountSettingsFactory = remember(appContext) { accountSettingsViewModelFactory(appContext) }
-    val accountLoadProfile = remember(appContext) { activeProfileLoader(appContext) }
+    val profileListFactory = remember(appContext) { profileListViewModelFactory(graph) }
+    val accountSettingsFactory = remember(appContext) {
+        // Opening the browser is a capability, so it crosses as a lambda rather than as the
+        // `Context` it needs: the factory never casts it, and a desktop caller supplies
+        // `Desktop.browse` in its place.
+        accountSettingsViewModelFactory(graph, openUrl = { url -> launchUrl(appContext, url) })
+    }
+    val accountLoadProfile = remember(appContext) { graph.activeProfileLoader() }
 
     // ---- library ----------------------------------------------------------------
     // `monthName` and `loadProfile` are remembered lambdas because their identity is
@@ -94,7 +99,7 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     val libraryMonthName = remember(appContext) { localeDateFormatters(appContext).monthName }
     val libraryClock = remember { { System.currentTimeMillis() } }
     val libraryUtcOffsetMillis = remember { { deviceUtcOffsetMillis() } }
-    val libraryLoadProfile = remember(appContext) { activeProfileLoader(appContext) }
+    val libraryLoadProfile = remember(appContext) { graph.activeProfileLoader() }
     val libraryLogger = remember(appContext) { AndroidAppLogger(appContext) }
 
     // ---- discover ---------------------------------------------------------------
@@ -102,8 +107,8 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     // composable body, and that build-in-the-screen shape was the last thing pinning
     // both it and its graph to `androidMain`; the graph never touched a platform type
     // itself.
-    val discoverViewModelFactory = remember(appContext) { discoverViewModelFactory(appContext) }
-    val discoverLoadProfile = remember(appContext) { activeProfileLoader(appContext) }
+    val discoverViewModelFactory = remember(appContext) { discoverViewModelFactory(graph) }
+    val discoverLoadProfile = remember(appContext) { graph.activeProfileLoader() }
 
     // ---- home -------------------------------------------------------------------
     // `homeProfileLoader` is the FIFTH instance, on the same grounds as the four above.
@@ -120,7 +125,7 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     // sharing one would be a behaviour change in the other direction.
     val homeViewModelFactory = remember(appContext) { homeViewModelFactory(appContext) }
     val homeSelectorViewModelFactory = remember(appContext) { homeSelectorViewModelFactory(appContext) }
-    val homeLoadProfile = remember(appContext) { activeProfileLoader(appContext) }
+    val homeLoadProfile = remember(appContext) { graph.activeProfileLoader() }
     val homeCalendarViewModelFactory = remember(appContext) { calendarViewModelFactory(appContext) }
     val homeCatalogViewModelFactory = remember(appContext) {
         { section: CatalogSectionRef -> catalogViewModelFactory(appContext, section) }
@@ -138,7 +143,7 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
         { personId: String -> personDetailsViewModelFactory(appContext, personId) }
     }
     val homePlaybackSettingsRepository = remember(appContext) {
-        PlaybackSettingsRepositoryProvider.get(appContext)
+        graph.playbackSettingsRepository
     }
     // `appContext`, not the composition-local `context`: `shareOnCrispy` documents that
     // the chooser needs `FLAG_ACTIVITY_NEW_TASK` because a composition-local context is
@@ -276,9 +281,9 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
         pluginsUiSupported = distribution.capabilities.pluginsUiSupported,
         pluginsSettingsScreen = distribution.pluginsSettingsScreen,
         addonsSettingsViewModelFactory = remember(appContext) { addonsSettingsViewModelFactory(appContext) },
-        imageSettingsRepository = remember(appContext) { ImageSettingsRepositoryProvider.get(appContext) },
+        imageSettingsRepository = remember(appContext) { graph.imageSettingsRepository },
         profileDataCloudSync = remember(appContext) {
-            SupabaseServicesProvider.createProfileDataCloudSync(appContext)
+            graph.createProfileDataCloudSync()
         },
         // `addPlayerDestination` is an *extension* on `NavGraphBuilder`, so
         // `::addPlayerDestination` does not resolve -- there is no one-argument function

@@ -131,8 +131,11 @@ internal fun isCompactWidth(screenWidthDp: Int): Boolean = screenWidthDp < 600
  * them, and [detailsArguments] is a platform read with no logic in it to test.
  *
  * See [runtimeDetailsEntryOrNull] for the one of those decisions with a name.
+ *
+ * `public`, not `internal`: `AppNavHostDependencies` is public, and a public class cannot
+ * expose an internal member type -- these argument readers are part of its signature.
  */
-internal data class HomeDetailsRouteArgs(
+data class HomeDetailsRouteArgs(
     val itemId: String?,
     val itemType: String?,
     val highlightEpisodeId: String?,
@@ -146,18 +149,20 @@ internal data class HomeDetailsRouteArgs(
 
 /**
  * The person destination's route arguments, with nothing decided. See
- * [HomeDetailsRouteArgs] for why the fields are nullable and unparsed.
+ * [HomeDetailsRouteArgs] for why the fields are nullable and unparsed, and why they are
+ * public.
  */
-internal data class HomePersonRouteArgs(
+data class HomePersonRouteArgs(
     val personId: String?,
     val profileUrl: String?,
 )
 
 /**
  * The catalog destination's route arguments, with nothing decided. See
- * [HomeDetailsRouteArgs] for why the fields are nullable and unparsed.
+ * [HomeDetailsRouteArgs] for why the fields are nullable and unparsed, and why they are
+ * public.
  */
-internal data class HomeCatalogRouteArgs(
+data class HomeCatalogRouteArgs(
     val catalogId: String?,
     val title: String?,
 )

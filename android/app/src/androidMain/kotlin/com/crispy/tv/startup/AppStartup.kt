@@ -1,7 +1,7 @@
 package com.crispy.tv.startup
 
 import android.content.Context
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +19,7 @@ object AppStartup {
         val appContext = context.applicationContext
         scope.launch {
             val registry = metadataAddonRegistry(appContext)
-            val sync = SupabaseServicesProvider.createHouseholdAddonsCloudSync(appContext, registry)
+            val sync = appContext.appGraph().graph.createHouseholdAddonsCloudSync(registry)
             sync.pullToLocal()
                 .onFailure {
                     android.util.Log.w("CrispyStartup", "addon pull failed: ${it.message.orEmpty()}")

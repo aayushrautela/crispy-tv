@@ -2,9 +2,13 @@ package com.crispy.tv.network
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import java.io.File
 import okhttp3.OkHttpClient
 
 object AppHttp {
+    private const val HTTP_CACHE_DIR = "okhttp"
+    private const val AI_HTTP_CACHE_DIR = "okhttp_ai"
+
     @Volatile
     private var okHttpClient: OkHttpClient? = null
 
@@ -25,7 +29,7 @@ object AppHttp {
             val userAgent = buildUserAgent(appContext)
             val created =
                 CrispyOkHttpFactory.create(
-                    context = appContext,
+                    cacheDir = File(appContext.cacheDir, HTTP_CACHE_DIR),
                     userAgent = userAgent,
                     debugLogging = isDebuggable(context),
                 )
@@ -55,7 +59,7 @@ object AppHttp {
             val appContext = context.applicationContext
             val created =
                 CrispyOkHttpFactory.createAiClient(
-                    context = appContext,
+                    cacheDir = File(appContext.cacheDir, AI_HTTP_CACHE_DIR),
                     userAgent = buildUserAgent(appContext),
                     debugLogging = isDebuggable(context),
                 )

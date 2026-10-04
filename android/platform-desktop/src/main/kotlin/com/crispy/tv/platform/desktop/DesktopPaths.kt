@@ -52,6 +52,28 @@ object DesktopPaths {
     }
 
     /**
+     * The per-user cache root, in the platform's own cache location.
+     *
+     * The same convention as [applicationDataDirectory] but deliberately a different
+     * directory, because the two have different lifetimes: application data is user
+     * state and has to survive, while a cache is disposable and an OS cleanup tool is
+     * entitled to delete it. Writing HTTP caches under the data root would make that
+     * a promise the app cannot keep.
+     *
+     * `XDG_CACHE_HOME` is honoured on Linux for the same reason as its config
+     * counterpart; `LOCALAPPDATA` is the Windows cache location and
+     * `~/Library/Caches` the macOS one.
+     */
+    fun cacheDirectory(
+        home: File = File(System.getProperty("user.home") ?: "."),
+        environment: Map<String, String> = System.getenv(),
+    ): File = when {
+        isWindows -> File(environment["LOCALAPPDATA"] ?: File(home, "AppData/Local").path, APPLICATION_DIRECTORY)
+        isMacOs -> File(environment["HOME"] ?: home.path, "Library/Caches/$APPLICATION_DIRECTORY")
+        else -> File(environment["XDG_CACHE_HOME"] ?: File(home, ".cache").path, APPLICATION_DIRECTORY)
+    }
+
+    /**
      * The on-disk OS name, lowercased.
      *
      * Computed per call rather than in a `val` for the same reason as above: it

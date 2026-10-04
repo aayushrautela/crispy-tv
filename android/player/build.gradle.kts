@@ -7,10 +7,9 @@ plugins {
  * Player-facing interfaces. The first Phase 2 module to become multiplatform, and
  * the one that establishes the recipe the other five follow.
  *
- * Nothing in here touched a platform API: 6 of 6 files were already clean, so
- * every file moved to `commonMain` unchanged and this is a module-shape change
- * rather than a code change. That is why it goes first — if the recipe in
- * phase2-data-layer-plan.md is wrong, this is the cheapest place to discover it.
+ * Nothing in here touched a platform API: all 6 files were already clean, so
+ * every file moved to `commonMain` unchanged and this was a module-shape change
+ * rather than a code change.
  *
  * The `androidMain` source set is deliberately left empty. `:android:native-engine`
  * owns Media3 and libmpv and stays a plain `com.android.library`; players are

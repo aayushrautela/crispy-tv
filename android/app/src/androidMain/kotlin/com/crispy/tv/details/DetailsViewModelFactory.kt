@@ -3,8 +3,7 @@ package com.crispy.tv.details
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.distribution.AppDistribution
 import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.optimistic.newUserMutationId
@@ -44,11 +43,11 @@ internal fun detailsViewModelFactory(
                 streamResolver = StreamResolverProvider.get(app),
                 logger = AndroidAppLogger(app),
                 getMetadataItemDetail = { token, metadataItemId ->
-                    BackendServicesProvider.backendClient(app)
+                    app.appGraph().graph.backendClient
                         .getMetadataItemDetail(accessToken = token, itemId = metadataItemId)
                 },
                 sessionTokenProvider = {
-                    SupabaseServicesProvider.accountClient(app).ensureValidSession()?.accessToken
+                    app.appGraph().graph.accountClient.ensureValidSession()?.accessToken
                 },
                 pluginStreamLoader = AppDistribution.current.pluginStreamLoader(app),
                 stashHandoff = { stream, lookupId -> PlayerStreamHandoff.stash(stream, lookupId) },

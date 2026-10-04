@@ -367,8 +367,11 @@ internal fun heroHeight(screenHeightDp: Int): Dp =
  * `HeroSection` passes it to its `heroTrailerLayer` slot; the Android file
  * unpacks it straight back into `HeroTrailerLayer`'s parameters, so the
  * implementation's signature is unchanged and this is the only new type.
+ *
+ * `public`, not `internal`, because `AppNavHostDependencies` carries it as the parameter of
+ * its `homeHeroTrailerLayer` slot and that bundle is public.
  */
-internal class HeroTrailerLayerArgs(
+class HeroTrailerLayerArgs(
     val modifier: Modifier,
     val trailer: List<HeroTrailerSource>,
     val viewportWidthPx: Int,

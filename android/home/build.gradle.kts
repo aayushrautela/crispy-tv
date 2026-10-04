@@ -51,10 +51,11 @@ plugins {
  * | `CalendarService`, `UpNextService` | `commonMain` | moved in Phase 4. The old row said "`org.json`, Compose, and the backend client", and **only the last of those three was real** — neither file parses JSON and neither touches Compose. The actual blockers were `android.util.Log` (three call sites) and the concrete client, and both were already solved elsewhere: `AppLogger` is a `:platform-core` interface the service now takes as a constructor parameter, and `BackendApi` is the port `CrispyBackendClient` implements. **Three files whose stated reason was a proxy rather than the cause** |
  * | `HomeSnapshotModels` | split | the models, the section keys, `defaultWideRailSection`, both `toWideRailItem` extensions and the two date/format helpers moved to `commonMain`; `ContinueWatchingSuppressionStore` stayed in `androidMain` and became its own file. The old row said "`org.json` and `Context`", and that was the *file's* truth and not the models' — the store was the only part that used either, so splitting by that boundary left the models portable without touching them |
  * | `HomeHeroItem` | new file, `commonMain` | lifted out of the top of `HomeCatalogService` because `HeroState` (in the moved `HomeSnapshotModels`) names it, and a nested type is as pinned as the file declaring it. Second instance of that rule in the repo |
- * | `HomeRefreshCoordinator` | `androidMain` | **its stated reason was "consumes `HomeCatalogService`, `CalendarService` and `UpNextService`, all of which are `androidMain`", and that is now two-thirds wrong** — `CalendarService` and `UpNextService` are `commonMain`. What still pins it is the two that remain: `HomeCatalogService` (`org.json`, OkHttp, `formatRating`) and `ContinueWatchingSuppressionStore` (`Context`, `org.json`). The injected clock already moved, and the file was already a coordinator over injected services, so it should follow the moment those two do |
- * | `HomeCatalogService` | `androidMain` | `org.json`, OkHttp, and `formatRating` from `:android:addons` |
+ * | `HomeRefreshCoordinator` | `androidMain` | **its stated reason was "consumes `HomeCatalogService`, `CalendarService` and `UpNextService`, all of which are `androidMain`", and that is now two-thirds wrong** — `CalendarService` and `UpNextService` are `commonMain`. What still pins it is the one that remains: `ContinueWatchingSuppressionStore` (`Context`, `org.json`). `HomeCatalogService` was the second of the two and stopped being a pin in the landing that split its snapshot cache out, so the row's own claim that it "should follow the moment those two do" is now a one-item claim. The injected clock already moved, and the file was already a coordinator over injected services, so it should follow the moment those two do |
+ * | `CachingHomeCatalogService` | `commonMain` | The algorithm, every wire-to-model mapping and the in-flight dedup moved, and so did the snapshot cache behind the two-member `HomeCatalogSnapshotCache` port. The row's stated reason for the split was "`org.json` has no KMP answer in this repository", and **`kotlinx.serialization` is that answer** -- the same conversion `WatchProgressStore` already made. **The old row named three pins and two of them were proxies**: `OkHttp` was already behind `BackendApi`, and `formatRating` is `:android:addons`' `commonMain` code that `:home` merely declared in `androidMain.dependencies`. The pin that actually survived was neither: it was the map-to-model helpers in this module's own `images` file, which imports nothing |
+ * | `ResponsiveImageSetMapping` | `commonMain` | moved with its only consumer. Its own KDoc said `androidMain` "because those caches are" -- a statement about its callers, not about the file, and the second time in this table that a file's stated reason named a consumer instead of a cause |
  * | `CatalogModels` | `commonMain` | moved in Phase 4. The row used to read "`androidMain` / Compose runtime", which was **incomplete rather than a real blocker** -- the only Compose call in the file is the `@Immutable` annotation, and Compose runtime publishes for every target `:home` builds. What actually pinned it was `java.util.Locale`, on one line: `catalogId.trim().lowercase(Locale.US)`. That is the second time this file's stated reason was a proxy rather than the cause, and the difference matters -- the real blocker was a single call that had a portable equivalent, where the stated one implied giving up the annotation |
- * | `RecommendationCatalogDiskCacheStore` | `androidMain` | `Context`, `org.json`, `java.io` |
+ * | `RecommendationCatalogDiskCacheStore`, `DiskHomeCatalogSnapshotCache`, `JsonObjectToStringMap` | `commonMain` | moved together with the landing that gave `AppServices.homeSnapshotCache` a real desktop answer. All three stated reasons were discharged rather than carried: `Context.filesDir` became an injected okio `Path`, `org.json` became `kotlinx.serialization`, `java.io` became okio's `FileSystem`. **All three moved rather than only the two named classes because `DiskHomeCatalogSnapshotCache`'s writer is the only place the file *format* exists** -- copying the reader for desktop would have been two codecs for one format. The on-disk **file name** is pinned by `CacheFileNameTest` (okio's `sha256()` had to be *measured* against the hand-rolled `MessageDigest` loop it replaced, not assumed equal), and the written payload's key set by `DiskHomeCatalogSnapshotCacheTest`. **Nothing claims the payload bytes are unchanged**: the `androidMain` writer this replaced was an uncommitted working file, so there was no golden to diff against -- see the KDoc on `DiskHomeCatalogSnapshotCache` for what is pinned instead and why a divergence there is bounded to a cold start |
  *
  * The two `java.*` calls that moved out of `commonMain` files followed precedents already
  * set in this module and in `:core-domain`, rather than being reinvented: `lowercase(Locale.US)`
@@ -95,6 +96,13 @@ kotlin {
         commonMain.dependencies {
             api(project(":android:core-domain"))
 
+            // For `formatRating`, used by `CachingHomeCatalogService`'s item mapping.
+            // It was declared in `androidMain.dependencies` while the only consumer
+            // that needed it moved to `commonMain`, which made a portable function
+            // unreachable from `commonMain` -- the dependency belongs in the source
+            // set the file is in, not where it used to be.
+            implementation(project(":android:addons"))
+
             // For `TimeSource` and the `Iso8601` helpers. The contracts, not the
             // Android implementations: depending on `:android:platform-android` here
             // would reintroduce exactly the platform leak the interfaces exist to
@@ -129,25 +137,50 @@ kotlin {
             // is already multiplatform and already a `commonMain` dependency of
             // `:android:app`, which is what makes this consistent rather than novel.
             implementation(project(":android:backend"))
+
+            // For `RecommendationCatalogDiskCacheStore`, which is `commonMain` so
+            // the desktop `AppServices` can hand `AppServices.homeSnapshotCache`
+            // the same file-backed cache Android already had rather than
+            // `NoHomeCatalogSnapshotCache`. It used `java.io`, a hand-rolled
+            // `MessageDigest` and `org.json`; all three
+            // pins were discharged rather than moved — `FileSystem.SYSTEM` /
+            // `Path` / `ByteString.sha256()` are okio, and
+            // `kotlinx.serialization.json` is already on `:backend`'s
+            // classpath so it is a *version*, not a new dependency. The file
+            // name is unchanged (see `CacheFileNameTest`); the payload's key set
+            // is pinned by `DiskHomeCatalogSnapshotCacheTest`, and nothing claims
+            // byte identity with the writer it replaced.
+            implementation(libs.okio.core)
+            implementation(libs.serialization.json)
         }
 
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.coroutines.test)
+            implementation(libs.okio.fakefilesystem)
         }
 
         androidMain.dependencies {
             // For `TimeSource` and the `Iso8601` helpers.
             api(project(":android:platform-android"))
 
-            // Still `androidMain`: `HomeCatalogService` and
-            // `RecommendationCatalogDiskCacheStore` use OkHttp and `org.json`, and
-            // `HomeCatalogService` uses `formatRating` from `:android:addons`. These
-            // move down with their consumers. `CalendarService` and `UpNextService`
-            // used to be listed here for the backend client; both are `commonMain`
-            // now and the reason they could go is above.
+            // What is left here is `HomeRefreshCoordinator`, pinned by
+            // `ContinueWatchingSuppressionStore` (`Context`, `org.json`), and the
+            // Android instantiations of `TimeSource`/`MonotonicClock`.
+            // `HomeCatalogService` and `RecommendationCatalogDiskCacheStore` are
+            // **no longer** named here as reasons: the disk cache store moved to
+            // `commonMain` (its `Context.filesDir`, `org.json` and `java.io`
+            // pins discharged over an injected okio `Path`,
+            // kotlinx.serialization and okio's `FileSystem`), and
+            // `CachingHomeCatalogService` reached it only through the two-member
+            // `HomeCatalogSnapshotCache` port. `CalendarService` and
+            // `UpNextService` left this block earlier because they are
+            // `commonMain`; the dependency they needed is above. `:android:addons`
+            // left this block too: `formatRating` is its `commonMain` code, and
+            // `CachingHomeCatalogService` -- the one consumer the comment used to
+            // name -- is `commonMain`, so the dependency was sitting in the wrong
+            // source set rather than the code being wrong.
             implementation(project(":android:player"))
-            implementation(project(":android:addons"))
 
             implementation(libs.coroutines.android)
         }

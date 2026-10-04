@@ -11,16 +11,21 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.allowHardware
 import coil3.request.crossfade
+import com.crispy.tv.app.AndroidAppGraph
 import com.crispy.tv.app.AppGraph
 import com.crispy.tv.app.AppGraphHost
 import com.crispy.tv.distribution.AppDistribution
+import com.crispy.tv.services.AndroidAppServices
 import com.crispy.tv.distribution.BuildDistributionComponents
 import com.crispy.tv.network.AppHttp
 import okio.Path.Companion.toOkioPath
 
 class CrispyApplication : Application(), SingletonImageLoader.Factory, AppGraphHost {
-    override val appGraph: AppGraph by lazy {
-        AppGraph(this)
+    // One `AppServices` and one `AppGraph` for the process, built here and nowhere else. This is
+    // the whole reason `AppServices` exists: `AndroidAppServices` is the only place a `Context`
+    // reaches this wiring, and the graph is what everything else holds.
+    override val appGraph: AndroidAppGraph by lazy {
+        AndroidAppGraph(graph = AppGraph(AndroidAppServices(this)), context = this)
     }
 
     override fun onCreate() {

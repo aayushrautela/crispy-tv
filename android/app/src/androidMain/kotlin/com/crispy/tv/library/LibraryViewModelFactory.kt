@@ -5,8 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.app.appGraph
-import com.crispy.tv.backend.BackendContextResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.optimistic.newUserMutationId
@@ -41,14 +39,17 @@ import okio.Path.Companion.toPath
  */
 fun libraryViewModelFactory(context: Context): ViewModelProvider.Factory {
     val appContext = context.applicationContext
-    val backendClient = BackendServicesProvider.backendClient(appContext)
+    // `AndroidAppGraph` rather than the portable `AppGraph` underneath it: this factory needs
+    // both halves — the backend client from one, the outbox from the other.
+    val graph = appContext.appGraph()
+    val backendClient = graph.graph.backendClient
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
                 return LibraryViewModel(
                     backend = backendClient,
-                    backendContextResolver = BackendContextResolverProvider.get(appContext),
+                    backendContextResolver = graph.graph.backendContextResolver,
                     userMediaRepository =
                         DefaultUserMediaRepository(
                             PlaybackDependencies.watchHistoryServiceFactory(appContext),

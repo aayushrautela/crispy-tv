@@ -26,9 +26,8 @@ class AppBootstrapViewModel internal constructor(
 ) : ViewModel() {
 
     // The `factory(context)` companion that used to live here is now
-    // `appBootstrapViewModelFactory` in `androidMain`. It is the same `ViewModelProvider`
-    // code, unchanged; it is there only because it takes a `Context` and reaches into
-    // `SupabaseServicesProvider`, and this class is now in `commonMain`.
+    // `appBootstrapViewModelFactory` in `androidMain`, and it takes the shared service
+    // graph rather than a `Context`. It is the same `ViewModelProvider` code, unchanged.
 
     private val _state = MutableStateFlow<BootstrapState>(BootstrapState.Loading)
     val state: StateFlow<BootstrapState> = _state.asStateFlow()

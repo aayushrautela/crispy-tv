@@ -21,6 +21,7 @@ import com.crispy.tv.home.HomeUiState
 import com.crispy.tv.home.HomeWideRailSectionUi
 import com.crispy.tv.home.HeroState
 import com.crispy.tv.home.RailLoadState
+import com.crispy.tv.home.DiskHomeCatalogSnapshotCache
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.UpNextService
 import com.crispy.tv.home.buildHomeLayoutState
@@ -33,7 +34,10 @@ import com.crispy.tv.tv.di.TvServices
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -45,6 +49,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okio.FileSystem
+import okio.Path.Companion.toOkioPath
 import com.crispy.tv.platform.android.AndroidTimeSource
 
 class TvHomeViewModel internal constructor(
@@ -76,7 +82,15 @@ class TvHomeViewModel internal constructor(
                             homeCatalogService = CachingHomeCatalogService(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
-                                diskCacheStore = RecommendationCatalogDiskCacheStore(appContext, AndroidTimeSource()),
+                                cache = DiskHomeCatalogSnapshotCache(
+                                    RecommendationCatalogDiskCacheStore(
+                                        cacheRoot = appContext.filesDir.toOkioPath(),
+                                        timeSource = AndroidTimeSource(),
+                                        ioDispatcher = Dispatchers.IO,
+                                        fileSystem = FileSystem.SYSTEM,
+                                    ),
+                                ),
+                                serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                             ),
                             homeWatchActivityService = com.crispy.tv.home.HomeWatchActivityService(),
                             watchHistoryService = watchHistoryService,

@@ -61,7 +61,7 @@ plugins {
  * |---|---|---|---|
  * | the viewmodels | `AccountViewModels`, `CatalogViewModel`, `HomeViewModel`, `HomeSelectorViewModel`, `LibraryScreen`, `SearchViewModel`, `AppBootstrapViewModel` | the `Route`/`Screen` files, ~4,000 lines | **not a factory/viewmodel split — that premise was false.** `ViewModelProvider.Factory` is reachable from `commonMain` (see the `lifecycle-viewmodel-compose` comment 277 lines below, which already says so and is right, and the 14 `ViewModelProvider*` classes in that artifact's `-desktop` jar). A route composable can therefore take its factories *as values*. What actually blocked `HomeRoute` was three `Context` reads, and those cross as **no-default slots** on a signature that already carried eleven: `viewModelFactory`, `selectorViewModelFactory`, `loadProfile` — and `HomeStreamSelector` came with it, its `LocalConfiguration` read crossing as `isCompact: Boolean`. **2 files / 359 lines freed, 0 new ports.** The factories keep taking a `Context` and stay in `androidMain`, because a `Context` used for *wiring* belongs in the factory — so it is the call sites that move, not the factories. **That is the fifth time a blocker in this table turned out to be an untested premise.** |
  * | ~~`DetailsPalette.kt`~~ | **freed** | `AiInsightsStoryOverlay`, `DetailsBody`, `DetailsRatingsSection` | **none left -- all three moved.** The three reasons this row claimed were all wrong, and each is worth recording because two of them were premises rather than measurements. `com.materialkolor` 5.0.0 is a genuine KMP artifact (it publishes `android`, `iosArm64`, `iosSimulatorArm64`, `jvm`, `macosArm64`, `js`, `wasmJs`), so `rememberDynamicColorScheme` and `themeColor` were never blockers. `LocalContext` is Coil's own `coil3.compose.LocalPlatformContext` in `commonMain`. And the bitmap is not a blocker either, it is the *return type* of an `expect`: `coil3.toBitmap` yields `android.graphics.Bitmap` on Android and `org.jetbrains.skia.Bitmap` elsewhere, so no `commonMain` signature can name it -- the extraction takes Compose's `ImageBitmap`, which every target shares, and only the two loader composables stayed behind for `Context`. That is the fourth time a blocker in this table turned out to be an untested premise |
- * | the composition root | `SupabaseServicesProvider`, `BackendServicesProvider`, `PlaybackDependencies`, `DistributionComponents`, the two settings `…RepositoryProvider`s | `ProfileMenuRoute`, `CalendarScreen`, `SettingsScreen`, `SettingsNavGraph`, `AppDistribution` | these *are* the root; a screen resolves them in `androidMain` and needs a seam for the values, not for the providers |
+ * | the composition root | **`AppGraph`** (now `commonMain`, built from one `AppServices`), `AndroidAppGraph` (the three members still needing `PlaybackDependencies`/player seams), `PlaybackDependencies`, `DistributionComponents` | `ProfileMenuRoute`, `CalendarScreen`, `SettingsScreen`, `SettingsNavGraph`, `AppDistribution` | these *are* the root; a screen resolves them in `androidMain` and needs a seam for the values, not for the graph. **The four service providers and the two settings `…RepositoryProvider`s this row used to name are deleted** -- the five cached `object` providers moved into `commonMain/.../app/AppGraph.kt` and the graph is the only place a store name, an HTTP client or a snapshot cache is built |
  * | `androidx.navigation` | **now on the `commonMain` classpath**, as `libs.jb.navigation.compose` | **0 of 9 files moved** | **swapped, measured 5/5, and it frees nothing — the sixth untested premise in this table.** The JetBrains fork `org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01` publishes `androidJvm`/`desktop`/`iosArm64`/`iosSimulatorArm64`, keeps the `androidx.navigation.compose` package, and resolves through Google's own now-KMP `navigation-runtime:2.10.0`; Google's `navigation-compose:2.9.8` publishes `android` plus `jvmStubs`, which are dokka artifacts. So the classpath blocker is gone. **What remains is a `Context` that arrives through a call, which an import scan cannot see:** `AppNavHost` calls all six graphs by name, and each graph calls a `Context`-taking factory, so the layer is mutually referencing and moves as a unit or not at all. The `6 files` this row used to name was also wrong: the layer is **9** — 7 graphs in `ui/navigation` (`Auth`, `Discover`, `Home`, `Library`, `Player`, `Search`, `Settings`) plus `AppRoot` and `AppNavHost` |
  * | `androidx.paging` | `paging-common` **and** `paging-compose` are on the `commonMain` classpath; `paging-runtime` is not | `LibraryPagingSource`, `BrowsePagingSource` (`CatalogPagingSource` moved to `commonMain`) | measured per artifact, and the two halves of the family answer differently: `paging-common-3.5.1` and `paging-compose-3.5.1` both publish `metadataApiElements` with platform.type=common plus `iosArm64`/`iosSimulatorArm64`/`linuxX64`/`linuxArm64`/`desktop`, while `paging-runtime-3.5.1` publishes four variants carrying a single `.aar` with platform.type=- and no `available-at` and depends on `androidx.recyclerview` — so `paging` is not "KMP", it is **three artifacts with three different answers**, which is why `paging-runtime` alone is the one left in `androidMain` |
  * | `StreamResolver` | `androidMain/.../addons` | `SelectorCoordinator`, `HomeStreamSelector` | the same port treatment as `BackendApi`, applied to a type the project owns |
@@ -419,6 +419,28 @@ kotlin {
             // so it publishes no JVM variant and cannot be consumed from a KMP
             // `commonMain` at all -- the same constraint `:ui-assets` hit. The one
             // file that needs it, `PlayerSessionSupport`, stays in `androidMain`.
+        }
+
+        // The desktop side of the ports, for `DesktopAppServices` in this module's
+        // `desktopMain`. It is declared **here and not at module level** because
+        // `:android:platform-desktop` is a plain `kotlin.jvm` module -- it publishes
+        // no metadata variant, so a `commonMain` line asking for it would fail to
+        // resolve the same way `:android:native-engine` does two blocks below. This
+        // is the desktop mirror of the `platform-android` edge that
+        // `AndroidAppServices` already uses, and the two implementations of the
+        // same interface sit at the same level in the hierarchy on purpose.
+        //
+        // Note what is *not* added: `:android:network` is already a `commonMain`
+        // dependency above, so `DesktopHttpClients` -- the desktop half of the
+        // transport `AppServices.httpClient` names -- is visible here without a
+        // second line, and adding one would be a claim nothing needs.
+        // `named("desktopMain")` rather than a `desktopMain` accessor: `jvm("desktop")`
+        // does not publish a typed accessor for its own source set, and
+        // `:android:network` reaches the same set the same way. The name is the
+        // target's, not a compilation's -- there is no `jvmMain` here to hang a
+        // custom set off.
+        named("desktopMain").get().dependencies {
+            implementation(project(":android:platform-desktop"))
         }
 
         // Everything the current code actually needs. Listed as `androidMain`

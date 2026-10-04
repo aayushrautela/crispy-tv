@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.authViewModelFactory
 import com.crispy.tv.accounts.profileListViewModelFactory
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.ui.navigation.appNavHostDependencies
 
 /**
@@ -18,20 +19,23 @@ import com.crispy.tv.ui.navigation.appNavHostDependencies
  * what a bootstrap ViewModel factory is for; this is the thing that knows how to make one on
  * Android. That split is the whole shape of the landing, expressed in two declarations.
  *
- * Nothing here decides anything, and the three `remember`s are the same ones that used to be
+ * Nothing here decides anything, and the four `remember`s are the same ones that used to be
  * in [AppRoot]: keyed on the application context, so each factory is built once per process
  * rather than once per recomposition. Moving them across a file boundary is not a lifetime
  * change -- [AppRoot] and this function occupy the same composition scope at the same point
- * in the tree.
+ * in the tree. The graph is read off the context rather than built here, because the
+ * `Application` owns it: a second `AppGraph` would mean a second token store, a second
+ * snapshot cache and a second service scope, and this is the wrong place to decide that.
  */
 @Composable
 fun AndroidAppRoot() {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
+    val graph = remember(appContext) { appContext.appGraph().graph }
     AppRoot(
-        bootstrapViewModelFactory = remember(appContext) { appBootstrapViewModelFactory(appContext) },
-        authViewModelFactory = remember(appContext) { authViewModelFactory(appContext) },
-        profileListViewModelFactory = remember(appContext) { profileListViewModelFactory(appContext) },
+        bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
+        authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
+        profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
         navHostDependencies = { appNavHostDependencies() },
     )
 }

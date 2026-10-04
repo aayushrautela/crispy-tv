@@ -16,20 +16,27 @@ package com.crispy.tv.desktop
  * cannot collide however many keys either accumulates. That is why the name is a
  * constant rather than a string repeated at each call site.
  */
-internal const val SETTINGS_STORE_NAME: String = "settings"
-
 /**
- * The store name for anything the user changes through a screen.
+ * The store name for the window's own geometry.
  *
- * A **separate store** from [SETTINGS_STORE_NAME], not a second key prefix inside
- * it, and the reason is the rule `FileKeyValueStore` already documents: one file
- * per store name, because a prefix has to be re-applied on every read and write
- * and one missed prefix is a silent leak between stores. The window size is
- * incidental to the build; the image quality is the user's. They change on
- * different schedules, and the day one of them wants a schema the other will not
- * want to be in the same file.
+ * A **separate store** from everything the graph owns, and the reason is the rule
+ * `FileKeyValueStore` already documents: one file per store name, because a prefix
+ * has to be re-applied on every read and write and one missed prefix is a silent
+ * leak between stores. The window size is incidental to the build; the image
+ * quality is the user's. They change on different schedules, and the day one of
+ * them wants a schema the other will not want to be in the same file.
+ *
+ * ## What is *not* named here any more
+ *
+ * This file used to also declare `IMAGE_SETTINGS_STORE_NAME = "image-settings"`
+ * for [com.crispy.tv.settings.ImageSettingsRepository]. The image-quality store is
+ * named by `:app`'s `AppGraph`, which is the only reader of it once the screens
+ * are real, and the two names disagreed by a hyphen -- two files, two answers to
+ * "what quality is this profile using", and the one the real screens read was not
+ * the one this module wrote. A name declared in two places is a name that will
+ * eventually disagree, so only the window's own name lives here.
  */
-internal const val IMAGE_SETTINGS_STORE_NAME: String = "image-settings"
+internal const val SETTINGS_STORE_NAME: String = "settings"
 
 /** Window width in density-independent pixels. */
 internal const val WINDOW_WIDTH_KEY: String = "window.width"

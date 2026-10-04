@@ -3,8 +3,7 @@ package com.crispy.tv.home
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.backend.BackendContextResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.platform.android.AndroidAppLogger
 import kotlinx.coroutines.Dispatchers
 
@@ -20,9 +19,11 @@ import kotlinx.coroutines.Dispatchers
  * and the factory became a sibling file, which is the only way both halves can
  * live in different source sets.
  *
- * **Every line here is a `Context` read or a provider lookup, which is why this
- * file stays in `androidMain` and the class does not.** A `Context` used for
- * *wiring* belongs in the factory; the view model itself never names one.
+ * **The backend client and the context resolver are read off the `commonMain` graph
+ * rather than through a `Context`, so what keeps this file in `androidMain` is the two
+ * lines below** — `Dispatchers.IO` and `System.currentTimeMillis()`. A `Context` used for
+ * *wiring* belongs in the factory; the view model itself never names one, and neither does
+ * this file now that the wiring has moved.
  *
  * `ioDispatcher = Dispatchers.IO` is the platform edge for the ViewModel's
  * required no-default slot. It is written here, once, rather than defaulted in
@@ -32,9 +33,10 @@ import kotlinx.coroutines.Dispatchers
  */
 fun calendarViewModelFactory(context: Context): ViewModelProvider.Factory {
     val appContext = context.applicationContext
+    val graph = appContext.appGraph().graph
     val calendarService = CalendarService(
-        backendClient = BackendServicesProvider.backendClient(appContext),
-        backendContextResolver = BackendContextResolverProvider.get(appContext),
+        backendClient = graph.backendClient,
+        backendContextResolver = graph.backendContextResolver,
         logger = AndroidAppLogger(appContext),
     )
     return object : ViewModelProvider.Factory {

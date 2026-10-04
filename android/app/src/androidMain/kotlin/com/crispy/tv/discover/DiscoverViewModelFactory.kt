@@ -1,16 +1,14 @@
 package com.crispy.tv.discover
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.crispy.tv.app.AppGraph
 
-// `DiscoverViewModel` and `backendBrowseRepository` are in this package, so neither is
-// imported: an import from the file's own package is legal and reads as a claim that the
-// name came from somewhere else.
+// `DiscoverViewModel` is in this package, so it is not imported: an import from the file's
+// own package is legal and reads as a claim that the name came from somewhere else.
 
 /**
- * The Android half of [DiscoverViewModel]'s construction, and the only place in the
- * discover flow that knows a `Context` exists.
+ * The Android half of [DiscoverViewModel]'s construction.
  *
  * This is an **extraction, not a move**: the factory used to be a
  * `companion object { fun factory(context: Context) }` on the ViewModel, which is a
@@ -21,22 +19,22 @@ import androidx.lifecycle.ViewModelProvider
  *
  * Three details are preserved from the original rather than tidied:
  *
- * - `context.applicationContext` is captured **once, outside** the returned object. It is a
- *   lifetime normalisation, and inside the object it would be re-read on every `create`.
  * - The `isAssignableFrom` check comes before the throw, so a caller asking for the wrong
  *   ViewModel class gets the same message it always did. The text is unchanged, because it
  *   is a diagnostic string and changing it is a behaviour change dressed as a cleanup.
  * - The `@Suppress("UNCHECKED_CAST")` is the cast `ViewModelProvider`'s own API forces:
  *   `create` cannot know `T` from `modelClass` alone.
+ *
+ * **The `Context` parameter is gone.** The one collaborator was the browse repository, which
+ * [AppGraph] builds from its two clients; nothing here reaches a platform any more.
  */
-fun discoverViewModelFactory(context: Context): ViewModelProvider.Factory {
-    val appContext = context.applicationContext
+fun discoverViewModelFactory(graph: AppGraph): ViewModelProvider.Factory {
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
                 return DiscoverViewModel(
-                    repository = backendBrowseRepository(appContext)
+                    repository = graph.backendBrowseRepository()
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

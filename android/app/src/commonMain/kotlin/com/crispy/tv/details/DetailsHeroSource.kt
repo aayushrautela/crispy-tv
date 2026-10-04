@@ -19,7 +19,14 @@ internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
     return details?.artworkUrl
 }
 
-internal data class HeroTrailerSource(
+/**
+ * One trailer candidate: the id the details screen keys on, and where to fetch it from.
+ *
+ * `public`, not `internal`, because it is a field of [HeroTrailerLayerArgs], and that type is
+ * public only because `AppNavHostDependencies` -- which is public -- carries it in the
+ * signature of its `homeHeroTrailerLayer` slot.
+ */
+data class HeroTrailerSource(
     val id: String,
     val source: TrailerSource,
 )

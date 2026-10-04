@@ -28,10 +28,9 @@ import kotlin.test.assertTrue
 /**
  * The seam proof, as a test.
  *
- * kmp-migration-plan.md §3 exists because a previous ordering moved 31,000 lines
- * of Compose first and deferred the first off-Android render to phase 6, so a
- * structurally wrong seam stayed undiscovered for the whole migration. This test
- * is what makes that failure mode impossible here: it renders real Compose
+ * A previous ordering moved 31,000 lines of Compose first and deferred the first
+ * off-Android render, so a structurally wrong seam stayed undiscovered for a long
+ * time. This test is what makes that failure mode impossible here: it renders real Compose
  * Multiplatform UI on a desktop JVM, with no emulator, no device and no display,
  * so a broken seam fails in seconds on the developer's own machine.
  *

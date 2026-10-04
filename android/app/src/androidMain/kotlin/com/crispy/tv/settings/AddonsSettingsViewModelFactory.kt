@@ -3,8 +3,8 @@ package com.crispy.tv.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.addons.registry.metadataAddonRegistry
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.network.AppHttp
 import kotlinx.coroutines.Dispatchers
 
@@ -44,7 +44,7 @@ fun addonsSettingsViewModelFactory(context: Context): ViewModelProvider.Factory 
                     addonRegistry = addonRegistry,
                     httpClient = httpClient,
                     householdAddonsCloudSync =
-                        SupabaseServicesProvider.createHouseholdAddonsCloudSync(appContext, addonRegistry),
+                        appContext.appGraph().graph.createHouseholdAddonsCloudSync(addonRegistry),
                     ioDispatcher = Dispatchers.IO,
                 ) as T
             }

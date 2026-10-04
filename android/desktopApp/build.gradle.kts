@@ -19,15 +19,11 @@ kotlin {
  *
  * It exists to prove the seam on a developer's own machine, in seconds, rather
  * than discovering on a CI runner twenty minutes later whether Compose
- * Multiplatform code can actually render off-Android. See §3 of
- * kmp-migration-plan.md for why the sequencing is deliberate.
- *
- * So it renders the real design system from `:android:sharedUI` over the real
- * domain logic from `:android:core-domain`. Nothing here is a mock of the app:
- * the theme, the spacing scale, the cards and the `planContinueWatching` call
- * are all production code. What is new is only the arrangement -- the screens
- * themselves migrate into `:app`'s `appUi` source set in Phase 4, and this
- * module then renders those instead.
+ * Multiplatform code can actually render off-Android. It therefore renders the
+ * real design system from `:android:sharedUI` over the real domain logic from
+ * `:android:core-domain`. Nothing here is a mock of the app: the theme, the
+ * spacing scale, the cards and the `planContinueWatching` call are all
+ * production code. What is new is only the arrangement.
  *
  * ## The blocker that used to stop this, and how it was removed
  *
@@ -92,6 +88,14 @@ dependencies {
     // clock, a logger, a settings store or a secret store, so nothing portable
     // that injects one could be called from here.
     implementation(project(":android:platform-desktop"))
+
+    // `:app` declares `:backend` as an implementation dependency, so `AppServices`'s
+    // public `tokenStore` member names `com.crispy.tv.accounts.AccountSessionStore`
+    // in a type this module cannot see -- the compiler answers "Cannot access class
+    // ... check your module classpath", which reads like a broken `:app` rather than
+    // a missing line here. Only the tests need the type: they save a real `Session`
+    // through the desktop token store and read it back with the next build's.
+    testImplementation(project(":android:backend"))
 
     // SeedData reads a real contract fixture off disk to seed the window.
     implementation(libs.serialization.json)

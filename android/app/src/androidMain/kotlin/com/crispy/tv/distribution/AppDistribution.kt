@@ -27,9 +27,8 @@ import com.crispy.tv.PlaybackDependencies
  *
  * This is a service locator, which is not the pattern one would choose in green
  * field code. It is chosen because it matches the rest of this codebase --
- * `SupabaseServicesProvider`, `StreamResolverProvider`, `BackendContextResolverProvider`
- * and `PlaybackDependencies` are all read the same way -- and because the
- * alternative is a `DistributionComponents` parameter threaded through six
+ * `StreamResolverProvider` and `PlaybackDependencies` are all read the same way -- and
+ * because the alternative is a `DistributionComponents` parameter threaded through six
  * factory signatures and a `NavGraphBuilder` extension. Phase 3 is the right
  * place to revisit that if the graph keeps growing.
  */

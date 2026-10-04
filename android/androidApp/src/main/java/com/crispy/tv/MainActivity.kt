@@ -19,7 +19,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.metrics.performance.JankStats
 import androidx.metrics.performance.PerformanceMetricsState
 import com.crispy.tv.accounts.PendingProviderAuthStore
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.playerui.ComponentActivityPlayerHost
 import com.crispy.tv.playerui.LocalPlayerHost
 import com.crispy.tv.startup.AppStartup
@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
         // We only care that we came back; the actual connection state is re-fetched
         // from the backend. Park the provider so AccountSettingsRoute can consume it
         // via consumePendingProviderAuth() and mark the sync provider as connected.
-        SupabaseServicesProvider.pendingProviderAuthStore(applicationContext).put(provider, "")
+        applicationContext.appGraph().graph.pendingProviderAuthStore.put(provider, "")
     }
 
 

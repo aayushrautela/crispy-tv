@@ -17,7 +17,7 @@ import com.crispy.tv.settings.PlaybackSettingsRepository
  * default values of [activeProfileStore] and [shadowStore], so it was the
  * *composition root* of this class wearing a constructor's clothes. A `Context`
  * used to open two stores is wiring, and wiring belongs in the factory that
- * builds this class -- `SupabaseServicesProvider.createProfileDataCloudSync` now
+ * builds this class -- `AppGraph.createProfileDataCloudSync` now
  * names both stores and their backing files. The same shape was discharged
  * twice before, by `ProfileDataShadowStore` and by `DefaultAccountBootstrapRepository`.
  *

@@ -3,14 +3,11 @@ package com.crispy.tv
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.audio.AudioFocusManager
-import com.crispy.tv.backend.BackendContextResolverProvider
-import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.platform.AppConfig
 import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.platform.android.AndroidAppLogger
-import com.crispy.tv.platform.android.AndroidMonotonicClock
 import com.crispy.tv.platform.android.AndroidTimeSource
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import com.crispy.tv.addons.sources.BackendEpisodeListProvider
@@ -34,7 +31,6 @@ import com.crispy.tv.player.SupabaseSyncLabService
 import com.crispy.tv.player.TorrentResolver
 import com.crispy.tv.player.TorrentSupportUnavailableException
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.Dispatchers
 
 private fun newMetadataResolver(context: Context): MetadataLabResolver {
@@ -50,17 +46,21 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
 
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
+    val graph = appContext.appGraph().graph
     val episodeListProvider = BackendEpisodeListProvider(
-        supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
-        backendClient = BackendServicesProvider.backendClient(appContext),
+        supabaseAccountClient = graph.accountClient,
+        backendClient = graph.backendClient,
     )
     return BackendWatchHistoryService(
         progressStore = SharedPreferencesKeyValueStore(appContext, "watch_progress"),
         timeSource = AndroidTimeSource(),
-        monotonicClock = AndroidMonotonicClock(),
+        // The graph owns the answer now: `AppServices.monotonicClock` is this same
+        // `AndroidMonotonicClock`, and two constructions of a clock is two answers to
+        // "how long has this been playing".
+        monotonicClock = graph.services.monotonicClock,
         logger = AndroidAppLogger(appContext),
-        backend = BackendServicesProvider.backendClient(appContext),
-        backendContextResolver = BackendContextResolverProvider.get(appContext),
+        backend = graph.backendClient,
+        backendContextResolver = graph.backendContextResolver,
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(
@@ -71,9 +71,10 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
 
 private fun newEpisodeListProvider(context: Context): EpisodeListProvider {
     val appContext = context.applicationContext
+    val graph = appContext.appGraph().graph
     return BackendEpisodeListProvider(
-        supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
-        backendClient = BackendServicesProvider.backendClient(appContext),
+        supabaseAccountClient = graph.accountClient,
+        backendClient = graph.backendClient,
     )
 }
 
@@ -93,7 +94,7 @@ private fun newEpisodeListProvider(context: Context): EpisodeListProvider {
 private fun newSupabaseSyncService(context: Context): SupabaseSyncLabService {
     val appContext = context.applicationContext
     return RemoteSupabaseSyncLabService(
-        supabase = SupabaseServicesProvider.accountClient(appContext),
+        supabase = appContext.appGraph().graph.accountClient,
         ioDispatcher = Dispatchers.IO,
     )
 }
@@ -103,7 +104,7 @@ object PlaybackDependencies {
     @Volatile
     var playbackControllerFactory: (Context) -> PlaybackController =
         { context ->
-            val settings = PlaybackSettingsRepositoryProvider.get(context).settings.value
+            val settings = context.appGraph().graph.playbackSettingsRepository.settings.value
             NativePlaybackController(
                 context = context,
                 useLibass = settings.useLibass,

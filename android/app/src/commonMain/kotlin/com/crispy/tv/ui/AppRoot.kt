@@ -8,26 +8,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.crispy.tv.accounts.AppBootstrapViewModel
-import com.crispy.tv.accounts.AuthRoute
-import com.crispy.tv.accounts.BootstrapState
-import com.crispy.tv.accounts.ProfileSelectorRoute
-import com.crispy.tv.ui.brand.CrispyIntroSplash
 import com.crispy.tv.ui.edge_to_edge.LocalBottomBarOverlayPadding
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppNavHostDependencies
@@ -36,12 +25,15 @@ import com.crispy.tv.ui.navigation.FloatingBarBottomMargin
 import com.crispy.tv.ui.navigation.FloatingBarHeight
 import com.crispy.tv.ui.navigation.FloatingBottomBar
 import com.crispy.tv.ui.navigation.TopLevelDestination
-import kotlinx.coroutines.delay
-
-private const val IntroTimeoutMs = 3_000L
 
 /**
- * The app's root composable: intro, then auth, then profile selection, then the shell.
+ * The app's root composable: the shared bootstrap gate, then the shell.
+ *
+ * This is [AppBootstrapGate] with `MainAppShell` supplied as its ready content.
+ * The split is a landing of its own, and the reason it was needed is written on
+ * the gate: `MainAppShell`'s navigation bundle cannot be built off Android, so
+ * a platform that can run the intro/auth/profile prefix supplies its own ready
+ * branch instead. Desktop does exactly that.
  *
  * ## What crossed out
  *
@@ -72,52 +64,32 @@ private const val IntroTimeoutMs = 3_000L
  * metadata, so it is available on every target and this call site compiles everywhere as it
  * stands. **A token in an import line says nothing about whether its declaration is common** --
  * that is the import audit's version of "a census bucket is a floor, not a description".
+ *
+ * ## Visibility
+ *
+ * `public`, not `internal`: `:android:desktopApp` is a separate Gradle module and a module
+ * cannot see another module's `internal`. The desktop entry point calls this with a bundle
+ * built by its own producer, so widening this exposes no wiring -- it makes the shared shell
+ * callable off Android, which is the whole point of the file living in `commonMain`.
  */
 @Composable
-internal fun AppRoot(
+fun AppRoot(
     bootstrapViewModelFactory: ViewModelProvider.Factory,
     authViewModelFactory: ViewModelProvider.Factory,
     profileListViewModelFactory: ViewModelProvider.Factory,
     navHostDependencies: @Composable () -> AppNavHostDependencies,
 ) {
-    val bootstrapViewModel: AppBootstrapViewModel = viewModel(factory = bootstrapViewModelFactory)
-    val state by bootstrapViewModel.state.collectAsStateWithLifecycle()
-    var introDone by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(IntroTimeoutMs)
-        introDone = true
-    }
-
-    // Hold the splash until the intro has played through even if bootstrap
-    // resolves first; afterwards the finished frame holds until data arrives.
-    when {
-        state == BootstrapState.Loading || !introDone -> {
-            CrispyIntroSplash(
-                playIntro = !introDone,
-                onFinished = { introDone = true },
-            )
-        }
-        state == BootstrapState.NeedsAuth -> {
-            AuthRoute(
-                onSignedIn = { bootstrapViewModel.refresh() },
-                viewModelFactory = authViewModelFactory,
-            )
-        }
-        state == BootstrapState.NeedsProfileSelection -> {
-            ProfileSelectorRoute(
-                onComplete = { bootstrapViewModel.refresh() },
-                onBack = { bootstrapViewModel.onSignedOut() },
-                viewModelFactory = profileListViewModelFactory,
-            )
-        }
-        state == BootstrapState.Ready -> {
+    AppBootstrapGate(
+        bootstrapViewModelFactory = bootstrapViewModelFactory,
+        authViewModelFactory = authViewModelFactory,
+        profileListViewModelFactory = profileListViewModelFactory,
+        ready = { onSignedOut ->
             MainAppShell(
-                onSignedOut = { bootstrapViewModel.onSignedOut() },
+                onSignedOut = onSignedOut,
                 navHostDependencies = navHostDependencies,
             )
-        }
-    }
+        },
+    )
 }
 
 @Composable

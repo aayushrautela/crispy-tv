@@ -7,6 +7,8 @@ import com.crispy.tv.backend.ImportJobsResponse
 import com.crispy.tv.backend.ImportProvider
 import com.crispy.tv.backend.ItemLookupInput
 import com.crispy.tv.backend.PlaybackEventInput
+import com.crispy.tv.backend.ProfileHomeResponse
+import com.crispy.tv.backend.ProfileHomeSection
 import com.crispy.tv.backend.UpNextItem
 import com.crispy.tv.backend.UpNextResponse
 import com.crispy.tv.backend.UpdateProfileInput
@@ -29,15 +31,18 @@ internal class RecordingBackendApi : BackendApi {
     val calendarCalls = mutableListOf<Pair<String, String>>()
     val thisWeekCalls = mutableListOf<Pair<String, String>>()
     val upNextCalls = mutableListOf<Triple<String, String, Int>>()
+    val homeCalls = mutableListOf<Pair<String, String>>()
 
     var calendarResponse: CalendarResponse? = null
     var thisWeekResponse: CalendarResponse? = null
     var upNextResponse: UpNextResponse? = null
+    var homeResponse: ProfileHomeResponse? = null
 
     /** When set, the named read throws it instead of answering. */
     var calendarFailure: Throwable? = null
     var thisWeekFailure: Throwable? = null
     var upNextFailure: Throwable? = null
+    var homeFailure: Throwable? = null
 
     fun withCalendar(vararg items: CalendarItem) = apply {
         calendarResponse = calendarResponse(
@@ -58,6 +63,16 @@ internal class RecordingBackendApi : BackendApi {
             kind = null,
             generatedAt = null,
             items = items.toList(),
+        )
+    }
+
+    /** One home response, with the expiry a caller reads back as `cachedHomeExpiresAtMs`. */
+    fun withHome(vararg sections: ProfileHomeSection) = apply {
+        homeResponse = ProfileHomeResponse(
+            profileId = PROFILE_ID,
+            generatedAt = "2026-01-01T00:00:00Z",
+            expiresAt = HOME_EXPIRES_AT,
+            sections = sections.toList(),
         )
     }
 
@@ -222,7 +237,11 @@ internal class RecordingBackendApi : BackendApi {
         sort: String,
         page: Int
 ): Nothing = unused("browseTitles")
-    override suspend fun getHome(accessToken: String, profileId: String): Nothing = unused("getHome")
+    override suspend fun getHome(accessToken: String, profileId: String): ProfileHomeResponse {
+        homeCalls += accessToken to profileId
+        homeFailure?.let { throw it }
+        return homeResponse ?: unused("getHome")
+    }
     override suspend fun resolvePlayback(
         accessToken: String,
         input: ItemLookupInput
@@ -320,6 +339,10 @@ internal class RecordingBackendApi : BackendApi {
 
 internal const val PROFILE_ID = "profile-1"
 internal const val ACCESS_TOKEN = "token-1"
+
+/** The expiry [RecordingBackendApi.withHome] puts on the wire, read back by callers
+ * as `cachedHomeExpiresAtMs()`. Mid-2026 so it cannot be confused with an epoch value. */
+internal const val HOME_EXPIRES_AT = "2026-06-01T12:00:00Z"
 
 private fun calendarResponse(items: List<CalendarItem>) = CalendarResponse(
     profileId = PROFILE_ID,

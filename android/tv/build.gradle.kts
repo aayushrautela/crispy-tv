@@ -171,6 +171,13 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.coil.svg)
 
+    // For `okio.Path`, because `TvHomeViewModel` now builds
+    // `RecommendationCatalogDiskCacheStore` itself instead of handing a `Context`
+    // to `DiskHomeCatalogSnapshotCache` (the store's `Context.filesDir` pin moved
+    // to an injected path). `:home` declares this for the same file, but as
+    // `implementation`, so it does not reach here.
+    implementation(libs.okio.core)
+
     implementation(libs.coroutines.android)
 
     implementation(libs.zxing.core)

@@ -41,7 +41,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.plugins.repo.PluginRepoClient
 import com.crispy.tv.plugins.repo.PluginRepoInfo
@@ -191,8 +191,7 @@ internal class PluginsSettingsViewModel(
                     if (modelClass.isAssignableFrom(PluginsSettingsViewModel::class.java)) {
                         return PluginsSettingsViewModel(
                             repoClient = PluginRepoClient(appContext, AppHttp.okHttp(appContext)),
-                            cloudSync = SupabaseServicesProvider.createHouseholdAddonsCloudSync(
-                                appContext,
+                            cloudSync = appContext.appGraph().graph.createHouseholdAddonsCloudSync(
                                 metadataAddonRegistry(appContext),
                             ),
                         ) as T

@@ -3,6 +3,7 @@ package com.crispy.tv.search
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -26,9 +27,14 @@ import kotlinx.coroutines.Dispatchers
  * - it no longer passes a locale to the repositories: `BackendSearchRepository`
  *   never used the one it was given and its parameter has been deleted, and
  *   `AiSearchRepository` now takes the tag directly.
+ *
+ * The two repositories used to be built by `search/SearchRepositories.kt`, which existed
+ * only to hold the provider lookups. They are [com.crispy.tv.app.AppGraph] members now, and
+ * they are still built fresh per `create` rather than cached — see the graph for why.
  */
 fun searchViewModelFactory(appContext: Context): ViewModelProvider.Factory {
     val context = appContext.applicationContext
+    val graph = context.appGraph().graph
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (!modelClass.isAssignableFrom(SearchViewModel::class.java)) {
@@ -36,8 +42,8 @@ fun searchViewModelFactory(appContext: Context): ViewModelProvider.Factory {
             }
 
             val viewModel = SearchViewModel(
-                searchRepository = backendSearchRepository(context),
-                aiSearchRepository = aiSearchRepository(context),
+                searchRepository = graph.backendSearchRepository(),
+                aiSearchRepository = graph.aiSearchRepository(),
                 searchHistoryStore =
                     KeyValueSearchHistoryStore(
                         SharedPreferencesKeyValueStore(context, "search_preferences"),

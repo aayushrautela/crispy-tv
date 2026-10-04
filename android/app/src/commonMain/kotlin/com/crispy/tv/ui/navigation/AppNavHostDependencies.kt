@@ -62,15 +62,24 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  *
  * ## `remember`ed on the Android side, deliberately
  *
- * Every member is built by a `@Composable` producer in `androidMain`, because
+ * Every member is built by a `@Composable` producer per platform, because
  * `LocalConfiguration` and `LocalPlatformContext` are composition locals. That is also
  * where all the `remember`s are, and the two that are *not* remembered there are
  * deliberate: `screenWidthDp`/`screenHeightDp` are re-read on every composition so a
  * configuration change is visible on the next one, and the four `@Composable` slots are
  * rebuilt every composition because that is what the graphs used to do -- they capture
  * nothing, so a stable identity would buy nothing and a stale one would be a bug.
+ *
+ * ## Flat, and assembled per platform
+ *
+ * A flat bundle rather than a builder because `AppNavHost` is a registration function, not
+ * a component: the decisions about what to show stay in the shared file, and only the
+ * *assembly* of the products belongs to the platform. It is `public` rather than `internal`
+ * for the same reason `AppRoot` is -- `:desktopApp` is a separate module from `:app` and
+ * has to be able to build one -- and an `internal` class here would make the shared shell
+ * unreachable off Android even though every member type is common.
  */
-internal class AppNavHostDependencies(
+class AppNavHostDependencies(
     // ---- search -----------------------------------------------------------------
     val searchViewModelFactory: ViewModelProvider.Factory,
     val searchLoadProfile: suspend () -> ActiveProfileInfo?,

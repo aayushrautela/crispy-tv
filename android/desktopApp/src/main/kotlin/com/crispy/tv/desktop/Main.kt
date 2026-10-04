@@ -17,7 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.crispy.tv.app.AppGraph
+import com.crispy.tv.services.DesktopAppServices
+import com.crispy.tv.settings.ImageSettingsRepository
 import com.crispy.tv.settings.ImageSettingsScreen
+import com.crispy.tv.ui.DesktopAppRoot
 import com.crispy.tv.ui.navigation.CrispySharedTransitionLayout
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.watchhistory.ContinueWatchingRail
@@ -28,81 +32,113 @@ import com.crispy.tv.watchhistory.ContinueWatchingRail
  * One module serves Windows, macOS and Linux, because all three run on the JVM;
  * only the packaging differs. Run it with `./gradlew :desktopApp:run`.
  *
- * What is rendered, and from where, is described on [SeedData] and on
- * `ContinueWatchingRail` in `:android:app`. The short version: this is the seam
- * proof, and it renders the real design system over real domain logic rather than a
- * mock of either. See the comment at the top of this module's build file for what
- * it deliberately does *not* render yet, and why.
+ * ## What this composes, and what it still does not render
  *
- * Both screens are `:app` code reached through `:app`'s `desktop` JVM variant. This
- * module holds the window, the fixture seed, the [DesktopEnvironment] that supplies
- * the platform ports, and the two-entry-point switch between them.
+ * [DesktopAppServices] is the desktop `AppServices` -- every `:platform-core` port,
+ * answered on the JVM -- and [AppGraph] is `:app`'s service graph over it. One of
+ * each, built here and handed down, which is the whole of the wiring this module
+ * owns. What [DesktopAppRoot] renders is `:app`'s *real* bootstrap prefix: the
+ * splash, and then whichever of sign-in or profile-selection the graph says the
+ * session calls for. With no Supabase credentials configured that is sign-in,
+ * which is the honest first desktop screen rather than a placeholder.
  *
- * ## Why the switch is here and not in `:app`
+ * What is **not** rendered is the main shell. `AppRoot` takes its whole wiring
+ * bundle as `navHostDependencies: @Composable () -> AppNavHostDependencies`, and
+ * roughly a third of that bundle cannot be built off Android: the three
+ * `NavBackStackEntry`-reading route-argument accessors (`Bundle` on every target),
+ * the player graph, the Media3 hero trailer layer, the provider-logo badges
+ * (their drawables live in a plain Android library) and the factories naming
+ * `StreamResolverProvider` / `PlayerStreamHandoff` / `Dispatchers.IO` /
+ * `java.util.Locale`. So `ready` is still the seeded [DesktopSeedShell] rather
+ * than `MainAppShell`, and the landing after this one is what removes it.
  *
- * Because `:app` has no navigation seam yet, and inventing one for two screens
- * would be a design decision made in a landing whose point is something else. The
- * two screens live in `commonMain` and are reachable; what does not exist is a
- * portable `NavHost`, and `androidx.navigation` is not on the `commonMain`
- * classpath at all. So the switch is four lines of `remember`ed state, and it is
- * written to be replaced rather than extended: when `:app` grows a real shell,
- * this file loses the `when` and keeps the two calls.
+ * ## Why the window's size is read here and written on close
+ *
+ * Written on close rather than from a `SideEffect` on the size, which would
+ * rewrite the file on every frame of a drag -- hundreds of full read-modify-writes
+ * -- to record a value that only matters at launch. It goes through
+ * `AppServices.keyValueStores` rather than a second store built over the same
+ * directory, so there is one place in this module that decides where desktop data
+ * lives.
  */
-private enum class DesktopScreen { WATCHING, IMAGE_SETTINGS }
-
 fun main() {
-    val environment = DesktopEnvironment()
+    val services = DesktopAppServices()
+    val graph = AppGraph(services)
     val seed = SeedData.load()
 
-    // The window's size is read back out of the settings store and written on the
-    // way out, which is the smallest honest use of the seam: it drives an injected
-    // `KeyValueStore` through a real round trip, so a store that cannot persist
-    // shows up as a window that forgets its size rather than as a test nobody
-    // wrote. A first run has no stored value and takes the defaults.
-    val storedWidth = environment.settings.getFloat(WINDOW_WIDTH_KEY, DEFAULT_WINDOW_WIDTH_DP)
-    val storedHeight = environment.settings.getFloat(WINDOW_HEIGHT_KEY, DEFAULT_WINDOW_HEIGHT_DP)
-    environment.logger.info("Main", "Seeded ${seed.items.size} continue-watching item(s)")
+    val windowSettings = services.keyValueStores.store(SETTINGS_STORE_NAME)
+    val storedWidth = windowSettings.getFloat(WINDOW_WIDTH_KEY, DEFAULT_WINDOW_WIDTH_DP)
+    val storedHeight = windowSettings.getFloat(WINDOW_HEIGHT_KEY, DEFAULT_WINDOW_HEIGHT_DP)
+    services.logger.info("Main", "Seeded ${seed.items.size} continue-watching item(s)")
 
     application {
         val windowState = rememberWindowState(width = storedWidth.dp, height = storedHeight.dp)
 
         Window(
-            // Written here rather than from a `SideEffect` on the size, which
-            // would rewrite the file on every frame of a drag -- hundreds of full
-            // read-modify-writes -- to record a value that only matters at launch.
             onCloseRequest = {
-                environment.settings.putFloat(WINDOW_WIDTH_KEY, windowState.size.width.value.toFloat())
-                environment.settings.putFloat(WINDOW_HEIGHT_KEY, windowState.size.height.value.toFloat())
+                windowSettings.putFloat(WINDOW_WIDTH_KEY, windowState.size.width.value.toFloat())
+                windowSettings.putFloat(WINDOW_HEIGHT_KEY, windowState.size.height.value.toFloat())
                 exitApplication()
             },
             title = "Crispy",
             state = windowState,
         ) {
-            var screen by remember { mutableStateOf(DesktopScreen.WATCHING) }
+            // The `onSignedOut` slot is ignored rather than declined: it is the
+            // real capability the shared shell needs, and this shell has no
+            // signed-in state to leave. The next landing's shell takes it.
+            DesktopAppRoot(graph) { _ ->
+                DesktopSeedShell(seed = seed, imageSettings = graph.imageSettingsRepository)
+            }
+        }
+    }
+}
 
-            CrispySharedTransitionLayout {
-                when (screen) {
-                    DesktopScreen.WATCHING -> Column {
-                        DesktopAffordance("Image quality") { screen = DesktopScreen.IMAGE_SETTINGS }
-                        ContinueWatchingRail(
-                            items = seed.items,
-                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding),
-                        )
-                    }
+/**
+ * The two screens that existed before there was a shell, kept as the `ready`
+ * content until there is one.
+ *
+ * Written to be deleted, not extended: both screens are reachable only because
+ * `DesktopAppRoot`'s bootstrap gate answers `Ready`, and once `MainAppShell` is
+ * callable off Android the `when` and the enum go with them.
+ */
+private enum class DesktopScreen { WATCHING, IMAGE_SETTINGS }
 
-                    DesktopScreen.IMAGE_SETTINGS -> {
-                        val settings by environment.imageSettings.settings.collectAsState()
-                        ImageSettingsScreen(
-                            settings = settings,
-                            // The repository's other half: a real `:app` screen writing
-                            // through a real `KeyValueStore`, so a quality chosen here
-                            // is still there on the next launch. Nothing invalidates an
-                            // image cache because nothing decodes one.
-                            onQualityChanged = environment.imageSettings::setQuality,
-                            onBack = { screen = DesktopScreen.WATCHING },
-                        )
-                    }
-                }
+/**
+ * What `:app`'s shell renders once the gate is through: real design system, real
+ * domain logic, real repository over a real desktop store.
+ *
+ * [imageSettings] is `AppGraph`'s own repository, not a second one built here.
+ * That was the defect this replaced: `DesktopEnvironment` named its store
+ * `"image-settings"` while the graph names its own `"image_settings"`, so the
+ * build carried two files and two answers to "what quality is this profile using"
+ * -- and the one the real screens read was not the one this screen wrote.
+ */
+@Composable
+private fun DesktopSeedShell(seed: SeedData, imageSettings: ImageSettingsRepository) {
+    var screen by remember { mutableStateOf(DesktopScreen.WATCHING) }
+
+    CrispySharedTransitionLayout {
+        when (screen) {
+            DesktopScreen.WATCHING -> Column {
+                DesktopAffordance("Image quality") { screen = DesktopScreen.IMAGE_SETTINGS }
+                ContinueWatchingRail(
+                    items = seed.items,
+                    contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding),
+                )
+            }
+
+            DesktopScreen.IMAGE_SETTINGS -> {
+                val settings by imageSettings.settings.collectAsState()
+                ImageSettingsScreen(
+                    settings = settings,
+                    // The repository's other half: a real `:app` screen writing
+                    // through a real `KeyValueStore`, so a quality chosen here is
+                    // still there on the next launch. Unlike before this landing,
+                    // the change now reaches `AppServices.invalidateImageCache`,
+                    // so the cache and the screen agree on what "current" means.
+                    onQualityChanged = imageSettings::setQuality,
+                    onBack = { screen = DesktopScreen.WATCHING },
+                )
             }
         }
     }
