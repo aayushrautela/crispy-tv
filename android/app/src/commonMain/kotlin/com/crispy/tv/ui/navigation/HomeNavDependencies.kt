@@ -3,7 +3,6 @@ package com.crispy.tv.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.NavBackStackEntry
 import com.crispy.tv.accounts.ActiveProfileInfo
 import com.crispy.tv.backend.MetadataVideoView
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -58,13 +57,17 @@ import com.crispy.tv.settings.PlaybackSettingsRepository
  *    each factory closes over something read from *this graph's* route arguments.
  *    Hoisting them to the caller would make the caller know the section, the item and
  *    the person, which are the graph's business and nobody else's.
- *  - [detailsArguments] and [personArguments] are functions for the same reason, plus
- *    one more: reading a route argument at all is `android.os.Bundle`. `NavBackStackEntry`
- *    *is* declared in `commonMain`, but its `arguments` member returns `Bundle` on every
- *    platform, so a shared file cannot read one. **That is why the four graphs that moved
- *    before this one moved: none of them registers a route argument.** This one does,
- *    for three of its five destinations, so the read crosses and the decisions do not --
- *    see [HomeDetailsRouteArgs].
+ *  - The three route arguments are **not** crossings any more. They used to be, and the
+ *    reason they were is stated in [HomeRouteArguments] because it was wrong: it was
+ *    written here as "`NavBackStackEntry.arguments` returns `android.os.Bundle` on every
+ *    platform", and it returns a common `androidx.savedstate.SavedState?` whose readers
+ *    are unreachable — which is a different problem with a different answer. The
+ *    `NavBackStackEntry -> SavedStateHandle` step is a one-liner at each of the three
+ *    call sites, and the mapping is [catalogRouteArguments], [detailsRouteArguments] and
+ *    [personRouteArguments]. **So the statement "that is why the four graphs that moved
+ *    before this one moved: none of them registers a route argument" no longer explains
+ *    anything** — this graph's remaining `androidMain` claims are the ones its factories
+ *    make, not its arguments'.
  *
  * Every member is required. A defaulted crossing here would be a value the Android
  * composition root could silently forget, and the file this replaces had five places
@@ -78,9 +81,7 @@ internal class HomeNavDependencies(
     val catalogViewModelFactory: (section: CatalogSectionRef) -> ViewModelProvider.Factory,
     val detailsViewModelFactory: (itemId: String, itemType: String, runtimeEntry: RuntimeDetailsEntry?) -> ViewModelProvider.Factory,
     val personViewModelFactory: (personId: String) -> ViewModelProvider.Factory,
-    val detailsArguments: (entry: NavBackStackEntry) -> HomeDetailsRouteArgs,
-    val personArguments: (entry: NavBackStackEntry) -> HomePersonRouteArgs,
-    val catalogArguments: (entry: NavBackStackEntry) -> HomeCatalogRouteArgs,
+    
     val playbackSettingsRepository: PlaybackSettingsRepository,
     val shareText: (text: String) -> Unit,
     val dateFormat: (epochMillis: Long) -> String,
@@ -128,14 +129,19 @@ internal fun isCompactWidth(screenWidthDp: Int): Boolean = screenWidthDp < 600
  * `""`, an unparseable number is still `"abc"`, and whether either means anything is a
  * question [addHomeNavGraph] asks because that is where the question was asked before.
  * Keeping the decisions on this side is the point: a test in `commonTest` can reach
- * them, and [detailsArguments] is a platform read with no logic in it to test.
+ * them, and it can now reach the mapping too -- see [detailsRouteArguments].
  *
  * See [runtimeDetailsEntryOrNull] for the one of those decisions with a name.
  *
- * `public`, not `internal`: `AppNavHostDependencies` is public, and a public class cannot
- * expose an internal member type -- these argument readers are part of its signature.
+ * `internal` now, and it was `public` before the readers moved: a public class cannot
+ * expose an internal member type, and `AppNavHostDependencies`' three
+ * `(NavBackStackEntry) -> …RouteArgs` members were the only public API naming these three
+ * types. With them deleted, the widest thing that names them is [addHomeNavGraph] and
+ * [detailsRouteArguments], both `internal`, so the reason for `public` is gone. That is
+ * the rule worth keeping: **a type's visibility is set by the widest signature that names
+ * it, not by what the type itself needs** — so it is a measurement, and it changed here.
  */
-data class HomeDetailsRouteArgs(
+internal data class HomeDetailsRouteArgs(
     val itemId: String?,
     val itemType: String?,
     val highlightEpisodeId: String?,
@@ -149,20 +155,20 @@ data class HomeDetailsRouteArgs(
 
 /**
  * The person destination's route arguments, with nothing decided. See
- * [HomeDetailsRouteArgs] for why the fields are nullable and unparsed, and why they are
- * public.
+ * [HomeDetailsRouteArgs] for why the fields are nullable, why they are unparsed, and
+ * why they are `internal`.
  */
-data class HomePersonRouteArgs(
+internal data class HomePersonRouteArgs(
     val personId: String?,
     val profileUrl: String?,
 )
 
 /**
  * The catalog destination's route arguments, with nothing decided. See
- * [HomeDetailsRouteArgs] for why the fields are nullable and unparsed, and why they are
- * public.
+ * [HomeDetailsRouteArgs] for why the fields are nullable, why they are unparsed, and
+ * why they are `internal`.
  */
-data class HomeCatalogRouteArgs(
+internal data class HomeCatalogRouteArgs(
     val catalogId: String?,
     val title: String?,
 )

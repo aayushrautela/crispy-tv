@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavBackStackEntry
 import com.crispy.tv.accounts.accountSettingsViewModelFactory
 import com.crispy.tv.accounts.launchUrl
 import com.crispy.tv.accounts.profileListViewModelFactory
@@ -165,45 +164,6 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
 
     val distribution = AppDistribution.current
 
-    // The three route-argument readers, and the last thing that kept the Home graph in
-    // `androidMain` for a reason of its own. `NavBackStackEntry` is declared in
-    // `commonMain` -- the graph uses it as a type -- but its `arguments` member returns
-    // `android.os.Bundle` on every platform, so a shared file cannot read a route
-    // argument at all. **That is the whole explanation for the nav graphs: the ones that
-    // moved register no arguments.**
-    //
-    // These three closures decide nothing. Every rule about what a blank means, and
-    // whether a runtime entry exists at all, is in the graph or in
-    // `runtimeDetailsEntryOrNull`, because a rule on this side would be untestable.
-    //
-    // They are not remembered: nothing keys on them, and each is called once per
-    // composition of the graph.
-    val homeDetailsArguments = { entry: NavBackStackEntry ->
-        HomeDetailsRouteArgs(
-            itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg),
-            itemType = entry.arguments?.getString(AppRoutes.HomeDetailsItemTypeArg),
-            highlightEpisodeId = entry.arguments?.getString(AppRoutes.HomeDetailsHighlightEpisodeIdArg),
-            autoOpenEpisode = entry.arguments?.getBoolean(AppRoutes.HomeDetailsAutoOpenEpisodeArg) == true,
-            runtimeSeasonNumber = entry.arguments?.getString(AppRoutes.HomeDetailsRuntimeSeasonNumberArg),
-            runtimeEpisodeNumber = entry.arguments?.getString(AppRoutes.HomeDetailsRuntimeEpisodeNumberArg),
-            runtimeAbsoluteEpisodeNumber = entry.arguments?.getString(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg),
-            initialArtworkUrl = entry.arguments?.getString(AppRoutes.HomeDetailsArtworkUrlArg),
-            sharedElementKey = entry.arguments?.getString(AppRoutes.HomeDetailsSharedElementKeyArg),
-        )
-    }
-    val homePersonArguments = { entry: NavBackStackEntry ->
-        HomePersonRouteArgs(
-            personId = entry.arguments?.getString(AppRoutes.PersonDetailsPersonIdArg),
-            profileUrl = entry.arguments?.getString(AppRoutes.PersonDetailsProfileUrlArg),
-        )
-    }
-    val homeCatalogArguments = { entry: NavBackStackEntry ->
-        HomeCatalogRouteArgs(
-            catalogId = entry.arguments?.getString(AppRoutes.CatalogIdArg),
-            title = entry.arguments?.getString(AppRoutes.CatalogTitleArg),
-        )
-    }
-
     return AppNavHostDependencies(
         searchViewModelFactory = searchViewModelFactory,
         searchLoadProfile = searchLoadProfile,
@@ -225,9 +185,6 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
         homeCatalogViewModelFactory = homeCatalogViewModelFactory,
         homeDetailsViewModelFactory = homeDetailsViewModelFactory,
         homePersonViewModelFactory = homePersonViewModelFactory,
-        homeDetailsArguments = homeDetailsArguments,
-        homePersonArguments = homePersonArguments,
-        homeCatalogArguments = homeCatalogArguments,
         homePlaybackSettingsRepository = homePlaybackSettingsRepository,
         homeShareText = homeShareText,
         homeDateFormat = homeFormatters.date,

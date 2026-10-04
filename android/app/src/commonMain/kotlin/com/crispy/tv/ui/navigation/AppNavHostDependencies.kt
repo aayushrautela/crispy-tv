@@ -3,7 +3,6 @@ package com.crispy.tv.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import com.crispy.tv.accounts.ActiveProfileInfo
@@ -31,9 +30,10 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  * **`AppNavHost` is a registration function, not a component.** Nobody builds one per
  * frame, so the usual argument for a bundle -- "it keeps a constructor call readable" --
  * is weak here, and the stronger argument is that the flat form keeps the *decisions* in
- * the shared file. Assembly is not wiring: `HomeNavDependencies(detailsArguments = d.homeDetailsArguments,
- * …)` decides nothing, and on this side of the line it is readable and it is testable,
- * whereas the same thirty lines in an `androidMain` file would be neither. The
+ * the shared file. Assembly is not wiring: `HomeNavDependencies(personViewModelFactory =
+ * d.homePersonViewModelFactory, …)` decides nothing, and on this side of the line it is
+ * readable and it is testable, whereas the same thirty lines in an `androidMain` file
+ * would be neither. The
  * `SettingsNavDependencies` construction keeps its `playbackSettingsRepository =
  * d.homePlaybackSettingsRepository` aliasing here for the same reason: that alias is a
  * decision about *one* repository serving two graphs, and it is worth being able to see.
@@ -43,10 +43,10 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  * | Crossing | Why it is a product and not a lambda |
  * |---|---|
  * | `screenWidthDp` / `screenHeightDp` as two `Int`s | `androidx.compose.ui.platform.LocalConfiguration` is Android-only and has no `commonMain` counterpart by that name, and its only two uses were `.screenWidthDp` and `.screenHeightDp`. A slot over the composition local would have made the shared file read a configuration it cannot hold. |
- * | The three `(NavBackStackEntry) -> …RouteArgs` readers | `NavBackStackEntry` is common-declared, but its `arguments` member returns `android.os.Bundle` on every platform -- so the *type* crosses and the *reading* cannot. These closures decide nothing; every rule about a blank value lives in the graph or in `runtimeDetailsEntryOrNull`. |
- * | `addPlayerDestination: (builder: NavGraphBuilder, navController: NavHostController) -> Unit` | `PlayerNavGraph.kt` is the one genuinely Bundle-bound graph (16 `navArgument(` declarations, 4 bundle reads), so it stays in `androidMain`. A registration function crossing as a function is the same shape `pluginsSettingsScreen` already uses in `SettingsNavDependencies`. |
+ * | `addPlayerDestination: (builder: NavGraphBuilder, navController: NavHostController) -> Unit` | `PlayerNavGraph.kt` registers 16 `navArgument(` declarations and reads four of them off `entry.arguments`, whose readers are unreachable outside `androidx.savedstate` (see `HomeRouteArguments`), so it stays in `androidMain`. A registration function crossing as a function is the same shape `pluginsSettingsScreen` already uses in `SettingsNavDependencies`. |
  * | The four `@Composable` slots | Media3's trailer surface, the badge composables and the YouTube dialog are Android by the user's directive. They were already `@Composable` slots on `HomeNavDependencies`; this class carries them unchanged. |
  * | `pluginsUiSupported` as a `Boolean` | `DistributionCapabilities` is already `commonMain` (`:platform-core`), so only the *read* of it needed crossing. |
+ * | ~~The three `(NavBackStackEntry) -> …RouteArgs` readers~~ **gone** | They were here because this file's KDoc claimed `NavBackStackEntry.arguments` returns `android.os.Bundle` on every platform. It does not — it is a common `SavedState?` whose readers are `@PublishedApi internal` to `androidx.savedstate` — and `savedStateHandle` (already used in four shared graphs) carries the same arguments. So the readers are now `detailsRouteArguments` and friends over a `SavedStateHandle`, in `HomeRouteArguments.kt`. |
  *
  * ## The five `activeProfileLoader` instances
  *
@@ -109,9 +109,6 @@ class AppNavHostDependencies(
         runtimeEntry: RuntimeDetailsEntry?,
     ) -> ViewModelProvider.Factory,
     val homePersonViewModelFactory: (personId: String) -> ViewModelProvider.Factory,
-    val homeDetailsArguments: (entry: NavBackStackEntry) -> HomeDetailsRouteArgs,
-    val homePersonArguments: (entry: NavBackStackEntry) -> HomePersonRouteArgs,
-    val homeCatalogArguments: (entry: NavBackStackEntry) -> HomeCatalogRouteArgs,
     val homePlaybackSettingsRepository: PlaybackSettingsRepository,
     val homeShareText: (text: String) -> Unit,
     val homeDateFormat: (epochMillis: Long) -> String,

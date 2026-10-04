@@ -157,10 +157,12 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 navArgument(AppRoutes.CatalogTitleArg) { type = NavType.StringType; defaultValue = "" }
             )
     ) { entry ->
-        // The first of the three destinations that reads arguments, and the one that
-        // made the shape obvious: this block used to bind the bundle to a local before
-        // reading it, so an import-shaped guard found nothing here at all.
-        val catalogArgs = dependencies.catalogArguments(entry)
+        // The first of the three destinations that reads arguments. This block used to
+        // bind the bundle to a local before reading it, so an import-shaped guard found
+        // nothing here at all -- and it used to hand the read to a crossing in
+        // `androidMain`. Both are gone: the mapping is `catalogRouteArguments`, and
+        // `entry.savedStateHandle` carries the same argument set.
+        val catalogArgs = catalogRouteArguments(entry.savedStateHandle)
         val catalogId = catalogArgs.catalogId.orEmpty()
         val catalogIdentifier =
             com.crispy.tv.domain.home.parseHomeCatalogId(catalogId)
@@ -212,13 +214,12 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 navArgument(AppRoutes.HomeDetailsSharedElementKeyArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
-        // Reading a route argument is `android.os.Bundle`, so the read crosses and the
-        // decisions do not. `entry` is declared `commonMain`; `entry.arguments` is not.
-        //
         // Every line below the reader is the rule that was already here: a missing id is
         // an empty string, a blank optional is absent, and the runtime entry exists only
-        // if one of its three numbers was reported. Nothing is decided by the reader.
-        val detailsArgs = dependencies.detailsArguments(entry)
+        // if one of its three numbers was reported. Nothing is decided by the reader --
+        // which is now `detailsRouteArguments`, over the handle, and not a crossing.
+        // See `HomeRouteArguments` for why the read moved and what it changed.
+        val detailsArgs = detailsRouteArguments(entry.savedStateHandle)
         val itemId = detailsArgs.itemId.orEmpty()
         val itemType = detailsArgs.itemType.orEmpty()
         val highlightEpisodeId = detailsArgs.highlightEpisodeId?.ifBlank { null }
@@ -359,14 +360,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(
             }
         )
     ) { entry ->
-        // The fifth destination, and the third that reads arguments; see the catalog
-        // block for why the read crosses and the rule stays. This one uses
+        // The fifth destination, and the third that reads arguments; see the details
+        // block for the read. This one uses
         // `isNotBlank` where the details block uses `ifBlank { null }`, which is not the
         // same shape for the same reason twice -- the profile url is passed to
         // `PersonDetailsRoute` as a fallback for a value the backend may replace, so an
         // empty string is a *worse* answer than no string, while the details block's
         // optionals are simply absent when blank.
-        val personArgs = dependencies.personArguments(entry)
+        val personArgs = personRouteArguments(entry.savedStateHandle)
         val personId = personArgs.personId.orEmpty()
         val profileUrl = personArgs.profileUrl.orEmpty().takeIf { it.isNotBlank() }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
