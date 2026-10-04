@@ -154,6 +154,16 @@ android {
     }
 
     buildTypes {
+        // A debug install has to coexist with the release one on the same
+        // device, so it is its own app end to end: a distinct package (own
+        // data, own sign-in) and a versionName that says which build Settings
+        // is showing. The launcher label comes from
+        // src/debug/res/values/strings.xml, which outranks src/main's
+        // `app_name` in the resource merge.
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

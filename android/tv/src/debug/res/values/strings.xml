@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug builds install beside release under com.crispy.tv.debug, so the
+         launcher needs to say which one this is. This file is the debug build
+         type's source set and outranks src/main's `app_name` in the merge. -->
+    <string name="app_name">Crispy TV Debug</string>
+</resources>

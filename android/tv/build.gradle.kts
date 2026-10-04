@@ -96,6 +96,15 @@ android {
     }
 
     buildTypes {
+        // Same treatment as :androidApp's debug build type — a sideloaded TV
+        // debug build sits beside the release one as its own app, with its own
+        // data and a versionName that names the build. The label comes from
+        // src/debug/res/values/strings.xml, which outranks src/main's
+        // `app_name` in the resource merge.
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
