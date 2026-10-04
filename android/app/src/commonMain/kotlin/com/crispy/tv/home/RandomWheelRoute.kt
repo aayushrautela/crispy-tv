@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +33,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,17 +42,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -81,6 +78,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -92,6 +90,8 @@ import com.crispy.tv.domain.home.HomeRandomGenre
 import com.crispy.tv.domain.home.randomPool
 import com.crispy.tv.domain.home.topGenres
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.components.CrispySectionAppBarTitle
+import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.genreIcon
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.resources.Res
@@ -212,14 +212,16 @@ internal fun randomSpinDurationMs(steps: Int): Int = (1700 + steps * 24).coerceA
  * it). Adding a second request path to buy a cache hit would duplicate the builder that keeps the
  * cache correct, so there is no second path. At most the rows on screen are in flight.
  *
- * ## The layout is the reference project's
+ * ## The layout is the reference project's, the chrome is the app's
  *
- * The header (back button + title), the connected genre pills, the full-height drum with the
- * Spin button floating over its faded foot, and the Play button sitting on the centred row are
- * all transcribed from the reference project's wheel. Only the vocabulary is ours: [CrispyIcon]
- * and the project's drawables instead of Material Icons, and [Dimensions] for the page padding.
+ * The full-height drum with the Spin button floating over its faded foot, and the Play button
+ * sitting on the centred row, are transcribed from the reference project's wheel. The header
+ * and the pills are not: the header is the search page's -- [StandardTopAppBar] with
+ * [CrispySectionAppBarTitle] reading "Feeling Lucky" -- and the pills are the discover page's
+ * standalone [FilterChip]s. Only the vocabulary is ours throughout: [CrispyIcon] and the
+ * project's drawables instead of Material Icons.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun RandomWheelRoute(
     viewModelFactory: ViewModelProvider.Factory,
@@ -255,21 +257,20 @@ internal fun RandomWheelRoute(
             if (listState.isScrollInProgress) -1 else listState.randomCenteredIndex()
         }
     }
-    /** Whatever is sitting in the centre slot. There is no other notion of a pick. */
-    val picked: HomeRandomCandidate? by remember(pool) {
-        derivedStateOf {
-            val index = chosenIndex
-            if (index < 0 || pool.isEmpty()) null else pool[index % pool.size]
-        }
-    }
-
-    val unfold by animateFloatAsState(
+    // Kept as a State and read only inside layer blocks below, so the drum opening is a
+    // redraw per frame rather than a recomposition of this route: the graphics-layer lambda
+    // invalidates the layer, while reading the value in the composable body would recompose
+    // every visible row -- and re-run its image request -- sixty times a second. This is the
+    // same reason the face reads the list's own layout inside the layer.
+    val unfoldState = animateFloatAsState(
         targetValue = if (unfolded) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 260f),
         label = "randomUnfold",
     )
-    // A short pulse on the centre row when the wheel stops, which is what gives the landing its
-    // settle. It decays rather than latches, so it cannot leave a permanent pop on the winner.
+    // A kick of velocity on landing: the slot pops and settles. Fired from [spin] once the
+    // wheel has stopped, rather than on every pick change -- which would also fire when a chip
+    // change re-seats the drum. It decays rather than latches, so it cannot leave a permanent
+    // pop on the winner.
     val landing = remember { Animatable(0f) }
 
     val openingIndex = (RandomWheelLaps / 2) * pool.size
@@ -284,12 +285,6 @@ internal fun RandomWheelRoute(
             delay(RandomUnfoldDelayMs)
             unfolded = true
         }
-    }
-
-    LaunchedEffect(picked) {
-        if (picked == null || !unfolded) return@LaunchedEffect
-        landing.snapTo(1f)
-        landing.animateTo(0f, tween(durationMillis = RandomTurnDurationMs))
     }
 
     /**
@@ -321,93 +316,86 @@ internal fun RandomWheelRoute(
         if (pool.isEmpty()) return
         isSpinning = true
         scope.launch {
-            val steps = randomSpinSteps(pool.size, Random.Default)
-            val durationMs = randomSpinDurationMs(steps)
-            // The die turns with the wheel and slows with it.
-            launch { dice.animateTo(dice.value + 720f, tween(durationMs, easing = CubicBezierEasing(0.12f, 0.72f, 0.18f, 1f))) }
-            listState.randomSpinBy(
-                steps = steps,
-                rowPx = rowPx,
-                durationMs = durationMs,
-            )
-            isSpinning = false
+            try {
+                val steps = randomSpinSteps(pool.size, Random.Default)
+                val durationMs = randomSpinDurationMs(steps)
+                // The die turns with the wheel and slows with it.
+                launch { dice.animateTo(dice.value + 720f, tween(durationMs, easing = CubicBezierEasing(0.12f, 0.72f, 0.18f, 1f))) }
+                listState.randomSpinBy(
+                    steps = steps,
+                    rowPx = rowPx,
+                    durationMs = durationMs,
+                )
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                launch {
+                    landing.snapTo(0f)
+                    landing.animateTo(
+                        0f,
+                        spring(dampingRatio = 0.35f, stiffness = 420f),
+                        initialVelocity = 7f,
+                    )
+                }
+            } finally {
+                // A thumb on the wheel cancels the spin mid-turn, which is the wheel doing
+                // what a wheel does; the button comes back.
+                isSpinning = false
+            }
         }
     }
 
-    fun turnTo(poolIndex: Int) {
+    /**
+     * Turns the wheel so [index] sits in the centre slot: a relative scroll from where the
+     * wheel is, over a spring, which is what makes a tap read as a turn rather than a jump.
+     * Relative matters because the drum holds hundreds of laps: an absolute lap-plus-offset
+     * target would fling across the whole list instead of turning to the tapped row.
+     */
+    fun turnTo(index: Int) {
         if (pool.isEmpty()) return
         isSpinning = true
         scope.launch {
-            // This LazyListState has no animating `scrollToItem` overload, so the turn is a
-            // single `animateScrollBy` over whole rows: every row is `RandomRowHeight` tall, so
-            // a row count converts to pixels exactly and no item offset is ever needed.
-            val fromRow = listState.firstVisibleItemIndex
-            listState.animateScrollBy(
-                (openingIndex + poolIndex - fromRow).toFloat() * rowPx,
-                tween(durationMillis = RandomTurnDurationMs),
-            )
-            isSpinning = false
+            try {
+                listState.animateScrollBy(
+                    listState.randomDistanceFromCenter(index, rowPx) * rowPx,
+                    spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                )
+            } finally {
+                isSpinning = false
+            }
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            // The whole point of the page, and the one thing the first version omitted entirely:
-            // a destination has to clear the system bars. Background first so it reaches the
-            // edges, insets after so only the content is pushed in.
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(
-                start = Dimensions.PageHorizontalPaddingCompact,
-                end = Dimensions.PageHorizontalPaddingCompact,
-                top = Dimensions.CardInternalPadding,
-                bottom = Dimensions.SectionSpacing,
-            ),
-        verticalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing),
-    ) {
-        // Back and the title share one row: every dp the header does not take is a dp of wheel.
-        Row(
+    // The search page's structure: a full-bleed app bar on a Scaffold, with the page content
+    // padded below it. The bar carries the system-bars inset itself, so the content only pads
+    // the navigation bars at the foot -- and the drum below is full-bleed like the reference
+    // project's, with each row carrying its own horizontal padding.
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            StandardTopAppBar(
+                title = { CrispySectionAppBarTitle(label = "Feeling Lucky") },
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        CrispyIcon(
+                            painter = painterResource(Res.drawable.ic_arrow_back),
+                            contentDescription = "Back",
+                            autoMirror = true,
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 20.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .fillMaxSize()
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = Dimensions.SectionSpacing),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing),
         ) {
-            FilledIconButton(
-                onClick = onClose,
-                shape = CircleShape,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-                modifier = Modifier.size(44.dp),
-            ) {
-                CrispyIcon(
-                    painter = painterResource(Res.drawable.ic_arrow_back),
-                    contentDescription = "Back",
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Spin",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Let the wheel pick what plays next",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
         RandomChipRow(
             genres = genres,
             selectedGenre = selectedGenre,
@@ -470,7 +458,9 @@ internal fun RandomWheelRoute(
                                 candidate = candidate,
                                 isCentred = index == chosenIndex,
                                 onPlay = { onPlay(candidate) },
-                                onClick = { turnTo(index % pool.size) },
+                                // The tapped slot's own index, laps included: the turn is a relative
+                                // scroll from where the wheel is, so it must start there.
+                                onClick = { turnTo(index) },
                                 modifier = Modifier
                                     .height(RandomRowHeight)
                                     .graphicsLayer {
@@ -480,7 +470,7 @@ internal fun RandomWheelRoute(
                                         // which is what the reference project learned the hard way.
                                         randomWheelFace(
                                             distanceInRows = listState.randomDistanceFromCenter(index, rowPx),
-                                            unfold = unfold,
+                                            unfold = unfoldState.value,
                                             landing = landing.value,
                                             density = localDensity.density,
                                             rowPx = rowPx,
@@ -536,8 +526,8 @@ internal fun RandomWheelRoute(
         }
     }
 }
+}
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RandomChipRow(
     genres: List<HomeRandomGenre>,
@@ -546,7 +536,9 @@ private fun RandomChipRow(
 ) {
     // `All` carries the layers glyph, which is the same glyph the discover sheet gives its
     // "All genres" row, and every genre carries the same `genreIcon` the hero carousel gives its
-    // metadata -- so a chip and a hero row read the same genre the same way.
+    // metadata -- so a chip and a hero row read the same genre the same way. Standalone
+    // pills, spaced apart, exactly like the discover page's own filter chips: the connected
+    // toggle-button strip read as a different component from every other pill in the app.
     val options: List<Pair<String?, DrawableResource>> = buildList {
         add(null to Res.drawable.ic_layers)
         genres.forEach { add(it.genre to genreIcon(it.genre)) }
@@ -556,35 +548,42 @@ private fun RandomChipRow(
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        options.forEachIndexed { index, (genre, icon) ->
-            ToggleButton(
-                checked = genre != null && genre.equals(selectedGenre, ignoreCase = true),
-                onCheckedChange = { onGenreSelected(genre) },
-                colors = ToggleButtonDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    checkedContainerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    checkedContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    CrispyIcon(
-                        painter = painterResource(icon),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
+        options.forEach { (genre, icon) ->
+            val selected = if (genre == null) {
+                selectedGenre == null
+            } else {
+                genre.equals(selectedGenre, ignoreCase = true)
+            }
+            FilterChip(
+                selected = selected,
+                onClick = { onGenreSelected(genre) },
+                label = {
                     Text(
                         text = genre ?: "All",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
-            }
+                },
+                leadingIcon = {
+                    CrispyIcon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    labelColor = MaterialTheme.colorScheme.onSurface,
+                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            )
         }
     }
 }
@@ -643,6 +642,14 @@ private fun RandomWheelRow(
         Box(
             modifier = Modifier
                 .size(RandomDiscSize)
+                .graphicsLayer {
+                    // The centred cover grows with its pill, the way the reference disc does.
+                    // `pill` is read inside the layer, so the growth is a redraw per frame
+                    // rather than a recomposition.
+                    val grow = lerp(0.88f, 1f, pill)
+                    scaleX = grow
+                    scaleY = grow
+                }
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
