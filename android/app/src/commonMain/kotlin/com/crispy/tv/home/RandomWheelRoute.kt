@@ -120,6 +120,14 @@ private const val RandomTurnDurationMs = 320
 private val RandomRowHeight = 100.dp
 private val RandomDiscSize = 72.dp
 
+/**
+ * How much of the drum's foot the floating spin button covers: its 32.dp scrim lead-in plus the
+ * 64.dp button plus its 8.dp bottom margin. The drum's viewport ends where the overlay begins, so
+ * the list's own centre -- which is where the wheel settles -- is the centre of what is actually
+ * visible rather than 52.dp below it. Keep the three numbers in step with the overlay below.
+ */
+private val RandomSpinOverlayHeight = 32.dp + 64.dp + 8.dp
+
 // The 3D face. The numbers are transcribed from the reference project's drum, which was tuned by
 // eye against a running app; nothing here is derived from first principles. They are all
 // expressed in ROW UNITS -- `a` is the row's distance from the centre in rows, not a fraction of
@@ -404,11 +412,14 @@ internal fun RandomWheelRoute(
 
         // The drum takes the rest of the column, so it is as tall as the device rather than a
         // fixed three rows -- and `contentPadding` makes the list's own first and last slots sit
-        // on the centre line, which is what lets an end slot land in the middle.
+        // on the centre line, which is what lets an end slot land in the middle. The viewport
+        // stops where the floating spin button starts (see [RandomSpinOverlayHeight]), so the
+        // settle line is the visible middle, not the middle of a taller box whose foot is covered.
         Box(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(bottom = RandomSpinOverlayHeight),
         ) {
             BoxWithConstraints(
                 modifier = Modifier.fillMaxSize(),
