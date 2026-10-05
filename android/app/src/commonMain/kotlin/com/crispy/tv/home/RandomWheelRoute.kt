@@ -128,12 +128,12 @@ private val RandomDiscSize = 72.dp
  */
 private val RandomSpinOverlayHeight = 32.dp + 64.dp + 8.dp
 
-// The 3D face. The numbers are transcribed from the reference project's drum, which was tuned by
-// eye against a running app; nothing here is derived from first principles. They are all
-// expressed in ROW UNITS -- `a` is the row's distance from the centre in rows, not a fraction of
-// one -- which is what makes the arc reach its cap within the handful of rows a phone can show.
+// The 3D face. Tilt and arc keep growing across every row a phone can show, so the drum
+// reads as a C rather than a bend with flat ends: the arc cap sits past the last visible row
+// and the tilt clamp past the last readable one. `a` is in ROW UNITS -- the row's distance
+// from the centre in rows, not a fraction of one.
 private const val RandomRotationPerRow = 14f
-private const val RandomRotationLimit = 72f
+private const val RandomRotationLimit = 85f
 private const val RandomCameraDistance = 12f
 private const val RandomScaleFalloff = 0.07f
 private const val RandomScaleFloor = 0.62f
@@ -144,7 +144,7 @@ private const val RandomLocalPerUnfold = 1.6f
 private const val RandomLocalPerRow = 0.18f
 private const val RandomLandingGain = 0.05f
 private val RandomArcStep = 7.dp
-private val RandomArcLimit = 56.dp
+private val RandomArcLimit = 120.dp
 
 /** How long the wheel holds off re-ticking after a detent, so a fast spin does not buzz continuously. */
 private val RandomDetentInterval = 40.milliseconds
