@@ -11,6 +11,7 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SyncProviderRepository
 import com.crispy.tv.accounts.loadActiveProfile
 import com.crispy.tv.addons.registry.MetadataAddonRegistry
+import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.ai.AiInsightsCacheStore
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.backend.BackendContextResolver
@@ -18,12 +19,15 @@ import com.crispy.tv.backend.CachingBackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.data.repository.DefaultCatalogRepository
 import com.crispy.tv.data.repository.DefaultSessionRepository
+import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.discover.BackendBrowseRepository
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
+import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.CachingHomeCatalogService
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.platform.AppConfig
+import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.search.AiSearchRepository
 import com.crispy.tv.search.BackendSearchRepository
 import com.crispy.tv.services.AppServices
@@ -34,6 +38,9 @@ import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.sync.ProfileDataShadowStore
+import com.crispy.tv.watchhistory.BackendWatchHistoryService
+import com.crispy.tv.watchhistory.WatchHistoryConfig
+
 
 // The names the durable stores are written under. They are a data-compatibility contract with
 // every install that has already run, so they are literal strings and they are declared here,
@@ -50,6 +57,7 @@ private const val PROFILE_DATA_SHADOW_STORE = "profile_data_shadow"
 private const val PLAYBACK_SETTINGS_STORE = "playback_settings"
 private const val IMAGE_SETTINGS_STORE = "image_settings"
 private const val AI_INSIGHTS_CACHE_STORE = "ai_insights_cache"
+private const val WATCH_HISTORY_PROGRESS_STORE = "watch_progress"
 
 /**
  * The service graph, in `commonMain`, built from one [AppServices].
@@ -66,9 +74,17 @@ private const val AI_INSIGHTS_CACHE_STORE = "ai_insights_cache"
  * remainder: the player. `homeViewModelFactory` reaches for a raw OkHttp client rather than the
  * [com.crispy.tv.network.CrispyHttpClient] this graph holds, `homeSelectorViewModelFactory` and
  * `detailsViewModelFactory` need `StreamResolverProvider`, `PlayerStreamHandoff` and
- * `AppDistribution`, and `PlaybackDependencies` is a set of `(Context) ->` seams the `:androidApp`
- * store and sideload variants install into. Those keep a `Context` until the desktop player
- * lands, because pulling them forward would drag the player forward with them.
+ * `AppDistribution`, and the remaining `PlaybackDependencies` seams are `(Context) ->` factories
+ * for the playback controller, the torrent resolver, audio focus, the intro-skip service and the
+ * stream resolver. Those keep a `Context` until the desktop player lands, because pulling them
+ * forward would drag the player forward with them.
+ *
+ * `PlaybackDependencies` used to be described here as "a set of `(Context) ->` seams the
+ * `:androidApp` store and sideload variants install into". **Nothing installs into it.** The only
+ * assignments to any of its members in the whole tree are `DistributionComponents`, which writes
+ * `torrentResolverFactory` from inside `:app`, and one test. Watch history was the member that
+ * premise was really about, and it has now joined this class above -- see
+ * [watchHistoryService].
  *
  * ## One instance per process
  *
@@ -234,6 +250,49 @@ class AppGraph(
 
     val catalogRepository: CatalogRepository by lazy {
         DefaultCatalogRepository(backendClient)
+    }
+
+    /**
+     * Watch progress: the local store, the backend half, and the two things built on top of them.
+     *
+     * All three used to be reached through `PlaybackDependencies`, a set of `(Context) ->`
+     * factories in `androidMain`. That indirection carried a KDoc saying `:androidApp`'s `store`
+     * and `sideload` variants install into it, and **nothing installs into it**: the only
+     * assignment to any `PlaybackDependencies` member anywhere in the tree is a test's, and it
+     * writes `torrentResolverFactory`, which `DistributionComponents` also writes from inside
+     * `:app`. So the question the locator existed to answer -- "who provides watch history" --
+     * had exactly one answer, and a desktop could not reach it without writing into an
+     * `androidMain` global. That is a construction here instead.
+     *
+     * Collapsing the instances is not a behaviour change. `BackendWatchHistoryService` holds its
+     * collaborators as constructor `val`s and writes through the [WATCH_HISTORY_PROGRESS_STORE]
+     * handle it is given, with no in-memory cache for a second copy to own; `DefaultUserMediaRepository`
+     * is a delegating wrapper over it with no state of its own. What did change is the count:
+     * there is now one watch-history service per process rather than one per factory call.
+     */
+    val watchHistoryService: WatchHistoryService by lazy {
+        BackendWatchHistoryService(
+            progressStore = services.keyValueStores.store(WATCH_HISTORY_PROGRESS_STORE),
+            timeSource = services.timeSource,
+            // Off [services] rather than built here, and that is the whole reason this member
+            // moved: `monotonicClock` is the same clock this service would otherwise construct,
+            // and two constructions of a clock is two answers to "how long has this been playing".
+            monotonicClock = services.monotonicClock,
+            logger = services.logger,
+            backend = backendClient,
+            backendContextResolver = backendContextResolver,
+            // The same provider the player used to build through `episodeListProviderFactory`,
+            // over the same two clients -- a third construction of it was never the question.
+            episodeListProvider = BackendEpisodeListProvider(
+                supabaseAccountClient = accountClient,
+                backendClient = backendClient,
+            ),
+            config = WatchHistoryConfig(appVersion = AppConfig.VERSION_NAME),
+        )
+    }
+
+    val userMediaRepository: UserMediaRepository by lazy {
+        DefaultUserMediaRepository(watchHistoryService)
     }
 
     /**

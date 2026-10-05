@@ -2,11 +2,8 @@ package com.crispy.tv.app
 
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.details.DetailsUseCases
 import com.crispy.tv.details.RuntimeDetailsEntry
-import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.optimistic.FileBackedPendingMutationStore
 import com.crispy.tv.optimistic.UserMediaMutationExecutor
 import com.crispy.tv.optimistic.UserMutationOutbox
@@ -17,29 +14,47 @@ import okio.FileSystem
 import okio.Path.Companion.toPath
 
 /**
- * The player half of the graph: the three things [AppGraph] cannot build because each one is
- * still an Android seam rather than a `Context`-free construction.
+ * What [AppGraph] still cannot build, because what is left needs a `Context` for a reason that
+ * has not been discharged.
  *
  * [AppGraph] is in `commonMain` and takes one [AppServices]. This is the other half, and it takes
- * a `Context` for three named reasons, each of which is a decision that belongs to the platform:
+ * a `Context` for one named reason: **the details view model** reaches `appContext` for
+ * `Locale` and `android.text.format.DateFormat`, and `StreamResolverProvider`,
+ * `AppDistribution.pluginStreamLoader` and `PlayerStreamHandoff.stash` alongside it. None of those
+ * exist off Android yet, so this class is where they wait -- and when the desktop player lands,
+ * this type goes away with the last `Context`.
  *
- * - **watch history** is reached through `PlaybackDependencies.watchHistoryServiceFactory`, an
- *   overridable `@Volatile` indirection into which `:androidApp`'s `store` and `sideload` variants
- *   install. Building `BackendWatchHistoryService` directly would answer a different question
- *   than the one the indirection exists to answer -- "who provides watch history", not "what does
- *   watch history need" -- and it would bypass any install.
- * - **the details view model** needs `StreamResolverProvider`, `AppDistribution.pluginStreamLoader`
- *   and `PlayerStreamHandoff.stash`, none of which exist off Android yet.
- * - **the outbox** needs the watch-history repository above, and nothing else: its file path,
- *   its dispatcher and its clock all come from [AppServices] now, so all that is left here is the
- *   one collaborator that has not moved.
+ * ## What used to be here, and why it left
  *
- * So this class is not a second graph and not a delegate: it is the part of one graph that could
- * not be written yet. When the player lands, these three members join [AppGraph] and this type goes
- * away with the last `Context`.
+ * There were four members, and three of this file's own KDoc reasons were wrong. Each is recorded
+ * here because a corrected premise with two surviving copies is worse than the original.
+ *
+ * - **watch history** was said to be reached through `PlaybackDependencies.watchHistoryServiceFactory`,
+ *   "an overridable `@Volatile` indirection into which `:androidApp`'s `store` and `sideload`
+ *   variants install". **No flavour installs into it.** Measured: the only assignments to any
+ *   `PlaybackDependencies` member in the tree are `DistributionComponents` -- which writes
+ *   `torrentResolverFactory`, from inside `:app` -- and one test that writes the same member. So
+ *   the indirection had exactly one answer, and keeping it would have meant the desktop writing
+ *   into an `androidMain` global to get one. `AppGraph` now builds it directly; the factory and
+ *   its indirection are gone.
+ * - **the user-media repository** was said to be pinned because the watch-history service was.
+ *   That followed the first bullet, so it went with it: `graph.userMediaRepository`.
+ * - **the details use cases** could move as easily -- all six collaborators are [AppGraph] members
+ *   or [AppServices] products -- but nothing off Android can *call* them, because the caller is
+ *   `detailsViewModelFactory` and that is still the pin. Moving a member no reader can reach is the
+ *   same edit in a place that only reads like progress, so it stays until the factory it feeds can
+ *   be built.
+ * - **the outbox** is the one that is genuinely still here, and its remaining pin is a member, not
+ *   an import: `FileSystem.SYSTEM` lives in okio's `systemFileSystemMain` source set, so
+ *   `:android:app:compileCommonMainKotlinMetadata` reports `Unresolved reference 'SYSTEM'` for it
+ *   and **declaring `libs.okio.core` in `:app`'s `commonMain` does not help** -- the catalogue
+ *   note that `coil-core` brings okio to `:app` is true of the *types* (`FileSystem`, `Path`,
+ *   `buffer`, `use` all resolve today with no dependency line) and false of that one member.
+ *   Everything the outbox needs from `services` is already portable, so this is the last thing
+ *   standing between it and [AppGraph].
  */
 class AndroidAppGraph(
-    /** The portable half. Exposed so a caller can reach a service *and* one of these three. */
+    /** The portable half, and the half that holds everything this file cannot build. */
     val graph: AppGraph,
     context: Context,
 ) {
@@ -51,10 +66,17 @@ class AndroidAppGraph(
      */
     private val services: AppServices = graph.services
 
-    val userMediaRepository: UserMediaRepository by lazy {
-        DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext))
-    }
-
+    /**
+     * The one member that is still here for a mechanical reason rather than a design one.
+     *
+     * Everything it needs from [services] is already portable, so the only thing keeping it out of
+     * [AppGraph] is [FileSystem]`.`SYSTEM` -- okio declares it in `systemFileSystemMain`, and
+     * `:android:app:compileCommonMainKotlinMetadata` reports `Unresolved reference 'SYSTEM'` for it
+     * even with `libs.okio.core` declared in `commonMain`. Its own scope is deliberately *not*
+     * [AppServices.serviceScope]: `start()` is called from `Application.onCreate`, so the drain has
+     * to outlive any one screen, and tying it to a scope this class does not own is the change this
+     * is not making.
+     */
     val userMutationOutbox: UserMutationOutbox by lazy {
         // The store itself is `commonMain`; the three things it deliberately does not name are
         // supplied here, at the composition root. `FileSystem.SYSTEM` is okio's real filesystem
@@ -69,7 +91,11 @@ class AndroidAppGraph(
         )
         UserMutationOutbox(
             store = store,
-            executor = UserMediaMutationExecutor(userMediaRepository),
+            executor = UserMediaMutationExecutor(graph.userMediaRepository),
+            // Its own job, uncancelled, and that is unchanged: `services.serviceScope` is the same
+            // answer (`SupervisorJob` on the IO dispatcher), and switching to it would tie the
+            // outbox's drain to a scope this graph does not own. `UserMutationOutbox.start()` is
+            // called from `Application.onCreate`, so the scope has to outlive any one screen.
             scope = CoroutineScope(SupervisorJob() + services.ioDispatcher),
             // The clock was a defaulted lambda whose body was a JVM call; a default that cannot
             // compile in `commonMain` is not a default, it is a decision the composition root has
@@ -82,7 +108,7 @@ class AndroidAppGraph(
         DetailsUseCases(
             sessionRepository = graph.sessionRepository,
             catalogRepository = graph.catalogRepository,
-            userMediaRepository = userMediaRepository,
+            userMediaRepository = graph.userMediaRepository,
             backendContextResolver = graph.backendContextResolver,
             backendApi = graph.backendClient,
             logger = services.logger,

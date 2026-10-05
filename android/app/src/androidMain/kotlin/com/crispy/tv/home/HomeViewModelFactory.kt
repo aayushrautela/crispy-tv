@@ -3,7 +3,6 @@ package com.crispy.tv.home
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.platform.android.AndroidAppLogger
@@ -16,11 +15,11 @@ import kotlinx.coroutines.Dispatchers
  * the port moved out of the class: the OkHttp client, the player seam and the
  * wall clock. The viewmodel itself never names any of them.
  *
- * **The backend client, the context resolver and the home catalog service are no longer
- * reached through a `Context`** — the first two are in the `commonMain` graph and the third
- * is one of its members. The two collaborators that keep this file in `androidMain` are
- * [AppHttp.okHttp] (a raw OkHttp client rather than the graph's `CrispyHttpClient`, because
- * `OkHttpWatchSyncSource` needs the socket itself) and `PlaybackDependencies`.
+ * **The backend client, the context resolver, the home catalog service and the watch-history
+ * service are no longer reached through a `Context`** — the first three are members of the
+ * `commonMain` graph and the fourth is one of them now. What is left of that list is
+ * [AppHttp.okHttp], a raw OkHttp client rather than the graph's `CrispyHttpClient`, and it is
+ * here because `OkHttpWatchSyncSource` needs the socket itself.
  */
 fun homeViewModelFactory(context: Context): ViewModelProvider.Factory {
     val appContext = context.applicationContext
@@ -28,7 +27,7 @@ fun homeViewModelFactory(context: Context): ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                 val graph = appContext.appGraph().graph
-                val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
+                val watchHistoryService = graph.watchHistoryService
                 val suppressionStore = continueWatchingSuppressionStore(appContext)
                 val backendClient = graph.backendClient
                 val backendResolver = graph.backendContextResolver

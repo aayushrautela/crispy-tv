@@ -3,9 +3,7 @@ package com.crispy.tv.library
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.app.appGraph
-import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.optimistic.newUserMutationId
 import com.crispy.tv.watchhistory.sync.OkHttpWatchSyncSource
@@ -39,21 +37,25 @@ import okio.Path.Companion.toPath
  */
 fun libraryViewModelFactory(context: Context): ViewModelProvider.Factory {
     val appContext = context.applicationContext
-    // `AndroidAppGraph` rather than the portable `AppGraph` underneath it: this factory needs
-    // both halves — the backend client from one, the outbox from the other.
-    val graph = appContext.appGraph()
-    val backendClient = graph.graph.backendClient
+    val graph = appContext.appGraph().graph
+    val backendClient = graph.backendClient
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
                 return LibraryViewModel(
                     backend = backendClient,
-                    backendContextResolver = graph.graph.backendContextResolver,
-                    userMediaRepository =
-                        DefaultUserMediaRepository(
-                            PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                        ),
+                    backendContextResolver = graph.backendContextResolver,
+                    // The graph's own repository, not a second one built here. This factory used
+                    // to construct a `DefaultUserMediaRepository` per call over a watch-history
+                    // service of its own; `DefaultUserMediaRepository` is a delegating wrapper
+                    // with no state, so the two instances were the same object wearing two names.
+                    userMediaRepository = graph.userMediaRepository,
+                    // **Not `graph`.** The outbox stayed on [AndroidAppGraph] because it needs
+                    // `FileSystem.SYSTEM`, which okio declares in `systemFileSystemMain` and not
+                    // in `commonMain`, so no `commonMain` file can name it. The two collaborators
+                    // this factory takes therefore still come from different halves, and the
+                    // graph below is reached for the three that moved.
                     outbox = appContext.appGraph().userMutationOutbox,
                     libraryCache = LibraryDiskCacheStore(
                         fileSystem = FileSystem.SYSTEM,

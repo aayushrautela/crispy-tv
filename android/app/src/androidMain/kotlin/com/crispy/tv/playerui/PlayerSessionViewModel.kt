@@ -86,7 +86,7 @@ class PlayerSessionViewModel(
     private val chosenStreamHandoffKey = chosenStreamHandoffKey?.trim()?.takeIf { it.isNotBlank() }
     private val supabase = this.appContext.appGraph().graph.accountClient
     private val backendClient: CrispyBackendClient = this.appContext.appGraph().graph.backendClient
-    private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
+    private val watchHistoryService = this.appContext.appGraph().graph.watchHistoryService
     private val streamResolver: StreamResolver = PlaybackDependencies.streamResolverFactory(this.appContext)
     // Not cancelled in onCleared: bounded reporting jobs must finish flushing after clearing.
     // Every launch on this scope is timeout-bounded or a short network post, so the scope is

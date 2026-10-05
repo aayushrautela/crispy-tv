@@ -45,7 +45,7 @@ fun homeSelectorViewModelFactory(context: Context): ViewModelProvider.Factory {
                 },
                 sessionTokenProvider = { supabase.ensureValidSession()?.accessToken },
                 pluginStreamLoader = AppDistribution.current.pluginStreamLoader(appContext),
-                userMediaRepository = appContext.appGraph().userMediaRepository,
+                userMediaRepository = graph.userMediaRepository,
                 stashHandoff = { stream, lookupId -> PlayerStreamHandoff.stash(stream, lookupId) },
                 ioDispatcher = Dispatchers.IO,
             ) as T

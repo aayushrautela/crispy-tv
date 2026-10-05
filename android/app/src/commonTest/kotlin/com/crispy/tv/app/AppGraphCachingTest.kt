@@ -68,6 +68,13 @@ class AppGraphCachingTest {
         assertSame(graph.playbackSettingsRepository, graph.playbackSettingsRepository, why)
         assertSame(graph.imageSettingsRepository, graph.imageSettingsRepository, why)
         assertSame(graph.aiInsightsRepository, graph.aiInsightsRepository, why)
+        // Watch history and the repository over it used to be reached through a `(Context) ->`
+        // factory in `androidMain`, so a reader had four separate instances of each. They are
+        // `by lazy` here, and this line is what would catch that having been undone by an
+        // `install`-shaped write -- the reason the old indirection existed, measured as having no
+        // writers at all.
+        assertSame(graph.watchHistoryService, graph.watchHistoryService, why)
+        assertSame(graph.userMediaRepository, graph.userMediaRepository, why)
     }
 
     @Test
@@ -80,6 +87,8 @@ class AppGraphCachingTest {
         graph.playbackSettingsRepository
         graph.imageSettingsRepository
         graph.aiInsightsRepository
+        graph.watchHistoryService
+        graph.userMediaRepository
         graph.createProfileDataCloudSync()
 
         assertEquals(
@@ -89,6 +98,7 @@ class AppGraphCachingTest {
                 "playback_settings",
                 "image_settings",
                 "ai_insights_cache",
+                "watch_progress",
                 "profile_data_shadow",
             ),
             services.requestedStoreNames,
@@ -124,6 +134,8 @@ class AppGraphCachingTest {
         graph.backendContextResolver
         graph.homeCatalogService
         graph.aiInsightsRepository
+        graph.watchHistoryService
+        graph.userMediaRepository
         graph.activeProfileLoader()
 
         assertEquals(
