@@ -814,16 +814,20 @@ private fun LazyListState.randomDistanceFromCenter(index: Int, rowPx: Float): Fl
 /**
  * Travel `steps` rows, overshoot by a fifth of a row, then settle back onto a detent.
  *
- * The overshoot is what makes it read as a wheel rather than a list: it leaves the slot with the
- * row still leaning, and the spring brings it upright as it arrives. The fling behaviour's own
- * detent would also snap here, but only after a user-initiated fling, so the snap is explicit.
+ * The distance is `steps` full rows plus the fraction already travelled past the visible
+ * middle, so the pick lands exactly on the settle line. Without that correction the wheel
+ * rests a fraction of a row off and the face reads lopsided. The overshoot is what makes it
+ * read as a wheel rather than a list: it leaves the slot with the row still leaning, and the
+ * spring brings it upright as it arrives. The fling behaviour's own detent would also snap
+ * here, but only after a user-initiated fling, so the snap is explicit.
  */
 private suspend fun LazyListState.randomSpinBy(
     steps: Int,
     rowPx: Float,
     durationMs: Int,
 ) {
-    val distance = steps * rowPx
+    val start = randomCenteredIndex()
+    val distance = (steps + randomDistanceFromCenter(start, rowPx)) * rowPx
     val overshoot = rowPx * 0.2f
     animateScrollBy(
         distance + overshoot,
