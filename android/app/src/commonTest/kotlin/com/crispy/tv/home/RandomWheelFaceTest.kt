@@ -212,15 +212,96 @@ class RandomWheelFaceTest {
         }
     }
 
-    // ---------------------------------------------------- the fade, kept ----
+    // ------------------------------------------- the fade and the shrink ----
 
     @Test
-    fun `a resting row fades with distance and nothing else`() {
+    fun `the rows fade and shrink to the drum's edge, so the block ends where the drum does`() {
+        // The falloff used to be a flat fifth of a row, spent five rows out -- a distance a phone
+        // drum never spans (its half-viewport is 2.75 rows), so its outermost row was clipped away
+        // still carrying 40% of its opacity and where the block *ended* was decided by the screen
+        // above it and by the button's scrim below it: two different endings, one for each side.
+        // Both are now read off the drum's own edge, and the drum has only the one edge either way.
         assertEquals(1f, face(0f).alpha, "the winner is opaque")
-        listOf(1f, 2f, 3f, 4f).forEach { rowsOut ->
-            assertEquals(1f - 0.2f * rowsOut, face(rowsOut).alpha, 0.001f, "row $rowsOut out")
+        assertEquals(
+            0f,
+            face(rowsAtEdge).alpha,
+            0.001f,
+            "the fade has not spent itself at the drum's edge, $rowsAtEdge rows out",
+        )
+        assertEquals(0f, face(rowsAtEdge + 1f).alpha, "a row past the drum's edge is still drawn")
+
+        var previousAlpha = 1f
+        var previousScale = face(0f).scale
+        (1..24).forEach { step ->
+            val rowsOut = rowsAtEdge * step / 24f
+            val alpha = face(rowsOut).alpha
+            assertTrue(
+                alpha <= previousAlpha,
+                "the fade grew at $rowsOut rows out: $alpha after $previousAlpha",
+            )
+            previousAlpha = alpha
+            val scale = face(rowsOut).scale
+            assertTrue(
+                scale < previousScale,
+                "the rows stopped shrinking at $rowsOut rows out: $scale after $previousScale",
+            )
+            previousScale = scale
+            assertTrue(
+                scale > 0f,
+                "row $rowsOut out is scaled to $scale, which a graphics layer cannot divide by",
+            )
         }
-        assertEquals(0f, face(5f).alpha, "the fade still ends the drum at five rows out")
+    }
+
+    @Test
+    fun `every row above the centre is the exact mirror of its twin below`() {
+        // The cylinder term in the shift used to be unsigned while a row's place in the list is
+        // signed, so the pull that closes the bottom half's gaps pushed the top half's apart: on a
+        // phone drum the bottom gaps read 98 / 89 / 71 and the top 102 / 111 / 129, and a row three
+        // out was drawn at -341.7 against a 278.5dp half-span -- off the drum while its mirror was
+        // still on it, which is the "last two options sit tighter than the top two" report. Every
+        // term the two halves draw is asserted, so a term that quietly loses its sign fails here
+        // instead of merely looking wrong on screen.
+        listOf(0f, 0.5f, 1f).forEach { open ->
+            listOf(0.25f, 0.5f, 1f, 2f, rowsAtEdge).forEach { rowsOut ->
+                val below = face(rowsOut, unfold = open)
+                val above = face(-rowsOut, unfold = open)
+                // `shiftYPx` itself is deliberately not compared: it cancels the row's own signed
+                // place in the list, so a row above the centre carries the opposite fold to one
+                // below it even when both end up in the mirrored place. What has to mirror is
+                // where the row lands, and every property drawn on top of that landing.
+                assertEquals(
+                    -drawnCentreY(rowsOut, unfold = open),
+                    drawnCentreY(-rowsOut, unfold = open),
+                    0.01f,
+                    "at open=$open, row $rowsOut out is not drawn as far above the centre as below",
+                )
+                assertEquals(
+                    -below.tiltDeg,
+                    above.tiltDeg,
+                    0.001f,
+                    "at open=$open, row $rowsOut out does not lean opposite to its twin across the centre",
+                )
+                assertEquals(
+                    below.arcPx,
+                    above.arcPx,
+                    0.001f,
+                    "at open=$open, row $rowsOut out arcs differently above the centre than below",
+                )
+                assertEquals(
+                    below.scale,
+                    above.scale,
+                    0.001f,
+                    "at open=$open, row $rowsOut out is a different size above the centre than below",
+                )
+                assertEquals(
+                    below.alpha,
+                    above.alpha,
+                    0.001f,
+                    "at open=$open, row $rowsOut out is a different opacity above the centre than below",
+                )
+            }
+        }
     }
 
     // ------------------------------------------------- the radius itself ----
