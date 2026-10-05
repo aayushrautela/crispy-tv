@@ -5,12 +5,26 @@
 **This project is a Kotlin Multiplatform app: one codebase runs on Android, Android TV, iOS/tvOS and desktop (Windows, macOS, Linux).**
 
 Android and TV ship today. **The desktop app is the work in front of you** — `:android:desktopApp`
-now builds its own `AppServices` and `AppGraph` and boots the shared shell's **real** intro/auth/
-profile gate, so it is an app that authenticates rather than two screens behind a private `when`. It
-still cannot reach `MainAppShell`/`AppNavHost`: that bundle's route-argument readers need
-`NavBackStackEntry.arguments`, which is a `Bundle` on every target. The next landing is the desktop
-route-argument seam plus the desktop chrome. Desktop playback (a real player behind `:player`'s
-interfaces) and the Apple wiring come after that.
+builds its own `AppServices` and `AppGraph` and boots the shared shell's **real** intro/auth/
+profile gate, so it is an app that authenticates rather than a hardcoded pair of screens. **`AppRoot`
+and its `MainAppShell` are already `commonMain` and already callable off Android** — `MainAppShell` is
+a `private fun` at `AppRoot.kt:96`, private to a file that sits in `commonMain`, so nothing about
+them is an Android pin. The one thing between `:desktopApp` and the shared shell is that it cannot
+build an `AppNavHostDependencies`: 40 members, of which the four `@Composable` Android-only slots
+(the Media3 trailer layer, the two `:ui-assets` badge composables, the YouTube dialog), the player
+destination, and the factories behind `StreamResolverProvider`/`PlayerStreamHandoff` have no desktop
+answer yet.
+
+**The route-argument seam is not a blocker and never was.** `NavBackStackEntry.arguments` is a
+common `SavedState?`, not an `android.os.Bundle`, and `:app` reads route arguments off
+`savedStateHandle` — `HomeRouteArguments.kt`, three `internal` readers, and **zero** `.arguments`
+reads left anywhere under `android/app/src`. What *is* still true is the `when`: `desktopApp/Main.kt`
+keeps a `private enum class DesktopScreen` that exists only because the shell could not be reached,
+and its own KDoc says it was written to be deleted rather than extended. The next landings are a
+desktop `AppNavHostDependencies`, the deletion of that `when`, and then the desktop chrome — which is
+a `:app` `commonMain` decision, because `MainAppShell` already owns the chrome and puts a
+`FloatingBottomBar` at the bottom where Crispy-web puts a top topbar. Desktop playback (a real
+player behind `:player`'s interfaces, from Nuvio) and the Apple wiring come after that.
 
 This file describes the project as it is. It is not a phase map and holds no migration history —
 the multiplatform port is finished.
@@ -108,7 +122,7 @@ Two reference projects, and **the division between them is the whole point — d
 |---|---|---|
 | **Player and desktop mechanics** | **Nuvio** | It has solved the hard half: libmpv on three OSes, a native AWT surface peered into Compose, fullscreen, PiP, window chrome. **This is the most important thing we take from anywhere.** |
 | **Layout, information architecture, feel** | **Crispy-web, roughly** | It is this project's own predecessor, so it already knows the product. **Its implementation is the part we are replacing.** |
-| **Composition and wiring** | **neither — `:app`** | The desktop plugs into the seams `:app` already exposes. `AppBootstrapGate(…, ready)` is the portable one (intro → auth → profile selection, and `ready` gets `onSignedOut`); `AppRoot` is the Android wrapper that calls it with `MainAppShell`, so **`AppRoot` itself is still `androidMain`** and takes the `@Composable () -> AppNavHostDependencies` producer. |
+| **Composition and wiring** | **neither — `:app`** | The desktop plugs into the seams `:app` already exposes, and **all of them are already `commonMain`**: `AppBootstrapGate(…, ready)` (intro → auth → profile selection, and `ready` gets `onSignedOut`), and `AppRoot`, which calls the gate with `MainAppShell` and takes the `@Composable () -> AppNavHostDependencies` producer. `AndroidAppRoot` is the *Android* wrapper around it — the one that reads the graph off the `Application` — and `DesktopAppRoot` is its desktop twin; neither is what the desktop is waiting for. |
 | **Widget vocabulary** | **neither — Compose + `:sharedUI`** | See below; this is the line that is easiest to cross by accident. |
 
 **Neither is a code source.** Do not port files across, and do not build a transliteration layer.

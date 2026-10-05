@@ -26,12 +26,11 @@ import com.crispy.tv.app.AppGraph
  * The gate is the whole shared prefix -- splash, auth, profile selection -- and it
  * is real shared code rather than a desktop copy. The `ready` slot is where the
  * desktop shell would go, and it is passed in because there is nothing to put
- * there yet: `MainAppShell` builds an `AppNavHost`, whose dependency bundle cannot
- * be constructed off Android (its three `(NavBackStackEntry) -> …` argument readers
- * return an `android.os.Bundle` on every target, the player destination is
- * `PlayerNavGraph.kt`, the hero trailer layer is Media3). Until that bundle can be
- * built, the caller supplies its own ready branch and this function stays a
- * three-`remember` mirror of [AndroidAppRoot].
+ * there yet: `MainAppShell` builds an `AppNavHost`, whose 40-member dependency bundle
+ * cannot be constructed off Android (the player destination is `PlayerNavGraph.kt`,
+ * the hero trailer layer is Media3, the provider-logo badges read the plain-library
+ * `:ui-assets`). Until that bundle can be built, the caller supplies its own ready
+ * branch and this function stays a three-`remember` mirror of [AndroidAppRoot].
  *
  * An unconfigured desktop build lands on [com.crispy.tv.accounts.BootstrapState.NeedsAuth],
  * not on a blank frame: with a blank Supabase URL the bootstrap repository answers

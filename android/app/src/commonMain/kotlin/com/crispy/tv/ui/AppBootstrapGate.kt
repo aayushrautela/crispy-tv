@@ -26,11 +26,14 @@ private const val IntroTimeoutMs = 3_000L
  *
  * [AppRoot] is this gate plus `MainAppShell`, and `MainAppShell` is still
  * `androidMain`-shaped even though its file is `commonMain`: it builds a
- * `NavController` over an `AppNavHost` whose ~40-member dependency bundle
- * cannot be constructed off Android (three `(NavBackStackEntry) -> …` argument
- * readers return an `android.os.Bundle` on *every* target, `addPlayerDestination`
- * is `PlayerNavGraph.kt`, the hero trailer layer is Media3, and the provider-logo
- * badges read the plain-library `:ui-assets`).
+ * `NavController` over an `AppNavHost` whose 40-member dependency bundle cannot be
+ * constructed off Android — the player destination is `PlayerNavGraph.kt`, the hero
+ * trailer layer is Media3, the provider-logo badges read the plain-library
+ * `:ui-assets`, and a few factories still name `StreamResolverProvider` /
+ * `PlayerStreamHandoff`. (It was also once believed that three
+ * `(NavBackStackEntry) -> …` argument readers blocked this, because they were said to
+ * return an `android.os.Bundle` on *every* target. They do not — `arguments` is a common
+ * `SavedState?`, and `HomeRouteArguments` reads the same values off `savedStateHandle`.)
  *
  * So the seam is drawn at the last portable screen rather than at the shell:
  * everything a platform can share runs here, and the caller supplies the content

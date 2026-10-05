@@ -44,13 +44,17 @@ import com.crispy.tv.watchhistory.ContinueWatchingRail
  *
  * What is **not** rendered is the main shell. `AppRoot` takes its whole wiring
  * bundle as `navHostDependencies: @Composable () -> AppNavHostDependencies`, and
- * roughly a third of that bundle cannot be built off Android: the three
- * `NavBackStackEntry`-reading route-argument accessors (`Bundle` on every target),
- * the player graph, the Media3 hero trailer layer, the provider-logo badges
- * (their drawables live in a plain Android library) and the factories naming
- * `StreamResolverProvider` / `PlayerStreamHandoff` / `Dispatchers.IO` /
- * `java.util.Locale`. So `ready` is still the seeded [DesktopSeedShell] rather
+ * that 40-member bundle cannot be built off Android: the player graph, the Media3
+ * hero trailer layer, the provider-logo badges (their drawables live in a plain
+ * Android library) and the factories naming `StreamResolverProvider` /
+ * `PlayerStreamHandoff`. So `ready` is still the seeded [DesktopSeedShell] rather
  * than `MainAppShell`, and the landing after this one is what removes it.
+ *
+ * An earlier version of this paragraph also blamed three `NavBackStackEntry`-reading
+ * route-argument accessors, on the grounds that `arguments` is an `android.os.Bundle`
+ * on every target. It is not: it is a common `SavedState?`, and `:app` already reads
+ * the same values off `savedStateHandle`. That premise cost a landing; `HomeRouteArguments`
+ * is where the correction is recorded.
  *
  * ## Why the window's size is read here and written on close
  *
@@ -98,8 +102,9 @@ fun main() {
  * content until there is one.
  *
  * Written to be deleted, not extended: both screens are reachable only because
- * `DesktopAppRoot`'s bootstrap gate answers `Ready`, and once `MainAppShell` is
- * callable off Android the `when` and the enum go with them.
+ * `DesktopAppRoot`'s bootstrap gate answers `Ready`, and once `:desktopApp` can
+ * build an `AppNavHostDependencies` — `MainAppShell` is already callable off
+ * Android — the `when` and the enum go with them.
  */
 private enum class DesktopScreen { WATCHING, IMAGE_SETTINGS }
 

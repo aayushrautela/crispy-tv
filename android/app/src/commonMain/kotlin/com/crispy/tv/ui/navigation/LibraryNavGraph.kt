@@ -19,8 +19,12 @@ import com.crispy.tv.platform.AppLogger
  * `commonMain` in `c6bb5d32`, and a file can move once its *callees* are in
  * `commonMain`, because `androidMain` callers can call `commonMain` callees
  * freely. So this graph moves *up* from the route without dragging
- * `AppNavHost` with it -- the graph-to-route edge is one-way, and
- * `AppNavHost` is still `androidMain` and still names all six graphs.
+ * `AppNavHost` with it -- the graph-to-route edge is one-way. (`AppNavHost`
+ * has since moved up too: it is `commonMain` now, and it names **eight**
+ * registrations -- the seven graphs plus `d.addPlayerDestination` -- so the
+ * "still `androidMain`, still six graphs" version of this sentence was wrong
+ * twice over. It is a `commonMain` file making a placement claim about a
+ * sibling `commonMain` file, which is the failure this paragraph is about.)
  *
  * **All seven slots are required, with no defaults, and none of them is a
  * factory lambda.** `viewModelFactory` is the product, because `LibraryRoute`

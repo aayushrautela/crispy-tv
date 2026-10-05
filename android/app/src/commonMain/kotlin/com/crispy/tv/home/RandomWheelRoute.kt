@@ -105,7 +105,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sign
+import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -121,30 +125,67 @@ private val RandomRowHeight = 100.dp
 private val RandomDiscSize = 72.dp
 
 /**
- * How much of the drum's foot the floating spin button covers: its 32.dp scrim lead-in plus the
- * 64.dp button plus its 8.dp bottom margin. The drum's viewport ends where the overlay begins, so
- * the list's own centre -- which is where the wheel settles -- is the centre of what is actually
- * visible rather than 52.dp below it. Keep the three numbers in step with the overlay below.
+ * How much of the drum's foot the spin button's own band takes: its 32.dp scrim lead-in
+ * plus the 64.dp button plus its 8.dp bottom margin.
+ *
+ * The drum's viewport is padded up by exactly this much so that it ends where the scrim turns
+ * solid and the button's band begins, which leaves the wheel settling on the viewport's own
+ * centre -- the middle of the rows anybody can read. The scrim below is twice this tall: its
+ * fade covers the viewport's foot, and its lower half is the band the button sits on, reaching
+ * the drum's bottom so nothing empty sits under the button. Keep the three numbers in step
+ * with the overlay below.
  */
 private val RandomSpinOverlayHeight = 32.dp + 64.dp + 8.dp
 
-// The 3D face. Tilt and arc keep growing across every row a phone can show, so the drum
-// reads as a C rather than a bend with flat ends: the arc cap sits past the last visible row
-// and the tilt clamp past the last readable one. `a` is in ROW UNITS -- the row's distance
-// from the centre in rows, not a fraction of one.
-private const val RandomRotationPerRow = 14f
-private const val RandomRotationLimit = 85f
+// The 3D face. Tilt, arc and vertical shift are all read off ONE number -- how far round the
+// cylinder the row sits -- so the shape cannot disagree with itself, and the curve has no cap
+// to run into before the edge of the viewport. Scale and alpha stay the falloffs they were: the
+// rows shrink and fade with distance, and nothing else does.
 private const val RandomCameraDistance = 12f
 private const val RandomScaleFalloff = 0.07f
 private const val RandomScaleFloor = 0.62f
 private const val RandomScaleLocalGain = 0.14f
 private const val RandomScaleLocalBase = 0.86f
 private const val RandomAlphaFalloff = 0.2f
-private const val RandomLocalPerUnfold = 1.6f
-private const val RandomLocalPerRow = 0.18f
 private const val RandomLandingGain = 0.05f
-private val RandomArcStep = 7.dp
-private val RandomArcLimit = 120.dp
+
+/** Degrees to radians, the only conversion this file needs: everything else is in radians. */
+private val RandomDegToRad = (PI / 180.0).toFloat()
+
+/** A quarter turn, which is where a row's tilt stops meaning anything -- see [randomWheelFace]. */
+private val RandomQuarterTurn = (PI / 2).toFloat()
+
+/**
+ * How far round the drum its visible face spans, in radians.
+ *
+ * Sixty degrees, and it is the whole tuning knob. The centred row sits on the cylinder's tangent
+ * and each row further out is tilted a little more, so the wheel reads as a knob turned a little
+ * rather than a list bent in the middle.
+ *
+ * The number is an angle and not a distance in rows, because a phone viewport only spans three
+ * or four rows of a 100.dp drum -- so the rows nobody can see are the ones that decide the shape,
+ * and the angle is the only thing that survives being sampled coarsely. A quarter turn is the hard
+ * ceiling, and 60 degrees sits under it with room to spare: it is 16 pixels shy of 75 degrees on a
+ * Pixel 5, past which a row's own text crowds its cover art.
+ *
+ * Measured on a Pixel 5 render, as the left edge of each row's cover disc: 44px on the settle
+ * line, then 118px a row out and 230px two rows out. Thirty degrees gives 102px and 169px, which
+ * is the complaint -- the arc is there but too shallow to read as a C.
+ */
+private val RandomEdgeTiltRad = 60f * RandomDegToRad
+
+/**
+ * The radius of the cylinder the drum's rows sit on, in pixels.
+ *
+ * Derived from the viewport rather than fixed, which is the point of the whole file's geometry:
+ * a radius measured in *rows* makes the wheel's shape depend on how many rows the screen happens
+ * to show, so a phone showing three rows sees the flattest part of the circle and a tablet
+ * showing nine sees it bend harder. [RandomEdgeTiltRad] is the angle the drum spans either way,
+ * so it is the same curve at every screen size, and the rows past the edge of the viewport keep
+ * curving rather than stopping at the last one anybody can see.
+ */
+internal fun randomWheelRadiusPx(halfSpanPx: Float): Float =
+    (halfSpanPx / sin(RandomEdgeTiltRad)).coerceAtLeast(1f)
 
 /** How long the wheel holds off re-ticking after a detent, so a fast spin does not buzz continuously. */
 private val RandomDetentInterval = 40.milliseconds
@@ -400,8 +441,7 @@ internal fun RandomWheelRoute(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = Dimensions.SectionSpacing),
+                .windowInsetsPadding(WindowInsets.navigationBars),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SmallSpacing),
         ) {
         RandomChipRow(
@@ -415,17 +455,27 @@ internal fun RandomWheelRoute(
         // on the centre line, which is what lets an end slot land in the middle. The viewport
         // stops where the floating spin button starts (see [RandomSpinOverlayHeight]), so the
         // settle line is the visible middle, not the middle of a taller box whose foot is covered.
+        // The padding sits on the viewport, not on this Box: padding the Box instead pushes the
+        // overlay up with it and leaves the drum's foot -- the band the button is meant to sit
+        // on -- empty below it.
         Box(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .padding(bottom = RandomSpinOverlayHeight),
+                .fillMaxWidth(),
         ) {
             BoxWithConstraints(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = RandomSpinOverlayHeight),
                 contentAlignment = Alignment.Center,
             ) {
+                // [maxHeight] is the *padded* height -- the padding above is part of this
+                // viewport's own modifier chain, so the button's band is already out of it and
+                // subtracting it again would shrink the drum's ends off the centre line.
                 val edge = ((maxHeight - RandomRowHeight) / 2).coerceAtLeast(0.dp)
+                // The cylinder the drum's rows sit on, sized from what is actually on screen so
+                // the curve is the same curve on a phone and on a tablet.
+                val radiusPx = with(localDensity) { randomWheelRadiusPx(maxHeight.toPx() / 2f) }
                 when {
                     uiState.isLoading -> Box(
                         modifier = Modifier.fillMaxSize(),
@@ -479,12 +529,14 @@ internal fun RandomWheelRoute(
                                         // offset changes on every scroll frame, and reading it there would recompose every
                                         // visible row -- and re-run its image request -- sixty times a second mid-spin,
                                         // which is what the reference project learned the hard way.
-                                        randomWheelFace(
-                                            distanceInRows = listState.randomDistanceFromCenter(index, rowPx),
-                                            unfold = unfoldState.value,
-                                            landing = landing.value,
-                                            density = localDensity.density,
-                                            rowPx = rowPx,
+                                        applyRandomWheelFace(
+                                            randomWheelFace(
+                                                distanceInRows = listState.randomDistanceFromCenter(index, rowPx),
+                                                rowPx = rowPx,
+                                                radiusPx = radiusPx,
+                                                unfold = unfoldState.value,
+                                                landing = landing.value,
+                                            ),
                                         )
                                     },
                             )
@@ -494,22 +546,29 @@ internal fun RandomWheelRoute(
             }
 
             // The button floats over the wheel's faded foot rather than taking a band of its
-            // own. The scrim has no click of its own, so a drag that starts on it still turns
-            // the wheel.
+            // own. The scrim is twice [RandomSpinOverlayHeight] tall: its fade occupies the top
+            // half, which is the viewport's foot, and its bottom half is the drum's foot, where
+            // the button sits -- so the button reaches the drum's bottom instead of floating
+            // above an empty band. The scrim has no click of its own, so a drag that starts on
+            // it still turns the wheel.
             val page = MaterialTheme.colorScheme.background
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .height(RandomSpinOverlayHeight * 2)
                     .background(
                         Brush.verticalGradient(
                             0f to page.copy(alpha = 0f),
-                            0.45f to page.copy(alpha = 0.9f),
+                            // The old stops halved, so the top half of the band fades exactly
+                            // as the old full-height scrim did.
+                            0.225f to page.copy(alpha = 0.9f),
+                            0.5f to page,
                             1f to page,
                         )
                     )
                     .padding(horizontal = 20.dp)
-                    .padding(top = 32.dp, bottom = 8.dp),
+                    .padding(top = 32.dp + RandomSpinOverlayHeight, bottom = 8.dp),
             ) {
                 Button(
                     onClick = { spin() },
@@ -728,60 +787,90 @@ private fun RandomWheelRow(
     }
 }
 
+/** The five layer properties one drum row is drawn with, kept together so the shape can be read. */
+internal data class RandomWheelFace(
+    val tiltDeg: Float,
+    val arcPx: Float,
+    val shiftYPx: Float,
+    val scale: Float,
+    val alpha: Float,
+)
+
 /**
- * The drum's 3D face, from the row's own distance in rows from the centre slot.
+ * Where one row sits on the drum, from its own distance in rows from the centre slot.
  *
- * ## Every term is in row units
+ * ## Every term comes out of one angle
  *
- * [distanceInRows] is a count of rows, not a fraction of the screen, and nothing divides it down.
- * The first version divided it by three to "soften" the curve, which put the arc cap 8.5 rows
- * out of reach on a screen showing three -- the wheel looked like a straight list because the
- * maths said it was one. `a` here is the row's distance in rows, exactly as the reference
- * project's drum computes it, so a row one slot out already bends by a full arc step.
+ * [angle] is how far round the cylinder the row sits, and tilt, arc and vertical shift are all
+ * read off it, so the shape cannot disagree with itself. Nothing clamps it before a quarter
+ * turn, which a row only reaches well outside the viewport, so no two visible rows can end up
+ * sharing a tilt and an offset -- the flat ends of a bend, which is what the top of a tall
+ * viewport used to look like.
  *
- * [unfold] springs 0 -> 1. The geometry -- tilt, arc, falloff -- is computed from [distanceInRows]
- * *unattenuated*, exactly as the reference project's drum does, so a row keeps its bend while the
- * drum opens rather than growing one from zero. The fold itself is positional: [unfold] only
- * damps `local`, and `local` drives `translationY` below, so at zero every row is pulled onto the
- * centre slot and they fan out as the drum opens. Fading the rows where they stood, which is what
+ * ## `open` and `presence` are two things, and they used to be one
+ *
+ * `local` was the fold *and* a falloff with distance: `(unfold * 1.6 - a * 0.18)`, which reaches
+ * 1 about three rows out and then decays. Past that it dragged every row back towards its
+ * neighbours in the resting drum, not just while opening -- measured on a 970dp viewport, the
+ * rows four, five and six out were drawn at 352, 350 and 312 against a 100dp pitch, so row six
+ * sat *behind* row four and the top of the drum was a flat, out-of-order smear. [open] is the
+ * drum opening and nothing else; [presence] is the fade, which is what `alpha` is for.
+ *
+ * [unfold] springs 0 -> 1 and the fold is positional, so a closed drum has every row drawn on
+ * the centre slot and they fan out as it opens. Fading the rows where they stood, which is what
  * an earlier version did by multiplying [unfold] into the distance, opens like a crossfade and
  * not like a drum.
  */
-private fun GraphicsLayerScope.randomWheelFace(
+internal fun randomWheelFace(
     distanceInRows: Float,
+    rowPx: Float,
+    radiusPx: Float,
     unfold: Float,
     landing: Float,
-    density: Float,
-    rowPx: Float,
-) {
+): RandomWheelFace {
     val d = distanceInRows
     val a = abs(d)
-    // How "present" a row is: it opens with the drum and is damped the further it sits from the
-    // centre, which is what stops the outer slots from reading as a flat band behind the winner.
-    val local = (unfold * RandomLocalPerUnfold - a * RandomLocalPerRow).coerceIn(0f, 1f)
-    val nearMiddle = (1f - a).coerceAtLeast(0f)
-    val arcPx = (a * a * RandomArcStep.toPx()).coerceAtMost(RandomArcLimit.toPx())
-    val faceScale = (1f - RandomScaleFalloff * a).coerceAtLeast(RandomScaleFloor)
+    val angle = ((a * rowPx) / radiusPx).coerceAtMost(RandomQuarterTurn)
+    val open = unfold.coerceIn(0f, 1f)
+    val presence = (1f - RandomAlphaFalloff * a).coerceIn(0f, 1f)
+    return RandomWheelFace(
+        // A quarter turn: the row at the cylinder's tangent, which no visible row reaches.
+        tiltDeg = -sign(d) * angle / RandomDegToRad,
+        // The sagitta of this slice of the circle, so the curvature is the same everywhere
+        // along the drum the way a knob's face is.
+        arcPx = radiusPx * (1f - cos(angle)),
+        // The cylinder's own spacing, and the fold. `sin` is concave, so a row set out `a` rows
+        // from the centre belongs nearer the centre than the flat list put it -- which is what
+        // keeps the rows the same distance apart as they foreshorten instead of fanning apart
+        // into gaps at the ends.
+        shiftYPx = -(d * rowPx) * (1f - open) + (radiusPx * sin(angle) - a * rowPx) * open,
+        scale = (1f - RandomScaleFalloff * a).coerceAtLeast(RandomScaleFloor) *
+            (RandomScaleLocalBase + RandomScaleLocalGain * open) *
+            (1f + RandomLandingGain * landing * (1f - a).coerceAtLeast(0f)),
+        alpha = presence * open,
+    )
+}
 
+/**
+ * [face] onto the layer.
+ *
+ * The camera distance is the one term that is not geometry: it is how hard the perspective is,
+ * and it is read off the layer's own density rather than passed in.
+ */
+private fun GraphicsLayerScope.applyRandomWheelFace(face: RandomWheelFace) {
     transformOrigin = TransformOrigin(0.1f, 0.5f)
     // Required for `alpha` to layer against the rows behind it rather than multiply into them.
     compositingStrategy = CompositingStrategy.ModulateAlpha
-    // The fold. `local` is 0 at `unfold` 0, which puts every row exactly on the centre slot, and
-    // reaches 1 within about three rows of it at rest -- so this is ~0 for the rows you actually
-    // read and carries the opening entirely.
-    translationY = -d * rowPx * (1f - local)
-    rotationX = (-d * RandomRotationPerRow)
-        .coerceIn(-RandomRotationLimit, RandomRotationLimit)
+    rotationX = face.tiltDeg
     cameraDistance = RandomCameraDistance * density
-    translationX = arcPx
-    // Never zero: the floor above keeps the falloff positive, `local` is clamped to [0, 1] so its
-    // term is at least its base, and the landing term only ever grows it. `alpha` below is what
-    // makes a row disappear, so there is nothing here for a graphics layer to divide by.
-    scaleX = faceScale *
-        (RandomScaleLocalBase + RandomScaleLocalGain * local) *
-        (1f + RandomLandingGain * landing * nearMiddle)
-    scaleY = scaleX
-    alpha = ((1f - RandomAlphaFalloff * a).coerceIn(0f, 1f) * local)
+    translationX = face.arcPx
+    translationY = face.shiftYPx
+    // Never zero: the floor above keeps the falloff positive, `open` is clamped to [0, 1] so its
+    // term is at least its base, and the landing term only ever grows it. `alpha` is what makes a
+    // row disappear, so there is nothing here for a graphics layer to divide by.
+    scaleX = face.scale
+    scaleY = face.scale
+    alpha = face.alpha
 }
 
 /** The item whose middle sits nearest the viewport's centre, or -1 before the list has measured. */
@@ -799,8 +888,9 @@ private fun LazyListState.randomCenteredIndex(): Int {
  *
  * A row that is not in `visibleItemsInfo` has not been measured, so it reports a distance large
  * enough that the face is fully folded and fully transparent -- the same answer an off-screen row
- * would have got. [RandomArcLimit]'s cap makes the exact value irrelevant beyond a few rows, which
- * is why the caller can be this loose about it.
+ * would have got. The angle is capped at a quarter turn and alpha is gone within five rows of the
+ * centre, so the exact value is irrelevant beyond a few rows -- which is why the caller can
+ * be this loose about it.
  */
 private fun LazyListState.randomDistanceFromCenter(index: Int, rowPx: Float): Float {
     if (rowPx <= 0f) return 6f
