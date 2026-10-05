@@ -8,12 +8,14 @@ import java.util.Locale
 /**
  * Renders the epoch-millisecond UTC midnight of a birth date as `September 4, 1981`.
  *
- * This is the `androidMain` half of `PersonBody`'s `formatBirthday` slot, and it
+ * This is the `jvmMain` half of `PersonBody`'s `formatBirthday` slot, and it
  * exists because the *pattern* follows the device's language. `LocaleDateFormatters`
  * says this once for its own three renderings and the reason generalises: `:core-domain`'s
  * `formatIso8601LongDate` is portable and locale-invariant, so routing this through it
  * would print a different string than the user has learned to read — a behaviour change
- * dressed as a port.
+ * dressed as a port. It is `jvmMain` rather than `commonMain` because `Locale` and
+ * `java.time` are JVM types, and `jvmMain` is the source set both the Android and the
+ * desktop target compile.
  *
  * **It takes a `Long`, not a `LocalDate`.** A `java.time` type in this signature would
  * be the pin the whole split exists to discharge, so the calendar date crosses as an

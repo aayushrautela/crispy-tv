@@ -50,7 +50,7 @@ Repo agent rules:
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
-| `:android:app` | KMP + Compose | the shared UI and presentation. **169 `commonMain` / 40 `androidMain` / 4 `desktopMain`** |
+| `:android:app` | KMP + Compose | the shared UI and presentation. **172 `commonMain` / 39 `androidMain` / 9 `jvmMain` / 9 `desktopMain`** — counted by `verify_kmp_structure.py --json`, not by eye. `jvmMain` is the JVM layer **both** JVM targets compile, and holds what a JVM API (not Android) pins; a factory split across it puts only its wiring there, because `create(Class<T>)` has no common spelling. |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
@@ -87,22 +87,40 @@ Six facts about this layout that cost time to learn:
 - **`:android:home` shares the package `com.crispy.tv.home` with `:app`**, so a type declared in its
   `androidMain` is reachable from `:app` **with no import at all** — the purest form of the trap
   that makes an import-only audit report confidently-empty answers.
-- **The 40 remaining `:app` `androidMain` files are not a backlog.** Each carries a real platform
+- **The 39 remaining `:app` `androidMain` files are not a backlog.** Each carries a real platform
   pin. Measured by import, and **these sets overlap** — a pin is per file, so a file holding two pins
   appears twice and a first-match partition would report only the first (see Rules §1):
 
   | token | files |
   |---|---|
-  | `import android.content.Context` | 25 |
+  | `import android.content.Context` | 23 |
   | `androidx.media3.*` | 6 |
   | `androidx.compose.ui.platform.LocalContext` | 7 |
-  | `import java.util.Locale` | 6 |
+  | `import java.util.Locale` | 2 |
   | a `R.<type>` reference | 3 |
-  | `androidx.navigation.*` | 2 |
+  | `androidx.navigation.*` | 1 |
 
   **A wiring `Context` is not the same pin as a calling one** — a factory's `Context` belongs to the
-  factory, so a bucket that lumps them reads as 25 blocked files when many are correct. **Expect to add
+  factory, so a bucket that lumps them reads as 23 blocked files when many are correct. **Expect to add
   files here, not to drain them.**
+
+  **But "pinned by `Context`" no longer means "stays in `androidMain`".** `jvmMain` exists, both JVM
+  targets compile it, and a `Context` used only to reach `AppGraph` or an `AppServices` member is
+  discharged by taking that object instead — which is the difference between a file that is written
+  once and a file written twice as an androidMain/desktopMain pair. What genuinely cannot leave is
+  what needs `Class<T>` (the factory's `create`, which has no common spelling) or a `java.awt`/media3
+  type. `CatalogViewModelBuild.kt` was the proof of the shape — the wiring moved, the `create(Class<T>)`
+  shim stayed — and it now has siblings: `DiscoverViewModelBuild.kt`, `RandomWheelViewModelBuild.kt`,
+  `PersonDetailsViewModelBuild.kt`, `CalendarViewModelBuild.kt`, `SearchViewModelBuild.kt` each took
+  their factory's wiring into `jvmMain` while the same-named `androidMain` file shrank to the
+  `create(Class<T>)` shim, and three functions moved whole with no shim at all
+  (`BirthdayDateFormat.kt`, `AndroidLanguageLabels.kt`, `DeviceUtcOffsetMillis.kt`).
+  `AndroidAppLogger(appContext)` became `graph.services.logger` and
+  `SharedPreferencesKeyValueStore(context, name)` became `graph.services.keyValueStores.store(name)`:
+  `AppGraph.services` is an `internal` member of `:app`, so `jvmMain` can read it.
+  **The reverse also holds — a move is blocked when the collaborator itself is platform-bound**:
+  `AddonsSettingsViewModelFactory` could not move because `metadataAddonRegistry(context)` lives in
+  `:addons` `androidMain`, and a plain `com.android.library` publishes no `jvmMain` variant.
 - **`:android:sharedUI`** — CMP `1.11.1` pinned to Kotlin `2.4.10`; bump together or not at all.
   **Do not re-litigate Material3 Expressive, and do not "fix" it by dropping it.** `android { }` is
   current, `androidLibrary { }` is deprecated; **CMP 1.11.x ships `androidx.compose.*`, not

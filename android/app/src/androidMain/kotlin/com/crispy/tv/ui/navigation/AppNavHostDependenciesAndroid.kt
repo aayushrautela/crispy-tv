@@ -69,11 +69,11 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     val graph = remember(appContext) { appContext.appGraph().graph }
 
     // ---- search -----------------------------------------------------------------
-    val searchViewModelFactory = remember(appContext) { searchViewModelFactory(appContext) }
+    val searchViewModelFactory = remember(graph) { searchViewModelFactory(graph) }
     val searchLoadProfile = remember(appContext) { graph.activeProfileLoader() }
 
     // ---- random wheel -----------------------------------------------------------
-    val randomWheelViewModelFactory = remember(appContext) { randomWheelViewModelFactory(appContext) }
+    val randomWheelViewModelFactory = remember(graph) { randomWheelViewModelFactory(graph) }
 
     // ---- account ----------------------------------------------------------------
     // `accountLoadProfile` is a SECOND instance rather than a reuse of
@@ -131,7 +131,7 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
     val homeLoadProfile = remember(appContext) { graph.activeProfileLoader() }
     val homeCalendarViewModelFactory = remember(appContext) { calendarViewModelFactory(appContext) }
     val homeCatalogViewModelFactory = remember(appContext) {
-        { section: CatalogSectionRef -> catalogViewModelFactory(appContext, section) }
+        { section: CatalogSectionRef -> catalogViewModelFactory(graph, section) }
     }
     val homeDetailsViewModelFactory = remember(appContext) {
         { itemId: String, itemType: String, runtimeEntry: RuntimeDetailsEntry? ->

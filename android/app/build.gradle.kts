@@ -236,6 +236,21 @@ kotlin {
         val appUi = create("appUi") { dependsOn(commonMain.get()) }
         androidMain.get().dependsOn(appUi)
         jvmMain.get().dependsOn(appUi)
+
+        // The JVM layer BOTH JVM targets compile. `applyDefaultHierarchyTemplate`
+        // registers `jvmMain` and hangs it off `appUi`, but by default nothing
+        // dependsOn it, so it is a source set the build never compiles -- and a
+        // file placed there is silently inert rather than an error. Android and
+        // desktop are both JVM targets, so these two edges are what turn it
+        // into the shared layer for everything pinned by `java.*`/`Dispatchers.IO`
+        // rather than Android alone.
+        //
+        // `named("desktopMain")` and not `desktopMain`: `jvm("desktop")` renames its
+        // own source set, so there is no typed accessor for it. `androidMain` DOES
+        // have one. Proven in both directions with a probe calling across the edge
+        // and a negative test with each edge removed.
+        named("desktopMain").get().dependsOn(jvmMain.get())
+        androidMain.get().dependsOn(jvmMain.get())
         iosMain.get().dependsOn(appUi)
 
         // What every target needs. These are the dependencies a `commonMain`

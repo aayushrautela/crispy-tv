@@ -1,41 +1,34 @@
 package com.crispy.tv.catalog
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.app.appGraph
-import kotlinx.coroutines.Dispatchers
+import com.crispy.tv.app.AppGraph
 
 /**
- * The `androidMain` construction site for [CatalogViewModel], lifted out of the
- * companion object it used to be.
+ * The Android half of [CatalogViewModel]'s construction.
  *
- * **The split is an extraction rather than a move, and the reason is the same one
- * [CalendarScreenFactory] records.** The factory needs a `Context` and the view model needs
- * none, so one of the two halves has to stay behind; keeping the factory on the class would
- * have meant the portable half inherited the `Context` import.
+ * The wiring itself is **not** here — it is `buildCatalogViewModel` in `jvmMain`, which both
+ * the Android and the desktop target compile. Only the class check is Android-shaped, and it
+ * is kept verbatim rather than tidied:
  *
- * **The home catalog service used to be the `Context`'s reason to exist here.** It is a
- * member of the `commonMain` graph now, so what is left is `Dispatchers.IO` — and that one
- * is a platform edge for the view model's required no-default slot, written here once rather
- * than defaulted in the class: `Dispatchers.IO` is `internal` on Kotlin/Native, so a
- * `commonMain` default would not compile there at all, and `Dispatchers.Default` would compile
- * everywhere and silently put a blocking add-on fetch on a CPU-sized pool.
+ * - The `isAssignableFrom` check comes before the throw, so a caller asking for the wrong
+ *   ViewModel class gets the same message it always did. The text is unchanged, because it
+ *   is a diagnostic string and changing it is a behaviour change dressed as a cleanup.
+ * - `Class<T>` cannot move: the common metadata declares only `create(KClass<T>, extras)`,
+ *   and `KClass.isAssignableFrom` does not exist in Kotlin 2.4.10's common `KClass`. The
+ *   desktop's copy of this factory goes through `viewModelFactoryOf` instead and therefore
+ *   compares for equality — a recorded difference, and the reason this file still exists in
+ *   `androidMain` at all.
  */
 fun catalogViewModelFactory(
-    context: Context,
+    graph: AppGraph,
     section: CatalogSectionRef,
 ): ViewModelProvider.Factory {
-    val homeCatalogService = context.applicationContext.appGraph().graph.homeCatalogService
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(CatalogViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return CatalogViewModel(
-                    homeCatalogService = homeCatalogService,
-                    section = section,
-                    ioDispatcher = Dispatchers.IO,
-                ) as T
+                return buildCatalogViewModel(graph, section) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

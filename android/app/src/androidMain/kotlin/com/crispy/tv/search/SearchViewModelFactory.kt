@@ -1,58 +1,38 @@
 package com.crispy.tv.search
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.app.appGraph
-import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
-import java.util.Locale
-import kotlinx.coroutines.Dispatchers
+import com.crispy.tv.app.AppGraph
 
 /**
- * Builds the [ViewModelProvider.Factory] for [SearchViewModel].
+ * The Android half of [SearchViewModel]'s construction.
  *
- * This is the whole Android half of the search viewmodel, and it is one function
- * rather than a `companion object` member because the viewmodel itself now lives
- * in `commonMain` and cannot name `Context`. The body is the one the companion
- * used to hold, with one addition and two removals:
+ * The wiring itself is **not** here — it is `buildSearchViewModel` in `jvmMain`, which both
+ * the Android and the desktop target compile. Only the class check is Android-shaped, and it is
+ * kept verbatim rather than tidied:
  *
- * - it supplies `languageTagProvider`, which is new. The viewmodel no longer
- *   decides the language; the platform does, here, and the value crosses into it
- *   as the BCP-47 tag the backend already speaks.
- * - it constructs `KeyValueSearchHistoryStore`, the [SearchHistoryStore]
- *   implementation. The port took the implementation's original name, and when the
- *   store itself moved to `commonMain` it took the *port's* name instead: it had
- *   stopped naming `SharedPreferences`, which is still the name of the file on
- *   disk and the one thing the class no longer knows.
- * - it no longer passes a locale to the repositories: `BackendSearchRepository`
- *   never used the one it was given and its parameter has been deleted, and
- *   `AiSearchRepository` now takes the tag directly.
+ * - The `isAssignableFrom` check comes before the throw, so a caller asking for the wrong
+ *   ViewModel class gets the same message it always did. The text is unchanged, because it
+ *   is a diagnostic string and changing it is a behaviour change dressed as a cleanup.
+ * - `Class<T>` cannot move: the common metadata declares only `create(KClass<T>, extras)`, and
+ *   `KClass.isAssignableFrom` does not exist in Kotlin 2.4.10's common `KClass`. The desktop's
+ *   copy of this factory goes through `viewModelFactoryOf` instead and therefore compares for
+ *   equality — a recorded difference, and the reason this file still exists in `androidMain` at
+ *   all.
  *
- * The two repositories used to be built by `search/SearchRepositories.kt`, which existed
- * only to hold the provider lookups. They are [com.crispy.tv.app.AppGraph] members now, and
- * they are still built fresh per `create` rather than cached — see the graph for why.
+ * The `Context` parameter is gone. The one collaborator was the search history store, which now
+ * comes off the `commonMain` `AppGraph` through `services.keyValueStores`; nothing here reaches
+ * a platform any more.
  */
-fun searchViewModelFactory(appContext: Context): ViewModelProvider.Factory {
-    val context = appContext.applicationContext
-    val graph = context.appGraph().graph
+fun searchViewModelFactory(graph: AppGraph): ViewModelProvider.Factory {
     return object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (!modelClass.isAssignableFrom(SearchViewModel::class.java)) {
                 throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
 
-            val viewModel = SearchViewModel(
-                searchRepository = graph.backendSearchRepository(),
-                aiSearchRepository = graph.aiSearchRepository(),
-                searchHistoryStore =
-                    KeyValueSearchHistoryStore(
-                        SharedPreferencesKeyValueStore(context, "search_preferences"),
-                    ),
-                languageTagProvider = { Locale.getDefault().toLanguageTag() },
-                ioDispatcher = Dispatchers.IO,
-            )
             @Suppress("UNCHECKED_CAST")
-            return viewModel as T
+            return buildSearchViewModel(graph) as T
         }
     }
 }

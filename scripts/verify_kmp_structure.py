@@ -52,6 +52,15 @@ KIND_BY_PLUGIN = {
 # into any of these is free; an edge into a platform set is a violation.
 COMMON_SETS = ("commonMain", "commonTest")
 
+# Which sets a resolved name is DELIBERATELY shared through, as opposed to
+# coupled to Android by.  `jvmMain` and `appUi` belong here and not in
+# COMMON_SETS: they are real source sets so their files must be counted in the
+# per-module table (line 409 sums everything outside COMMON_SETS as "other", and
+# folding them in would delete their counts from the report entirely), but a name
+# resolving into `:app`'s `jvmMain` is the shared-JVM-layer technique working as
+# intended, not the Android coupling `platform` exists to surface.
+SHARED_SETS = COMMON_SETS + ("appUi", "jvmMain")
+
 
 def git(*args: str) -> str:
     return subprocess.run(
@@ -215,18 +224,30 @@ def project_edges(path: str) -> dict[str, set[str]]:
 # see every dependency `:app`'s `commonMain` declares, so a same-package name
 # resolving into `:backend/commonMain` from `commonTest` is declared, not
 # invisible.
+#
+# `jvmMain` and `appUi` are `:app`'s own intermediate sets, and they were
+# missing here while existing in the build, which made this table a claim about
+# the module rather than a measurement of it.  `appUi` sits between
+# `commonMain` and the platform sets; `jvmMain` sits between `appUi` and the
+# two JVM targets, because both `androidMain` and `desktopMain` now `dependsOn`
+# it -- which is what lets a file pinned only by `java.*` or `Dispatchers.IO`
+# be written once instead of as an androidMain/desktopMain pair.  One level of
+# closure, listed explicitly, is what `declares()` walks.
 ANCESTORS = {
     "commonMain": (),
-    "androidMain": ("commonMain",),
+    "appUi": ("commonMain",),
+    "jvmMain": ("appUi", "commonMain"),
+    "androidMain": ("jvmMain", "appUi", "commonMain"),
+    "desktopMain": ("jvmMain", "appUi", "commonMain"),
     "main": (),
     "desktop": (),
     "linuxX64": (),
     "commonTest": ("commonMain",),
-    "androidHostTest": ("androidMain", "commonMain"),
-    "androidTest": ("androidMain", "commonMain"),
-    "test": ("main", "androidMain", "commonMain", "store", "sideload"),
-    "store": ("main", "androidMain", "commonMain"),
-    "sideload": ("main", "androidMain", "commonMain"),
+    "androidHostTest": ("androidMain", "jvmMain", "appUi", "commonMain"),
+    "androidTest": ("androidMain", "jvmMain", "appUi", "commonMain"),
+    "test": ("main", "androidMain", "jvmMain", "appUi", "commonMain", "store", "sideload"),
+    "store": ("main", "androidMain", "jvmMain", "appUi", "commonMain"),
+    "sideload": ("main", "androidMain", "jvmMain", "appUi", "commonMain"),
 }
 
 
@@ -364,7 +385,7 @@ def main() -> int:
         _, _, _, _, _, osset, _, declared_ok = rec
         if not declared_ok:
             undeclared.append(rec)
-        elif osset not in COMMON_SETS:
+        elif osset not in SHARED_SETS:
             platform.append(rec)
         else:
             shared.append(rec)
