@@ -160,21 +160,22 @@ private val RandomQuarterTurn = (PI / 2).toFloat()
 /**
  * How far round the drum its visible face spans, in radians.
  *
- * Sixty degrees, and it is the whole tuning knob. The centred row sits on the cylinder's tangent
- * and each row further out is tilted a little more, so the wheel reads as a knob turned a little
- * rather than a list bent in the middle.
+ * Forty-five degrees, and it is the whole tuning knob. The centred row sits on the cylinder's
+ * tangent and each row further out is tilted a little more, so the wheel reads as a knob turned a
+ * little rather than a list bent in the middle.
  *
  * The number is an angle and not a distance in rows, because a phone viewport only spans three
  * or four rows of a 100.dp drum -- so the rows nobody can see are the ones that decide the shape,
  * and the angle is the only thing that survives being sampled coarsely. A quarter turn is the hard
- * ceiling, and 60 degrees sits under it with room to spare: it is 16 pixels shy of 75 degrees on a
- * Pixel 5, past which a row's own text crowds its cover art.
+ * ceiling, and 45 degrees sits under it with room to spare, past which a row's own text crowds
+ * its cover art.
  *
- * Measured on a Pixel 5 render, as the left edge of each row's cover disc: 44px on the settle
- * line, then 118px a row out and 230px two rows out. Thirty degrees gives 102px and 169px, which
- * is the complaint -- the arc is there but too shallow to read as a C.
+ * Tuned between two rendered rejections: thirty degrees carried a row one step out only 9% of its
+ * own width round the drum -- the arc is there but too shallow to read as a C -- and sixty carried
+ * it 16%, with a two-rows-out bulge of 0.6 of a row height, which read as overly round. Forty-five
+ * is the midpoint: 13% a row out, half a row height two rows out.
  */
-private val RandomEdgeTiltRad = 60f * RandomDegToRad
+private val RandomEdgeTiltRad = 45f * RandomDegToRad
 
 /**
  * The radius of the cylinder the drum's rows sit on, in pixels.
@@ -195,7 +196,7 @@ internal fun randomWheelRadiusPx(halfSpanPx: Float): Float =
  * [randomWheelRadiusPx] sizes the radius from [RandomEdgeTiltRad], but it derives it as a
  * *vertical* projection and the face then walks that radius by arc length -- so the row a
  * half-span out is at `halfSpan / radius`, which is [RandomEdgeTiltRad]'s own sine rather than
- * the sixty degrees the radius was derived from.
+ * the forty-five degrees the radius was derived from.
  *
  * Both the fade and the shrink are measured against this rather than against a count of rows,
  * which is what makes the drum self-contained: the last row is gone at the edge of the drum on a

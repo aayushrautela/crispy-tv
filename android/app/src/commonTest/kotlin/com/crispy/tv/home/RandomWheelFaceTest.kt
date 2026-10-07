@@ -333,15 +333,17 @@ class RandomWheelFaceTest {
         // different wheel, it is a flat list with a slight lean, and every other test in this file
         // passes either way. So the number is pinned rather than left to taste.
         //
-        // Measured on a Pixel 5 render as the left edge of each row's cover disc -- 60 degrees
-        // puts them 44px, 118px and 230px from the settle line, and the rejected 30 degrees gave
-        // 102px and 169px, which is the drum that was reported as going flat towards the top.
-        assertEquals(60f, edgeAngleDeg(), 0.01f, "the drum's visible span was retuned")
+        // The two rendered rejections the knob was tuned between: thirty degrees carried a row
+        // one step out 9% of its own width round the drum -- too shallow to read as a C -- and
+        // sixty carried it 16% with a 0.6-row-height bulge two rows out, which read as overly
+        // round.
+        assertEquals(45f, edgeAngleDeg(), 0.01f, "the drum's visible span was retuned")
         // And the same claim in the units the eye reads it in: each row one step out is carried
-        // 15.6% of its own width round the drum, where the rejected 30 degrees carried it 9.1% --
-        // enough of a step to see the curve, little enough that the rows still read as a list.
+        // 12.8% of its own width round the drum, where the too-flat thirty degrees carried it 9.1%
+        // and the too-round sixty carried it 15.6% -- enough of a step to see the curve, little
+        // enough that the rows still read as a list.
         assertEquals(
-            0.156f,
+            0.128f,
             face(1f).arcPx / rowPx,
             0.002f,
             "a row one step out no longer sits far enough round the drum to read as a C",
