@@ -50,22 +50,27 @@ fun NavGraphBuilder.addAccountNavGraph(
     loadProfile: suspend () -> ActiveProfileInfo?,
 ) {
     composable(AppRoutes.ProfileManagementRoute) {
+        PredictivePeelContainer {
         ProfileManagementRoute(
             onBack = { navController.popBackStack() },
             onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
             viewModelFactory = profileListFactory,
         )
+        }
     }
 
     composable(AppRoutes.AccountSettingsRoute) {
+        PredictivePeelContainer {
         AccountSettingsRoute(
             onBack = { navController.popBackStack() },
             onSignedOut = onSignedOut,
             viewModelFactory = accountSettingsFactory,
         )
+        }
     }
 
     composable(AppRoutes.ProfileMenuRoute) {
+        PredictivePeelContainer {
         ProfileMenuRoute(
             onOpenSettings = { navController.navigate(AppRoutes.SettingsRoute) },
             onManageProfiles = { navController.navigate(AppRoutes.AccountsProfilesRoute) },
@@ -73,5 +78,6 @@ fun NavGraphBuilder.addAccountNavGraph(
             onBack = { navController.popBackStack() },
             loadProfile = loadProfile,
         )
+        }
     }
 }

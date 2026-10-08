@@ -413,6 +413,12 @@ kotlin {
     // censuses of this layer each found a different artifact and each found it was
     // not the pin. The remedy is the no-default-slot pattern, not this coordinate.
     implementation(libs.jb.navigation.compose)
+    // `androidx.navigationevent:navigationevent-compose`, pinned explicitly in
+    // the catalog. The fork re-exports it on metadata+android but ships hollow
+    // non-Android variants, so without this line `commonMain` can name the
+    // package on Android and nowhere else. Read-only use only: this module
+    // never registers a handler, it only observes `transitionState`.
+    implementation(libs.androidx.navigationevent.compose)
     // androidx.lifecycle:lifecycle-viewmodel is a genuine KMP artifact at 2.11.0 - this was
     // measured by declaring it here and compiling the `desktop` target, not read from a
     // doc. ViewModel, ViewModelProvider and viewModelScope are therefore all reachable

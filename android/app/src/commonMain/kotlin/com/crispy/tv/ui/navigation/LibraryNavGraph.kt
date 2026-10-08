@@ -65,6 +65,7 @@ fun NavGraphBuilder.addLibraryNavGraph(
     logger: AppLogger,
 ) {
     composable(AppRoutes.LibraryRoute) { entry ->
+        PredictivePeelContainer {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             LibraryRoute(
                 viewModelFactory = viewModelFactory,
@@ -101,6 +102,7 @@ fun NavGraphBuilder.addLibraryNavGraph(
                     entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
                 },
             )
+        }
         }
     }
 }

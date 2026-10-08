@@ -19,25 +19,23 @@ import androidx.compose.runtime.CompositionLocalProvider
  * ([LocalSharedTransitionScope], defaulting to `null`, which is why a participant
  * that finds no provider has a defined "no transition" path), and the mechanism is
  * available everywhere. The only Android-bound piece was the two lines that
- * *supplied* the scope, and they lived in `AppNavHost.kt` -- a file that is
- * `androidMain` for its own reasons, because it wraps a
- * `androidx.navigation.compose.NavHost`.
+ * *supplied* the scope; they lived in `AppNavHost.kt` when that file was still
+ * `androidMain`, and they moved with it -- the host is `commonMain` now, and this
+ * provider wraps it there.
  *
  * This is the same shape as every other seam in this migration: the portable half
  * is a three-line composable, and the platform half is the composition root that
  * calls it.
  *
- * ## What is deliberately not here
+ * ## What used to be written here about the graphs, and why it is gone
  *
- * The seven `*NavGraph.kt` files stay in `androidMain` -- `AuthNavGraph`,
- * `DiscoverNavGraph`, `HomeNavGraph`, `LibraryNavGraph`, `PlayerNavGraph`,
- * `SearchNavGraph` and `SettingsNavGraph`. They declare
- * `NavGraphBuilder` graphs and are genuinely bound to `androidx.navigation`,
- * which is not on the `commonMain` classpath at all -- there is no KMP artifact
- * for it (its only `available-at` files are `-android-` and `*Stubs*`, and the
- * `*Stubs*` variants are dokkadoc stub artifacts, not compilable targets). A
- * desktop shell will need a navigation model that is not this one, and inventing
- * it here would be designing the wrong thing in the wrong place.
+ * This KDoc used to say the seven `*NavGraph.kt` files stay in `androidMain`
+ * because `androidx.navigation` is not on the `commonMain` classpath at all.
+ * Both clauses are now false: the graphs are `commonMain` (the JetBrains KMP
+ * fork of `navigation-compose` carries them), and `AppNavHost` -- predictive
+ * transitions included -- compiles against metadata. The paragraph is replaced
+ * rather than amended because a corrected premise with a surviving copy is
+ * worse than the original.
  *
  * ## Why `content` has no default
  *

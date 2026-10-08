@@ -86,6 +86,7 @@ internal fun NavGraphBuilder.addPlayerDestination(navController: NavHostControll
         ForegroundPlaybackEffect(entry, sessionViewModel, host.isInPictureInPictureMode)
         LaunchedEffect(host) { host.maybeRequestNotificationPermission() }
 
+        PredictivePeelContainer {
         PlayerRoute(
             session = sessionViewModel,
             isInPictureInPictureMode = host.isInPictureInPictureMode.value,
@@ -101,6 +102,7 @@ internal fun NavGraphBuilder.addPlayerDestination(navController: NavHostControll
                 )
             },
         )
+        }
     }
 }
 

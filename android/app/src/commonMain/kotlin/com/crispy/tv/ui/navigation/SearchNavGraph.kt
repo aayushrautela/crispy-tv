@@ -56,6 +56,7 @@ fun NavGraphBuilder.addSearchNavGraph(
     loadProfile: suspend () -> ActiveProfileInfo?,
 ) {
     composable(AppRoutes.SearchRoute) { entry ->
+        PredictivePeelContainer {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             SearchRoute(
                 onItemClick = { item, sharedElementKey ->
@@ -84,6 +85,7 @@ fun NavGraphBuilder.addSearchNavGraph(
                 viewModelFactory = searchViewModelFactory,
                 loadProfile = loadProfile,
             )
+        }
         }
     }
 }

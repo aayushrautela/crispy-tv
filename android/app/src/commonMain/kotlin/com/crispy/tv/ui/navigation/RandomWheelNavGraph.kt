@@ -31,6 +31,7 @@ fun NavGraphBuilder.addRandomWheelNavGraph(
     randomWheelViewModelFactory: ViewModelProvider.Factory,
 ) {
     composable(AppRoutes.RandomWheelRoute) { entry ->
+        PredictivePeelContainer {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             RandomWheelRoute(
                 viewModelFactory = randomWheelViewModelFactory,
@@ -51,6 +52,7 @@ fun NavGraphBuilder.addRandomWheelNavGraph(
                 },
                 onClose = { navController.popBackStack() },
             )
+        }
         }
     }
 }

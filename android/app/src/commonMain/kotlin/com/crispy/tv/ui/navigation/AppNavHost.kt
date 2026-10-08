@@ -5,12 +5,16 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigationevent.NavigationEvent
 
 private const val TopLevelNavigationDurationMillis = 200
 private const val TopLevelNavigationOffsetDivisor = 8
@@ -156,6 +160,41 @@ internal fun AppNavHost(
                     else -> ExitTransition.None
                 }
             },
+            // The scrub half of a system back gesture. While the finger is down
+            // `NavHost` ignores the four transitions above and consults only
+            // these two, driving the returned transition's fraction from the
+            // gesture -- so this is where the previous page stops being static
+            // and where the direction stops being a route-order guess: `swipeEdge`
+            // is the physical edge the finger came from. Motion only; the corner
+            // shape a transition cannot express lives in `predictivePeelClip`,
+            // and both read the same gesture so they cannot disagree.
+            //
+            // No settle hand-off is authored here on purpose. Commit and cancel
+            // both continue *this same transition* (`animateTo` on the scrubbed
+            // state, verified in the resolved classes), so there is no second
+            // pose to keep in sync -- `popEnter/popExitTransition` above run
+            // only for programmatic pops, never for a gesture.
+            predictivePopEnterTransition = { swipeEdge ->
+                val sign = peelSign(swipeEdge)
+                if (roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                    roleOf(targetState.destination.route) == NavigationRole.TopLevel
+                ) {
+                    predictiveTabEnter(sign)
+                } else {
+                    predictivePeelEnter(sign)
+                }
+            },
+            predictivePopExitTransition = { swipeEdge ->
+                val sign = peelSign(swipeEdge)
+                when {
+                    roleOf(initialState.destination.route) == NavigationRole.Overlay ->
+                        predictiveOverlayExitTo(sign)
+                    roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                        roleOf(targetState.destination.route) == NavigationRole.TopLevel ->
+                        predictiveTabExit(sign)
+                    else -> predictivePeelExitTo(sign)
+                }
+            },
         ) {
             addHomeNavGraph(
                 navController = navController,
@@ -272,3 +311,50 @@ private fun overlayExitToRight(): ExitTransition =
         animationSpec = tween(OverlayNavigationDurationMillis),
         targetOffsetX = { fullWidth -> fullWidth },
     ) + fadeOut(animationSpec = tween(OverlayNavigationDurationMillis))
+
+// The predictive halves below mirror the ordinary ones in magnitude -- tabs
+// keep their 1/8 slide, overlays their full-width slide, detail exits gain the
+// card scale -- but take their direction from the finger (`sign`) rather than
+// from route order. The scrub drives the fraction, so the durations only shape
+// the release settle; they reuse [PredictiveSettleDurationMillis], the same
+// constant the corner tail uses, so shape and motion finish together.
+private fun predictiveTabEnter(sign: Int): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        initialOffsetX = { fullWidth -> -sign * fullWidth / TopLevelNavigationOffsetDivisor },
+    ) + fadeIn(animationSpec = tween(PredictiveSettleDurationMillis))
+
+private fun predictiveTabExit(sign: Int): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        targetOffsetX = { fullWidth -> sign * fullWidth / TopLevelNavigationOffsetDivisor },
+    ) + fadeOut(animationSpec = tween(PredictiveSettleDurationMillis))
+
+private fun predictiveOverlayExitTo(sign: Int): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        targetOffsetX = { fullWidth -> sign * fullWidth },
+    ) + fadeOut(animationSpec = tween(PredictiveSettleDurationMillis))
+
+// The revealed page: starts a step scaled down and offset against the swipe,
+// settles to identity. Parallax (1/12 width against the finger) over scale.
+private fun predictivePeelEnter(sign: Int): EnterTransition =
+    scaleIn(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        initialScale = 0.94f,
+    ) + slideInHorizontally(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        initialOffsetX = { fullWidth -> -sign * fullWidth / 12 },
+    ) + fadeIn(animationSpec = tween(PredictiveSettleDurationMillis))
+
+// The peeling page: scales toward the edge the finger came from -- the pivot
+// is on that edge, not the centre -- while sliding out with the swipe.
+private fun predictivePeelExitTo(sign: Int): ExitTransition =
+    scaleOut(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        targetScale = 0.90f,
+        transformOrigin = TransformOrigin(if (sign > 0) 0f else 1f, 0.5f),
+    ) + slideOutHorizontally(
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        targetOffsetX = { fullWidth -> sign * fullWidth },
+    ) + fadeOut(animationSpec = tween(PredictiveSettleDurationMillis))

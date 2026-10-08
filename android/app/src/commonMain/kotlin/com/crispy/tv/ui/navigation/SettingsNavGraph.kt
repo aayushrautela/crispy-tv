@@ -28,6 +28,7 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
     // navigation decision and not a wiring one.
 
     composable(AppRoutes.SettingsRoute) { entry ->
+        PredictivePeelContainer {
         SettingsScreen(
             pluginsUiSupported = dependencies.pluginsUiSupported,
             onNavigateToAddonsSettings = {
@@ -47,13 +48,16 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             },
             onBack = { navController.popBackStack() },
         )
+        }
     }
 
     composable(AppRoutes.AddonsSettingsRoute) {
+        PredictivePeelContainer {
         AddonsSettingsRoute(
             onBack = { navController.popBackStack() },
             viewModelFactory = dependencies.addonsSettingsViewModelFactory,
         )
+        }
     }
 
     // The plugins destination is registered only when the build has a plugins
@@ -61,19 +65,24 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
     // destination would let a deep link to it land on a blank page.
     dependencies.pluginsSettingsScreen?.let { pluginsScreen ->
         composable(AppRoutes.PluginsSettingsRoute) {
+            PredictivePeelContainer {
             pluginsScreen { navController.popBackStack() }
+            }
         }
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {
+        PredictivePeelContainer {
         ProfileManagementRoute(
             onBack = { navController.popBackStack() },
             onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
             viewModelFactory = dependencies.profileListViewModelFactory,
         )
+        }
     }
 
     composable(AppRoutes.ImageSettingsRoute) {
+        PredictivePeelContainer {
         val imageSettingsRepository = dependencies.imageSettingsRepository
         val imageSettings by imageSettingsRepository.settings.collectAsStateWithLifecycle()
 
@@ -84,9 +93,11 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             },
             onBack = { navController.popBackStack() }
         )
+        }
     }
 
     composable(AppRoutes.PlaybackSettingsRoute) {
+        PredictivePeelContainer {
         val coroutineScope = rememberCoroutineScope()
 
         val cloudSync = dependencies.profileDataCloudSync
@@ -122,5 +133,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             },
             onBack = { navController.popBackStack() }
         )
+        }
     }
 }

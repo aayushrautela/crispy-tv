@@ -112,6 +112,17 @@ lifecycle = "2.11.0"
 # rename is every module that reads the alias, not the one being edited.**
 jbNavigationCompose = "2.10.0-beta01"
 navigationCompose = "2.9.8"
+# `androidx.navigationevent:navigationevent-compose:1.1.1` is pinned explicitly
+# even though it already arrives transitively: the fork's
+# `org.jetbrains.androidx.navigationevent:navigationevent-compose:1.1.0`
+# re-exports Google's 1.1.1 on `metadata`+`android` but ships EMPTY
+# desktop/ios/js/native variants (`available-at` redirects to hollow JB
+# artifacts; the JB desktop jar is a manifest with zero classes). The explicit
+# line is what puts the real KMP artifact -- and with it
+# `LocalNavigationEventDispatcherOwner` -- on every target's classpath.
+# 1.1.1 and not 1.1.2: it is the version the fork's own `.module` re-exports,
+# so the pin changes no resolution, only its explicitness.
+navigationEventCompose = "1.1.1"
 
 # --- Paging ---
 paging = "3.5.1"
@@ -198,6 +209,11 @@ androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle
 # reader needs to see when a navigation API changes underneath seven files.
 jb-navigation-compose = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "jbNavigationCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+# Provider-named like the two above: same package family, different group, and
+# the group is what tells them apart on a classpath that carries both. Read-only
+# use only -- this repo never registers a handler, it only observes
+# `NavigationEventDispatcher.transitionState`.
+androidx-navigationevent-compose = { group = "androidx.navigationevent", name = "navigationevent-compose", version.ref = "navigationEventCompose" }
 
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }

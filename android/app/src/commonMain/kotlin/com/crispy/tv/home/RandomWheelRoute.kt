@@ -605,7 +605,7 @@ internal fun RandomWheelRoute(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text = if (isSpinning) "Spinning…" else "Spin",
+                        text = "Spin",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )

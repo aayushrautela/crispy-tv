@@ -21,6 +21,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
     dependencies: HomeNavDependencies,
 ) {
     composable(AppRoutes.HomeRoute) { entry ->
+        PredictivePeelContainer {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             // All three of `HomeRoute`'s crossings arrive in `dependencies`, built by
             // `AppNavHost` -- the last graph still reading a `Context` for itself, and
@@ -110,9 +111,11 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 },
             )
         }
+        }
     }
 
     composable(AppRoutes.CalendarRoute) {
+        PredictivePeelContainer {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             // `CalendarRoute` is in `commonMain` and its only crossing was the factory
             // it used to reach through a `Context`, so the factory arrives in
@@ -137,6 +140,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 viewModelFactory = dependencies.calendarViewModelFactory,
             )
         }
+        }
     }
 
     composable(
@@ -147,6 +151,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 navArgument(AppRoutes.CatalogTitleArg) { type = NavType.StringType; defaultValue = "" }
             )
     ) { entry ->
+        PredictivePeelContainer {
         // The first of the three destinations that reads arguments. This block used to
         // bind the bundle to a local before reading it, so an import-shaped guard found
         // nothing here at all -- and it used to hand the read to a crossing in
@@ -188,6 +193,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 }
             )
         }
+        }
     }
 
     composable(
@@ -204,6 +210,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 navArgument(AppRoutes.HomeDetailsSharedElementKeyArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
+        PredictivePeelContainer {
         // Every line below the reader is the rule that was already here: a missing id is
         // an empty string, a blank optional is absent, and the runtime entry exists only
         // if one of its three numbers was reported. Nothing is decided by the reader --
@@ -338,6 +345,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 youTubeExtraVideoDialog = dependencies.youTubeExtraVideoDialog,
             )
         }
+        }
     }
 
     composable(
@@ -350,6 +358,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
             }
         )
     ) { entry ->
+        PredictivePeelContainer {
         // The fifth destination, and the third that reads arguments; see the details
         // block for the read. This one uses
         // `isNotBlank` where the details block uses `ifBlank { null }`, which is not the
@@ -389,6 +398,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                     )
                 }
             )
+        }
         }
     }
 }

@@ -32,6 +32,7 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(
     loadProfile: suspend () -> ActiveProfileInfo?,
 ) {
     composable(AppRoutes.DiscoverRoute) { entry ->
+        PredictivePeelContainer {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             DiscoverRoute(
                 viewModelFactory = viewModelFactory,
@@ -56,6 +57,7 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(
                     )
                 },
             )
+        }
         }
     }
 }

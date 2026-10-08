@@ -1,5 +1,7 @@
 package com.crispy.tv.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -12,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -24,7 +27,9 @@ import com.crispy.tv.ui.navigation.AppRoutes
 import com.crispy.tv.ui.navigation.FloatingBarBottomMargin
 import com.crispy.tv.ui.navigation.FloatingBarHeight
 import com.crispy.tv.ui.navigation.FloatingBottomBar
+import com.crispy.tv.ui.navigation.PredictiveSettleDurationMillis
 import com.crispy.tv.ui.navigation.TopLevelDestination
+import com.crispy.tv.ui.navigation.rememberPredictivePeel
 
 /**
  * The app's root composable: the shared bootstrap gate, then the shell.
@@ -135,6 +140,18 @@ private fun MainAppShell(
         }
     }
 
+    // The bar sits outside `NavHost`, so a peeling page slides under a bar that
+    // would otherwise stay put. It fades with the same gesture the pages read
+    // -- and over the same settle constant, so bar and pages finish together.
+    // Snapping it on `active` would be one frame early on release, the same
+    // reason the corner uses a chaser rather than the raw boolean.
+    val peel = rememberPredictivePeel()
+    val bottomBarAlpha by animateFloatAsState(
+        targetValue = if (peel.active) 0f else 1f,
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        label = "predictivePeelBar",
+    )
+
     CompositionLocalProvider(LocalBottomBarOverlayPadding provides bottomBarOverlayPadding) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -158,7 +175,7 @@ private fun MainAppShell(
                         currentRoute = currentRoute,
                         onDestinationClick = onDestinationClick,
                         onSearchClick = onSearchClick,
-                        modifier = Modifier.align(Alignment.BottomCenter),
+                        modifier = Modifier.align(Alignment.BottomCenter).alpha(bottomBarAlpha),
                     )
                 }
             }
