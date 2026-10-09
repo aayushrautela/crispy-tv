@@ -17,7 +17,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.snapping.SnapPosition
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,13 +37,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -91,6 +87,8 @@ import com.crispy.tv.domain.home.randomPool
 import com.crispy.tv.domain.home.topGenres
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
+import com.crispy.tv.ui.components.CrispySegmentedButton
+import com.crispy.tv.ui.components.CrispySegmentedButtonRow
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.genreIcon
 import com.crispy.tv.ui.components.rememberCrispyImageModel
@@ -103,7 +101,6 @@ import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
 import kotlin.math.abs
@@ -123,6 +120,16 @@ private const val RandomTurnDurationMs = 320
 
 private val RandomRowHeight = 100.dp
 private val RandomDiscSize = 72.dp
+
+/**
+ * The id [RandomChipRow] gives the `All` choice.
+ *
+ * A sentinel rather than a nullable id because the shared row's options are keyed by a non-null
+ * `String` and the library page's three sections already are. It cannot collide with a genre id
+ * because the ids are genre *names* -- `topGenres` groups on a lowercased key, so `Sci-Fi` and
+ * `sci-fi` are one chip -- and no genre is named `all`.
+ */
+private const val RANDOM_ALL_GENRES_ID = "all"
 
 /**
  * How much of the drum's foot the spin button's own band takes: its 32.dp lead-in
@@ -284,9 +291,9 @@ internal fun randomSpinDurationMs(steps: Int): Int = (1700 + steps * 24).coerceA
  *
  * The full-height drum with the Spin button floating over its faded foot, and the Play button
  * sitting on the centred row, are transcribed from the reference project's wheel. The header
- * and the pills are not: the header is the search page's -- [StandardTopAppBar] with
- * [CrispySectionAppBarTitle] reading "Feeling Lucky" -- and the pills are the discover page's
- * standalone [FilterChip]s. Only the vocabulary is ours throughout: [CrispyIcon] and the
+ * and the genre row are not: the header is the search page's -- [StandardTopAppBar] with
+ * [CrispySectionAppBarTitle] reading "Feeling Lucky" -- and the genre row is the library page's
+ * [CrispySegmentedButtonRow]. Only the vocabulary is ours throughout: [CrispyIcon] and the
  * project's drawables instead of Material Icons.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -624,56 +631,26 @@ private fun RandomChipRow(
 ) {
     // `All` carries the layers glyph, which is the same glyph the discover sheet gives its
     // "All genres" row, and every genre carries the same `genreIcon` the hero carousel gives its
-    // metadata -- so a chip and a hero row read the same genre the same way. Standalone
-    // pills, spaced apart, exactly like the discover page's own filter chips: the connected
-    // toggle-button strip read as a different component from every other pill in the app.
-    val options: List<Pair<String?, DrawableResource>> = buildList {
-        add(null to Res.drawable.ic_layers)
-        genres.forEach { add(it.genre to genreIcon(it.genre)) }
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        options.forEach { (genre, icon) ->
-            val selected = if (genre == null) {
-                selectedGenre == null
-            } else {
-                genre.equals(selectedGenre, ignoreCase = true)
+    // metadata -- so a button and a hero row read the same genre the same way.
+    //
+    // The library page's connected group, at its intrinsic widths: genre labels are variable-length
+    // and there are up to four of them, so an equal share of a phone's width would truncate
+    // `Documentary`.
+    val options = remember(genres) {
+        buildList {
+            add(CrispySegmentedButton(id = RANDOM_ALL_GENRES_ID, label = "All", icon = Res.drawable.ic_layers))
+            genres.forEach { genre ->
+                add(CrispySegmentedButton(id = genre.genre, label = genre.genre, icon = genreIcon(genre.genre)))
             }
-            FilterChip(
-                selected = selected,
-                onClick = { onGenreSelected(genre) },
-                label = {
-                    Text(
-                        text = genre ?: "All",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                leadingIcon = {
-                    CrispyIcon(
-                        painter = painterResource(icon),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                shape = RoundedCornerShape(16.dp),
-                border = null,
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
         }
     }
+    CrispySegmentedButtonRow(
+        options = options,
+        selectedId = selectedGenre ?: RANDOM_ALL_GENRES_ID,
+        onSelect = { id -> onGenreSelected(id.takeUnless { it == RANDOM_ALL_GENRES_ID }) },
+        modifier = Modifier.padding(horizontal = 20.dp),
+        fillWidth = false,
+    )
 }
 
 /**

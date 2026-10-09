@@ -45,6 +45,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
+import com.crispy.tv.ui.components.CrispySegmentedButton
+import com.crispy.tv.ui.components.CrispySegmentedButtonRow
 import com.crispy.tv.ui.components.ItemActionSheet
 import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -186,10 +188,17 @@ ProfileIconButton(
     ) {
         item(key = "filters") {
             Box(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                LibraryFiltersRow(
-                    sections = sections,
-                    selectedSectionId = selectedSectionId,
-                    onSelectSection = viewModel::selectSection,
+                CrispySegmentedButtonRow(
+                    // Remapped rather than passed straight through: the shared row's option is its
+                    // own type, and its `icon` is nullable because the random-pick page's genre
+                    // glyphs are a different lookup from this page's three fixed sections.
+                    options = remember(sections) {
+                        sections.map { section ->
+                            CrispySegmentedButton(id = section.id, label = section.label, icon = section.icon)
+                        }
+                    },
+                    selectedId = selectedSectionId,
+                    onSelect = viewModel::selectSection,
                 )
             }
         }
