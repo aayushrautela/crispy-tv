@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -22,9 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -66,9 +70,15 @@ private const val DefaultExpandRatio = 0.15f
  * animating it is what actually moves the edges -- and it moves both the neighbour's edges at the
  * same time, which is the half of the effect a per-chip layout cannot reach.
  *
+ * **The ratio is of the chip's measured width, not of its padding.** `ExpandedRatio` is a fraction
+ * of the interacted child's width, so applying it to the padding instead makes a 12dp padding grow
+ * by 1.8dp and the effect is invisible. Each chip's resting width is recorded by `onSizeChanged` and
+ * the padding moves by half of `width * expandRatio` on each side, so the chip's total width changes
+ * by exactly that fraction.
+ *
  * @param chips the choices in display order, each carrying its own selected state and click.
- * @param chipHeight applied to every chip. `FilterChip` defaults to 32dp, short for a chip carrying
- *   an icon and a TV tap target; callers pass their own.
+ * @param chipHeight applied to every chip, and the pill's corner radius. `FilterChip` defaults to
+ *   32dp, short for a chip carrying an icon and a TV tap target; callers pass their own.
  */
 @Composable
 fun CrispyChipRow(
@@ -86,6 +96,10 @@ fun CrispyChipRow(
         chips.map { chip -> key(chip.id) { remember { MutableInteractionSource() } } }
     val pressedFlags = interactionSources.map { source -> source.collectIsPressedAsState().value }
     val pressedIndex = pressedFlags.indexOfFirst { pressed -> pressed }
+    // Each chip's resting width, so the growth can be a fraction of the chip rather than of its
+    // padding. Recorded per chip id and only while not pressed, so the value a chip is measured
+    // against is its own unpressed width and does not feed back into itself.
+    val restingWidths = remember { mutableStateMapOf<String, Int>() }
 
     Row(
         modifier =
@@ -101,6 +115,10 @@ fun CrispyChipRow(
                 chip = chip,
                 interactionSource = interactionSources[index],
                 chipHeight = chipHeight,
+                // Zero until the chip has been measured once, so the first press cannot animate from
+                // a width nobody knows yet.
+                restingWidthDp = with(LocalDensity.current) { restingWidths[chip.id]?.toDp() ?: 0.dp },
+                onRestingWidthMeasured = { pixels -> restingWidths[chip.id] = pixels },
                 expandRatio = expandRatio,
                 isPressed = index == pressedIndex,
                 isNeighbourOfPressed =
@@ -114,26 +132,33 @@ fun CrispyChipRow(
  * One chip, with the padding that carries the press animation.
  *
  * The pressed chip and its neighbour animate towards opposite paddings by the same amount, so one
- * grows by exactly what the other loses. [paddingFloor] is what stops the neighbour going flat when
- * it started with less padding than the pressed chip gains.
+ * grows by exactly what the other loses. The amount is half of `restingWidthDp * expandRatio` on
+ * each side, because padding is applied to both edges while `ExpandedRatio` is a fraction of the
+ * chip's *total* width -- halving is what makes the widths trade exactly rather than by twice the
+ * ratio. [paddingFloor] stops the neighbour going flat if it is already narrower than the growth.
+ *
+ * [onRestingWidthMeasured] reports this chip's width, and is only called while it is not pressed, so
+ * the width the growth is computed from never includes the growth itself.
  */
 @Composable
 private fun RowScope.CrispyChipInRow(
     chip: CrispyChip,
     interactionSource: MutableInteractionSource,
     chipHeight: Dp,
+    restingWidthDp: Dp,
+    onRestingWidthMeasured: (Int) -> Unit,
     expandRatio: Float,
     isPressed: Boolean,
     isNeighbourOfPressed: Boolean,
     paddingBase: Dp = ChipPaddingBase,
-    paddingExpand: Dp = ChipPaddingExpand,
     paddingFloor: Dp = ChipPaddingFloor,
 ) {
-    val gained = (paddingBase * expandRatio).coerceAtMost(paddingBase - paddingFloor)
+    val halfGrowth =
+        (restingWidthDp * expandRatio / 2f).coerceIn(0.dp, (paddingBase - paddingFloor))
     val target =
         when {
-            isPressed -> paddingBase + gained
-            isNeighbourOfPressed -> paddingBase - gained
+            isPressed -> paddingBase + halfGrowth
+            isNeighbourOfPressed -> paddingBase - halfGrowth
             else -> paddingBase
         }
     val horizontalPadding by
@@ -148,8 +173,17 @@ private fun RowScope.CrispyChipInRow(
         onClick = chip.onClick,
         label = { Text(text = chip.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = chip.icon?.let { icon -> { CrispyIcon(painter = painterResource(icon), contentDescription = null) } },
-        modifier = Modifier.height(chipHeight),
-        shape = FilterChipDefaults.shape,
+        modifier =
+            Modifier
+                .height(chipHeight)
+                .onSizeChanged { size ->
+                    // Unpressed only: measuring while growing would record the grown width and the
+                    // next press would be computed from it, compounding on every press.
+                    if (!isPressed) onRestingWidthMeasured(size.width)
+                },
+        // A pill is a stadium: half the height on every corner. `FilterChipDefaults.shape` is
+        // `CornerSmall` (8dp), which reads as a rounded rectangle at any height worth calling a chip.
+        shape = RoundedCornerShape(percent = 50),
         border = null,
         contentPadding =
             PaddingValues(
@@ -171,5 +205,4 @@ private fun RowScope.CrispyChipInRow(
 }
 
 private val ChipPaddingBase = 12.dp
-private val ChipPaddingExpand = 8.dp
 private val ChipPaddingFloor = 4.dp
