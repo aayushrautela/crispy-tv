@@ -1,12 +1,10 @@
 package com.crispy.tv.ui.components
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -59,12 +57,13 @@ private fun CrispySegmentedButtonIcon(icon: DrawableResource) {
  * this row's height, which is the standalone shape. This is reachable, not hypothetical: a picker
  * whose choices come from loaded data has none to show until that data arrives.
  *
- * ## [fillWidth] is the one difference between callers
+ * ## Every button takes an equal share of the row
  *
- * `true` shares the row's width evenly (`Modifier.weight(1f)` each), which is right for a fixed,
- * short, known set of labels. `false` sizes each button to its own label and scrolls the row
- * sideways, which is what a variable-length set needs -- genre names run to `Documentary`, and at
- * four choices an equal share of a phone's width truncates them.
+ * `Modifier.weight(1f)` on each, so the group spans the full width the caller gives it whatever the
+ * labels are. An intrinsic-width variant was tried and read as a row of narrow pills beside the
+ * full-width one it was copied from -- which is the thing this component exists to stop -- so there
+ * is one layout. A label too long for its share ellipsizes; genre names do this at four choices on a
+ * phone, and that is the trade being made deliberately.
  *
  * @param onSelect called with the chosen [CrispySegmentedButton.id] on every click, including a
  *   click on the already-checked button. The row does not model a "no selection" state; a caller
@@ -77,17 +76,11 @@ fun CrispySegmentedButtonRow(
     selectedId: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    fillWidth: Boolean = true,
 ) {
     if (options.isEmpty()) return
     val lastIndex = options.lastIndex
     Row(
-        modifier =
-            if (fillWidth) {
-                modifier.fillMaxWidth()
-            } else {
-                modifier.horizontalScroll(rememberScrollState())
-            },
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         options.forEachIndexed { index, option ->
@@ -105,12 +98,7 @@ fun CrispySegmentedButtonRow(
             ToggleButton(
                 checked = checked,
                 onCheckedChange = { onSelect(option.id) },
-                modifier =
-                    if (fillWidth) {
-                        Modifier.weight(1f).height(SegmentedButtonHeight)
-                    } else {
-                        Modifier.height(SegmentedButtonHeight)
-                    },
+                modifier = Modifier.weight(1f).height(SegmentedButtonHeight),
                 icon = iconSlot,
                 shapes =
                     when {

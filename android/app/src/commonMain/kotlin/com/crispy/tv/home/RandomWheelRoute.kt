@@ -632,10 +632,6 @@ private fun RandomChipRow(
     // `All` carries the layers glyph, which is the same glyph the discover sheet gives its
     // "All genres" row, and every genre carries the same `genreIcon` the hero carousel gives its
     // metadata -- so a button and a hero row read the same genre the same way.
-    //
-    // The library page's connected group, at its intrinsic widths: genre labels are variable-length
-    // and there are up to four of them, so an equal share of a phone's width would truncate
-    // `Documentary`.
     val options = remember(genres) {
         buildList {
             add(CrispySegmentedButton(id = RANDOM_ALL_GENRES_ID, label = "All", icon = Res.drawable.ic_layers))
@@ -649,7 +645,6 @@ private fun RandomChipRow(
         selectedId = selectedGenre ?: RANDOM_ALL_GENRES_ID,
         onSelect = { id -> onGenreSelected(id.takeUnless { it == RANDOM_ALL_GENRES_ID }) },
         modifier = Modifier.padding(horizontal = 20.dp),
-        fillWidth = false,
     )
 }
 
