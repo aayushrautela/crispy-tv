@@ -41,6 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -86,9 +87,9 @@ import com.crispy.tv.domain.home.HomeRandomGenre
 import com.crispy.tv.domain.home.randomPool
 import com.crispy.tv.domain.home.topGenres
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.components.CrispyChip
+import com.crispy.tv.ui.components.CrispyChipRow
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
-import com.crispy.tv.ui.components.CrispySegmentedButton
-import com.crispy.tv.ui.components.CrispySegmentedButtonRow
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.genreIcon
 import com.crispy.tv.ui.components.rememberCrispyImageModel
@@ -120,16 +121,6 @@ private const val RandomTurnDurationMs = 320
 
 private val RandomRowHeight = 100.dp
 private val RandomDiscSize = 72.dp
-
-/**
- * The id [RandomChipRow] gives the `All` choice.
- *
- * A sentinel rather than a nullable id because the shared row's options are keyed by a non-null
- * `String` and the library page's three sections already are. It cannot collide with a genre id
- * because the ids are genre *names* -- `topGenres` groups on a lowercased key, so `Sci-Fi` and
- * `sci-fi` are one chip -- and no genre is named `all`.
- */
-private const val RANDOM_ALL_GENRES_ID = "all"
 
 /**
  * How much of the drum's foot the spin button's own band takes: its 32.dp lead-in
@@ -292,9 +283,9 @@ internal fun randomSpinDurationMs(steps: Int): Int = (1700 + steps * 24).coerceA
  * The full-height drum with the Spin button floating over its faded foot, and the Play button
  * sitting on the centred row, are transcribed from the reference project's wheel. The header
  * and the genre row are not: the header is the search page's -- [StandardTopAppBar] with
- * [CrispySectionAppBarTitle] reading "Feeling Lucky" -- and the genre row is the library page's
- * [CrispySegmentedButtonRow]. Only the vocabulary is ours throughout: [CrispyIcon] and the
- * project's drawables instead of Material Icons.
+ * [CrispySectionAppBarTitle] reading "Feeling Lucky" -- and the genre row is the shared
+ * [CrispyChipRow], the same standalone pills the discover page uses. Only the vocabulary is ours
+ * throughout: [CrispyIcon] and the project's drawables instead of Material Icons.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -631,22 +622,33 @@ private fun RandomChipRow(
 ) {
     // `All` carries the layers glyph, which is the same glyph the discover sheet gives its
     // "All genres" row, and every genre carries the same `genreIcon` the hero carousel gives its
-    // metadata -- so a button and a hero row read the same genre the same way.
-    val options = remember(genres) {
+    // metadata -- so a chip and a hero row read the same genre the same way.
+    val chips = remember(genres, selectedGenre) {
         buildList {
-            add(CrispySegmentedButton(id = RANDOM_ALL_GENRES_ID, label = "All", icon = Res.drawable.ic_layers))
+            add(CrispyChip(id = "", label = "All", icon = Res.drawable.ic_layers, selected = selectedGenre == null, onClick = { onGenreSelected(null) }))
             genres.forEach { genre ->
-                add(CrispySegmentedButton(id = genre.genre, label = genre.genre, icon = genreIcon(genre.genre)))
+                add(
+                    CrispyChip(
+                        id = genre.genre,
+                        label = genre.genre,
+                        icon = genreIcon(genre.genre),
+                        selected = genre.genre.equals(selectedGenre, ignoreCase = true),
+                        onClick = { onGenreSelected(genre.genre) },
+                    ),
+                )
             }
         }
     }
-    CrispySegmentedButtonRow(
-        options = options,
-        selectedId = selectedGenre ?: RANDOM_ALL_GENRES_ID,
-        onSelect = { id -> onGenreSelected(id.takeUnless { it == RANDOM_ALL_GENRES_ID }) },
-        modifier = Modifier.padding(horizontal = 20.dp),
+    CrispyChipRow(
+        chips = chips,
+        horizontalPadding = 20.dp,
+        // Taller than `FilterChip`'s 32dp: these carry an icon, and this is a TV where the row is
+        // tapped rather than pointed at.
+        chipHeight = RandomChipHeight,
     )
 }
+
+private val RandomChipHeight = 40.dp
 
 /**
  * One drum row: a circular cover beside the title and the type/genre line, and -- once the

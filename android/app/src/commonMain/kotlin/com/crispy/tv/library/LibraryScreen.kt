@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,17 +17,20 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -47,10 +52,6 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
-import com.crispy.tv.ui.resources.Res
-import com.crispy.tv.ui.resources.ic_bookmark
-import com.crispy.tv.ui.resources.ic_history
-import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -68,7 +69,6 @@ import com.crispy.tv.domain.watch.civilMonthKey
 import com.crispy.tv.domain.watch.civilMonthKeyFromEpochMillis
 import com.crispy.tv.domain.watch.previousMonthKey
 import com.crispy.tv.backend.WatchGenerationsResponse
-import org.jetbrains.compose.resources.DrawableResource
 
 private const val LIBRARY_PAGE_SIZE = 60
 
@@ -86,26 +86,17 @@ internal const val WATCHLIST_GROUP_EARLIER_THIS_YEAR = "earlier_this_year"
 internal const val WATCHLIST_GROUP_LAST_YEAR = "last_year"
 internal const val WATCHLIST_GROUP_OLDER = "older"
 
-// Each section's icon is the same glyph that section already uses *elsewhere* in
-// the app, so the button and the thing it filters never disagree: `ic_history` is
-// the search screen's recent-searches mark, `ic_bookmark` is the details header's
-// watchlist toggle, and `ic_thumb_up` is what the details header shows for
-// `liked` -- which is what the Ratings section actually holds, Liked and Disliked
-// bands rather than scores. Deliberately not `ic_star_filled`: in this codebase a
-// star is always the IMDb score (hero meta, details, player sheet), so a star on
-// a button whose own rows display star scores would mean two different things.
 private val LIBRARY_SECTIONS =
     listOf(
-        LibrarySectionUi(id = LIBRARY_SECTION_HISTORY, label = "History", icon = Res.drawable.ic_history),
-        LibrarySectionUi(id = LIBRARY_SECTION_WATCHLIST, label = "Watchlist", icon = Res.drawable.ic_bookmark),
-        LibrarySectionUi(id = LIBRARY_SECTION_RATINGS, label = "Ratings", icon = Res.drawable.ic_thumb_up),
+        LibrarySectionUi(id = LIBRARY_SECTION_HISTORY, label = "History"),
+        LibrarySectionUi(id = LIBRARY_SECTION_WATCHLIST, label = "Watchlist"),
+        LibrarySectionUi(id = LIBRARY_SECTION_RATINGS, label = "Ratings"),
     )
 
 @Immutable
 data class LibrarySectionUi(
     val id: String,
     val label: String,
-    val icon: DrawableResource,
 )
 
 @Immutable
@@ -768,6 +759,49 @@ internal fun ColumnScope.WatchlistSectionContent(
                 }
             }
         }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun LibraryFiltersRow(
+    sections: List<LibrarySectionUi>,
+    selectedSectionId: String,
+    onSelectSection: (String) -> Unit,
+) {
+    // A connected button group, not filter chips: one full-width control whose
+    // checked button carries `Primary` and whose shape is continuous across the
+    // group. The position decides the shape -- leading, middle or trailing --
+    // so the three buttons read as one segmented control rather than three
+    // independent chips. The label is bold only when checked, which is the
+    // group's only per-state styling; everything else is the theme default.
+    if (sections.isNotEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            sections.forEachIndexed { index, section ->
+                val checked = section.id == selectedSectionId
+                ToggleButton(
+                    checked = checked,
+                    onCheckedChange = { onSelectSection(section.id) },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shapes =
+                        when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            sections.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = section.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
+                    )
+                }
+            }
         }
     }
 }

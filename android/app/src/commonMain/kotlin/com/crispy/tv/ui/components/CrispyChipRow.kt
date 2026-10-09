@@ -1,0 +1,175 @@
+package com.crispy.tv.ui.components
+
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
+
+/** One choice in a [CrispyChipRow]. */
+@Stable
+data class CrispyChip(
+    val id: String,
+    val label: String,
+    val icon: DrawableResource?,
+    val selected: Boolean,
+    val onClick: () -> Unit,
+)
+
+/** Material 3 Expressive's `ButtonGroupDefaults.ExpandedRatio`. */
+private const val DefaultExpandRatio = 0.15f
+
+/**
+ * A scrollable row of standalone filter chips, each hugging its own label so nothing truncates.
+ *
+ * ## The press animation
+ *
+ * The chip being pressed grows horizontally and the chip beside it gives up exactly the width the
+ * pressed one took, so the row's total width does not change and nothing after them reflows. The
+ * growth is a fraction of the pressed chip's width, which is Material 3 Expressive's own `ButtonGroup`
+ * behaviour -- `ButtonGroupDefaults.ExpandedRatio`, applied by `Modifier.animateWidth`.
+ *
+ * That modifier cannot be used here: it is a member of `ButtonGroupScope`, so it resolves only
+ * inside a `ButtonGroup`, and `ButtonGroup` is the *connected* group -- one control with a continuous
+ * shape, which is a different component from a row of separate pills. It also has no scrolling of
+ * its own: it measures to fit and squeezes. So the effect is reproduced over a scrolling `Row`.
+ *
+ * **It is reproduced through `contentPadding`, not through a width.** `FilterChip` lays its content
+ * out with `Modifier.width(IntrinsicSize.Max)`, which pins the chip to its content's own maximum
+ * intrinsic width and ignores any width constraint from a parent. A `Layout` around the chip
+ * therefore cannot widen or narrow it. The padding the chip is handed *is* part of that content, so
+ * animating it is what actually moves the edges -- and it moves both the neighbour's edges at the
+ * same time, which is the half of the effect a per-chip layout cannot reach.
+ *
+ * @param chips the choices in display order, each carrying its own selected state and click.
+ * @param chipHeight applied to every chip. `FilterChip` defaults to 32dp, short for a chip carrying
+ *   an icon and a TV tap target; callers pass their own.
+ */
+@Composable
+fun CrispyChipRow(
+    chips: List<CrispyChip>,
+    modifier: Modifier = Modifier,
+    horizontalPadding: Dp = 0.dp,
+    chipHeight: Dp = FilterChipDefaults.Height,
+    spacing: Dp = 8.dp,
+    expandRatio: Float = DefaultExpandRatio,
+) {
+    if (chips.isEmpty()) return
+    // Keyed by id rather than remembered once: the chip list is rebuilt from loaded data, and a
+    // source list frozen at the first composition's size would be the wrong length once it changes.
+    val interactionSources: List<MutableInteractionSource> =
+        chips.map { chip -> key(chip.id) { remember { MutableInteractionSource() } } }
+    val pressedFlags = interactionSources.map { source -> source.collectIsPressedAsState().value }
+    val pressedIndex = pressedFlags.indexOfFirst { pressed -> pressed }
+
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        chips.forEachIndexed { index, chip ->
+            CrispyChipInRow(
+                chip = chip,
+                interactionSource = interactionSources[index],
+                chipHeight = chipHeight,
+                expandRatio = expandRatio,
+                isPressed = index == pressedIndex,
+                isNeighbourOfPressed =
+                    pressedIndex >= 0 && (index == pressedIndex - 1 || index == pressedIndex + 1),
+            )
+        }
+    }
+}
+
+/**
+ * One chip, with the padding that carries the press animation.
+ *
+ * The pressed chip and its neighbour animate towards opposite paddings by the same amount, so one
+ * grows by exactly what the other loses. [paddingFloor] is what stops the neighbour going flat when
+ * it started with less padding than the pressed chip gains.
+ */
+@Composable
+private fun RowScope.CrispyChipInRow(
+    chip: CrispyChip,
+    interactionSource: MutableInteractionSource,
+    chipHeight: Dp,
+    expandRatio: Float,
+    isPressed: Boolean,
+    isNeighbourOfPressed: Boolean,
+    paddingBase: Dp = ChipPaddingBase,
+    paddingExpand: Dp = ChipPaddingExpand,
+    paddingFloor: Dp = ChipPaddingFloor,
+) {
+    val gained = (paddingBase * expandRatio).coerceAtMost(paddingBase - paddingFloor)
+    val target =
+        when {
+            isPressed -> paddingBase + gained
+            isNeighbourOfPressed -> paddingBase - gained
+            else -> paddingBase
+        }
+    val horizontalPadding by
+        animateDpAsState(
+            targetValue = target,
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+            label = "chipPressPadding",
+        )
+
+    FilterChip(
+        selected = chip.selected,
+        onClick = chip.onClick,
+        label = { Text(text = chip.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingIcon = chip.icon?.let { icon -> { CrispyIcon(painter = painterResource(icon), contentDescription = null) } },
+        modifier = Modifier.height(chipHeight),
+        shape = FilterChipDefaults.shape,
+        border = null,
+        contentPadding =
+            PaddingValues(
+                horizontal = horizontalPadding,
+                // Half the height the icon does not fill, so the content reaches the chip's own top
+                // and bottom instead of sitting short inside a taller box.
+                vertical = (chipHeight - FilterChipDefaults.IconSize) / 2,
+            ),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        interactionSource = interactionSource,
+    )
+}
+
+private val ChipPaddingBase = 12.dp
+private val ChipPaddingExpand = 8.dp
+private val ChipPaddingFloor = 4.dp
