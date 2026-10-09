@@ -32,7 +32,7 @@ import okio.Path.Companion.toPath
  * The locale-aware month name is *not* built here. It is a rendering decision, so
  * it belongs with the other two renderers in
  * [com.crispy.tv.details.localeDateFormatters] and reaches the screen as the
- * `monthName` argument of `historyItems` -- the screen names the decision, this
+ * `monthName` argument of `HistorySectionContent` -- the screen names the decision, this
  * file only names the socket.
  */
 fun libraryViewModelFactory(context: Context): ViewModelProvider.Factory {

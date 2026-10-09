@@ -2,12 +2,14 @@ package com.crispy.tv.library
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.paging.LoadState
@@ -15,16 +17,20 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -36,7 +42,6 @@ import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.watchhistory.sync.WatchSyncSource
-import kotlinx.coroutines.flow.combine
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.domain.optimistic.MutationStatus
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
@@ -45,10 +50,6 @@ import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.catalog.CatalogItem
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.ui.graphics.Color
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.CrispyPalette
@@ -232,34 +233,47 @@ class LibraryViewModel internal constructor(
         viewModelScope.launch { invalidateSection(sectionId) }
     }
 
+    // Retained per-section pagers, keyed by section id.
+    //
+    // The old shape was one flow that `flatMapLatest`-ed on the selected
+    // section: every switch killed the pager, the new section started from a
+    // fresh empty `PagingData`, and the screen showed a spinner. That made a tab
+    // switch animation impossible -- `AnimatedContent` needs the old section's
+    // data still present while the new section loads -- and it refetched on
+    // every switch-back. Each section now owns a pager built once via
+    // `getOrPut` and kept across switches; only the section token invalidates
+    // its own pager, and `cachedIn(viewModelScope)` survives collection restarts
+    // the same way the old flow did.
+    private val sectionPagers = mutableMapOf<String, Flow<PagingData<CatalogItem>>>()
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val items: Flow<PagingData<CatalogItem>> =
-        combine(
-            _uiState.map { it.selectedSectionId }.distinctUntilChanged(),
-            sectionRefreshTokens,
-        ) { sectionId, tokens -> sectionId to (tokens[sectionId] ?: 0) }
-            .distinctUntilChanged()
-            .flatMapLatest { (sectionId, _) ->
-                Pager(
-                    config =
-                        PagingConfig(
-                            pageSize = LIBRARY_PAGE_SIZE,
-                            initialLoadSize = LIBRARY_PAGE_SIZE,
-                            prefetchDistance = 10,
-                            enablePlaceholders = false,
-                        ),
-                    pagingSourceFactory = {
-                        LibraryPagingSource(
-                            backend = backend,
-                            backendContextResolver = backendContextResolver,
-                            sectionId = sectionId,
-                            libraryCache = libraryCache,
-                            appliedGenerationMsProvider = { latestGenerations?.generationMsFor(sectionId) },
-                            ioDispatcher = ioDispatcher,
-                        )
-                    },
-                ).flow
-            }.cachedIn(viewModelScope)
+    internal fun itemsFor(sectionId: String): Flow<PagingData<CatalogItem>> =
+        sectionPagers.getOrPut(sectionId) {
+            sectionRefreshTokens
+                .map { tokens -> tokens[sectionId] ?: 0 }
+                .distinctUntilChanged()
+                .flatMapLatest {
+                    Pager(
+                        config =
+                            PagingConfig(
+                                pageSize = LIBRARY_PAGE_SIZE,
+                                initialLoadSize = LIBRARY_PAGE_SIZE,
+                                prefetchDistance = 10,
+                                enablePlaceholders = false,
+                            ),
+                        pagingSourceFactory = {
+                            LibraryPagingSource(
+                                backend = backend,
+                                backendContextResolver = backendContextResolver,
+                                sectionId = sectionId,
+                                libraryCache = libraryCache,
+                                appliedGenerationMsProvider = { latestGenerations?.generationMsFor(sectionId) },
+                                ioDispatcher = ioDispatcher,
+                            )
+                        },
+                    ).flow
+                }.cachedIn(viewModelScope)
+        }
 
     override fun onCleared() {
         syncSource?.onSurfaceHidden()
@@ -567,7 +581,8 @@ private sealed interface WatchlistDisplayRow {
 
 // endregion
 
-internal fun LazyListScope.historyItems(
+@Composable
+internal fun ColumnScope.HistorySectionContent(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
@@ -589,7 +604,8 @@ internal fun LazyListScope.historyItems(
             HistoryDisplayRow.Post(section.monthKey, section.items),
         )
     }
-    items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
+    displayRows.forEach { row ->
+        key(row.stableKey) {
         when (row) {
             is HistoryDisplayRow.Header -> {
                 Text(
@@ -626,10 +642,12 @@ internal fun LazyListScope.historyItems(
                 }
             }
         }
+        }
     }
 }
 
-internal fun LazyListScope.ratingsItems(
+@Composable
+internal fun ColumnScope.RatingsSectionContent(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
@@ -642,7 +660,8 @@ internal fun LazyListScope.ratingsItems(
             RatingDisplayRow.Post(section.bandKey, section.items),
         )
     }
-    items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
+    displayRows.forEach { row ->
+        key(row.stableKey) {
         when (row) {
             is RatingDisplayRow.Header -> {
                 Text(
@@ -678,10 +697,12 @@ internal fun LazyListScope.ratingsItems(
                 }
             }
         }
+        }
     }
 }
 
-internal fun LazyListScope.watchlistItems(
+@Composable
+internal fun ColumnScope.WatchlistSectionContent(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
@@ -701,7 +722,8 @@ internal fun LazyListScope.watchlistItems(
             WatchlistDisplayRow.Post(section.groupKey, section.items),
         )
     }
-    items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
+    displayRows.forEach { row ->
+        key(row.stableKey) {
         when (row) {
             is WatchlistDisplayRow.Header -> {
                 Text(
@@ -737,36 +759,48 @@ internal fun LazyListScope.watchlistItems(
                 }
             }
         }
+        }
     }
 }
 
-// region Extracted UI components
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun LibraryFiltersRow(
     sections: List<LibrarySectionUi>,
     selectedSectionId: String,
     onSelectSection: (String) -> Unit,
 ) {
+    // A connected button group, not filter chips: one full-width control whose
+    // checked button carries `Primary` and whose shape is continuous across the
+    // group. The position decides the shape -- leading, middle or trailing --
+    // so the three buttons read as one segmented control rather than three
+    // independent chips. The label is bold only when checked, which is the
+    // group's only per-state styling; everything else is the theme default.
     if (sections.isNotEmpty()) {
-        LazyRow(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         ) {
-            items(sections, key = { it.id }) { section ->
-                FilterChip(
-                    selected = section.id == selectedSectionId,
-                    onClick = { onSelectSection(section.id) },
-                    label = { Text(section.label) },
-                    shape = RoundedCornerShape(16.dp),
-                    border = null,
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        labelColor = MaterialTheme.colorScheme.onSurface,
-                        selectedContainerColor = Color.White,
-                        selectedLabelColor = Color(0xFF141414),
-                    ),
-                )
+            sections.forEachIndexed { index, section ->
+                val checked = section.id == selectedSectionId
+                ToggleButton(
+                    checked = checked,
+                    onCheckedChange = { onSelectSection(section.id) },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shapes =
+                        when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            sections.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = section.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
+                    )
+                }
             }
         }
     }
