@@ -223,6 +223,7 @@ private fun DetailContent(
                     shouldPlay = true,
                     isMuted = trailerMuted,
                     onAllSourcesFailed = { trailerFailed = true },
+                    onEnded = { trailerPlaying = false },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(360.dp),

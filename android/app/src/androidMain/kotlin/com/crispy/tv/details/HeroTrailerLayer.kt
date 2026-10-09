@@ -123,7 +123,6 @@ internal fun HeroTrailerLayer(
             .setMediaSourceFactory(DefaultMediaSourceFactory(context))
             .build()
             .apply {
-                repeatMode = Player.REPEAT_MODE_ONE
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                 volume = if (isMuted) 0f else 1f
             }
@@ -145,6 +144,7 @@ internal fun HeroTrailerLayer(
         if (lastSentState == state) return
         lastSentState = state
         latestOnPlaybackState.value(state, exoPlayer.currentPosition / 1000.0)
+        if (state == 0) audioFocusManager.release("trailer")
     }
 
     DisposableEffect(exoPlayer) {

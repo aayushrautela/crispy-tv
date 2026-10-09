@@ -37,6 +37,7 @@ internal fun TvHeroTrailerLayer(
     shouldPlay: Boolean,
     isMuted: Boolean,
     onAllSourcesFailed: () -> Unit,
+    onEnded: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -89,7 +90,6 @@ internal fun TvHeroTrailerLayer(
             .setMediaSourceFactory(DefaultMediaSourceFactory(context))
             .build()
             .apply {
-                repeatMode = Player.REPEAT_MODE_ONE
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                 volume = if (isMuted) 0f else 1f
             }
@@ -109,6 +109,10 @@ internal fun TvHeroTrailerLayer(
                     errored = true
                     advanceRequests++
                 }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) onEnded()
             }
         }
         exoPlayer.addListener(listener)
