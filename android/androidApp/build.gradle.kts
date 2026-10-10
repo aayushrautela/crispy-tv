@@ -20,7 +20,7 @@ plugins {
  * | `productFlavors { store, sideload }` | `:app` is single-variant, so the variant lives here      |
  * | `BuildDistributionComponents` | one per flavour source set, same name in each                  |
  * | signing, ProGuard, splits, packaging | ship-level concerns                                     |
- * | the screenshot tests          | they need the merged manifest and the real app theme            |
+ * | the Robolectric unit tests    | they need the merged manifest and the real app theme            |
  *
  * What deliberately did *not* move here:
  *
@@ -30,48 +30,6 @@ plugins {
  * - `testInstrumentationRunner` and the `androidTestImplementation` deps. There
  *   are zero instrumentation sources in this project.
  */
-
-/**
- * Golden-screenshot mode. Off by default (verify); pass -Proborazzi.record=true
- * to re-record the committed PNGs under src/test/screenshots.
- */
-val roborazziRecord = providers.gradleProperty("roborazzi.record").orNull == "true"
-
-/**
- * Generates a fontconfig file pointing at the font committed in
- * `src/test/fonts`, and points the unit-test JVM at it.
- *
- * Roborazzi draws a label onto its diff canvas with Java2D, so a *failing*
- * screenshot test needs a host font. Without this a bare container reports
- * `Fontconfig head is null` instead of the real difference. Generated rather
- * than committed because fontconfig requires an absolute <dir>.
- */
-val testFontsConfig = layout.buildDirectory.file("test-fonts/fonts.conf")
-val testFontsDir = rootProject.layout.projectDirectory.dir("test-fonts")
-
-val generateTestFontsConfig by tasks.registering {
-    val fontsDirectory = testFontsDir.asFile.absolutePath
-    val outputFile = testFontsConfig
-    inputs.dir(testFontsDir)
-    outputs.file(testFontsConfig)
-    doLast {
-        val file = outputFile.get().asFile
-        file.parentFile.mkdirs()
-        file.writeText(
-            """
-            <?xml version="1.0" encoding="utf-8"?>
-            <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-            <fontconfig>
-              <dir>$fontsDirectory</dir>
-              <cachedir>${file.parentFile.absolutePath}/cache</cachedir>
-              <match target="pattern">
-                <edit name="family" mode="append_last"><string>Roboto</string></edit>
-              </match>
-            </fontconfig>
-            """.trimIndent()
-        )
-    }
-}
 
 val releaseKeystorePath = providers.gradleProperty("RELEASE_KEYSTORE_PATH").orNull
 val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASSWORD").orNull
@@ -188,38 +146,16 @@ android {
     testOptions {
         unitTests {
             // Robolectric needs the merged resources and manifest to inflate
-            // themes, so the goldens render against the real app theme rather
-            // than a stub. This is why the screenshot suite lives in the
+            // themes, so the tests run against the real app theme rather
+            // than a stub. This is why the unit tests live in the
             // application module and not in :app.
             isIncludeAndroidResources = true
 
             all {
-                it.dependsOn(generateTestFontsConfig)
-
-                // Roborazzi writes PNGs to disk and Robolectric reaches for
-                // android-all jars; neither tolerates a narrow heap.
+                // Robolectric reaches for android-all jars and renders with
+                // real Skia; neither tolerates a narrow heap.
                 it.maxHeapSize = "2g"
                 it.systemProperty("robolectric.graphicsMode", "NATIVE")
-
-                // Verify is the DEFAULT, so an ordinary test run is a rendering
-                // gate. Recording is explicit (`-Proborazzi.record=true`) and
-                // the resulting PNGs under src/test/screenshots are committed,
-                // which is what makes a missing golden a build failure rather
-                // than a silently accepted new baseline.
-                it.systemProperty("roborazzi.test.record", roborazziRecord.toString())
-                it.systemProperty("roborazzi.test.verify", (!roborazziRecord).toString())
-                // Keep the rendered diff image. Roborazzi builds the diff canvas
-                // on any mismatch regardless, so this only controls whether the
-                // artefact is written -- which is what CI uploads.
-                it.systemProperty("roborazzi.test.compare", (!roborazziRecord).toString())
-
-                // Gives the diff canvas a real font, so a mismatch reports the
-                // actual difference instead of dying in fontconfig.
-                it.environment("FONTCONFIG_FILE", testFontsConfig.get().asFile.absolutePath)
-
-                // Relative to the test JVM working directory, which Gradle
-                // sets to the project dir. CI uploads this tree on failure.
-                it.systemProperty("roborazzi.output.dir", "build/outputs/roborazzi")
             }
         }
     }
@@ -343,22 +279,18 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
-    // Golden-screenshot tests. These run on a plain JVM (no emulator, no KVM),
-    // which is the only way a rendering regression gets caught in CI on this
-    // repository. See src/test/java/.../screenshot for the harness.
+    // Unit tests. These run on a plain JVM (no emulator, no KVM) under
+    // Robolectric. See src/test/java for the harness.
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.compose.ui.test.junit4)
-    testImplementation(libs.androidx.compose.ui.test)
-    testImplementation(libs.roborazzi)
-    testImplementation(libs.roborazzi.compose)
+    // ApplicationProvider lives here; Robolectric alone does not bring it.
+    testImplementation(libs.androidx.test.core.ktx)
     // Coil is `implementation` in :app's commonMain, so it is on the runtime
-    // classpath of these tests but not on their compile classpath. Only the two
-    // tests that drive Coil's API directly need it here: LandscapeCardScreenshotTest
-    // reaches the image layer through the composable, and CoilDataUriScreenshotTest
-    // has to build an ImageLoader and read SuccessResult/ErrorResult. Declared
-    // rather than reached through a test fixture, because a test that cannot see
-    // the type it is asserting about is a test that cannot be written.
+    // classpath of these tests but not on their compile classpath.
+    // CoilDataUriScreenshotTest has to build an ImageLoader and read
+    // SuccessResult/ErrorResult. Declared rather than reached through a test
+    // fixture, because a test that cannot see the type it is asserting about
+    // is a test that cannot be written.
     testImplementation(libs.coil.core)
     testImplementation(libs.coil.compose)
 

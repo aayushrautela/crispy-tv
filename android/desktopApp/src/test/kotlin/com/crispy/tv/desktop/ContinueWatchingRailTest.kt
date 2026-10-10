@@ -38,8 +38,9 @@ import kotlin.test.assertTrue
  * raster differs by Skia version and font availability, so a desktop golden would
  * either be flaky or need a pinned container. What is actually worth proving is
  * that the design system composes, that the planner's real output reaches the
- * screen, and that the responsive spacing helper resolves off-Android. The
- * Android Roborazzi gate remains the rendering gate.
+ * screen, and that the responsive spacing helper resolves off-Android. There
+ * is deliberately no image-comparison gate: rendering regressions are caught
+ * by review, not by pixels.
  *
  * What it renders is `ContinueWatchingRail` from `:android:app`'s `commonMain`,
  * reached through `:app`'s `desktop` JVM variant. This module holds the window and

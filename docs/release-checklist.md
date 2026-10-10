@@ -3,8 +3,8 @@
 Manual verification that automation cannot do. Run this before shipping any
 build to a store or handing an APK/IPA to a user.
 
-Automated gates already cover: contract fixtures, domain unit tests, golden
-screenshots, distribution exclusions (both dependency graph and built APK/AAB),
+Automated gates already cover: contract fixtures, domain unit tests,
+distribution exclusions (both dependency graph and built APK/AAB),
 purity of `commonMain`, and the Apple compile/test job. See
 `./check-local.sh` and `AGENTS.md`. This file covers what they cannot see.
 

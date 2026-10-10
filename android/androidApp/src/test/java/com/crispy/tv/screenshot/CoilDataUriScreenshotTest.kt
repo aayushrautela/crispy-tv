@@ -18,15 +18,13 @@ import java.io.File
 import java.util.Base64
 
 /**
- * Pins the one fact [LandscapeCardScreenshotTest] depends on: under Robolectric
- * a `data:` image model decodes and a `file://` model does not.
+ * Under Robolectric a `data:` image model decodes and a `file://` model does not.
  *
- * This exists because of a real failure, not a hypothetical one. The card
- * golden originally pointed `artworkUrl` at the committed fixture as a
- * `file://` URI — which Coil fetches fine on a device, and which Robolectric's
- * `ImageDecoder` shadow fails with
- * `ImageDecoder$DecodeException: Only supported on Android`. The card never
- * reported a load and the golden timed out. Isolating it took four
+ * This exists because of a real failure, not a hypothetical one. A card image
+ * test once pointed `artworkUrl` at the committed fixture as a `file://` URI —
+ * which Coil fetches fine on a device, and which Robolectric's `ImageDecoder`
+ * shadow fails with `ImageDecoder$DecodeException: Only supported on Android`.
+ * The card never reported a load and the test timed out. Isolating it took four
  * measurements, and the useful one is the contrast: the *same bytes* as a
  * `data:` URI decode to 240x135.
  *
@@ -36,9 +34,9 @@ import java.util.Base64
  * The distinction is the source shape Coil passes to the decoder, and the
  * narrowest useful claim is the one this test makes.
  *
- * Keeping it costs one file and makes the golden's choice self-explaining: a
+ * Keeping it costs one file and makes the `data:` choice self-explaining: a
  * future reader who swaps the `data:` URI back to a file path gets a failing
- * test at the point of the swap rather than a hanging golden.
+ * test at the point of the swap rather than a hang.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

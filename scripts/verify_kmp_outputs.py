@@ -41,7 +41,7 @@ no check. An *extra* class is silent, and silent is what this exists to stop.
 what runs in practice: it is slow enough that people stop running the full gate,
 and it still does not help a developer who compiles a single module to check one
 error. Checking the artefact is also what this repository already decided to do
-for goldens ("Verify is the default") and for distribution
+for distribution
 (`verify_apk_distribution.py` reads the dex, not the dependency graph). This is the
 same rule applied to compilation.
 """

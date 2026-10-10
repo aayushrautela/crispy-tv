@@ -63,7 +63,7 @@ ENTRIES = [
             "a catalogue id while the backend returns the same title under its "
             "addon id. Remove the filter and the rail recommends the title the "
             "user is already looking at -- a bug nothing else in the build can "
-            "see, because the golden suite does not render this rail."
+            "see, because no image gate renders this rail."
         ),
     },
     {

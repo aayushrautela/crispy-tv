@@ -49,7 +49,7 @@ Repo agent rules:
 
 | Module | Kind | Notes |
 |---|---|---|
-| `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours, the golden screenshots |
+| `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours |
 | `:android:app` | KMP + Compose | the shared UI and presentation. **174 `commonMain` / 39 `androidMain` / 9 `jvmMain` / 9 `desktopMain`** — counted by `verify_kmp_structure.py --json`, not by eye. `jvmMain` is the JVM layer **both** JVM targets compile, and holds what a JVM API (not Android) pins; a factory split across it puts only its wiring there, because `create(Class<T>)` has no common spelling. |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
