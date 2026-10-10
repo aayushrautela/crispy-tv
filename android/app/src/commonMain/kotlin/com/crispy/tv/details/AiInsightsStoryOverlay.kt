@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,7 +50,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -182,8 +186,8 @@ private val StoryTextShadow =
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
 private val StoryStickerSize = 116.dp
 
-/** White, not grey: above the copy it sits over faces and sky, where grey thins out. */
-private val StoryStickerTint = Color.White.copy(alpha = 0.95f)
+/** Dimmed white: above the copy the sticker sits over faces and sky, where full white shouts. */
+private val StoryStickerTint = Color.White.copy(alpha = 0.75f)
 
 /**
  * The lower third: type sits above the footer, the way story captions do, with
@@ -196,8 +200,14 @@ private val StorySafeTopReserve = 132.dp
 private val StoryHorizontalPadding = 24.dp
 private val StoryVerticalPadding = 12.dp
 
-/** Breathing room between the measured footer and the lowest line of copy. */
+/** Poster thumb in the story header, the way the player sheet shows its artwork. */
+private val StoryHeaderPosterSize = 56.dp
+
+/** Breathing room between the measured footer top and the lowest line of copy. */
 private val StoryFooterGap = 16.dp
+
+/** First-frame reserve before the footer measures itself; replaced on layout. */
+private val StoryFooterFallbackReserve = 160.dp
 
 @Composable
 internal fun AiInsightsStoryOverlay(
@@ -205,6 +215,8 @@ internal fun AiInsightsStoryOverlay(
     backdropUrls: List<String>,
     onDismiss: () -> Unit,
     artworkUrl: String?,
+    title: String,
+    year: String?,
     palette: DetailsPaletteColors,
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
@@ -216,6 +228,9 @@ internal fun AiInsightsStoryOverlay(
     if (slides.isEmpty()) {
         AiInsightsEmptyStory(
             palette = palette,
+            title = title,
+            year = year,
+            posterUrl = artworkUrl,
             isInWatchlist = isInWatchlist,
             onToggleWatchlist = onToggleWatchlist,
             onShare = onShare,
@@ -236,12 +251,9 @@ internal fun AiInsightsStoryOverlay(
 
     val safeIndex = index.coerceIn(0, slides.lastIndex)
 
-    // Dynamic, not a reserve constant: the slide's copy sits behind the chrome
-    // column, so its bottom padding is the measured footer height plus a gap.
-    // A fixed dp here is what let the copy slide under the buttons.
-    var footerHeightPx by remember { mutableIntStateOf(0) }
-    val slideBottomReserve =
-        with(LocalDensity.current) { footerHeightPx.toDp() } + StoryFooterGap
+    // The footer's screen position, measured after layout: the copy reserve
+    // is derived from it inside the content box below.
+    var footerTopPx by remember { mutableFloatStateOf(-1f) }
 
     fun prev() {
         index = (safeIndex - 1).coerceAtLeast(0)
@@ -255,12 +267,23 @@ internal fun AiInsightsStoryOverlay(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(StoryDeepColor),
     ) {
+        // Position-based, not height-based: the chrome column's own bottom
+        // padding and the nav bars sit *under* the footer, and a height-only
+        // measure silently drops both -- which is what left the copy with no
+        // margin above the buttons. The footer's top edge absorbs all of it
+        // on any nav mode.
+        val slideBottomReserve =
+            if (footerTopPx < 0f) {
+                StoryFooterFallbackReserve
+            } else {
+                with(LocalDensity.current) { (maxHeight.toPx() - footerTopPx).toDp() } + StoryFooterGap
+            }
         // No transition: a hard cut. Taps move one slide at a time and the
         // direction is ambiguous (a left-third tap goes back), so any
         // directional motion plays the wrong way half the time.
@@ -296,13 +319,16 @@ internal fun AiInsightsStoryOverlay(
             AiInsightsProgressHeader(
                 slideCount = slides.size,
                 index = safeIndex,
-                onDismiss = onDismiss,
             )
 
-            // Username position: the slide label lives at the top, under the
-            // progress bars, the way an Instagram handle does -- not buried
-            // in the copy block.
-            AiInsightsStoryIdentity(text = slides[safeIndex].label)
+            // Player-sheet header: poster, title, year, close. The slide label
+            // rides the subtitle line, so no row is spent on it alone.
+            AiInsightsStoryHeader(
+                posterUrl = artworkUrl,
+                title = title,
+                subtitle = storyHeaderSubtitle(year = year, label = slides[safeIndex].label),
+                onDismiss = onDismiss,
+            )
 
             // Chrome sits above the slides, so this is an empty tap target: the
             // whole gesture surface is the region between the header and the footer.
@@ -327,7 +353,7 @@ internal fun AiInsightsStoryOverlay(
                 isInWatchlist = isInWatchlist,
                 onToggleWatchlist = onToggleWatchlist,
                 onShare = onShare,
-                modifier = Modifier.onSizeChanged { footerHeightPx = it.height },
+                modifier = Modifier.onGloballyPositioned { footerTopPx = it.positionInRoot().y },
             )
         }
     }
@@ -377,7 +403,7 @@ private fun AiInsightsStorySlide(
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 AiInsightsStorySticker(slide = slide)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 AiInsightsStoryCopy(slide = slide)
             }
             // Measured footer height, not a constant: the chrome column sits
@@ -479,8 +505,8 @@ private fun AiInsightsStoryCopy(
 
 /**
  * The watermark glyph: right side, above the copy, fully on-screen, rotating
- * gently around its own centre. ±8° at ~2s reads as barely alive rather than
- * distracting. `graphicsLayer` keeps it a draw transform, so there is no
+ * gently around its own centre. ±6° at ~3.6s reads as barely alive rather
+ * than distracting. `graphicsLayer` keeps it a draw transform, so there is no
  * recomposition cost.
  */
 @Composable
@@ -490,11 +516,11 @@ private fun AiInsightsStorySticker(
 ) {
     val sway = rememberInfiniteTransition(label = "story sticker sway")
     val angle by sway.animateFloat(
-        initialValue = -8f,
-        targetValue = 8f,
+        initialValue = -6f,
+        targetValue = 6f,
         animationSpec =
             infiniteRepeatable(
-                animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+                animation = tween(durationMillis = 3600, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse,
             ),
         label = "sway angle",
@@ -518,22 +544,76 @@ private fun AiInsightsStorySticker(
     }
 }
 
+/**
+ * Player-sheet header: poster thumb, title, `year • slide label`, close. The
+ * slide label rides the subtitle line, so no row is spent on it alone.
+ */
 @Composable
-private fun AiInsightsStoryIdentity(text: String) {
-    val label = text.trim()
-    if (label.isEmpty()) return
-    Text(
-        text = label.uppercase(),
-        style =
-            MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.Bold,
-                shadow = StoryTextShadow,
-            ),
-        color = Color.White,
-        letterSpacing = 1.2.sp,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+private fun AiInsightsStoryHeader(
+    posterUrl: String?,
+    title: String,
+    subtitle: String?,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (!posterUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = posterUrl,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(StoryHeaderPosterSize)
+                        .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style =
+                    MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.70f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_close_filled),
+                contentDescription = "Close",
+                tint = Color.White,
+            )
+        }
+    }
+}
+
+/** `year • label`, whichever halves exist; null when neither does. */
+internal fun storyHeaderSubtitle(
+    year: String?,
+    label: String,
+): String? {
+    val cleanYear = year?.trim()?.takeIf { it.isNotEmpty() }
+    val cleanLabel = label.trim().takeIf { it.isNotEmpty() }
+    return when {
+        cleanYear != null && cleanLabel != null -> "$cleanYear • $cleanLabel"
+        cleanYear != null -> cleanYear
+        else -> cleanLabel
+    }
 }
 
 /**
@@ -564,6 +644,9 @@ private fun AiInsightSlide.storySticker(): DrawableResource =
 @Composable
 private fun AiInsightsEmptyStory(
     palette: DetailsPaletteColors,
+    title: String,
+    year: String?,
+    posterUrl: String?,
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
@@ -587,6 +670,11 @@ private fun AiInsightsEmptyStory(
             AiInsightsProgressHeader(
                 slideCount = 1,
                 index = 0,
+            )
+            AiInsightsStoryHeader(
+                posterUrl = posterUrl,
+                title = title,
+                subtitle = storyHeaderSubtitle(year = year, label = ""),
                 onDismiss = onDismiss,
             )
             Box(
@@ -614,41 +702,28 @@ private fun AiInsightsEmptyStory(
 private fun AiInsightsProgressHeader(
     slideCount: Int,
     index: Int,
-    onDismiss: () -> Unit,
 ) {
+    // Pills only now: the close button lives in the story header row below.
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            // Fixed white, off the dynamic scheme: the artwork-seeded pastel
-            // accent is light by design and dissolves over bright photos.
-            repeat(slideCount.coerceAtLeast(1)) { i ->
-                val fillColor =
-                    if (i <= index) {
-                        Color.White
-                    } else {
-                        Color.White.copy(alpha = 0.45f)
-                    }
-                Box(
-                    modifier =
-                        Modifier
-                            .height(4.dp)
-                            .weight(1f)
-                            .clip(CircleShape)
-                            .background(fillColor),
-                )
-            }
-        }
-        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
-            Icon(
-                painter = painterResource(Res.drawable.ic_close_filled),
-                contentDescription = "Close",
-                tint = Color.White,
+        // Fixed white, off the dynamic scheme: the artwork-seeded pastel
+        // accent is light by design and dissolves over bright photos.
+        repeat(slideCount.coerceAtLeast(1)) { i ->
+            val fillColor =
+                if (i <= index) {
+                    Color.White
+                } else {
+                    Color.White.copy(alpha = 0.45f)
+                }
+            Box(
+                modifier =
+                    Modifier
+                        .height(4.dp)
+                        .weight(1f)
+                        .clip(CircleShape)
+                        .background(fillColor),
             )
         }
     }

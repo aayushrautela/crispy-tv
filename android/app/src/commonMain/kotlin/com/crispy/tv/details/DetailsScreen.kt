@@ -624,6 +624,7 @@ internal fun DetailsScreen(
                 val aiOverlayTitle = visibleDetails?.title ?: details?.title
                 val aiOverlayArtworkUrl = visibleDetails?.artworkUrl ?: details?.artworkUrl
                 val shareTitle = aiOverlayTitle?.trim()?.takeIf { it.isNotEmpty() } ?: "this title"
+                val aiOverlayYear = (visibleDetails?.year ?: details?.year)?.trim()?.takeIf { it.isNotEmpty() }
                 // Per-slide wash seeds, resolved the moment insights open: each
                 // slot call hits the seed LRU or fetches its 128px downscale
                 // asynchronously, so tapping through slides never waits. A
@@ -655,6 +656,8 @@ internal fun DetailsScreen(
                     backdropUrls = aiBackdropUrls,
                     onDismiss = onDismissAiInsights,
                      artworkUrl = aiOverlayArtworkUrl,
+                    title = aiOverlayTitle?.trim()?.takeIf { it.isNotEmpty() } ?: "Untitled",
+                    year = aiOverlayYear,
                     palette = palette,
                     isInWatchlist = visibleUiState.isInWatchlist,
                     onToggleWatchlist = onToggleWatchlist,
