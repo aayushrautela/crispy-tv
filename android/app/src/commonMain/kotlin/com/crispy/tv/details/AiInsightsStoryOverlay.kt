@@ -73,16 +73,18 @@ private val SlideDisplayOrder =
     )
 
 /**
- * The story's one wash: [CrispyPalette.primary] at a constant alpha.
+ * The story's one wash: [CrispyPalette.primary] (white) at a barely-there alpha.
  *
- * A filter whose alpha never moves is what lets a single set of numbers work on
- * every backdrop. Nothing about the result is derived from the image, so there
- * is nothing to retune when the image changes -- which is the whole reason the
- * treatment is a wash rather than a per-image gradient map.
+ * This used to sit at 0.22, which is a milky veil over the whole photo: it
+ * brightens the image exactly where the white headline has to win, so both the
+ * picture and the type read as faded. 0.08 keeps a whisper of lift without
+ * washing anything out. A filter whose alpha never moves is what lets a single
+ * set of numbers work on every backdrop -- nothing about the result is derived
+ * from the image, so there is nothing to retune when the image changes.
  */
 private val StoryWashColor = CrispyPalette.primary
 
-private const val StoryWashAlpha = 0.22f
+private const val StoryWashAlpha = 0.08f
 
 /**
  * The darkening the type sits in. Neutral, and deliberately not derived from the
@@ -91,8 +93,8 @@ private const val StoryWashAlpha = 0.22f
  */
 private val StoryDeepColor = CrispyPalette.background
 
-/** Light falls onto the type block, so it reads as depth rather than a band. */
-private const val StoryRadialAlpha = 0.58f
+/** The seat the type sits in: deep enough that white copy wins on bright backdrops. */
+private const val StoryRadialAlpha = 0.78f
 private const val StoryRadialCenterXRatio = 0.50f
 private const val StoryRadialCenterYRatio = 0.68f
 private const val StoryRadialRadiusRatio = 0.85f
@@ -108,13 +110,14 @@ private val StoryBodyFontFamily: FontFamily
 
 /**
  * One shadow, in the same colour the falloff uses, so the lift belongs to the
- * picture instead of sitting on top of it.
+ * picture instead of sitting on top of it. Tight and dark: a wide soft shadow
+ * is what makes white type look out of focus and faded.
  */
 private val StoryTextShadow =
     Shadow(
-        color = StoryDeepColor.copy(alpha = 0.55f),
-        offset = Offset(0f, 3f),
-        blurRadius = 14f,
+        color = StoryDeepColor.copy(alpha = 0.80f),
+        offset = Offset(0f, 2f),
+        blurRadius = 8f,
     )
 
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
@@ -382,7 +385,7 @@ private fun AiInsightsStoryCopy(
                             shadow = StoryTextShadow,
                             lineHeight = 22.sp,
                         ),
-                    color = Color.White.copy(alpha = 0.82f),
+                    color = Color.White.copy(alpha = 0.90f),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -435,7 +438,7 @@ private fun AiInsightsStoryIdentity(text: String) {
     Text(
         text = label.uppercase(),
         style = MaterialTheme.typography.labelLarge,
-        color = Color.White.copy(alpha = 0.92f),
+        color = Color.White,
         letterSpacing = 1.4.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -538,7 +541,7 @@ private fun AiInsightsProgressHeader(
                     if (i <= index) {
                         palette.accent.copy(alpha = 0.96f)
                     } else {
-                        palette.onPageBackground.copy(alpha = 0.20f)
+                        palette.onPageBackground.copy(alpha = 0.35f)
                     }
                 Box(
                     modifier =
@@ -579,14 +582,12 @@ private fun AiInsightsFooterActions(
             AiInsightsPillButton(
                 text = if (isInWatchlist) "In watchlist" else "Add to watchlist",
                 icon = if (isInWatchlist) Res.drawable.ic_check_filled else Res.drawable.ic_playlist_add_filled,
-                palette = palette,
                 onClick = onToggleWatchlist,
                 modifier = Modifier.weight(1f),
             )
             AiInsightsPillButton(
                 text = "Share",
                 icon = Res.drawable.ic_share,
-                palette = palette,
                 onClick = onShare,
                 modifier = Modifier.weight(1f),
             )
@@ -594,7 +595,7 @@ private fun AiInsightsFooterActions(
         Text(
             text = "Generative AI is experimental",
             style = MaterialTheme.typography.bodySmall,
-            color = palette.onPageBackground.copy(alpha = 0.62f),
+            color = palette.onPageBackground.copy(alpha = 0.75f),
         )
     }
 }
@@ -603,18 +604,21 @@ private fun AiInsightsFooterActions(
 private fun AiInsightsPillButton(
     text: String,
     icon: DrawableResource,
-    palette: DetailsPaletteColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Solid white pills, not the dynamic pastel accent: `palette.accent` is a
+    // TonalSpot primary, which is light *by design* in a dark scheme, so pills
+    // built from it read as washed out. White + near-black is the story-CTA
+    // look and wins on every backdrop.
     Button(
         onClick = onClick,
         modifier = modifier.height(44.dp),
         shape = RoundedCornerShape(999.dp),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = palette.accent,
-                contentColor = palette.onAccent,
+                containerColor = CrispyPalette.primary,
+                contentColor = CrispyPalette.onPrimary,
             ),
     ) {
         CrispyIcon(
