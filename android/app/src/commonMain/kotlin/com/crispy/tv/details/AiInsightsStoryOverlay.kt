@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +50,7 @@ import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.archivo_top10
 import com.crispy.tv.ui.resources.ic_auto_awesome
 import com.crispy.tv.ui.resources.ic_check_filled
 import com.crispy.tv.ui.resources.ic_close_filled
@@ -58,6 +60,7 @@ import com.crispy.tv.ui.resources.ic_share
 import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.theme.CrispyPalette
 import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
 
 /** Story presentation order: standout hook first, then good/bad, fun fact last. */
@@ -91,8 +94,17 @@ private val StoryDeepColor = CrispyPalette.background
 /** Light falls onto the type block, so it reads as depth rather than a band. */
 private const val StoryRadialAlpha = 0.58f
 private const val StoryRadialCenterXRatio = 0.50f
-private const val StoryRadialCenterYRatio = 0.50f
+private const val StoryRadialCenterYRatio = 0.68f
 private const val StoryRadialRadiusRatio = 0.85f
+
+/**
+ * Display face for the body copy. Stories read as designed pieces rather than
+ * paragraphs when the big line has its own voice; Archivo's condensed grotesque
+ * carries that without dropping to a decorative font. `Font(FontResource)` is
+ * `@Composable`, so this is a property getter, not a plain `val`.
+ */
+private val StoryBodyFontFamily: FontFamily
+    @Composable get() = FontFamily(Font(Res.font.archivo_top10))
 
 /**
  * One shadow, in the same colour the falloff uses, so the lift belongs to the
@@ -106,17 +118,17 @@ private val StoryTextShadow =
     )
 
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
-private val StoryStickerSize = 96.dp
+private val StoryStickerSize = 116.dp
 
 /** A darker shade of the wash: grey rather than a tint, and solid enough to read. */
 private val StoryStickerColor = CrispyPalette.secondary
-private const val StoryStickerAlpha = 0.90f
+private const val StoryStickerAlpha = 1.0f
 
 /**
- * The safe centre: text lives in the middle of the frame, clear of the progress
- * header above and the action row below. The top reserve covers the progress
- * bars plus the identity row; the bottom one just clears the footer so the
- * copy can breathe into the empty middle instead of truncating early.
+ * The lower third: type sits above the footer, the way story captions do, with
+ * the face and sky left open. Centre-placed copy reads as a block of article
+ * text; low-placed copy reads as a story. The top reserve only needs to clear
+ * the progress bars plus the identity row.
  */
 private val StorySafeTopReserve = 132.dp
 
@@ -206,10 +218,8 @@ internal fun AiInsightsStoryOverlay(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(
-                        horizontal = StoryHorizontalPadding,
-                        vertical = StoryVerticalPadding,
-                    ),
+                    .padding(horizontal = StoryHorizontalPadding)
+                    .padding(top = 4.dp, bottom = StoryVerticalPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             AiInsightsProgressHeader(
@@ -252,7 +262,7 @@ internal fun AiInsightsStoryOverlay(
     }
 }
 
-/** One slide: full-bleed image, the constant treatment over it, type in the safe centre. */
+/** One slide: full-bleed image, the constant treatment over it, type in the lower third. */
 @Composable
 private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
@@ -282,23 +292,20 @@ private fun AiInsightsStorySlide(
                     .padding(horizontal = StoryHorizontalPadding),
         ) {
             Spacer(modifier = Modifier.height(StorySafeTopReserve))
-            Box(
+            // Lower third: the copy column pins to the bottom of the free
+            // space, so the face and sky stay open. The sticker flows with the
+            // text -- just below it, right side -- so its position moves with
+            // each slide's length instead of sitting on a fixed mark.
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .weight(1f, fill = true),
+                verticalArrangement = Arrangement.Bottom,
             ) {
-                AiInsightsStoryCopy(
-                    slide = slide,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-                // Pinned to the lower empty space, fully on-screen: a sticker
-                // glued to the text reads as clutter, and a bled one reads
-                // as a rendering bug.
-                AiInsightsStorySticker(
-                    slide = slide,
-                    modifier = Modifier.align(Alignment.BottomStart),
-                )
+                AiInsightsStoryCopy(slide = slide)
+                Spacer(modifier = Modifier.height(12.dp))
+                AiInsightsStorySticker(slide = slide)
             }
             Spacer(modifier = Modifier.height(StorySafeBottomReserve))
         }
@@ -342,6 +349,7 @@ private fun AiInsightsStoryCopy(
 ) {
     val headline = slide.storyHeadline()
     val body = slide.storyBody()
+    val bodyFont = StoryBodyFontFamily
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -354,6 +362,7 @@ private fun AiInsightsStoryCopy(
                     text = it,
                     style =
                         MaterialTheme.typography.headlineMedium.copy(
+                            fontFamily = bodyFont,
                             fontWeight = FontWeight.Bold,
                             shadow = StoryTextShadow,
                             lineHeight = 34.sp,
@@ -382,6 +391,7 @@ private fun AiInsightsStoryCopy(
                 text = body,
                 style =
                     MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = bodyFont,
                         fontWeight = FontWeight.Bold,
                         shadow = StoryTextShadow,
                         lineHeight = 34.sp,
@@ -397,16 +407,17 @@ private fun AiInsightsStoryCopy(
 }
 
 /**
- * The watermark glyph: bottom-start of the copy box, fully on-screen.
+ * The watermark glyph: right side, flowing just below the copy, fully
+ * on-screen. Its position moves with each slide's text length.
  */
 @Composable
 private fun AiInsightsStorySticker(
     slide: AiInsightSlide,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    Row(
         modifier = modifier.fillMaxWidth(),
-        contentAlignment = Alignment.CenterStart,
+        horizontalArrangement = Arrangement.End,
     ) {
         Icon(
             painter = painterResource(slide.storySticker()),
