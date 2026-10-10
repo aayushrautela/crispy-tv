@@ -33,7 +33,7 @@ fun PlayerLoadingCurtain(
         ) {
             LoadingIndicator(
                 modifier = Modifier.size(64.dp),
-                color = CrispyPalette.spinner,
+                color = CrispyPalette.primary,
             )
         }
     }

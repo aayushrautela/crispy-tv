@@ -12,6 +12,18 @@ name: Android
 
 on:
   workflow_dispatch:
+    inputs:
+      # Re-record the committed golden screenshots instead of verifying them.
+      # Defaults to false, so a plain dispatch still fails on a rendering
+      # regression. Only set this when a golden is knowingly stale -- recording
+      # makes the current output correct by definition, so it can hide a real
+      # regression instead of fixing one. The re-recorded PNGs land in
+      # android/androidApp/src/test/screenshots and must be committed.
+      record_goldens:
+        description: "Re-record golden screenshots instead of verifying them"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   verify:
@@ -134,16 +146,41 @@ jobs:
           path: android/plugins/build/reports/tests/
           if-no-files-found: warn
 
-      - name: Verify golden screenshots
-        # Verify mode is the default; a rendering regression fails here.
-        run: ./gradlew :android:androidApp:testStoreDebugUnitTest
+      - name: Golden screenshots
+        # Verify mode is the default; a rendering regression fails here. With
+        # record_goldens set, this re-records instead and passes by construction.
+        run: |
+          ./gradlew :android:androidApp:testStoreDebugUnitTest \
+            -Proborazzi.record=${{ inputs.record_goldens }}
 
-      - name: Upload screenshot diffs on failure
-        if: failure()
+      # Named so a failure says which mode ran: a red "Record golden screenshots"
+      # means the PNGs were rewritten, not that a regression was caught.
+      - name: Report golden screenshot mode and changed files
+        if: always()
+        run: |
+          echo "record_goldens=${{ inputs.record_goldens }}"
+          echo "--- roborazzi output ---"
+          ls -la android/androidApp/build/outputs/roborazzi/ 2>/dev/null || echo "(none)"
+          echo "--- committed goldens, with checksums ---"
+          ls -la android/androidApp/src/test/screenshots/ 2>/dev/null || echo "(none)"
+          md5sum android/androidApp/src/test/screenshots/*.png 2>/dev/null || true
+          echo "--- working tree diff against HEAD ---"
+          git --no-pager diff --stat -- android/androidApp/src/test/screenshots/ || true
+
+      - name: Upload screenshot output
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: screenshot-diffs
           path: android/androidApp/build/outputs/roborazzi/
+          if-no-files-found: warn
+
+      - name: Upload re-recorded goldens
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: re-recorded-goldens
+          path: android/androidApp/src/test/screenshots/
           if-no-files-found: warn
 
       # ---- build ------------------------------------------------------------

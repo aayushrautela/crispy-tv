@@ -428,7 +428,7 @@ private fun SearchResultsContent(
 
             else -> {
                 if (isLoading) {
-                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CrispyPalette.spinner) }
+                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CrispyPalette.primary) }
                 }
                 if (buckets.movies.isNotEmpty()) {
                     item(key = "movies") {

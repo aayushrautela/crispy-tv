@@ -241,7 +241,7 @@ ProfileIconButton(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            LoadingIndicator(color = CrispyPalette.spinner)
+                            LoadingIndicator(color = CrispyPalette.primary)
                         }
                     } else if (animatedItems.itemCount == 0) {
                         LibraryEmptyState(

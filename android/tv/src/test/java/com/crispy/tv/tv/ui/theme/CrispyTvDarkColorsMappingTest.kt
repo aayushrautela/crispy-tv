@@ -125,7 +125,7 @@ class CrispyTvDarkColorsMappingTest {
         "surfaceContainerHighest", "surfaceContainerLow", "surfaceContainerLowest",
         "surfaceDim", "surfaceBright", "surfaceTint", "outline", "outlineVariant",
         "error", "onError", "errorContainer", "onErrorContainer", "inverseSurface",
-        "inverseOnSurface", "scrim", "spinner",
+        "inverseOnSurface", "scrim",
     )
 
     private fun paletteValue(role: String): Color = when (role) {
@@ -165,7 +165,6 @@ class CrispyTvDarkColorsMappingTest {
         "inverseSurface" -> CrispyPalette.inverseSurface
         "inverseOnSurface" -> CrispyPalette.inverseOnSurface
         "scrim" -> CrispyPalette.scrim
-        "spinner" -> CrispyPalette.spinner
         else -> error("no CrispyPalette property for role '$role'")
     }
 
@@ -286,14 +285,12 @@ class CrispyTvDarkColorsMappingTest {
     }
 
     @Test
-    fun thePaletteRolesWithNoTvSlotAreTheEightThisSaysTheyAre() {
-        // The KDoc used to say seven, under-counting by one: `spinner` is not a
-        // Material3 role and is also unmapped. Enumerating the *unmapped* set is the
-        // half a reader cannot check from `Theme.kt` — the passed roles are all visible
-        // there, the absent ones are not. Derived by name, never by value.
+    fun thePaletteRolesWithNoTvSlotAreTheSevenThisSaysTheyAre() {
+        // Enumerating the *unmapped* set is the half a reader cannot check from
+        // `Theme.kt` — the passed roles are all visible there, the absent ones are
+        // not. Derived by name, never by value.
         assertEquals(
             setOf(
-                "spinner",
                 "surfaceContainer",
                 "surfaceContainerHigh",
                 "surfaceContainerHighest",
@@ -308,9 +305,9 @@ class CrispyTvDarkColorsMappingTest {
 
     @Test
     fun theMappedAndUnmappedRolesPartitionTheWholePalette() {
-        // 29 + 8 = 37. Without this the two enumerations could both be right while a
+        // 29 + 7 = 36. Without this the two enumerations could both be right while a
         // role were counted twice or dropped, and the counts are the only cheap check.
-        assertEquals(37, tvRoleToPaletteRole.size + (paletteRoles - tvRoleToPaletteRole.values.toSet()).size)
+        assertEquals(36, tvRoleToPaletteRole.size + (paletteRoles - tvRoleToPaletteRole.values.toSet()).size)
         assertEquals(paletteRoles.size, tvRoleToPaletteRole.size + (paletteRoles - tvRoleToPaletteRole.values.toSet()).size)
     }
 

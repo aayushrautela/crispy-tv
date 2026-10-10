@@ -50,9 +50,6 @@ import androidx.compose.ui.graphics.Color
  */
 object CrispyPalette {
 
-    /** The one accent colour, used for every spinner and progress indicator. */
-    val spinner = Color(0xFFF56E3C)
-
     val primary = Color(0xFFFFFFFF)
     val onPrimary = Color(0xFF141414)
     val primaryContainer = Color(0xFF2A2A2A)

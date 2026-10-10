@@ -42,7 +42,6 @@ class CrispyPaletteTest {
     @Test
     fun everyRoleKeepsTheValueItHadBeforeThePaletteExisted() {
         val expected = linkedMapOf(
-            "spinner" to Color(0xFFF56E3C),
             "primary" to Color(0xFFFFFFFF),
             "onPrimary" to Color(0xFF141414),
             "primaryContainer" to Color(0xFF2A2A2A),
@@ -82,7 +81,6 @@ class CrispyPaletteTest {
         )
 
         val actual = mapOf(
-            "spinner" to CrispyPalette.spinner,
             "primary" to CrispyPalette.primary,
             "onPrimary" to CrispyPalette.onPrimary,
             "primaryContainer" to CrispyPalette.primaryContainer,
@@ -161,7 +159,6 @@ class CrispyPaletteTest {
      * and is written as two separate literals on purpose.
      */
     private fun rolesByName(): Map<String, Color> = mapOf(
-        "spinner" to CrispyPalette.spinner,
         "primary" to CrispyPalette.primary,
         "onPrimary" to CrispyPalette.onPrimary,
         "primaryContainer" to CrispyPalette.primaryContainer,
@@ -201,7 +198,7 @@ class CrispyPaletteTest {
     )
 
     /**
-     * The roles that are deliberately not grey, measured: of thirty-seven, five
+     * The roles that are deliberately not grey, measured: of thirty-six, four
      * carry a tint and thirty-two are exactly neutral.
      *
      * Named once and used by both neutrality tests. Two tests that each spelled out
@@ -210,7 +207,7 @@ class CrispyPaletteTest {
      * mode this pair exists to prevent.
      */
     private val colouredRoles = setOf(
-        "spinner", "error", "errorContainer", "onErrorContainer", "inverseSurface",
+        "error", "errorContainer", "onErrorContainer", "inverseSurface",
     )
 
     private fun isGrey(colour: Color): Boolean {
@@ -219,7 +216,7 @@ class CrispyPaletteTest {
     }
 
     /**
-     * The five roles that are deliberately not grey are exactly these.
+     * The four roles that are deliberately not grey are exactly these.
      *
      * This is the assertion that makes the neutrality check worth having, and it
      * is the one the hand-picked list it replaced was not. A list of the roles a
@@ -229,13 +226,13 @@ class CrispyPaletteTest {
      * expected set inverts that -- a new non-grey role fails, by name, and so does
      * an existing one going grey.
      *
-     * The split was measured, not assumed: of the thirty-seven roles, five carry a
+     * The split was measured, not assumed: of the thirty-six roles, four carry a
      * tint and thirty-two are exactly neutral. A first pass that read a
      * `Color(0xAARRGGBB)` literal as RGB instead of ARGB reported twenty-seven
      * non-neutral, which is what prompted reading the bytes properly.
      */
     @Test
-    fun exactlyFiveRolesAreNotGrey() {
+    fun exactlyFourRolesAreNotGrey() {
         val notGrey = rolesByName().filterValues { !isGrey(it) }.keys
 
         assertEquals(
@@ -255,7 +252,7 @@ class CrispyPaletteTest {
      * only because the palette is constants rather than computed.
      */
     @Test
-    fun everyRoleOutsideTheColouredFiveIsAGrey() {
+    fun everyRoleOutsideTheColouredFourIsAGrey() {
         for ((role, colour) in rolesByName().filterKeys { it !in colouredRoles }) {
             assertTrue(isGrey(colour), "$role is $colour, which is not a neutral grey")
         }
@@ -265,20 +262,13 @@ class CrispyPaletteTest {
      * Each coloured role leans the way it looks.
      *
      * Measured directions, so these are pins rather than decoration. Two of the
-     * five are *not* R > G > B, which is why they are written out individually
+     * four are *not* R > G > B, which is why they are written out individually
      * instead of being covered by one blanket assertion: `error` and
      * `errorContainer` are pink-red, with blue above green, and an assertion that
      * said "warm" for every coloured role would have quietly failed on them.
      */
     @Test
     fun eachColouredRoleLeansTheWayItLooks() {
-        // spinner 0xFFF56E3C: warm orange, R > G > B.
-        assertTrue(
-            CrispyPalette.spinner.red > CrispyPalette.spinner.green &&
-                CrispyPalette.spinner.green > CrispyPalette.spinner.blue,
-            "the accent must be warm: red > green > blue",
-        )
-
         // error 0xFFE8455C and errorContainer 0xFFB03040: red, but pink enough
         // that blue sits above green.
         assertTrue(

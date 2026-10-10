@@ -286,7 +286,7 @@ fun PluginsSettingsRoute(onBack: () -> Unit) {
                         enabled = !uiState.isInstalling,
                     ) {
                         if (uiState.isInstalling) {
-                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp, color = CrispyPalette.spinner)
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp, color = CrispyPalette.primary)
                             Spacer(modifier = Modifier.height(0.dp))
                         } else {
                             Text("Install repository")

@@ -511,7 +511,7 @@ private fun DiscoverScreen(
                                 .padding(vertical = Dimensions.ListItemPadding),
                             contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(20.dp), color = CrispyPalette.spinner)
+                            LoadingIndicator(modifier = Modifier.size(20.dp), color = CrispyPalette.primary)
                         }
                     }
                 } else if (appendState is LoadState.Error) {
