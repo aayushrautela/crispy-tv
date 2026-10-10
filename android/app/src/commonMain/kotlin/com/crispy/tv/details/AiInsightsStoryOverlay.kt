@@ -47,8 +47,11 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -190,11 +193,11 @@ private val StoryStickerTint = Color.White.copy(alpha = 0.95f)
  */
 private val StorySafeTopReserve = 132.dp
 
-/** Keeps the copy clear of the footer action row below it. */
-private val StorySafeBottomReserve = 48.dp
-
 private val StoryHorizontalPadding = 24.dp
 private val StoryVerticalPadding = 12.dp
+
+/** Breathing room between the measured footer and the lowest line of copy. */
+private val StoryFooterGap = 16.dp
 
 @Composable
 internal fun AiInsightsStoryOverlay(
@@ -233,6 +236,13 @@ internal fun AiInsightsStoryOverlay(
 
     val safeIndex = index.coerceIn(0, slides.lastIndex)
 
+    // Dynamic, not a reserve constant: the slide's copy sits behind the chrome
+    // column, so its bottom padding is the measured footer height plus a gap.
+    // A fixed dp here is what let the copy slide under the buttons.
+    var footerHeightPx by remember { mutableIntStateOf(0) }
+    val slideBottomReserve =
+        with(LocalDensity.current) { footerHeightPx.toDp() } + StoryFooterGap
+
     fun prev() {
         index = (safeIndex - 1).coerceAtLeast(0)
     }
@@ -269,6 +279,7 @@ internal fun AiInsightsStoryOverlay(
                     artworkUrl = artworkUrl,
                 ),
             washColor = slideWashSeeds[safeIndex]?.let(::clampStoryWash) ?: StoryWashFallback,
+            bottomReserve = slideBottomReserve,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -316,6 +327,7 @@ internal fun AiInsightsStoryOverlay(
                 isInWatchlist = isInWatchlist,
                 onToggleWatchlist = onToggleWatchlist,
                 onShare = onShare,
+                modifier = Modifier.onSizeChanged { footerHeightPx = it.height },
             )
         }
     }
@@ -327,6 +339,7 @@ private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
     imageUrl: String?,
     washColor: Color,
+    bottomReserve: Dp,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -367,7 +380,9 @@ private fun AiInsightsStorySlide(
                 Spacer(modifier = Modifier.height(12.dp))
                 AiInsightsStoryCopy(slide = slide)
             }
-            Spacer(modifier = Modifier.height(StorySafeBottomReserve))
+            // Measured footer height, not a constant: the chrome column sits
+            // over this slide, so the copy must clear whatever it measures.
+            Spacer(modifier = Modifier.height(bottomReserve))
         }
     }
 }
@@ -463,10 +478,10 @@ private fun AiInsightsStoryCopy(
 }
 
 /**
- * The watermark glyph: right side, above the copy, fully on-screen, swaying
- * like a metronome. ±8° at ~2s reads as barely alive rather than distracting;
- * the pivot hangs from the top edge so it swings instead of spinning in place.
- * `graphicsLayer` keeps it a draw transform, so there is no recomposition cost.
+ * The watermark glyph: right side, above the copy, fully on-screen, rotating
+ * gently around its own centre. ±8° at ~2s reads as barely alive rather than
+ * distracting. `graphicsLayer` keeps it a draw transform, so there is no
+ * recomposition cost.
  */
 @Composable
 private fun AiInsightsStorySticker(
@@ -497,7 +512,7 @@ private fun AiInsightsStorySticker(
                     .size(StoryStickerSize)
                     .graphicsLayer {
                         rotationZ = angle
-                        transformOrigin = TransformOrigin(0.5f, 0f)
+                        transformOrigin = TransformOrigin(0.5f, 0.5f)
                     },
         )
     }
@@ -645,9 +660,10 @@ private fun AiInsightsFooterActions(
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
