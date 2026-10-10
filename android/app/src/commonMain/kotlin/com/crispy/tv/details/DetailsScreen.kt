@@ -624,6 +624,32 @@ internal fun DetailsScreen(
                 val aiOverlayTitle = visibleDetails?.title ?: details?.title
                 val aiOverlayArtworkUrl = visibleDetails?.artworkUrl ?: details?.artworkUrl
                 val shareTitle = aiOverlayTitle?.trim()?.takeIf { it.isNotEmpty() } ?: "this title"
+                // Per-slide wash seeds, resolved the moment insights open: each
+                // slot call hits the seed LRU or fetches its 128px downscale
+                // asynchronously, so tapping through slides never waits. A
+                // still-loading seed is simply absent, and the overlay degrades
+                // that slide to the white fallback wash.
+                val aiStorySlides = remember(visibleUiState.aiInsights) { visibleUiState.aiInsights.slides.sortedForDisplay() }
+                val aiStoryCycling =
+                    remember(visibleUiState.aiInsights, aiBackdropUrls) {
+                        aiBackdropUrls.mapNotNull { it.trim().takeIf(String::isNotEmpty) }.distinct()
+                    }
+                val aiStoryWashSeeds = buildMap {
+                    aiStorySlides.forEachIndexed { index, slide ->
+                        val url =
+                            resolveSlideImageUrl(
+                                slide = slide,
+                                cyclingBackdropUrl =
+                                    if (aiStoryCycling.isEmpty()) {
+                                        null
+                                    } else {
+                                        aiStoryCycling[index % aiStoryCycling.size]
+                                    },
+                                artworkUrl = aiOverlayArtworkUrl,
+                            )
+                        imageSeedColor(url, Color.White)?.let { put(index, it) }
+                    }
+                }
                 AiInsightsStoryOverlay(
                     result = visibleUiState.aiInsights,
                     backdropUrls = aiBackdropUrls,
@@ -633,6 +659,7 @@ internal fun DetailsScreen(
                     isInWatchlist = visibleUiState.isInWatchlist,
                     onToggleWatchlist = onToggleWatchlist,
                     onShare = { shareText("Check out $shareTitle on Crispy") },
+                    slideWashSeeds = aiStoryWashSeeds,
                 )
             }
         }

@@ -1,5 +1,11 @@
 package com.crispy.tv.details
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -70,18 +78,78 @@ private val SlideDisplayOrder =
     )
 
 /**
- * The story's one wash: [CrispyPalette.primary] (white) at a barely-there alpha.
- *
- * This used to sit at 0.22, which is a milky veil over the whole photo: it
- * brightens the image exactly where the white headline has to win, so both the
- * picture and the type read as faded. 0.08 keeps a whisper of lift without
- * washing anything out. A filter whose alpha never moves is what lets a single
- * set of numbers work on every backdrop -- nothing about the result is derived
- * from the image, so there is nothing to retune when the image changes.
+ * The story's wash: one hue per slide, extracted from that slide's own
+ * backdrop (128px downscale + dominant-colour scoring, the same pipeline as
+ * the details page) and clamped into a narrow luminance band by
+ * [clampStoryWash]. The clamp is the whole trick: a raw vivid seed at any
+ * visible alpha re-creates the milky-veil faded-text problem, so hue varies
+ * per slide while contrast never moves. [StoryWashFallback] (white) covers a
+ * missing or still-loading seed, which degrades to the previous design.
  */
-private val StoryWashColor = CrispyPalette.primary
+private val StoryWashFallback = CrispyPalette.primary
 
-private const val StoryWashAlpha = 0.08f
+private const val StoryWashAlpha = 0.12f
+
+/**
+ * Tames an extracted seed into a wash: keeps the hue, halves the saturation,
+ * and pins lightness to [0.38, 0.55]. Pure function of the colour, so it lives
+ * in `commonMain` and is covered from `commonTest`.
+ */
+internal fun clampStoryWash(seed: Color): Color {
+    val r = seed.red
+    val g = seed.green
+    val b = seed.blue
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val lightness = (max + min) / 2f
+    val delta = max - min
+    val saturation =
+        if (delta == 0f) {
+            0f
+        } else if (lightness < 0.5f) {
+            delta / (max + min)
+        } else {
+            delta / (2f - max - min)
+        }
+    var hue = 0f
+    if (delta != 0f) {
+        hue =
+            when (max) {
+                r -> ((g - b) / delta) % 6f
+                g -> (b - r) / delta + 2f
+                else -> (r - g) / delta + 4f
+            } * 60f
+        if (hue < 0f) hue += 360f
+    }
+    val clampedLightness = lightness.coerceIn(0.38f, 0.55f)
+    val clampedSaturation = (saturation * 0.5f).coerceIn(0f, 1f)
+    return hslToColor(hue = hue, saturation = clampedSaturation, lightness = clampedLightness)
+}
+
+private fun hslToColor(
+    hue: Float,
+    saturation: Float,
+    lightness: Float,
+): Color {
+    if (saturation == 0f) {
+        return Color(red = lightness, green = lightness, blue = lightness)
+    }
+    val q = if (lightness < 0.5f) lightness * (1f + saturation) else lightness + saturation - lightness * saturation
+    val p = 2f * lightness - q
+    val h = hue / 360f
+    fun channel(t: Float): Float {
+        var tt = t
+        if (tt < 0f) tt += 1f
+        if (tt > 1f) tt -= 1f
+        return when {
+            tt < 1f / 6f -> p + (q - p) * 6f * tt
+            tt < 1f / 2f -> q
+            tt < 2f / 3f -> p + (q - p) * (2f / 3f - tt) * 6f
+            else -> p
+        }
+    }
+    return Color(red = channel(h + 1f / 3f), green = channel(h), blue = channel(h - 1f / 3f))
+}
 
 /**
  * The darkening the type sits in. Neutral, and deliberately not derived from the
@@ -111,9 +179,8 @@ private val StoryTextShadow =
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
 private val StoryStickerSize = 116.dp
 
-/** A darker shade of the wash: grey rather than a tint, and solid enough to read. */
-private val StoryStickerColor = CrispyPalette.secondary
-private const val StoryStickerAlpha = 1.0f
+/** White, not grey: above the copy it sits over faces and sky, where grey thins out. */
+private val StoryStickerTint = Color.White.copy(alpha = 0.95f)
 
 /**
  * The lower third: type sits above the footer, the way story captions do, with
@@ -139,6 +206,7 @@ internal fun AiInsightsStoryOverlay(
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
+    slideWashSeeds: Map<Int, Color> = emptyMap(),
 ) {
     val slides = remember(result) { result.slides.sortedForDisplay() }
 
@@ -200,6 +268,7 @@ internal fun AiInsightsStoryOverlay(
                         },
                     artworkUrl = artworkUrl,
                 ),
+            washColor = slideWashSeeds[safeIndex]?.let(::clampStoryWash) ?: StoryWashFallback,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -217,7 +286,6 @@ internal fun AiInsightsStoryOverlay(
                 slideCount = slides.size,
                 index = safeIndex,
                 onDismiss = onDismiss,
-                palette = palette,
             )
 
             // Username position: the slide label lives at the top, under the
@@ -253,11 +321,12 @@ internal fun AiInsightsStoryOverlay(
     }
 }
 
-/** One slide: full-bleed image, the constant treatment over it, type in the lower third. */
+/** One slide: full-bleed image, its own wash over it, type in the lower third. */
 @Composable
 private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
     imageUrl: String?,
+    washColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -273,7 +342,7 @@ private fun AiInsightsStorySlide(
                 contentScale = ContentScale.Crop,
             )
         }
-        Box(modifier = Modifier.fillMaxSize().storyTreatment())
+        Box(modifier = Modifier.fillMaxSize().storyTreatment(washColor))
         Column(
             modifier =
                 Modifier
@@ -283,10 +352,10 @@ private fun AiInsightsStorySlide(
                     .padding(horizontal = StoryHorizontalPadding),
         ) {
             Spacer(modifier = Modifier.height(StorySafeTopReserve))
-            // Lower third: the copy column pins to the bottom of the free
-            // space, so the face and sky stay open. The sticker flows with the
-            // text -- just below it, right side -- so its position moves with
-            // each slide's length instead of sitting on a fixed mark.
+            // Lower third: the sticker rides above the copy, right side, and
+            // the copy column pins to the bottom, so the face and sky stay
+            // open. Both flow with each slide's text length instead of sitting
+            // on fixed marks.
             Column(
                 modifier =
                     Modifier
@@ -294,9 +363,9 @@ private fun AiInsightsStorySlide(
                         .weight(1f, fill = true),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                AiInsightsStoryCopy(slide = slide)
-                Spacer(modifier = Modifier.height(12.dp))
                 AiInsightsStorySticker(slide = slide)
+                Spacer(modifier = Modifier.height(12.dp))
+                AiInsightsStoryCopy(slide = slide)
             }
             Spacer(modifier = Modifier.height(StorySafeBottomReserve))
         }
@@ -304,15 +373,14 @@ private fun AiInsightsStorySlide(
 }
 
 /**
- * The flat wash, then light falling onto the type block in the safe centre.
+ * The per-slide wash, then the dark seat the type sits in.
  *
- * Both are constant: no stop, radius or alpha is read from the image, so there
- * is one set of numbers for every slide. The falloff is drawn with four stops
- * and no hard edge, which is what keeps it from reading as a band.
+ * The wash hue varies per slide; the falloff is one constant set of numbers
+ * for every slide, which is what keeps white copy winning on all of them.
  */
-private fun Modifier.storyTreatment(): Modifier =
+private fun Modifier.storyTreatment(washColor: Color): Modifier =
     drawBehind {
-        drawRect(color = StoryWashColor.copy(alpha = StoryWashAlpha))
+        drawRect(color = washColor.copy(alpha = StoryWashAlpha))
         drawRect(
             brush =
                 Brush.radialGradient(
@@ -395,14 +463,27 @@ private fun AiInsightsStoryCopy(
 }
 
 /**
- * The watermark glyph: right side, flowing just below the copy, fully
- * on-screen. Its position moves with each slide's text length.
+ * The watermark glyph: right side, above the copy, fully on-screen, swaying
+ * like a metronome. ±8° at ~2s reads as barely alive rather than distracting;
+ * the pivot hangs from the top edge so it swings instead of spinning in place.
+ * `graphicsLayer` keeps it a draw transform, so there is no recomposition cost.
  */
 @Composable
 private fun AiInsightsStorySticker(
     slide: AiInsightSlide,
     modifier: Modifier = Modifier,
 ) {
+    val sway = rememberInfiniteTransition(label = "story sticker sway")
+    val angle by sway.animateFloat(
+        initialValue = -8f,
+        targetValue = 8f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "sway angle",
+    )
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End,
@@ -410,8 +491,14 @@ private fun AiInsightsStorySticker(
         Icon(
             painter = painterResource(slide.storySticker()),
             contentDescription = null,
-            tint = StoryStickerColor.copy(alpha = StoryStickerAlpha),
-            modifier = Modifier.size(StoryStickerSize),
+            tint = StoryStickerTint,
+            modifier =
+                Modifier
+                    .size(StoryStickerSize)
+                    .graphicsLayer {
+                        rotationZ = angle
+                        transformOrigin = TransformOrigin(0.5f, 0f)
+                    },
         )
     }
 }
@@ -422,9 +509,13 @@ private fun AiInsightsStoryIdentity(text: String) {
     if (label.isEmpty()) return
     Text(
         text = label.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
+        style =
+            MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Bold,
+                shadow = StoryTextShadow,
+            ),
         color = Color.White,
-        letterSpacing = 1.4.sp,
+        letterSpacing = 1.2.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -482,7 +573,6 @@ private fun AiInsightsEmptyStory(
                 slideCount = 1,
                 index = 0,
                 onDismiss = onDismiss,
-                palette = palette,
             )
             Box(
                 modifier = Modifier.weight(1f, fill = true),
@@ -510,7 +600,6 @@ private fun AiInsightsProgressHeader(
     slideCount: Int,
     index: Int,
     onDismiss: () -> Unit,
-    palette: DetailsPaletteColors,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -521,12 +610,14 @@ private fun AiInsightsProgressHeader(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            // Fixed white, off the dynamic scheme: the artwork-seeded pastel
+            // accent is light by design and dissolves over bright photos.
             repeat(slideCount.coerceAtLeast(1)) { i ->
                 val fillColor =
                     if (i <= index) {
-                        palette.accent.copy(alpha = 0.96f)
+                        Color.White
                     } else {
-                        palette.onPageBackground.copy(alpha = 0.35f)
+                        Color.White.copy(alpha = 0.45f)
                     }
                 Box(
                     modifier =
@@ -542,7 +633,7 @@ private fun AiInsightsProgressHeader(
             Icon(
                 painter = painterResource(Res.drawable.ic_close_filled),
                 contentDescription = "Close",
-                tint = palette.onPageBackground,
+                tint = Color.White,
             )
         }
     }
@@ -621,10 +712,10 @@ private fun AiInsightsPillButton(
 }
 
 /** Reorders server slides into story order while keeping any unknown keys at the end. */
-private fun List<AiInsightSlide>.sortedForDisplay(): List<AiInsightSlide> =
+internal fun List<AiInsightSlide>.sortedForDisplay(): List<AiInsightSlide> =
     sortedBy { slide -> SlideDisplayOrder.indexOf(slide.key).takeIf { it >= 0 } ?: Int.MAX_VALUE }
 
-private fun resolveSlideImageUrl(
+internal fun resolveSlideImageUrl(
     slide: AiInsightSlide,
     cyclingBackdropUrl: String?,
     artworkUrl: String?,
