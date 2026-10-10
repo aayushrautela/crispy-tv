@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -107,24 +106,22 @@ private val StoryTextShadow =
     )
 
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
-private val StoryStickerSize = 220.dp
+private val StoryStickerSize = 96.dp
 
 /** A darker shade of the wash: grey rather than a tint, and solid enough to read. */
 private val StoryStickerColor = CrispyPalette.secondary
-private const val StoryStickerAlpha = 0.80f
-
-/** Pushes the sticker far enough right that about a third of it leaves the frame. */
-private val StoryStickerBleed = 88.dp
+private const val StoryStickerAlpha = 0.90f
 
 /**
  * The safe centre: text lives in the middle of the frame, clear of the progress
- * header above and the action row below. Roughly 90dp top and 150dp bottom keep
- * the copy inside the central band on a 9:16 phone frame.
+ * header above and the action row below. The top reserve covers the progress
+ * bars plus the identity row; the bottom one just clears the footer so the
+ * copy can breathe into the empty middle instead of truncating early.
  */
-private val StorySafeTopReserve = 108.dp
+private val StorySafeTopReserve = 132.dp
 
 /** Keeps the copy clear of the footer action row below it. */
-private val StorySafeBottomReserve = 150.dp
+private val StorySafeBottomReserve = 48.dp
 
 private val StoryHorizontalPadding = 24.dp
 private val StoryVerticalPadding = 12.dp
@@ -222,6 +219,11 @@ internal fun AiInsightsStoryOverlay(
                 palette = palette,
             )
 
+            // Username position: the slide label lives at the top, under the
+            // progress bars, the way an Instagram handle does -- not buried
+            // in the copy block.
+            AiInsightsStoryIdentity(text = slides[safeIndex].label)
+
             // Chrome sits above the slides, so this is an empty tap target: the
             // whole gesture surface is the region between the header and the footer.
             Box(
@@ -285,10 +287,18 @@ private fun AiInsightsStorySlide(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f, fill = true),
-                contentAlignment = Alignment.Center,
             ) {
-                AiInsightsStorySticker(slide = slide)
-                AiInsightsStoryCopy(slide = slide)
+                AiInsightsStoryCopy(
+                    slide = slide,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+                // Pinned to the lower empty space, fully on-screen: a sticker
+                // glued to the text reads as clutter, and a bled one reads
+                // as a rendering bug.
+                AiInsightsStorySticker(
+                    slide = slide,
+                    modifier = Modifier.align(Alignment.BottomStart),
+                )
             }
             Spacer(modifier = Modifier.height(StorySafeBottomReserve))
         }
@@ -326,35 +336,60 @@ private fun Modifier.storyTreatment(): Modifier =
     }
 
 @Composable
-private fun AiInsightsStoryCopy(slide: AiInsightSlide) {
+private fun AiInsightsStoryCopy(
+    slide: AiInsightSlide,
+    modifier: Modifier = Modifier,
+) {
+    val headline = slide.storyHeadline()
+    val body = slide.storyBody()
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        AiInsightsKicker(text = slide.label)
-        slide.storyHeadline()?.let { headline ->
-            Text(
-                text = headline,
-                style =
-                    MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        shadow = StoryTextShadow,
-                    ),
-                color = Color.White.copy(alpha = 0.92f),
-                maxLines = 5,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        slide.storyBody()?.let { body ->
+        if (body == null) {
+            // No focus: the headline IS the body text, so print it at body
+            // size instead of leaving one small line in the middle of the frame.
+            headline?.let {
+                Text(
+                    text = it,
+                    style =
+                        MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            shadow = StoryTextShadow,
+                            lineHeight = 34.sp,
+                        ),
+                    color = Color.White,
+                    maxLines = 20,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            headline?.let {
+                Text(
+                    text = it,
+                    style =
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            shadow = StoryTextShadow,
+                            lineHeight = 22.sp,
+                        ),
+                    color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 text = body,
                 style =
-                    MaterialTheme.typography.headlineSmall.copy(
+                    MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         shadow = StoryTextShadow,
+                        lineHeight = 34.sp,
                     ),
                 color = Color.White,
-                maxLines = 8,
+                // Generous cap, not a design limit: the copy should spend the
+                // empty middle of the frame before it ever truncates.
+                maxLines = 20,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -362,36 +397,34 @@ private fun AiInsightsStoryCopy(slide: AiInsightSlide) {
 }
 
 /**
- * The watermark glyph: right edge, in the band between the type and the footer,
- * bleeding off-frame. Right-aligned because the type is left-aligned, and bled
- * because a sticker that stops neatly inside the frame reads as a mistake.
+ * The watermark glyph: bottom-start of the copy box, fully on-screen.
  */
 @Composable
-private fun AiInsightsStorySticker(slide: AiInsightSlide) {
+private fun AiInsightsStorySticker(
+    slide: AiInsightSlide,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.CenterEnd,
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Icon(
             painter = painterResource(slide.storySticker()),
             contentDescription = null,
             tint = StoryStickerColor.copy(alpha = StoryStickerAlpha),
-            modifier =
-                Modifier
-                    .size(StoryStickerSize)
-                    .offset(x = StoryStickerBleed),
+            modifier = Modifier.size(StoryStickerSize),
         )
     }
 }
 
 @Composable
-private fun AiInsightsKicker(text: String) {
+private fun AiInsightsStoryIdentity(text: String) {
     val label = text.trim()
     if (label.isEmpty()) return
     Text(
         text = label.uppercase(),
         style = MaterialTheme.typography.labelLarge,
-        color = Color.White.copy(alpha = 0.72f),
+        color = Color.White.copy(alpha = 0.92f),
         letterSpacing = 1.4.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
