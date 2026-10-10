@@ -15,19 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
@@ -49,9 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -71,6 +65,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.lazyKey
 import com.crispy.tv.search.SearchGenreSuggestion
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.CrispyChip
+import com.crispy.tv.ui.components.CrispyChipRow
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -97,6 +93,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import org.jetbrains.compose.resources.painterResource
+
+/** Taller than `FilterChip`'s 32dp, matching the library and random-pick pill rows. */
+private val DiscoverChipHeight = 40.dp
 
 enum class DiscoverTypeFilter(val label: String, val value: String) {
     All(label = "All", value = "all"),
@@ -352,89 +351,41 @@ private fun DiscoverScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item {
-                            FilterChip(
+                    // The shared [CrispyChipRow], so this page's pickers are the same pills as the
+                    // library sections and the random-pick genres. The chevron is kept on each: these
+                    // open a sheet rather than selecting, so a chip without it reads as a filter.
+                    val filterChips =
+                        listOf(
+                            CrispyChip(
+                                id = "type",
+                                label = uiState.typeFilter.label,
+                                icon = null,
                                 selected = false,
                                 onClick = { activeSheet = DiscoverSheet.Type },
-                                label = { Text(uiState.typeFilter.label) },
-                                trailingIcon = {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_keyboard_arrow_down),
-                                        contentDescription = null
-                                    )
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                border = null,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    labelColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedContainerColor = Color.White,
-                                    selectedLabelColor = Color(0xFF141414),
-                                ),
-                            )
-                        }
-
-                        item {
-                            FilterChip(
+                                trailingIcon = Res.drawable.ic_keyboard_arrow_down,
+                            ),
+                            CrispyChip(
+                                id = "genre",
+                                label = genreLabel,
+                                icon = null,
                                 selected = false,
                                 onClick = { activeSheet = DiscoverSheet.Genre },
-                                label = {
-                                    Text(
-                                        text = genreLabel,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_keyboard_arrow_down),
-                                        contentDescription = null
-                                    )
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                border = null,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    labelColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedContainerColor = Color.White,
-                                    selectedLabelColor = Color(0xFF141414),
-                                ),
-                            )
-                        }
-
-                        item {
-                            FilterChip(
+                                trailingIcon = Res.drawable.ic_keyboard_arrow_down,
+                            ),
+                            CrispyChip(
+                                id = "sort",
+                                label = uiState.sortFilter.label,
+                                icon = null,
                                 selected = false,
                                 onClick = { activeSheet = DiscoverSheet.Sort },
-                                label = {
-                                    Text(
-                                        text = uiState.sortFilter.label,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_keyboard_arrow_down),
-                                        contentDescription = null
-                                    )
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                border = null,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    labelColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedContainerColor = Color.White,
-                                    selectedLabelColor = Color(0xFF141414),
-                                ),
-                            )
-                        }
-
-                    }
+                                trailingIcon = Res.drawable.ic_keyboard_arrow_down,
+                            ),
+                        )
+                    CrispyChipRow(
+                        chips = filterChips,
+                        horizontalPadding = pageHorizontalPadding,
+                        chipHeight = DiscoverChipHeight,
+                    )
                 }
                 if (pagingStatusMessage.isNotBlank()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {

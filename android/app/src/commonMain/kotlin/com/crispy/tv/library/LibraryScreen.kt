@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,7 +15,6 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -28,9 +25,9 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -51,6 +48,8 @@ import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.CrispyChip
+import com.crispy.tv.ui.components.CrispyChipRow
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
@@ -763,48 +762,32 @@ internal fun ColumnScope.WatchlistSectionContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun LibraryFiltersRow(
     sections: List<LibrarySectionUi>,
     selectedSectionId: String,
     onSelectSection: (String) -> Unit,
 ) {
-    // A connected button group, not filter chips: one full-width control whose
-    // checked button carries `Primary` and whose shape is continuous across the
-    // group. The position decides the shape -- leading, middle or trailing --
-    // so the three buttons read as one segmented control rather than three
-    // independent chips. The label is bold only when checked, which is the
-    // group's only per-state styling; everything else is the theme default.
-    if (sections.isNotEmpty()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        ) {
-            sections.forEachIndexed { index, section ->
-                val checked = section.id == selectedSectionId
-                ToggleButton(
-                    checked = checked,
-                    onCheckedChange = { onSelectSection(section.id) },
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shapes =
-                        when (index) {
-                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            sections.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                        },
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                ) {
-                    Text(
-                        text = section.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
-                    )
-                }
-            }
+    // The shared [CrispyChipRow], like the random-pick page's genre row: standalone pills that hug
+    // their labels, so a section label is never truncated and every picker in the app is the same
+    // control. This row used to be a connected `ToggleButton` group -- a segmented control, which
+    // is a different component, and one that could only fit by giving each button an equal share of
+    // the full width.
+    val chips = remember(sections, selectedSectionId) {
+        sections.map { section ->
+            CrispyChip(
+                id = section.id,
+                label = section.label,
+                icon = null,
+                selected = section.id == selectedSectionId,
+                onClick = { onSelectSection(section.id) },
+            )
         }
     }
+    CrispyChipRow(chips = chips, chipHeight = LibraryChipHeight)
 }
+
+private val LibraryChipHeight = 40.dp
 
 @Composable
 internal fun LibraryStatusMessage(

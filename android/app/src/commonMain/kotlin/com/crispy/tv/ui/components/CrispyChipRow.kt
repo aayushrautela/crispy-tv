@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -43,6 +44,12 @@ data class CrispyChip(
     val icon: DrawableResource?,
     val selected: Boolean,
     val onClick: () -> Unit,
+    /**
+     * Drawn after the label. Carries the affordance for a chip that opens something rather than
+     * selecting: the discover page's type/genre/sort chips are dropdown triggers, and a chip with no
+     * chevron reads as a filter.
+     */
+    val trailingIcon: DrawableResource? = null,
 )
 
 /** Material 3 Expressive's `ButtonGroupDefaults.ExpandedRatio`. */
@@ -173,6 +180,16 @@ private fun RowScope.CrispyChipInRow(
         onClick = chip.onClick,
         label = { Text(text = chip.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = chip.icon?.let { icon -> { CrispyIcon(painter = painterResource(icon), contentDescription = null) } },
+        trailingIcon =
+            chip.trailingIcon?.let { icon ->
+                {
+                    CrispyIcon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                    )
+                }
+            },
         modifier =
             Modifier
                 .height(chipHeight)
@@ -181,9 +198,13 @@ private fun RowScope.CrispyChipInRow(
                     // next press would be computed from it, compounding on every press.
                     if (!isPressed) onRestingWidthMeasured(size.width)
                 },
-        // A pill is a stadium: half the height on every corner. `FilterChipDefaults.shape` is
-        // `CornerSmall` (8dp), which reads as a rounded rectangle at any height worth calling a chip.
-        shape = RoundedCornerShape(percent = 50),
+        // A pill is a stadium: every corner is half the height, so the ends are semicircles.
+        // `FilterChipDefaults.shape` is `CornerSmall` (8dp), which reads as a rounded rectangle at
+        // any height worth calling a chip. Half the *height* is named rather than written as
+        // `RoundedCornerShape(percent = 50)` because that percentage is a fraction of the smaller
+        // of width and height, so it stops being a pill the moment a chip is ever taller than it is
+        // wide -- and it makes the intent unreadable at the call site.
+        shape = RoundedCornerShape(chipHeight / 2),
         border = null,
         contentPadding =
             PaddingValues(
@@ -199,6 +220,12 @@ private fun RowScope.CrispyChipInRow(
             selectedContainerColor = MaterialTheme.colorScheme.primary,
             selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
             selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+            // Both icon slots are named, not just the leading one: every colour in
+            // `filterChipColors` defaults to `Color.Unspecified` and falls through to the theme
+            // individually, so omitting the trailing slot leaves a chevron resolving by a different
+            // path from the leading icon on a selected chip. `iconColor` already covers the
+            // unselected case for both slots.
+            selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimary,
         ),
         interactionSource = interactionSource,
     )
