@@ -1,9 +1,17 @@
 package com.crispy.tv.details
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,10 +46,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -70,16 +85,78 @@ private val SlideDisplayOrder =
     )
 
 /**
- * The story's one wash: [CrispyPalette.primary] at a constant alpha.
- *
- * A filter whose alpha never moves is what lets a single set of numbers work on
- * every backdrop. Nothing about the result is derived from the image, so there
- * is nothing to retune when the image changes -- which is the whole reason the
- * treatment is a wash rather than a per-image gradient map.
+ * The story's wash: one hue per slide, extracted from that slide's own
+ * backdrop (128px downscale + dominant-colour scoring, the same pipeline as
+ * the details page) and clamped into a narrow luminance band by
+ * [clampStoryWash]. The clamp is the whole trick: a raw vivid seed at any
+ * visible alpha re-creates the milky-veil faded-text problem, so hue varies
+ * per slide while contrast never moves. [StoryWashFallback] (white) covers a
+ * missing or still-loading seed, which degrades to the previous design.
  */
-private val StoryWashColor = CrispyPalette.primary
+private val StoryWashFallback = CrispyPalette.primary
 
-private const val StoryWashAlpha = 0.22f
+private const val StoryWashAlpha = 0.12f
+
+/**
+ * Tames an extracted seed into a wash: keeps the hue, halves the saturation,
+ * and pins lightness to [0.38, 0.55]. Pure function of the colour, so it lives
+ * in `commonMain` and is covered from `commonTest`.
+ */
+internal fun clampStoryWash(seed: Color): Color {
+    val r = seed.red
+    val g = seed.green
+    val b = seed.blue
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val lightness = (max + min) / 2f
+    val delta = max - min
+    val saturation =
+        if (delta == 0f) {
+            0f
+        } else if (lightness < 0.5f) {
+            delta / (max + min)
+        } else {
+            delta / (2f - max - min)
+        }
+    var hue = 0f
+    if (delta != 0f) {
+        hue =
+            when (max) {
+                r -> ((g - b) / delta) % 6f
+                g -> (b - r) / delta + 2f
+                else -> (r - g) / delta + 4f
+            } * 60f
+        if (hue < 0f) hue += 360f
+    }
+    val clampedLightness = lightness.coerceIn(0.38f, 0.55f)
+    val clampedSaturation = (saturation * 0.5f).coerceIn(0f, 1f)
+    return hslToColor(hue = hue, saturation = clampedSaturation, lightness = clampedLightness)
+}
+
+private fun hslToColor(
+    hue: Float,
+    saturation: Float,
+    lightness: Float,
+): Color {
+    if (saturation == 0f) {
+        return Color(red = lightness, green = lightness, blue = lightness)
+    }
+    val q = if (lightness < 0.5f) lightness * (1f + saturation) else lightness + saturation - lightness * saturation
+    val p = 2f * lightness - q
+    val h = hue / 360f
+    fun channel(t: Float): Float {
+        var tt = t
+        if (tt < 0f) tt += 1f
+        if (tt > 1f) tt -= 1f
+        return when {
+            tt < 1f / 6f -> p + (q - p) * 6f * tt
+            tt < 1f / 2f -> q
+            tt < 2f / 3f -> p + (q - p) * (2f / 3f - tt) * 6f
+            else -> p
+        }
+    }
+    return Color(red = channel(h + 1f / 3f), green = channel(h), blue = channel(h - 1f / 3f))
+}
 
 /**
  * The darkening the type sits in. Neutral, and deliberately not derived from the
@@ -88,43 +165,49 @@ private const val StoryWashAlpha = 0.22f
  */
 private val StoryDeepColor = CrispyPalette.background
 
-/** Light falls onto the type block, so it reads as depth rather than a band. */
-private const val StoryRadialAlpha = 0.58f
+/** The seat the type sits in: deep enough that white copy wins on bright backdrops. */
+private const val StoryRadialAlpha = 0.78f
 private const val StoryRadialCenterXRatio = 0.50f
-private const val StoryRadialCenterYRatio = 0.50f
+private const val StoryRadialCenterYRatio = 0.68f
 private const val StoryRadialRadiusRatio = 0.85f
 
 /**
  * One shadow, in the same colour the falloff uses, so the lift belongs to the
- * picture instead of sitting on top of it.
+ * picture instead of sitting on top of it. Tight and dark: a wide soft shadow
+ * is what makes white type look out of focus and faded.
  */
 private val StoryTextShadow =
     Shadow(
-        color = StoryDeepColor.copy(alpha = 0.55f),
-        offset = Offset(0f, 3f),
-        blurRadius = 14f,
+        color = StoryDeepColor.copy(alpha = 0.80f),
+        offset = Offset(0f, 2f),
+        blurRadius = 8f,
     )
 
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
-private val StoryStickerSize = 96.dp
+private val StoryStickerSize = 116.dp
 
-/** A darker shade of the wash: grey rather than a tint, and solid enough to read. */
-private val StoryStickerColor = CrispyPalette.secondary
-private const val StoryStickerAlpha = 0.90f
+/** Dimmed white: above the copy the sticker sits over faces and sky, where full white shouts. */
+private val StoryStickerTint = Color.White.copy(alpha = 0.75f)
 
 /**
- * The safe centre: text lives in the middle of the frame, clear of the progress
- * header above and the action row below. The top reserve covers the progress
- * bars plus the identity row; the bottom one just clears the footer so the
- * copy can breathe into the empty middle instead of truncating early.
+ * The lower third: type sits above the footer, the way story captions do, with
+ * the face and sky left open. Centre-placed copy reads as a block of article
+ * text; low-placed copy reads as a story. The top reserve only needs to clear
+ * the progress bars plus the identity row.
  */
 private val StorySafeTopReserve = 132.dp
 
-/** Keeps the copy clear of the footer action row below it. */
-private val StorySafeBottomReserve = 48.dp
-
 private val StoryHorizontalPadding = 24.dp
 private val StoryVerticalPadding = 12.dp
+
+/** Poster thumb in the story header, the way the player sheet shows its artwork. */
+private val StoryHeaderPosterSize = 56.dp
+
+/** Breathing room between the measured footer top and the lowest line of copy. */
+private val StoryFooterGap = 16.dp
+
+/** First-frame reserve before the footer measures itself; replaced on layout. */
+private val StoryFooterFallbackReserve = 160.dp
 
 @Composable
 internal fun AiInsightsStoryOverlay(
@@ -132,16 +215,22 @@ internal fun AiInsightsStoryOverlay(
     backdropUrls: List<String>,
     onDismiss: () -> Unit,
     artworkUrl: String?,
+    title: String,
+    year: String?,
     palette: DetailsPaletteColors,
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
+    slideWashSeeds: Map<Int, Color> = emptyMap(),
 ) {
     val slides = remember(result) { result.slides.sortedForDisplay() }
 
     if (slides.isEmpty()) {
         AiInsightsEmptyStory(
             palette = palette,
+            title = title,
+            year = year,
+            posterUrl = artworkUrl,
             isInWatchlist = isInWatchlist,
             onToggleWatchlist = onToggleWatchlist,
             onShare = onShare,
@@ -162,6 +251,10 @@ internal fun AiInsightsStoryOverlay(
 
     val safeIndex = index.coerceIn(0, slides.lastIndex)
 
+    // The footer's screen position, measured after layout: the copy reserve
+    // is derived from it inside the content box below.
+    var footerTopPx by remember { mutableFloatStateOf(-1f) }
+
     fun prev() {
         index = (safeIndex - 1).coerceAtLeast(0)
     }
@@ -174,12 +267,23 @@ internal fun AiInsightsStoryOverlay(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(StoryDeepColor),
     ) {
+        // Position-based, not height-based: the chrome column's own bottom
+        // padding and the nav bars sit *under* the footer, and a height-only
+        // measure silently drops both -- which is what left the copy with no
+        // margin above the buttons. The footer's top edge absorbs all of it
+        // on any nav mode.
+        val slideBottomReserve =
+            if (footerTopPx < 0f) {
+                StoryFooterFallbackReserve
+            } else {
+                with(LocalDensity.current) { (maxHeight.toPx() - footerTopPx).toDp() } + StoryFooterGap
+            }
         // No transition: a hard cut. Taps move one slide at a time and the
         // direction is ambiguous (a left-third tap goes back), so any
         // directional motion plays the wrong way half the time.
@@ -197,6 +301,8 @@ internal fun AiInsightsStoryOverlay(
                         },
                     artworkUrl = artworkUrl,
                 ),
+            washColor = slideWashSeeds[safeIndex]?.let(::clampStoryWash) ?: StoryWashFallback,
+            bottomReserve = slideBottomReserve,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -206,23 +312,23 @@ internal fun AiInsightsStoryOverlay(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .padding(
-                        horizontal = StoryHorizontalPadding,
-                        vertical = StoryVerticalPadding,
-                    ),
+                    .padding(horizontal = StoryHorizontalPadding)
+                    .padding(top = 4.dp, bottom = StoryVerticalPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             AiInsightsProgressHeader(
                 slideCount = slides.size,
                 index = safeIndex,
-                onDismiss = onDismiss,
-                palette = palette,
             )
 
-            // Username position: the slide label lives at the top, under the
-            // progress bars, the way an Instagram handle does -- not buried
-            // in the copy block.
-            AiInsightsStoryIdentity(text = slides[safeIndex].label)
+            // Player-sheet header: poster, title, year, close. The slide label
+            // rides the subtitle line, so no row is spent on it alone.
+            AiInsightsStoryHeader(
+                posterUrl = artworkUrl,
+                title = title,
+                subtitle = storyHeaderSubtitle(year = year, label = slides[safeIndex].label),
+                onDismiss = onDismiss,
+            )
 
             // Chrome sits above the slides, so this is an empty tap target: the
             // whole gesture surface is the region between the header and the footer.
@@ -247,16 +353,19 @@ internal fun AiInsightsStoryOverlay(
                 isInWatchlist = isInWatchlist,
                 onToggleWatchlist = onToggleWatchlist,
                 onShare = onShare,
+                modifier = Modifier.onGloballyPositioned { footerTopPx = it.positionInRoot().y },
             )
         }
     }
 }
 
-/** One slide: full-bleed image, the constant treatment over it, type in the safe centre. */
+/** One slide: full-bleed image, its own wash over it, type in the lower third. */
 @Composable
 private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
     imageUrl: String?,
+    washColor: Color,
+    bottomReserve: Dp,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -272,7 +381,7 @@ private fun AiInsightsStorySlide(
                 contentScale = ContentScale.Crop,
             )
         }
-        Box(modifier = Modifier.fillMaxSize().storyTreatment())
+        Box(modifier = Modifier.fillMaxSize().storyTreatment(washColor))
         Column(
             modifier =
                 Modifier
@@ -282,39 +391,37 @@ private fun AiInsightsStorySlide(
                     .padding(horizontal = StoryHorizontalPadding),
         ) {
             Spacer(modifier = Modifier.height(StorySafeTopReserve))
-            Box(
+            // Lower third: the sticker rides above the copy, right side, and
+            // the copy column pins to the bottom, so the face and sky stay
+            // open. Both flow with each slide's text length instead of sitting
+            // on fixed marks.
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .weight(1f, fill = true),
+                verticalArrangement = Arrangement.Bottom,
             ) {
-                AiInsightsStoryCopy(
-                    slide = slide,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-                // Pinned to the lower empty space, fully on-screen: a sticker
-                // glued to the text reads as clutter, and a bled one reads
-                // as a rendering bug.
-                AiInsightsStorySticker(
-                    slide = slide,
-                    modifier = Modifier.align(Alignment.BottomStart),
-                )
+                AiInsightsStorySticker(slide = slide)
+                Spacer(modifier = Modifier.height(20.dp))
+                AiInsightsStoryCopy(slide = slide)
             }
-            Spacer(modifier = Modifier.height(StorySafeBottomReserve))
+            // Measured footer height, not a constant: the chrome column sits
+            // over this slide, so the copy must clear whatever it measures.
+            Spacer(modifier = Modifier.height(bottomReserve))
         }
     }
 }
 
 /**
- * The flat wash, then light falling onto the type block in the safe centre.
+ * The per-slide wash, then the dark seat the type sits in.
  *
- * Both are constant: no stop, radius or alpha is read from the image, so there
- * is one set of numbers for every slide. The falloff is drawn with four stops
- * and no hard edge, which is what keeps it from reading as a band.
+ * The wash hue varies per slide; the falloff is one constant set of numbers
+ * for every slide, which is what keeps white copy winning on all of them.
  */
-private fun Modifier.storyTreatment(): Modifier =
+private fun Modifier.storyTreatment(washColor: Color): Modifier =
     drawBehind {
-        drawRect(color = StoryWashColor.copy(alpha = StoryWashAlpha))
+        drawRect(color = washColor.copy(alpha = StoryWashAlpha))
         drawRect(
             brush =
                 Brush.radialGradient(
@@ -373,7 +480,7 @@ private fun AiInsightsStoryCopy(
                             shadow = StoryTextShadow,
                             lineHeight = 22.sp,
                         ),
-                    color = Color.White.copy(alpha = 0.82f),
+                    color = Color.White.copy(alpha = 0.90f),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -397,38 +504,116 @@ private fun AiInsightsStoryCopy(
 }
 
 /**
- * The watermark glyph: bottom-start of the copy box, fully on-screen.
+ * The watermark glyph: right side, above the copy, fully on-screen, rotating
+ * gently around its own centre. ±6° at ~3.6s reads as barely alive rather
+ * than distracting. `graphicsLayer` keeps it a draw transform, so there is no
+ * recomposition cost.
  */
 @Composable
 private fun AiInsightsStorySticker(
     slide: AiInsightSlide,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    val sway = rememberInfiniteTransition(label = "story sticker sway")
+    val angle by sway.animateFloat(
+        initialValue = -6f,
+        targetValue = 6f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 3600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "sway angle",
+    )
+    Row(
         modifier = modifier.fillMaxWidth(),
-        contentAlignment = Alignment.CenterStart,
+        horizontalArrangement = Arrangement.End,
     ) {
         Icon(
             painter = painterResource(slide.storySticker()),
             contentDescription = null,
-            tint = StoryStickerColor.copy(alpha = StoryStickerAlpha),
-            modifier = Modifier.size(StoryStickerSize),
+            tint = StoryStickerTint,
+            modifier =
+                Modifier
+                    .size(StoryStickerSize)
+                    .graphicsLayer {
+                        rotationZ = angle
+                        transformOrigin = TransformOrigin(0.5f, 0.5f)
+                    },
         )
     }
 }
 
+/**
+ * Player-sheet header: poster thumb, title, `year • slide label`, close. The
+ * slide label rides the subtitle line, so no row is spent on it alone.
+ */
 @Composable
-private fun AiInsightsStoryIdentity(text: String) {
-    val label = text.trim()
-    if (label.isEmpty()) return
-    Text(
-        text = label.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = Color.White.copy(alpha = 0.92f),
-        letterSpacing = 1.4.sp,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+private fun AiInsightsStoryHeader(
+    posterUrl: String?,
+    title: String,
+    subtitle: String?,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (!posterUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = posterUrl,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(StoryHeaderPosterSize)
+                        .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style =
+                    MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.70f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_close_filled),
+                contentDescription = "Close",
+                tint = Color.White,
+            )
+        }
+    }
+}
+
+/** `year • label`, whichever halves exist; null when neither does. */
+internal fun storyHeaderSubtitle(
+    year: String?,
+    label: String,
+): String? {
+    val cleanYear = year?.trim()?.takeIf { it.isNotEmpty() }
+    val cleanLabel = label.trim().takeIf { it.isNotEmpty() }
+    return when {
+        cleanYear != null && cleanLabel != null -> "$cleanYear • $cleanLabel"
+        cleanYear != null -> cleanYear
+        else -> cleanLabel
+    }
 }
 
 /**
@@ -459,6 +644,9 @@ private fun AiInsightSlide.storySticker(): DrawableResource =
 @Composable
 private fun AiInsightsEmptyStory(
     palette: DetailsPaletteColors,
+    title: String,
+    year: String?,
+    posterUrl: String?,
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
@@ -482,8 +670,12 @@ private fun AiInsightsEmptyStory(
             AiInsightsProgressHeader(
                 slideCount = 1,
                 index = 0,
+            )
+            AiInsightsStoryHeader(
+                posterUrl = posterUrl,
+                title = title,
+                subtitle = storyHeaderSubtitle(year = year, label = ""),
                 onDismiss = onDismiss,
-                palette = palette,
             )
             Box(
                 modifier = Modifier.weight(1f, fill = true),
@@ -510,40 +702,28 @@ private fun AiInsightsEmptyStory(
 private fun AiInsightsProgressHeader(
     slideCount: Int,
     index: Int,
-    onDismiss: () -> Unit,
-    palette: DetailsPaletteColors,
 ) {
+    // Pills only now: the close button lives in the story header row below.
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            repeat(slideCount.coerceAtLeast(1)) { i ->
-                val fillColor =
-                    if (i <= index) {
-                        palette.accent.copy(alpha = 0.96f)
-                    } else {
-                        palette.onPageBackground.copy(alpha = 0.20f)
-                    }
-                Box(
-                    modifier =
-                        Modifier
-                            .height(4.dp)
-                            .weight(1f)
-                            .clip(CircleShape)
-                            .background(fillColor),
-                )
-            }
-        }
-        IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
-            Icon(
-                painter = painterResource(Res.drawable.ic_close_filled),
-                contentDescription = "Close",
-                tint = palette.onPageBackground,
+        // Fixed white, off the dynamic scheme: the artwork-seeded pastel
+        // accent is light by design and dissolves over bright photos.
+        repeat(slideCount.coerceAtLeast(1)) { i ->
+            val fillColor =
+                if (i <= index) {
+                    Color.White
+                } else {
+                    Color.White.copy(alpha = 0.45f)
+                }
+            Box(
+                modifier =
+                    Modifier
+                        .height(4.dp)
+                        .weight(1f)
+                        .clip(CircleShape)
+                        .background(fillColor),
             )
         }
     }
@@ -555,9 +735,10 @@ private fun AiInsightsFooterActions(
     isInWatchlist: Boolean,
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -568,14 +749,12 @@ private fun AiInsightsFooterActions(
             AiInsightsPillButton(
                 text = if (isInWatchlist) "In watchlist" else "Add to watchlist",
                 icon = if (isInWatchlist) Res.drawable.ic_check_filled else Res.drawable.ic_playlist_add_filled,
-                palette = palette,
                 onClick = onToggleWatchlist,
                 modifier = Modifier.weight(1f),
             )
             AiInsightsPillButton(
                 text = "Share",
                 icon = Res.drawable.ic_share,
-                palette = palette,
                 onClick = onShare,
                 modifier = Modifier.weight(1f),
             )
@@ -583,7 +762,7 @@ private fun AiInsightsFooterActions(
         Text(
             text = "Generative AI is experimental",
             style = MaterialTheme.typography.bodySmall,
-            color = palette.onPageBackground.copy(alpha = 0.62f),
+            color = palette.onPageBackground.copy(alpha = 0.75f),
         )
     }
 }
@@ -592,18 +771,21 @@ private fun AiInsightsFooterActions(
 private fun AiInsightsPillButton(
     text: String,
     icon: DrawableResource,
-    palette: DetailsPaletteColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Solid white pills, not the dynamic pastel accent: `palette.accent` is a
+    // TonalSpot primary, which is light *by design* in a dark scheme, so pills
+    // built from it read as washed out. White + near-black is the story-CTA
+    // look and wins on every backdrop.
     Button(
         onClick = onClick,
         modifier = modifier.height(44.dp),
         shape = RoundedCornerShape(999.dp),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = palette.accent,
-                contentColor = palette.onAccent,
+                containerColor = CrispyPalette.primary,
+                contentColor = CrispyPalette.onPrimary,
             ),
     ) {
         CrispyIcon(
@@ -621,10 +803,10 @@ private fun AiInsightsPillButton(
 }
 
 /** Reorders server slides into story order while keeping any unknown keys at the end. */
-private fun List<AiInsightSlide>.sortedForDisplay(): List<AiInsightSlide> =
+internal fun List<AiInsightSlide>.sortedForDisplay(): List<AiInsightSlide> =
     sortedBy { slide -> SlideDisplayOrder.indexOf(slide.key).takeIf { it >= 0 } ?: Int.MAX_VALUE }
 
-private fun resolveSlideImageUrl(
+internal fun resolveSlideImageUrl(
     slide: AiInsightSlide,
     cyclingBackdropUrl: String?,
     artworkUrl: String?,
