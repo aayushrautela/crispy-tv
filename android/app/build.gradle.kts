@@ -492,7 +492,7 @@ kotlin {
             // :android:sharedUI, and this module already depends on it. Declaring
             // the androidx coordinate here as well is what would put two material3
             // implementations -- this one at 1.5.0-alpha26 and the shared one --
-            // in the same graph, and the goldens would then be verifying a version
+            // in the same graph, which would put the runtime on a version
             // no other target resolves.
 
             implementation(project(":android:home"))
@@ -570,8 +570,8 @@ kotlin {
         // Robolectric, and only for a `Context`. Nothing here inflates a view or
         // reads a resource, so `@Config(manifest = Config.NONE)` is enough and the
         // merged manifest and the real app theme are not needed -- which is why
-        // these can live in `:app` while the golden screenshots must stay in
-        // `:androidApp`. Robolectric is already a dependency of this repository.
+        // these can live in `:app` while the Robolectric tests that need them
+        // stay in `:androidApp`. Robolectric is already a dependency of this repository.
         //
         // Note what this does NOT give the tests: Robolectric reuses one sandbox
         // classloader per `@Config` across every test class in the worker JVM, so

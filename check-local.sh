@@ -44,7 +44,7 @@
 # composition root is in androidMain. Robolectric is there for a `Context` and
 # nothing else -- no view is inflated and no resource is read, so
 # `@Config(manifest = Config.NONE)` is enough and these tests do not need the
-# merged manifest or the real app theme the golden screenshots require.
+# merged manifest or the real app theme a rendering test would require.
 #
 # :android:backend:desktopTest covers BackendContextResolver, which moved to
 # commonMain when AccountApi replaced SupabaseAccountClient. It runs on desktop
@@ -68,11 +68,9 @@
 # :android:home:compileKotlinLinuxX64 because it declares iosArm64 and
 # iosSimulatorArm64, and the native compile is the only check of those on Linux.
 #
-# :android:androidApp:testStoreDebugUnitTest is the golden-screenshot gate. It verifies
-# by default; re-record with
-#   ./gradlew :android:androidApp:testStoreDebugUnitTest -Proborazzi.record=true
-# The tests live in :androidApp rather than :app because they need the merged
-# manifest and the real app theme, while rendering composables that live in :app.
+# :android:androidApp:testStoreDebugUnitTest runs the app module's Robolectric
+# unit tests. The tests live in :androidApp rather than :app because they need
+# the merged manifest and the real app theme.
 
 set -euo pipefail
 

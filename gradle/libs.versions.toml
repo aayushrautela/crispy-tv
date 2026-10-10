@@ -48,12 +48,11 @@ material = "1.12.0"
 #
 # `1.12.0-beta01` is *older* than the `1.12.0` stable this repo was on -- publication
 # order is alpha01..alpha03, beta01, beta02, rc01, 1.12.0 -- so that option
-# downgrades both material3 and the whole Compose stack. The app's goldens were
-# recorded against `1.5.0-alpha26`, and 1.13.0-alpha01 is the only published
-# JetBrains material3 at or ahead of it.
+# downgrades both material3 and the whole Compose stack, and 1.13.0-alpha01 is
+# the only published JetBrains material3 at or ahead of `1.5.0-alpha26`.
 #
 # The cost is that the Compose stack leaves stable for `1.13.0-alpha02`. That is
-# accepted deliberately, and the golden screenshots are the check on it.
+# accepted deliberately; rendering regressions on it are caught by review.
 composeMaterial3 = "1.13.0-alpha01"
 
 # The androidx.compose.* version. Set to what `composeMaterial3` requires on
@@ -172,7 +171,6 @@ androidxTestRules = "1.6.1"
 androidxTestExtJunit = "1.2.1"
 espresso = "3.6.1"
 robolectric = "4.15.1"
-roborazzi = "1.43.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -289,16 +287,9 @@ androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 
-# Golden-screenshot testing on a plain JVM: Robolectric supplies the Android
-# runtime (including real Skia via GraphicsMode.NATIVE) and Roborazzi captures
-# the result as a PNG, so no emulator and no KVM are required.
-#
-# The Roborazzi Gradle plugin is deliberately NOT applied: 1.43.1 fails against
-# AGP 9.3 with "Extension of type 'TestedExtension' does not exist". The library
-# works without it, so record/verify is driven by -Proborazzi.* properties below.
+# Plain-JVM unit tests: Robolectric supplies the Android runtime (including
+# real Skia via GraphicsMode.NATIVE), so no emulator and no KVM are required.
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
-roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
-roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

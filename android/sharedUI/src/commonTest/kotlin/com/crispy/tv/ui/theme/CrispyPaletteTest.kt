@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * The palette was extracted from two files that each held the same twenty-seven
  * literals, and the whole claim of that change is that it moved values without
  * changing any. Nothing about a `darkColorScheme` call fails to compile when a
- * hex digit is mistyped, and the golden suite does not render `:android:tv` at
+ * hex digit is mistyped, and no image-comparison gate renders `:android:tv` at
  * all -- so before this test existed, a mistyped colour on either surface would
  * have shipped green.
  *
@@ -247,8 +247,8 @@ class CrispyPaletteTest {
      * The thirty-two roles that are meant to be greys are greys.
      *
      * A role that accidentally picked up a tint is invisible to the compiler, to
-     * the goldens on the phone surface, and -- because the golden suite never
-     * renders `:android:tv` -- invisible to the gate entirely. This is checkable
+     * any screenshot on the phone surface, and -- because no image gate renders
+     * `:android:tv` -- invisible to CI entirely. This is checkable
      * only because the palette is constants rather than computed.
      */
     @Test

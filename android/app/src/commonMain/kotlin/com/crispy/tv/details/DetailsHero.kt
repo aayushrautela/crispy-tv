@@ -356,7 +356,7 @@ internal fun HeroSection(
  *
  * Naming it is what makes the three regimes testable rather than asserted: below
  * the floor the floor wins, above the ceiling the ceiling wins, and in between it
- * is a linear 40%. A single golden could only ever have pinned one of them.
+ * is a linear 40%. A single screenshot could only ever have pinned one of them.
  */
 internal fun heroHeight(screenHeightDp: Int): Dp =
     (screenHeightDp.dp * 0.40f).coerceIn(300.dp, 520.dp)

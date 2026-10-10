@@ -110,9 +110,7 @@ dependencies {
  * Skia resolves typefaces through fontconfig, so a host with no system fonts
  * fails a Compose render with `IllegalStateException: Could not load font` --
  * which says nothing about whether the seam works, and looks exactly like a
- * real failure. The same problem and the same remedy already exist for
- * `:android:androidApp`, where Java2D draws Roborazzi's diff label; the font
- * lives at the repository root because both modules need it.
+ * real failure. The font lives at the repository root in `test-fonts/`.
  *
  * Generated rather than committed because fontconfig requires an absolute
  * `<dir>` and the checkout path differs per machine.

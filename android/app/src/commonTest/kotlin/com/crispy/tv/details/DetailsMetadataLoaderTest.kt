@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
  *   screen, exclude them, then de-duplicate. Two of the three are silent if removed:
  *   dropping the exclusion shows the user the title they are already looking at, and
  *   dropping the de-duplication shows the same card twice. Neither fails a compile,
- *   and no golden covers it because the golden suite does not render this rail.
+ *   and no image gate covers it because nothing renders this rail.
  * - **The fetch-once latch** is a flag, not a comparison against the published list,
  *   so a second call cannot re-enter the network even when the first produced nothing.
  */

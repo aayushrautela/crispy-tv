@@ -191,7 +191,7 @@ MUTATIONS = [
 # reason is now measured rather than assumed. Unlike the `androidMain` entries
 # below, this branch is not a source-set problem: it sits inside a `@Composable`
 # body, so **no** compilation task observes it -- only a rendering harness does,
-# and the golden screenshots in `:android:androidApp` do not render `SettingsScreen`.
+# and there is no image-comparison gate left in the repository to render it.
 # Reaching for a Compose test rule would add a dependency to pin one boolean, and
 # extracting an `internal fun shouldShowPluginsEntry(p: Boolean) = p` would be a
 # decision no test can tell from the call site -- the "a test's own re-implementation
