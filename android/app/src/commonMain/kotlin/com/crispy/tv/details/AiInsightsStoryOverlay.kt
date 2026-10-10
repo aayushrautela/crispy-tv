@@ -1,10 +1,5 @@
 package com.crispy.tv.details
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -94,10 +89,10 @@ private const val StoryWashAlpha = 0.22f
  */
 private val StoryDeepColor = CrispyPalette.background
 
-/** Light falls onto the type from above, so it reads as depth rather than a band. */
+/** Light falls onto the type block, so it reads as depth rather than a band. */
 private const val StoryRadialAlpha = 0.58f
-private const val StoryRadialCenterXRatio = 0.30f
-private const val StoryRadialCenterYRatio = 0.26f
+private const val StoryRadialCenterXRatio = 0.50f
+private const val StoryRadialCenterYRatio = 0.50f
 private const val StoryRadialRadiusRatio = 0.85f
 
 /**
@@ -121,13 +116,17 @@ private const val StoryStickerAlpha = 0.80f
 /** Pushes the sticker far enough right that about a third of it leaves the frame. */
 private val StoryStickerBleed = 88.dp
 
-/** Clears the progress header row above the type block. */
-private val StoryTextTopInset = 56.dp
+/**
+ * The safe centre: text lives in the middle of the frame, clear of the progress
+ * header above and the action row below. Roughly 90dp top and 150dp bottom keep
+ * the copy inside the central band on a 9:16 phone frame.
+ */
+private val StorySafeTopReserve = 108.dp
 
-/** Keeps the sticker's band clear of the footer action row. */
-private val StoryFooterReserve = 92.dp
+/** Keeps the copy clear of the footer action row below it. */
+private val StorySafeBottomReserve = 150.dp
 
-private val StoryHorizontalPadding = 16.dp
+private val StoryHorizontalPadding = 24.dp
 private val StoryVerticalPadding = 12.dp
 
 @Composable
@@ -184,38 +183,25 @@ internal fun AiInsightsStoryOverlay(
                 .fillMaxSize()
                 .background(StoryDeepColor),
     ) {
-        AnimatedContent(
-            targetState = safeIndex,
-            // A slide rather than a crossfade: both slides stay opaque, so the two
-            // washes never stack and darken the middle of the transition.
-            transitionSpec = {
-                slideInHorizontally(animationSpec = tween(durationMillis = 260)) { full ->
-                    full / 3
-                }.togetherWith(
-                    slideOutHorizontally(animationSpec = tween(durationMillis = 260)) { full ->
-                        -full / 3
-                    }
-                )
-            },
-            label = "ai_story_slide",
+        // No transition: a hard cut. Taps move one slide at a time and the
+        // direction is ambiguous (a left-third tap goes back), so any
+        // directional motion plays the wrong way half the time.
+        val slide = slides[safeIndex]
+        AiInsightsStorySlide(
+            slide = slide,
+            imageUrl =
+                resolveSlideImageUrl(
+                    slide = slide,
+                    cyclingBackdropUrl =
+                        if (cyclingBackdrops.isEmpty()) {
+                            null
+                        } else {
+                            cyclingBackdrops[safeIndex % cyclingBackdrops.size]
+                        },
+                    artworkUrl = artworkUrl,
+                ),
             modifier = Modifier.fillMaxSize(),
-        ) { pageIndex ->
-            val slide = slides[pageIndex.coerceIn(0, slides.lastIndex)]
-            AiInsightsStorySlide(
-                slide = slide,
-                imageUrl =
-                    resolveSlideImageUrl(
-                        slide = slide,
-                        cyclingBackdropUrl =
-                            if (cyclingBackdrops.isEmpty()) {
-                                null
-                            } else {
-                                cyclingBackdrops[pageIndex % cyclingBackdrops.size]
-                            },
-                        artworkUrl = artworkUrl,
-                    ),
-            )
-        }
+        )
 
         Column(
             modifier =
@@ -264,16 +250,16 @@ internal fun AiInsightsStoryOverlay(
     }
 }
 
-/** One slide: full-bleed image, the constant treatment over it, type above the fold. */
+/** One slide: full-bleed image, the constant treatment over it, type in the safe centre. */
 @Composable
 private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
     imageUrl: String?,
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
+            modifier
                 .background(StoryDeepColor),
     ) {
         if (!imageUrl.isNullOrBlank()) {
@@ -293,18 +279,24 @@ private fun AiInsightsStorySlide(
                     .navigationBarsPadding()
                     .padding(horizontal = StoryHorizontalPadding),
         ) {
-            Spacer(modifier = Modifier.height(StoryTextTopInset))
-            AiInsightsStoryCopy(slide = slide)
-            Spacer(modifier = Modifier.weight(1f))
-            AiInsightsStorySticker(slide = slide)
-            Spacer(modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.height(StoryFooterReserve))
+            Spacer(modifier = Modifier.height(StorySafeTopReserve))
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = true),
+                contentAlignment = Alignment.Center,
+            ) {
+                AiInsightsStorySticker(slide = slide)
+                AiInsightsStoryCopy(slide = slide)
+            }
+            Spacer(modifier = Modifier.height(StorySafeBottomReserve))
         }
     }
 }
 
 /**
- * The flat wash, then light falling onto the type block from above.
+ * The flat wash, then light falling onto the type block in the safe centre.
  *
  * Both are constant: no stop, radius or alpha is read from the image, so there
  * is one set of numbers for every slide. The falloff is drawn with four stops
@@ -337,28 +329,32 @@ private fun Modifier.storyTreatment(): Modifier =
 private fun AiInsightsStoryCopy(slide: AiInsightSlide) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         AiInsightsKicker(text = slide.label)
         slide.storyHeadline()?.let { headline ->
             Text(
                 text = headline,
                 style =
-                    MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
                         shadow = StoryTextShadow,
                     ),
-                color = Color.White,
-                maxLines = 4,
+                color = Color.White.copy(alpha = 0.92f),
+                maxLines = 5,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         slide.storyBody()?.let { body ->
             Text(
                 text = body,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.86f),
-                maxLines = 3,
+                style =
+                    MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        shadow = StoryTextShadow,
+                    ),
+                color = Color.White,
+                maxLines = 8,
                 overflow = TextOverflow.Ellipsis,
             )
         }
