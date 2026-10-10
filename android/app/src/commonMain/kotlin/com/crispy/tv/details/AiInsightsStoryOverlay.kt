@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +49,6 @@ import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.resources.Res
-import com.crispy.tv.ui.resources.archivo_top10
 import com.crispy.tv.ui.resources.ic_auto_awesome
 import com.crispy.tv.ui.resources.ic_check_filled
 import com.crispy.tv.ui.resources.ic_close_filled
@@ -60,7 +58,6 @@ import com.crispy.tv.ui.resources.ic_share
 import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.theme.CrispyPalette
 import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
 
 /** Story presentation order: standout hook first, then good/bad, fun fact last. */
@@ -98,15 +95,6 @@ private const val StoryRadialAlpha = 0.78f
 private const val StoryRadialCenterXRatio = 0.50f
 private const val StoryRadialCenterYRatio = 0.68f
 private const val StoryRadialRadiusRatio = 0.85f
-
-/**
- * Display face for the body copy. Stories read as designed pieces rather than
- * paragraphs when the big line has its own voice; Archivo's condensed grotesque
- * carries that without dropping to a decorative font. `Font(FontResource)` is
- * `@Composable`, so this is a property getter, not a plain `val`.
- */
-private val StoryBodyFontFamily: FontFamily
-    @Composable get() = FontFamily(Font(Res.font.archivo_top10))
 
 /**
  * One shadow, in the same colour the falloff uses, so the lift belongs to the
@@ -352,7 +340,6 @@ private fun AiInsightsStoryCopy(
 ) {
     val headline = slide.storyHeadline()
     val body = slide.storyBody()
-    val bodyFont = StoryBodyFontFamily
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -365,7 +352,6 @@ private fun AiInsightsStoryCopy(
                     text = it,
                     style =
                         MaterialTheme.typography.headlineMedium.copy(
-                            fontFamily = bodyFont,
                             fontWeight = FontWeight.Bold,
                             shadow = StoryTextShadow,
                             lineHeight = 34.sp,
@@ -394,7 +380,6 @@ private fun AiInsightsStoryCopy(
                 text = body,
                 style =
                     MaterialTheme.typography.headlineMedium.copy(
-                        fontFamily = bodyFont,
                         fontWeight = FontWeight.Bold,
                         shadow = StoryTextShadow,
                         lineHeight = 34.sp,
