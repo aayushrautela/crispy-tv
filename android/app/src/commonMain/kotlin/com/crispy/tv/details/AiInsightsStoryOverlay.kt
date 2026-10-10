@@ -43,7 +43,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -77,20 +76,23 @@ private val SlideDisplayOrder =
     )
 
 /**
- * The story's one colour: [CrispyPalette.spinner], the warm orange already behind
- * every progress indicator, held at a constant alpha.
+ * The story's one wash: [CrispyPalette.primary] at a constant alpha.
  *
  * A filter whose alpha never moves is what lets a single set of numbers work on
  * every backdrop. Nothing about the result is derived from the image, so there
  * is nothing to retune when the image changes -- which is the whole reason the
  * treatment is a wash rather than a per-image gradient map.
  */
-private val StoryWashColor = CrispyPalette.spinner
+private val StoryWashColor = CrispyPalette.primary
 
 private const val StoryWashAlpha = 0.22f
 
-/** The same hue carried most of the way down to the app background. */
-private val StoryDeepColor = lerp(CrispyPalette.spinner, CrispyPalette.background, 0.88f)
+/**
+ * The darkening the type sits in. Neutral, and deliberately not derived from the
+ * wash: a light wash and a light falloff would brighten the picture exactly where
+ * the white headline has to win.
+ */
+private val StoryDeepColor = CrispyPalette.background
 
 /** Light falls onto the type from above, so it reads as depth rather than a band. */
 private const val StoryRadialAlpha = 0.58f
@@ -99,8 +101,8 @@ private const val StoryRadialCenterYRatio = 0.26f
 private const val StoryRadialRadiusRatio = 0.85f
 
 /**
- * One shadow, in the deep hue rather than black: the same colour the falloff
- * uses, so the lift belongs to the picture instead of sitting on top of it.
+ * One shadow, in the same colour the falloff uses, so the lift belongs to the
+ * picture instead of sitting on top of it.
  */
 private val StoryTextShadow =
     Shadow(
@@ -111,7 +113,10 @@ private val StoryTextShadow =
 
 /** Decorative only -- there is no handler, and every slide carries the same weight. */
 private val StoryStickerSize = 220.dp
-private const val StoryStickerAlpha = 0.30f
+
+/** A darker shade of the wash: grey rather than a tint, and solid enough to read. */
+private val StoryStickerColor = CrispyPalette.secondary
+private const val StoryStickerAlpha = 0.80f
 
 /** Pushes the sticker far enough right that about a third of it leaves the frame. */
 private val StoryStickerBleed = 88.dp
@@ -374,7 +379,7 @@ private fun AiInsightsStorySticker(slide: AiInsightSlide) {
         Icon(
             painter = painterResource(slide.storySticker()),
             contentDescription = null,
-            tint = StoryDeepColor.copy(alpha = StoryStickerAlpha),
+            tint = StoryStickerColor.copy(alpha = StoryStickerAlpha),
             modifier =
                 Modifier
                     .size(StoryStickerSize)

@@ -231,7 +231,7 @@ private fun AuthScreen(
                             shape = RoundedCornerShape(8.dp),
                         ) {
                             if (uiState.isBusy) {
-                                LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispyPalette.spinner)
+                                LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispyPalette.primary)
                             } else {
                                 Text("Get Started")
                             }
@@ -345,7 +345,7 @@ private fun AuthScreen(
                                 shape = RoundedCornerShape(8.dp),
                             ) {
                                 if (uiState.isBusy) {
-                                    LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispyPalette.spinner)
+                                    LoadingIndicator(modifier = Modifier.padding(end = 8.dp), color = CrispyPalette.primary)
                                 } else {
                                     Text("Sign In")
                                 }
@@ -525,13 +525,13 @@ private fun ProfileSelectorScreen(
 
             if (isSetup) {
                 if (uiState.isBusy) {
-                    LoadingIndicator(color = CrispyPalette.spinner)
+                    LoadingIndicator(color = CrispyPalette.primary)
                 } else {
                     ProfileSetupScreen(onFinishSetup = onFinishSetup)
                 }
             } else {
                 if (uiState.isBusy && uiState.profiles.isEmpty()) {
-                    LoadingIndicator(color = CrispyPalette.spinner)
+                    LoadingIndicator(color = CrispyPalette.primary)
                 } else {
                     ProfileGrid(
                         profiles = uiState.profiles,
@@ -885,7 +885,7 @@ private fun ProfileManagementScreen(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        LoadingIndicator(color = CrispyPalette.spinner)
+                        LoadingIndicator(color = CrispyPalette.primary)
                     }
                 }
             }

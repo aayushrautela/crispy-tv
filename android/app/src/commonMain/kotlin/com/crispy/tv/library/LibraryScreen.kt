@@ -873,7 +873,7 @@ internal fun LibraryAppendState(
             modifier = Modifier.fillMaxWidth().padding(vertical = Dimensions.ListItemPadding),
             contentAlignment = Alignment.Center,
         ) {
-            LoadingIndicator(color = CrispyPalette.spinner)
+            LoadingIndicator(color = CrispyPalette.primary)
         }
     } else if (appendState is LoadState.Error) {
         Box(
