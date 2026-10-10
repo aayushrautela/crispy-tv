@@ -322,11 +322,11 @@ internal fun AiInsightsStoryOverlay(
             )
 
             // Player-sheet header: poster, title, year, close. The slide label
-            // rides the subtitle line, so no row is spent on it alone.
+            // is the copy block's own title line, so it rides no header row.
             AiInsightsStoryHeader(
                 posterUrl = artworkUrl,
                 title = title,
-                subtitle = storyHeaderSubtitle(year = year, label = slides[safeIndex].label),
+                subtitle = storyHeaderSubtitle(year = year),
                 onDismiss = onDismiss,
             )
 
@@ -447,23 +447,23 @@ private fun AiInsightsStoryCopy(
     slide: AiInsightSlide,
     modifier: Modifier = Modifier,
 ) {
-    val headline = slide.storyHeadline()
-    val body = slide.storyBody()
+    val title = slide.storyTitle()
+    val paragraph = slide.storyParagraph()
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (body == null) {
-            // No focus: the headline IS the body text, so print it at body
+        if (paragraph == null) {
+            // No paragraph: the title IS the body text, so print it at body
             // size instead of leaving one small line in the middle of the frame.
-            headline?.let {
+            title?.let {
                 Text(
                     text = it,
                     style =
-                        MaterialTheme.typography.headlineMedium.copy(
+                        MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
                             shadow = StoryTextShadow,
-                            lineHeight = 34.sp,
+                            lineHeight = 30.sp,
                         ),
                     color = Color.White,
                     maxLines = 20,
@@ -471,27 +471,28 @@ private fun AiInsightsStoryCopy(
                 )
             }
         } else {
-            headline?.let {
+            title?.let {
                 Text(
                     text = it,
                     style =
-                        MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
+                        MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
                             shadow = StoryTextShadow,
-                            lineHeight = 22.sp,
+                            lineHeight = 28.sp,
                         ),
-                    color = Color.White.copy(alpha = 0.90f),
+                    color = Color.White,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Text(
-                text = body,
+                text = paragraph,
                 style =
-                    MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                    MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
                         shadow = StoryTextShadow,
-                        lineHeight = 34.sp,
+                        lineHeight = 28.sp,
                     ),
                 color = Color.White,
                 // Generous cap, not a design limit: the copy should spend the
@@ -545,8 +546,8 @@ private fun AiInsightsStorySticker(
 }
 
 /**
- * Player-sheet header: poster thumb, title, `year • slide label`, close. The
- * slide label rides the subtitle line, so no row is spent on it alone.
+ * Player-sheet header: poster thumb, title, year, close. The slide label is
+ * the copy block's own title line, so it rides no header row at all.
  */
 @Composable
 private fun AiInsightsStoryHeader(
@@ -602,35 +603,33 @@ private fun AiInsightsStoryHeader(
     }
 }
 
-/** `year • label`, whichever halves exist; null when neither does. */
-internal fun storyHeaderSubtitle(
-    year: String?,
-    label: String,
-): String? {
-    val cleanYear = year?.trim()?.takeIf { it.isNotEmpty() }
+/** The year, or null when there is none to print. */
+internal fun storyHeaderSubtitle(year: String?): String? = year?.trim()?.takeIf { it.isNotEmpty() }
+
+/**
+ * The copy block's title line: the slide's `label`, joined to the server's
+ * `focus` with a middot when it sent one. Keyed off `focus` being present,
+ * not off the slide key, so the standout slide keeps its own title
+ * (`Standout • …`) while a plain `The good stuff` slide prints just its
+ * label -- and any slide that later grows a focus gets the same treatment.
+ */
+internal fun AiInsightSlide.storyTitle(): String? {
     val cleanLabel = label.trim().takeIf { it.isNotEmpty() }
+    val cleanFocus = focus?.trim()?.takeIf { it.isNotEmpty() }
     return when {
-        cleanYear != null && cleanLabel != null -> "$cleanYear • $cleanLabel"
-        cleanYear != null -> cleanYear
-        else -> cleanLabel
+        cleanLabel != null && cleanFocus != null -> "$cleanLabel • $cleanFocus"
+        cleanLabel != null -> cleanLabel
+        else -> cleanFocus
     }
 }
 
 /**
- * The hook: the server's `focus` when it sent one, otherwise the body is the
- * hook itself, which is what keeps the big type populated on every slide.
+ * Built from `body`/`context` only, so it can never repeat [storyTitle],
+ * which is built from `label`/`focus`. The no-double-print rule is
+ * structural, not defensive.
  */
-internal fun AiInsightSlide.storyHeadline(): String? =
-    focus?.trim()?.takeIf { it.isNotEmpty() }
-        ?: (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }
-
-/** Printed only when [storyHeadline] already spent `focus`, so nothing shows twice. */
-internal fun AiInsightSlide.storyBody(): String? =
-    if (focus.isNullOrBlank()) {
-        null
-    } else {
-        (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }
-    }
+internal fun AiInsightSlide.storyParagraph(): String? =
+    (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }
 
 private fun AiInsightSlide.storySticker(): DrawableResource =
     when (key) {
@@ -674,7 +673,7 @@ private fun AiInsightsEmptyStory(
             AiInsightsStoryHeader(
                 posterUrl = posterUrl,
                 title = title,
-                subtitle = storyHeaderSubtitle(year = year, label = ""),
+                subtitle = storyHeaderSubtitle(year = year),
                 onDismiss = onDismiss,
             )
             Box(

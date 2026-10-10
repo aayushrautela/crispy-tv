@@ -5,24 +5,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * The story header's subtitle: `year • label`, whichever halves exist.
+ * The story header's subtitle: the year, full stop. The slide label left the
+ * header for the copy block, where it prints as the title line.
  */
 class StoryHeaderSubtitleTest {
 
     @Test
-    fun yearAndLabelJoinWithAMiddot() {
-        assertEquals("2013 • The good stuff", storyHeaderSubtitle(year = "2013", label = "The good stuff"))
-    }
-
-    @Test
-    fun eitherHalfAloneStillPrints() {
-        assertEquals("2013", storyHeaderSubtitle(year = "2013", label = "   "))
-        assertEquals("Standout", storyHeaderSubtitle(year = null, label = "Standout"))
+    fun aYearPrints() {
+        assertEquals("2013", storyHeaderSubtitle(year = "2013"))
     }
 
     @Test
     fun blankInputsPrintNothing() {
-        assertNull(storyHeaderSubtitle(year = "  ", label = ""))
-        assertNull(storyHeaderSubtitle(year = null, label = "  "))
+        assertNull(storyHeaderSubtitle(year = "  "))
+        assertNull(storyHeaderSubtitle(year = null))
     }
 }
