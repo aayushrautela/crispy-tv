@@ -201,10 +201,10 @@ private val StoryHorizontalPadding = 24.dp
 private val StoryVerticalPadding = 12.dp
 
 /** Poster thumb in the story header, the way the player sheet shows its artwork. */
-private val StoryHeaderPosterSize = 56.dp
+private val StoryHeaderPosterSize = 44.dp
 
 /** Breathing room between the measured footer top and the lowest line of copy. */
-private val StoryFooterGap = 16.dp
+private val StoryFooterGap = 24.dp
 
 /** First-frame reserve before the footer measures itself; replaced on layout. */
 private val StoryFooterFallbackReserve = 160.dp
@@ -460,10 +460,10 @@ private fun AiInsightsStoryCopy(
                 Text(
                     text = it,
                     style =
-                        MaterialTheme.typography.headlineSmall.copy(
+                        MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
                             shadow = StoryTextShadow,
-                            lineHeight = 30.sp,
+                            lineHeight = 34.sp,
                         ),
                     color = Color.White,
                     maxLines = 20,
@@ -476,9 +476,10 @@ private fun AiInsightsStoryCopy(
                     text = it,
                     style =
                         MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 26.sp,
                             fontWeight = FontWeight.Bold,
                             shadow = StoryTextShadow,
-                            lineHeight = 28.sp,
+                            lineHeight = 32.sp,
                         ),
                     color = Color.White,
                     maxLines = 4,
@@ -489,10 +490,10 @@ private fun AiInsightsStoryCopy(
                 text = paragraph,
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         shadow = StoryTextShadow,
-                        lineHeight = 28.sp,
+                        lineHeight = 26.sp,
                     ),
                 color = Color.White,
                 // Generous cap, not a design limit: the copy should spend the
