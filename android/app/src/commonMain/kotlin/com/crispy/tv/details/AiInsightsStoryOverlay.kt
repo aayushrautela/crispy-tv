@@ -490,10 +490,10 @@ private fun AiInsightsStoryCopy(
                 text = paragraph,
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 18.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.SemiBold,
                         shadow = StoryTextShadow,
-                        lineHeight = 26.sp,
+                        lineHeight = 27.sp,
                     ),
                 color = Color.White,
                 // Generous cap, not a design limit: the copy should spend the
