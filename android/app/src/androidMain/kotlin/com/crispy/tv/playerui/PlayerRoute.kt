@@ -262,7 +262,7 @@ fun PlayerRoute(
                 },
             )
 
-            GestureFeedbackOverlay(feedback = gestureFeedback)
+            GestureFeedbackOverlay(feedback = gestureFeedback, palette = palette)
         }
     }
 }

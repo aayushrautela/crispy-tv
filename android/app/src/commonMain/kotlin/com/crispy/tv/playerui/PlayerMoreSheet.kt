@@ -69,7 +69,7 @@ internal fun PlayerMoreSheet(
                     Icon(
                         painter = painterResource(Res.drawable.ic_close_filled),
                         contentDescription = "Close",
-                        tint = Color.White,
+                        tint = palette.onPillBackground,
                     )
                 }
             }
@@ -91,7 +91,7 @@ internal fun PlayerMoreSheet(
                 Text(
                     text = "More",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = palette.onPillBackground,
                 )
 
                 val items = recommendedItems
@@ -100,7 +100,7 @@ internal fun PlayerMoreSheet(
                         Text(
                             text = "Loading...",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = palette.onPillBackground.copy(alpha = 0.7f),
                         )
                     }
 
@@ -108,7 +108,7 @@ internal fun PlayerMoreSheet(
                         Text(
                             text = "Nothing here yet.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = palette.onPillBackground.copy(alpha = 0.7f),
                         )
                     }
 

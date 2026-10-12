@@ -99,7 +99,7 @@ internal fun PlayerTopBar(
                 Text(
                     text = title.ifBlank { "Player" },
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = palette.onPillBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -108,7 +108,7 @@ internal fun PlayerTopBar(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.75f),
+                        color = palette.onPillBackground.copy(alpha = 0.75f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -365,7 +365,7 @@ private fun PlayerSeekBar(
         colors =
             SliderDefaults.colors(
                 activeTrackColor = palette.accent,
-                inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+                inactiveTrackColor = palette.onPillBackground.copy(alpha = 0.3f),
                 thumbColor = palette.accent,
             ),
     )

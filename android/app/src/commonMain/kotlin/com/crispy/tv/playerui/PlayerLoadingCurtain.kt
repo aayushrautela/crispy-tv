@@ -12,8 +12,8 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.theme.CrispyPalette
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -33,7 +33,10 @@ fun PlayerLoadingCurtain(
         ) {
             LoadingIndicator(
                 modifier = Modifier.size(64.dp),
-                color = CrispyPalette.primary,
+                // Deliberately plain white: every other player surface tints from the
+                // extracted palette, and the spinner is the one element that reads
+                // against raw video, so it stays neutral.
+                color = Color.White,
             )
         }
     }

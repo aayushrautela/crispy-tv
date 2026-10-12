@@ -113,7 +113,7 @@ internal fun PlayerEpisodesSheet(
                     Icon(
                         painter = painterResource(Res.drawable.ic_close_filled),
                         contentDescription = "Close",
-                        tint = Color.White,
+                        tint = palette.onPillBackground,
                     )
                 }
             }

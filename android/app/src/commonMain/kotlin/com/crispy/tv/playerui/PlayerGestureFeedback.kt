@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.abs
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.domain.player.TapZone
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.resources.Res
@@ -75,6 +76,7 @@ internal class GestureFeedbackState {
 @Composable
 internal fun GestureFeedbackOverlay(
     feedback: GestureFeedbackState,
+    palette: DetailsPaletteColors,
     modifier: Modifier = Modifier,
 ) {
     val message = feedback.message.value
@@ -92,7 +94,7 @@ internal fun GestureFeedbackOverlay(
                         .padding(top = 40.dp, start = 16.dp, end = 16.dp),
                     shape = RoundedCornerShape(20.dp),
                     color = Color.Black.copy(alpha = 0.68f),
-                    contentColor = Color.White,
+                    contentColor = palette.onPillBackground,
                 ) {
                     Box(
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
@@ -105,13 +107,13 @@ internal fun GestureFeedbackOverlay(
                             CrispyIcon(
                                 painter = painterResource(message.icon),
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = palette.onPillBackground,
                                 autoMirror = message.autoMirror,
                             )
                             Text(
                                 text = message.text,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = Color.White,
+                                color = palette.onPillBackground,
                             )
                         }
                     }
@@ -138,6 +140,7 @@ internal data class SeekRippleState(
 @Composable
 internal fun SeekRippleOverlay(
     state: SeekRippleState?,
+    palette: DetailsPaletteColors,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
 ) {
@@ -183,7 +186,7 @@ internal fun SeekRippleOverlay(
                                     }
                                 ),
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = palette.onPillBackground,
                             modifier = Modifier.size(32.dp),
                         )
                     }
@@ -191,7 +194,7 @@ internal fun SeekRippleOverlay(
                 Text(
                     text = playbackSeekDeltaLabel(ripple.totalDeltaMs),
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = palette.onPillBackground,
                 )
             }
         }
