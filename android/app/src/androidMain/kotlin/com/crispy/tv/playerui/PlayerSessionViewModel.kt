@@ -169,6 +169,17 @@ class PlayerSessionViewModel(
      * would survive a few hundred milliseconds and then be undone.
      */
     private var audioAutoSelectApplied = false
+    /**
+     * Whether the preferred subtitle language has already been applied to the stream
+     * now playing -- by the matcher, by an add-on subtitle attached for it, or by the
+     * viewer's own pick.
+     *
+     * Same shape and same reason as [audioAutoSelectApplied]: reset on every stream
+     * switch, set once the preference has been answered. A manual pick sets it too,
+     * because a pick is the viewer overriding the preference for this stream and the
+     * matcher must not undo them on the next poll.
+     */
+    private var subtitleAutoSelectApplied = false
     private var initialTarget: StreamLookupTarget? = null
 
     private val initialEngine: NativePlaybackEngine =
@@ -391,6 +402,11 @@ class PlayerSessionViewModel(
     fun selectSubtitleTrack(trackId: String?) {
         val language = trackId?.let(::languageFromTrack)
         Log.d(TAG, "selectSubtitleTrack id=$trackId language=$language")
+        // Any pick -- including Off -- is the viewer answering the subtitle question
+        // for this stream, so the auto-selection stops re-running on the next poll and
+        // undoing it. A pick is also the only writer of the preference, so the two
+        // statements belong together.
+        subtitleAutoSelectApplied = true
         if (trackId != null && trackId.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)) {
             val attached = uiState.value.subtitleTracks.any { it.id == trackId }
             if (!attached) {
@@ -466,12 +482,29 @@ class PlayerSessionViewModel(
      *
      * A preference is not a request to block the first frame, which is why an unset
      * preference skips both the wait and the match rather than defaulting into one.
+     *
+     * ## Why the match is first in the list, and when it is not attached at all
+     *
+     * Both engines select the first entry of `externalSubtitles` and ignore the rest
+     * (Exo: `pendingSubtitleTrackId` is the first URL's; MPV: `select` on index 0,
+     * `auto` on the others), so appending would attach a subtitle nobody selected.
+     * But the match is also *not* attached when the stream already ships a subtitle
+     * in the preferred language -- that subtitle is the first entry, and putting ours
+     * in front of it would overrule an answer the stream already gave. The plan for
+     * this was phrased as "skip when the handoff carries `carriedExternal`, which is
+     * not a thing the caller can see: `requestPlayback` calls `play(source, engine)`
+     * with no third argument, and `carriedExternal` is a local in
+     * `NativePlaybackController.play` derived from a subtitle it attached itself. The
+     * live version of that guard is the source's own list.
      */
     private suspend fun attachPreferredAddonSubtitle(source: PlaybackSource): PlaybackSource {
         val preferred =
             resolvePreferredLanguage(playbackSettingsRepository.settings.value.defaultSubtitleLanguage)
+        if (source.externalSubtitles.any { trackLanguageMatches(it.language, preferred) }) {
+            return source
+        }
         // Already in hand from an earlier fetch of the same title: nothing to wait for.
-        val cached =
+        val matched =
             preferredAddonSubtitle(subtitleRepository.addonSubtitles.value, preferred)
                 ?: run {
                     val job = subtitleFetchJob ?: return source
@@ -479,16 +512,73 @@ class PlayerSessionViewModel(
                     preferredAddonSubtitle(subtitleRepository.addonSubtitles.value, preferred)
                 }
                 ?: return source
-        Log.d(TAG, "attach subtitle preferred=$preferred url=${cached.url.take(96)}")
+        Log.d(TAG, "attach subtitle preferred=$preferred url=${matched.url.take(96)}")
         return source.copy(
             externalSubtitles =
-                source.externalSubtitles +
+                listOf(
                     PlaybackExternalSubtitle(
-                        url = cached.url,
-                        language = cached.language,
-                        name = cached.display,
+                        url = matched.url,
+                        language = matched.language,
+                        name = matched.display,
                     ),
+                ) + source.externalSubtitles,
         )
+    }
+
+    /**
+     * Apply the preferred subtitle language to the engine's track list, once per stream.
+     *
+     * The companion to [applyPreferredAudioLanguage], and the half of the same bug the
+     * viewer could still see after that one landed: **an embedded track** in the
+     * viewer's language was being passed over for whichever track came first, because
+     * nothing had ever selected a subtitle at all.
+     *
+     * Three ways it does nothing, and they are not the same answer:
+     *
+     * 1. **The active source already carries an add-on subtitle for the preference.**
+     *    [attachPreferredAddonSubtitle] put it there before the first `play()`, and it
+     *    answers the preference in full -- selecting an embedded track as well would
+     *    discard it. This is the guard that keeps the two halves of the subtitle work
+     *    from undoing each other.
+     * 2. **Nothing matches.** `preferredSubtitleTrack` returns `null` and the engine's
+     *    own default stands, for the reason [applyPreferredAudioLanguage] writes down:
+     *    a preference is not a request to pick something else.
+     * 3. **The engine's current pick already is the preferred language** -- which is
+     *    what happens when the attached add-on subtitle is reported back as a track
+     *    whose language matches, or when the viewer picked one earlier.
+     *
+     * Routing it through the existing `PlaybackSessionController.selectSubtitleTrack`
+     * is safe mid-playback on both engines: Exo applies a `TrackSelectionOverride`, and
+     * MPV sets `sid`. Neither rebuilds the media item, which is the property that made
+     * add-on subtitles have to be attached before `play()` and does not apply here.
+     */
+    private fun applyPreferredSubtitleLanguage() {
+        if (subtitleAutoSelectApplied) {
+            return
+        }
+        val preferred =
+            resolvePreferredLanguage(playbackSettingsRepository.settings.value.defaultSubtitleLanguage)
+        if (activePlaybackSource.externalSubtitles.any { trackLanguageMatches(it.language, preferred) }) {
+            subtitleAutoSelectApplied = true
+            return
+        }
+        val tracks = uiState.value.subtitleTracks
+        if (tracks.isEmpty()) {
+            return
+        }
+        val current =
+            uiState.value.selectedSubtitleTrackId?.let { id -> tracks.firstOrNull { it.id == id } }
+        if (current != null && trackLanguageMatches(current.language, preferred)) {
+            return
+        }
+        val match = preferredSubtitleTrack(tracks, preferred) ?: return
+        subtitleAutoSelectApplied = true
+        Log.d(
+            TAG,
+            "subtitle auto-select preferred=$preferred id=${match.id} language=${match.language}",
+        )
+        playbackController.selectSubtitleTrack(match.id)
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     /**
@@ -678,6 +768,7 @@ class PlayerSessionViewModel(
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
         resetPlaybackPosition()
         audioAutoSelectApplied = false
+        subtitleAutoSelectApplied = false
         _uiState.update { state ->
             state.copy(
                 currentPlaybackUrl = source.url,
@@ -1019,6 +1110,7 @@ class PlayerSessionViewModel(
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
         // A new stream is a new track list, and the preference applies once to it.
         audioAutoSelectApplied = false
+        subtitleAutoSelectApplied = false
 
         resetPlaybackPosition()
         _uiState.update { state ->
@@ -1176,6 +1268,7 @@ class PlayerSessionViewModel(
         // just published, and a side effect inside `update` would re-run on every
         // concurrent writer.
         applyPreferredAudioLanguage()
+        applyPreferredSubtitleLanguage()
     }
 
     private fun resetPlaybackPosition() {
@@ -1374,12 +1467,21 @@ private const val TAG = "PlayerSessionViewModel"
  * How long the subtitle-attach path waits for the entry fetch before letting playback
  * start without a subtitle.
  *
- * The fetch resolves one manifest per configured seed and then GETs every subtitle
- * endpoint it found, sequentially, so its honest cost is seconds. By the time a source
- * has been resolved it has usually already finished, because it started in
- * `startPlayback` and stream selection is the slower half. This is the budget for the
- * case where it has not: **the viewer waits no more than this for a subtitle that may
- * not exist at all**, and the fetch keeps running either way, so the sheet still
- * populates for a viewer who opens it afterwards.
+ * The fetch resolves one manifest per configured seed and then gets every subtitle
+ * endpoint at once, so its honest cost is now the *slowest* single response rather
+ * than a sum -- but still seconds, not milliseconds. By the time a source has been
+ * resolved it has usually already finished, because it started in `startPlayback` and
+ * stream selection is the slower half. This is the budget for the case where it has
+ * not: **the viewer waits no more than this for a subtitle that may not exist at all**,
+ * and the fetch keeps running either way, so the sheet still populates for a viewer who
+ * opens it afterwards.
+ *
+ * Three seconds, not the 700ms this used to be, because the 700ms window was measured
+ * to expire on a normal add-on response and the attach then never happened at all --
+ * which is the "it is still picking the first subtitle" report. The cost of the longer
+ * window is bounded and asymmetric: a title with no subtitles anywhere answers
+ * *immediately*, because `AddonStreamsService` returns `emptyList()` without a single
+ * request when no addon declares a `subtitles` resource. Only a title whose addons
+ * support subtitles and are slow to answer spends the whole budget.
  */
-private const val SUBTITLE_ATTACH_WINDOW_MS = 700L
+private const val SUBTITLE_ATTACH_WINDOW_MS = 3000L

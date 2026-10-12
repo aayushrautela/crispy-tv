@@ -4,8 +4,10 @@ import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamResolver
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +69,21 @@ class SubtitleRepository(
     private var cachedKey: Pair<MetadataLabMediaType, String>? = null
     private var cachedSubtitles: List<AddonSubtitle> = emptyList()
 
+    /**
+     * The fetch currently running for [inFlightKey], under [cacheLock].
+     *
+     * **Dedup, because the same title is asked for twice on the way into the
+     * player.** `PlayerSessionViewModel.startPlayback` fetches at entry, and then
+     * `playResolvedStream` / `handleChosenStream` fetch again for the same title once
+     * the stream has been chosen. Both are real requests and neither is wrong, but the
+     * second one lands while the first is still mid-flight -- the cache is only written
+     * *after* the network round trip -- so it used to start a second identical round
+     * trip, resolving every addon manifest a second time. A caller that arrives for a
+     * title already being fetched now joins that one instead.
+     */
+    private var inFlightKey: Pair<MetadataLabMediaType, String>? = null
+    private var inFlightJob: Job? = null
+
     private val _addonSubtitles = MutableStateFlow<List<AddonSubtitle>>(emptyList())
     val addonSubtitles: StateFlow<List<AddonSubtitle>> = _addonSubtitles.asStateFlow()
 
@@ -112,6 +129,10 @@ class SubtitleRepository(
      * slot, so "has this key been fetched" is not a question it can answer without
      * adding one. The suspend function is that answer, without the slot.
      *
+     * **A request for a title already being fetched joins it** rather than starting
+     * a second round trip -- see [inFlightJob]. So this can return while having made
+     * no network call of its own, which is the point.
+     *
      * `ViewState` observers keep using [fetchAddonSubtitles]. The one caller that
      * suspends is the one that has to: the player must attach a matched subtitle
      * *before* the first `play()` call, because the Exo path rebuilds the media item
@@ -125,23 +146,102 @@ class SubtitleRepository(
         if (!force && serveFromCache(mediaType, lookupId)) {
             return
         }
-        logger.debug(TAG, "fetch mediaType=$mediaType id=$lookupId force=$force")
+        val key = mediaType to lookupId
+        if (!force) {
+            val running =
+                cacheLock.withLock {
+                    if (inFlightKey == key) inFlightJob else null
+                }
+            if (running != null) {
+                logger.debug(TAG, "join in-flight fetch mediaType=$mediaType id=$lookupId")
+                // Waiting for the other caller's fetch rather than starting a second
+                // one. It does not throw: `runFetch` answers every failure as state,
+                // so this returns whether it succeeded or not.
+                running.join()
+                return
+            }
+        }
+        val job =
+            scope.launch { runFetch(mediaType, lookupId, this.coroutineContext.job) }
+        cacheLock.withLock {
+            if (force) {
+                // A forced fetch supersedes one still in flight for the same title;
+                // cancelling it rather than leaving both running is what stops the
+                // superseded one publishing its answer over the fresh one later.
+                inFlightJob?.cancel()
+            }
+            inFlightKey = key
+            inFlightJob = job
+        }
+        job.join()
+    }
+
+    private suspend fun runFetch(
+        mediaType: MetadataLabMediaType,
+        lookupId: String,
+        job: Job,
+    ) {
+        logger.debug(TAG, "fetch mediaType=$mediaType id=$lookupId")
         _isLoading.value = true
         _error.value = null
-        runCatching {
-            streamResolver.fetchAddonSubtitles(mediaType, lookupId)
-        }.onSuccess { subtitles ->
-            logger.debug(TAG, "success count=${subtitles.size}")
-            storeInCache(mediaType, lookupId, subtitles)
-            _addonSubtitles.value = subtitles
-            if (subtitles.isEmpty()) {
-                _error.value = "No subtitles found"
+        try {
+            // The network call answers a failure as `null` and lets cancellation pass
+            // through unwritten: `catch (throwable: Throwable)` below would swallow the
+            // `CancellationException` too, so the rethrow-first arm is load-bearing.
+            // Rethrowing also skips `_isLoading.value = false` further down on purpose.
+            // A cancelled job did not finish -- and the one case where the flag must
+            // not be lowered here is the force-supersede in `fetchAndAwait`, where the
+            // replacing fetch has already raised it. A torn-down scope has no observers
+            // left to read the flag anyway.
+            val subtitles =
+                try {
+                    streamResolver.fetchAddonSubtitles(mediaType, lookupId)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (throwable: Throwable) {
+                    logger.debug(TAG, "failure ${throwable.message}")
+                    _error.value = throwable.message ?: "Failed to fetch subtitles"
+                    null
+                }
+            if (subtitles != null) {
+                logger.debug(TAG, "success count=${subtitles.size}")
+                // An empty answer is not stored.
+                //
+                // It is not evidence of absence. `AddonStreamsService` returns
+                // `emptyList()` for "no addon declares a `subtitles` resource" *and* for
+                // "the addons were not warm yet at entry time", and those are different
+                // events. Storing the second as if it were the first made the entry fetch
+                // poison every later non-forced one: opening the subtitle sheet hit the
+                // cache, saw nothing, and showed an empty sheet until the viewer pressed
+                // Search -- which is exactly the "subtitles only fetch once I open the
+                // sheet" report. Failures never cached either, so an empty answer is the
+                // one remaining case where a successful round trip used to be remembered
+                // as absence.
+                if (subtitles.isNotEmpty()) {
+                    storeInCache(mediaType, lookupId, subtitles)
+                }
+                _addonSubtitles.value = subtitles
+                if (subtitles.isEmpty()) {
+                    _error.value = "No subtitles found"
+                }
             }
-        }.onFailure { throwable ->
-            logger.debug(TAG, "failure ${throwable.message}")
-            _error.value = throwable.message ?: "Failed to fetch subtitles"
+            _isLoading.value = false
+        } finally {
+            // Released even on cancellation, because a finished-or-dead job is not an
+            // in-flight one. Without this the slot would keep holding the dead job and
+            // a later non-forced call for the same title would `join()` it -- which for
+            // a cancelled job throws into the joiner rather than returning.
+            //
+            // The identity check is there because a forced fetch cancels this job before
+            // overwriting the slot with its own, and this `finally` runs *after* that
+            // overwrite in whichever order the cancellations land.
+            cacheLock.withLock {
+                if (inFlightJob === job) {
+                    inFlightKey = null
+                    inFlightJob = null
+                }
+            }
         }
-        _isLoading.value = false
     }
 
     // Sheet opens hit this instead of re-downloading every addon manifest; only the
@@ -155,12 +255,13 @@ class SubtitleRepository(
             }
             logger.debug(TAG, "cache hit mediaType=$mediaType id=$lookupId count=${subtitles.size}")
             // Redundant today, and kept for that reason. The cache is a single slot
-            // and only `onSuccess` ever writes it, on the line before this value is
-            // published, with the same list - so a hit's cached list is by construction
-            // the list already on screen. No test can see this assignment removed. It
-            // becomes load-bearing the moment the cache holds more than one title, or a
-            // failure can publish something without storing, so it states the invariant
-            // rather than being quietly deleted. See the redundant-guard note in AGENTS.md.
+            // and only a non-empty answer ever writes it, on the line before this
+            // value is published, with the same list - so a hit's cached list is by
+            // construction the list already on screen. No test can see this assignment
+            // removed. It becomes load-bearing the moment the cache holds more than one
+            // title, or a failure can publish something without storing, so it states
+            // the invariant rather than being quietly deleted. See the redundant-guard
+            // note in AGENTS.md.
             _addonSubtitles.value = subtitles
             _isLoading.value = false
             _error.value = null

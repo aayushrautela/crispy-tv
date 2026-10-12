@@ -58,6 +58,19 @@ private fun languageTagMatches(candidate: String?, preferred: String): Boolean {
     return target != "und" && tag != "und" && tag == target
 }
 
+/**
+ * Whether a raw language tag names [preferred], as [languageTagMatches] answers it.
+ *
+ * Exposed because the player asks this outside the matchers: a source that already
+ * carries an external subtitle for the viewer's language has answered the preference
+ * without any matcher running, and the track currently selected answers whether the
+ * engine's own default is already right. Both are the same question the matchers ask
+ * of a track, and a second spelling of it in `PlayerSessionViewModel` would be a
+ * second thing that can disagree.
+ */
+internal fun trackLanguageMatches(candidate: String?, preferred: String): Boolean =
+    languageTagMatches(candidate, preferred)
+
 private inline fun <T> preferredByLanguage(
     items: List<T>,
     preferred: String,
@@ -93,3 +106,21 @@ internal fun preferredAddonSubtitle(
     subtitles: List<AddonSubtitle>,
     preferred: String,
 ): AddonSubtitle? = preferredByLanguage(subtitles, preferred) { it.language }
+
+/**
+ * The embedded subtitle track to select for [preferred], or `null` when none matches.
+ *
+ * The same contract as [preferredAudioTrack], for the reason that matters twice as
+ * much here: an engine's default subtitle is the first track, and the viewer's report
+ * was that a correct English track was being ignored in favour of whichever one
+ * came first. `null` still means leave the engine alone -- a preference for English on
+ * a stream with no English track is not a request to hide the subtitle that is there.
+ *
+ * An *attached* add-on subtitle is not one of [tracks] by preference: the caller
+ * recognises it separately, because a preference already satisfied by the source's own
+ * `externalSubtitles` must not be re-answered by picking an embedded track instead.
+ */
+internal fun preferredSubtitleTrack(
+    tracks: List<NativeTrack>,
+    preferred: String,
+): NativeTrack? = preferredByLanguage(tracks, preferred) { it.language }

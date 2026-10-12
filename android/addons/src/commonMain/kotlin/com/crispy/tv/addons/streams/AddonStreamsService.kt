@@ -93,6 +93,7 @@ class AddonStreamsService(
 ) : AddonStreamsLoader {
     private val addonRegistry = addonRegistry
     private val manifestFetchSemaphore = Semaphore(6)
+    private val subtitleFetchSemaphore = Semaphore(6)
     private val endpointsCacheLock = Mutex()
 
     @Volatile
@@ -690,31 +691,68 @@ class AddonStreamsService(
         logger.debug(TAG, "fetchAddonSubtitles mediaType=$mediaType id=$normalizedId endpoints=${endpoints.size}")
         if (endpoints.isEmpty()) return emptyList()
 
+        // Parallel, then concatenated in the order the endpoint loop visited.
+        //
+        // The endpoint list is resolved first (already parallel, per seed) and only
+        // then are the subtitle documents fetched, so the title's subtitles take the
+        // time of the *slowest* one response rather than the sum of all of them. That
+        // matters because `SubtitleRepository.fetchAndAwait` is what the player waits
+        // on before it starts, and a sequential sum is seconds.
+        //
+        // Ordering is preserved, and not as a nicety: `SubtitleRepository` picks the
+        // first subtitle that matches the viewer's language, so a different order is
+        // a different picked subtitle. `awaitAll` returns in the order of `endpoints`,
+        // and the dedup below walks that same order, which is the order the old loop
+        // produced.
+        val perEndpoint =
+            withContext(ioDispatcher) {
+                coroutineScope {
+                    endpoints
+                        .map { endpoint ->
+                            async {
+                                if (!endpoint.supports(mediaType, normalizedId)) {
+                                    logger.debug(TAG, "subtitle endpoint skipped (type/prefix mismatch): ${endpoint.providerName}")
+                                    return@async emptyList<AddonSubtitle>()
+                                }
+                                // Same bound the manifest fetch uses, so a title with
+                                // many add-ons supporting subtitles does not open that
+                                // many sockets at once.
+                                subtitleFetchSemaphore.withPermit {
+                                    fetchSubtitlesForEndpoint(endpoint, mediaType, normalizedId)
+                                }
+                            }
+                        }
+                        .awaitAll()
+                }
+            }
+
         val out = ArrayList<AddonSubtitle>()
         val seen = LinkedHashSet<String>()
-        withContext(ioDispatcher) {
-            for (endpoint in endpoints) {
-                if (!endpoint.supports(mediaType, normalizedId)) {
-                    logger.debug(TAG, "subtitle endpoint skipped (type/prefix mismatch): ${endpoint.providerName}")
-                    continue
-                }
-                val url = buildSubtitleResourceUrl(endpoint, mediaType, normalizedId)
-                logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> $url")
-                val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY)
-                if (json == null) {
-                    logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> null (failed/empty)")
-                    continue
-                }
-                logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.size})")
-                val subtitles = parseAddonSubtitles(json, endpoint.providerId, endpoint.providerName)
-                logger.debug(TAG, "subtitle parsed ${endpoint.providerName} count=${subtitles.size}")
-                for (subtitle in subtitles) {
-                    if (seen.add(subtitle.id)) out += subtitle
-                }
+        for (subtitles in perEndpoint) {
+            for (subtitle in subtitles) {
+                if (seen.add(subtitle.id)) out += subtitle
             }
         }
         logger.debug(TAG, "fetchAddonSubtitles total=${out.size}")
         return out
+    }
+
+    private suspend fun fetchSubtitlesForEndpoint(
+        endpoint: SubtitleEndpoint,
+        mediaType: MetadataLabMediaType,
+        normalizedId: String,
+    ): List<AddonSubtitle> {
+        val url = buildSubtitleResourceUrl(endpoint, mediaType, normalizedId)
+        logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> $url")
+        val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY)
+        if (json == null) {
+            logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> null (failed/empty)")
+            return emptyList()
+        }
+        logger.debug(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.size})")
+        val subtitles = parseAddonSubtitles(json, endpoint.providerId, endpoint.providerName)
+        logger.debug(TAG, "subtitle parsed ${endpoint.providerName} count=${subtitles.size}")
+        return subtitles
     }
 
     private suspend fun resolveSubtitleEndpoints(): List<SubtitleEndpoint> {

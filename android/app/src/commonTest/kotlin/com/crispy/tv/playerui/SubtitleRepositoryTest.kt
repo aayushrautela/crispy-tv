@@ -4,9 +4,11 @@ import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.testing.FakeStreamResolver
 import com.crispy.tv.testing.RecordingAppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -222,5 +224,153 @@ class SubtitleRepositoryTest {
         assertEquals("the same list the resolver returned", listOf("a"), repository.addonSubtitles.value.map { it.id })
         assertFalse(repository.isLoading.value)
         assertNull(repository.error.value)
+    }
+
+    /**
+     * An empty answer is published and not remembered.
+     *
+     * The reason is not tidiness: `AddonStreamsService` returns `emptyList()` both for
+     * "no addon here declares a `subtitles` resource" and for "the addons were not warm
+     * yet when playback started", and only the first of those is a fact about the
+     * title. Storing the second made the sheet show nothing on open until the viewer
+     * pressed Search, and the entry fetch was the only thing that had ever been asked.
+     *
+     * So the assertion is that a non-forced refetch reaches the resolver again.
+     */
+    @Test
+    fun `an empty result is not remembered as the absence of subtitles`() = runTest {
+        val resolver = FakeStreamResolver(subtitles = emptyList())
+        val repository = SubtitleRepository(resolver, RecordingAppLogger(), scope)
+
+        repository.fetchAddonSubtitles(MetadataLabMediaType.MOVIE, "tt-1")
+        repository.fetchAddonSubtitles(MetadataLabMediaType.MOVIE, "tt-1")
+
+        assertEquals("a non-forced refetch must reach the resolver again", 2, resolver.fetchCalls.size)
+        // Published either way: an empty list on screen is still information, and it
+        // still carries the "No subtitles found" explanation.
+        assertEquals(emptyList<AddonSubtitle>(), repository.addonSubtitles.value)
+        assertEquals("No subtitles found", repository.error.value)
+    }
+
+    /**
+     * Two callers, one round trip.
+     *
+     * The player asks for the same title's subtitles at entry and again when the stream
+     * has been chosen, and both calls happen while the first is still in flight. The
+     * second used to start a second round trip, resolving every add-on manifest twice
+     * for one title.
+     *
+     * The gate holds the resolver, so both calls are provably in flight at once. The
+     * assertions are on the resolver's call count and on both callers returning: a joiner
+     * that never returned would hang here rather than fail quietly, because the first
+     * `join()` in the test body would not complete.
+     */
+    @Test
+    fun `two callers for one in-flight title reach the resolver once`() = runTest {
+        val gate = CompletableDeferred<List<AddonSubtitle>>()
+        val resolver =
+            object : FakeStreamResolver() {
+                override suspend fun fetchAddonSubtitles(
+                    mediaType: MetadataLabMediaType,
+                    lookupId: String,
+                ): List<AddonSubtitle> {
+                    // Recorded before suspending: the assertion below counts calls, and a
+                    // count taken after `gate.await()` would be zero while the fetch is
+                    // genuinely parked inside this function.
+                    fetchCalls += mediaType to lookupId
+                    return gate.await()
+                }
+            }
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = SubtitleRepository(resolver, RecordingAppLogger(), CoroutineScope(dispatcher))
+
+        val first = launch(dispatcher) { repository.fetchAndAwait(MetadataLabMediaType.MOVIE, "tt-1") }
+        val second = launch(dispatcher) { repository.fetchAndAwait(MetadataLabMediaType.MOVIE, "tt-1") }
+        testScheduler.advanceUntilIdle()
+        // Both are parked inside the repository, so neither has asked yet and neither has
+        // returned. This is the state the dedup exists for.
+        assertFalse("the gate holds the resolver", gate.isCompleted)
+        assertEquals(1, resolver.fetchCalls.size)
+
+        gate.complete(listOf(subtitle("a")))
+        first.join()
+        second.join()
+
+        assertEquals("one round trip served both callers", 1, resolver.fetchCalls.size)
+        assertEquals("both callers saw it", listOf("a"), repository.addonSubtitles.value.map { it.id })
+        assertFalse(repository.isLoading.value)
+        assertNull(repository.error.value)
+    }
+
+    /**
+     * Cancellation is not a failure.
+     *
+     * The fetch used to collapse everything through `runCatching`, which catches
+     * `CancellationException` and answers it as state -- so a cancelled fetch left
+     * "Failed to fetch subtitles" on screen for a title nobody had asked about
+     * anymore. A coroutine that swallows cancellation is the one thing this repository
+     * must not do, and the observable side of it is exactly `_error`.
+     *
+     * The scope is cancelled, not the caller. That is the right target and it is not an
+     * accident of this test's shape: `fetchAndAwait` runs its body in the scope the
+     * repository was built with -- which is why a player caller that stops waiting on a
+     * timeout does not kill the network fetch and the sheet still fills. So the only way
+     * to reach the parked body is to cancel that scope's job, which is the real event
+     * (the player is going away).
+     *
+     * Cancelling the test's own `launch` instead was measured to leave the error
+     * "No subtitles found" behind: the body lives on the other scope, so it ran to
+     * completion once the gate was released and published like nothing had happened.
+     */
+    @Test
+    fun `a cancelled fetch reports no error at all`() = runTest {
+        val gate = CompletableDeferred<List<AddonSubtitle>>()
+        val resolver =
+            object : FakeStreamResolver() {
+                override suspend fun fetchAddonSubtitles(
+                    mediaType: MetadataLabMediaType,
+                    lookupId: String,
+                ): List<AddonSubtitle> {
+                    fetchCalls += mediaType to lookupId
+                    return gate.await()
+                }
+            }
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        // A cancellable job as the repository scope's parent, so this test can cancel the
+        // scope the fetch body actually runs in.
+        val fetchScopeJob = Job()
+        val repository =
+            SubtitleRepository(resolver, RecordingAppLogger(), CoroutineScope(dispatcher + fetchScopeJob))
+
+        // The caller stays alive on the test's scope, which is the interesting case: it
+        // gets its own CancellationException from `job.join()`, so what it does with it
+        // must not be to publish `_error` on the way out.
+        val caller = launch(dispatcher) {
+            try {
+                repository.fetchAndAwait(MetadataLabMediaType.MOVIE, "tt-1")
+            } catch (cancellation: CancellationException) {
+                // Swallowed on purpose so the test can observe the repository afterwards;
+                // a `runTest` body must not let this escape uncaught.
+            }
+        }
+        testScheduler.advanceUntilIdle()
+        assertTrue("the body ran up to the gate", repository.isLoading.value)
+        assertEquals(1, resolver.fetchCalls.size)
+
+        fetchScopeJob.cancel()
+        gate.complete(emptyList())
+        testScheduler.advanceUntilIdle()
+
+        assertNull(
+            "cancellation is not an answer and must not publish one as if it were",
+            repository.error.value,
+        )
+        assertEquals(emptyList<AddonSubtitle>(), repository.addonSubtitles.value)
+        // Deliberately no assertion on `isLoading` here: a cancelled fetch is not a
+        // finished one, so it leaves the flag to whichever fetch is still running --
+        // lowering it would clear the superseding fetch's own flag in the force path.
+        // The slot release above is the observable half that matters (a later call
+        // must not join the dead job), and it is covered by the refetch test.
+        caller.join()
     }
 }

@@ -96,12 +96,17 @@ private data class EngineSubtitleOption(
 private data class CatalogSubtitleOption(
     val addonSubtitle: AddonSubtitle,
     private val displayName: (String) -> String,
+    private val selectedSubtitleTrackId: String?,
 ) : SubtitleOption {
     override val key = externalSubtitleTrackId(addonSubtitle.url)
     override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language, displayName) }
     override val language = addonSubtitle.language
     override val subtitle = addonSubtitle.addonName?.takeIf { it.isNotBlank() }
-    override val isSelected = false
+    // Was hard-coded `false`, so an attached add-on subtitle that is actually playing
+    // never looked selected in the sheet -- the only row in this UI that could be.
+    // Both engines report an external subtitle back with the same `ext:<hash(url)>`
+    // identity the sheet uses for a catalog entry, so one comparison answers it.
+    override val isSelected = key == selectedSubtitleTrackId
     override val trackId = key
 }
 
@@ -202,7 +207,9 @@ internal fun PlayerSubtitleSheet(
             addonSubtitles
                 .distinctBy { externalSubtitleTrackId(it.url) }
                 .filter { externalSubtitleTrackId(it.url) !in engineTrackIds }
-                .forEach { subtitle -> add(CatalogSubtitleOption(subtitle, displayName)) }
+                .forEach { subtitle ->
+                    add(CatalogSubtitleOption(subtitle, displayName, selectedSubtitleTrackId))
+                }
         }
     val groups = groupSubtitlesByLanguage(options, displayName)
     val languagePills = groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) }

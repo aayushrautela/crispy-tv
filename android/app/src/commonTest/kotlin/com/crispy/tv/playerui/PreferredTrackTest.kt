@@ -4,11 +4,14 @@ import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.nativeengine.playback.NativeTrack
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
- * Covers the two matchers behind "the default audio selection is always the first
- * audio", and the preference resolution they share.
+ * Covers the three matchers behind "the default audio selection is always the first
+ * audio" and "it is still picking the first subtitle", plus the preference resolution
+ * they share.
  *
  * ## Why the no-match case is pinned rather than implied
  *
@@ -204,6 +207,87 @@ class PreferredTrackTest {
             listOf(track?.language, sub?.language),
             "the matchers disagreed about $language",
         )
+    }
+
+    // region embedded subtitles
+
+    private fun subtitleTrack(id: String, language: String?) = audio(id, language)
+
+    @Test
+    fun `an embedded subtitle in the preferred language is selected over the first track`() {
+        // The engine reports its default as the first subtitle track, which is exactly
+        // what the viewer was seeing. The match is third, so only a real match passes.
+        val tracks =
+            listOf(
+                subtitleTrack("japanese", "jpn"),
+                subtitleTrack("spanish", "spa"),
+                subtitleTrack("english", "eng"),
+            )
+        assertEquals("english", preferredSubtitleTrack(tracks, "en")?.id)
+    }
+
+    @Test
+    fun `an embedded subtitle no match is null rather than the first track`() {
+        // The report in its negative form, now asserted for subtitles as it already is
+        // for audio: a preference is not a request to pick something else.
+        val tracks = listOf(subtitleTrack("spanish", "spa"), subtitleTrack("japanese", "jpn"))
+        assertNull(preferredSubtitleTrack(tracks, "en"))
+        assertNull(preferredSubtitleTrack(tracks, resolvePreferredLanguage(null)))
+        assertNull(preferredSubtitleTrack(emptyList(), "en"))
+    }
+
+    @Test
+    fun `an undetermined embedded subtitle never matches`() {
+        assertNull(preferredSubtitleTrack(listOf(subtitleTrack("undetermined", "und")), "en"))
+    }
+
+    @Test
+    fun `the three matchers are one rule`() {
+        // Audio, embedded subtitles and add-on subtitles are the same comparison over
+        // three types. A suite that drives them separately would not notice the day one
+        // of them stopped normalizing its preference the way the others do.
+        val language = "fre"
+        assertEquals(
+            preferredAudioTrack(listOf(audio("spa", "spa"), audio("fre", language)), language)?.id,
+            preferredSubtitleTrack(
+                listOf(subtitleTrack("spa", "spa"), subtitleTrack("fre", language)),
+                language,
+            )?.id,
+        )
+        assertEquals(
+            preferredAudioTrack(listOf(audio("spa", "spa"), audio("fre", language)), language)?.id,
+            preferredAddonSubtitle(
+                listOf(subtitle("spa", "spa"), subtitle("fre", language)),
+                language,
+            )?.id,
+        )
+    }
+
+    // endregion
+
+    // region trackLanguageMatches
+
+    @Test
+    fun `a track already carrying the preferred language is recognised as such`() {
+        // The player asks this outside the matchers: a source that already ships an
+        // add-on subtitle for the preference has answered it without a matcher running,
+        // and a currently-selected engine track that already matches must not be
+        // re-answered. Both callers would fail silently on a mismatch in spelling.
+        assertTrue(trackLanguageMatches("eng", "en"))
+        assertTrue(trackLanguageMatches("en", "eng"))
+        assertTrue(trackLanguageMatches("fre", "fr"))
+        assertTrue(trackLanguageMatches("  EN  ", "eng"))
+        assertTrue(trackLanguageMatches("en-US", "en"))
+    }
+
+    @Test
+    fun `a track carrying no language never counts as a match`() {
+        // `und` matches nothing in either position, so a preference that has not been
+        // set does not accidentally claim the unlabelled track that is playing.
+        assertFalse(trackLanguageMatches("und", "en"))
+        assertFalse(trackLanguageMatches("eng", "und"))
+        assertFalse(trackLanguageMatches(null, "en"))
+        assertFalse(trackLanguageMatches("en", ""))
     }
 
     // endregion
