@@ -151,6 +151,24 @@ class PlayerSessionViewModel(
     private var lastHandledErrorToken: Long? = null
     private var pendingInitialSeekMs: Long? = null
     private var autoSelectPending = false
+    /**
+     * The in-flight add-on subtitle fetch, so the path that attaches a matched
+     * subtitle can wait on the one it started rather than on a signal the repository
+     * does not raise.
+     */
+    private var subtitleFetchJob: Job? = null
+    /**
+     * Whether the preferred audio language has already been applied to the stream now
+     * playing.
+     *
+     * Reset on every stream switch, set once the auto-pick has run. **It is set
+     * *after* the pick, not on a manual pick**, and that is deliberate: the poll that
+     * carries the engine's track list into `_uiState` keeps arriving every 500ms, so a
+     * flag that was never set would re-run the matcher forever -- and the matcher
+     * keeps matching, because the preference has not changed. The viewer's manual pick
+     * would survive a few hundred milliseconds and then be undone.
+     */
+    private var audioAutoSelectApplied = false
     private var initialTarget: StreamLookupTarget? = null
 
     private val initialEngine: NativePlaybackEngine =
@@ -361,7 +379,11 @@ class PlayerSessionViewModel(
         Log.d(TAG, "selectAudioTrack id=$trackId language=$language")
         playbackController.selectAudioTrack(trackId)
         if (language != null) {
-            playbackSettingsRepository.setDefaultAudioLanguage(language)
+            // normalizeLang, because this is written from the *track's* spelling and an
+            // Exo track reports ISO 639-2 (`eng`). Without it the stored preference
+            // drifts to whichever code the last-tapped source happened to use, and the
+            // match in applyPreferredAudioLanguage then compares `eng` against `en`.
+            playbackSettingsRepository.setDefaultAudioLanguage(normalizeLang(language))
         }
         syncPlaybackSnapshot(playbackController.snapshot())
     }
@@ -390,7 +412,9 @@ class PlayerSessionViewModel(
         }
         playbackController.selectSubtitleTrack(trackId)
         if (language != null) {
-            playbackSettingsRepository.setDefaultSubtitleLanguage(language)
+            // Same normalization as the audio preference read: an engine track reports
+            // ISO 639-2, and the matcher reduces both sides to two letters.
+            playbackSettingsRepository.setDefaultSubtitleLanguage(normalizeLang(language))
         }
         syncPlaybackSnapshot(playbackController.snapshot())
     }
@@ -408,11 +432,92 @@ class PlayerSessionViewModel(
             return
         }
         Log.d(TAG, "fetchAddonSubtitles force=$force lookupId=$lookupId mediaType=$mediaType")
-        subtitleRepository.fetchAddonSubtitles(mediaType, lookupId, force)
+        subtitleFetchJob = subtitleRepository.fetchAddonSubtitles(mediaType, lookupId, force)
     }
 
     fun refreshAddonSubtitles() {
         fetchAddonSubtitles(force = true)
+    }
+
+    /**
+     * Attach the add-on subtitle that matches the viewer's preferred language to
+     * [source], before [playbackController] has ever seen it.
+     *
+     * ## Why before, and not after
+     *
+     * `NativePlaybackController.setExternalSubtitle` on the Exo path rebuilds the
+     * media item -- `setMediaItem(mediaItem, resumeMs)` + `prepare()` + `playWhenReady`
+     * -- so attaching once the picture is already moving is a visible re-prepare. On
+     * MPV it is a free `sub-add`. **The one place both engines agree is before `play()`**,
+     * because `PlaybackSource.externalSubtitles` is folded into the media item by
+     * `playbackMediaItemFromUrl` at play time, and that is where this attaches.
+     *
+     * ## Why a bounded wait and not an unconditional one
+     *
+     * The fetch resolves one manifest per configured seed and then GETs every subtitle
+     * endpoint it found, sequentially. Waiting for all of that is waiting several
+     * seconds, and [SUBTITLE_ATTACH_WINDOW_MS] is a budget, not a timeout on the
+     * network: when it runs out the source is returned unchanged and playback starts
+     * without a subtitle. **The job is not cancelled** -- it belongs to
+     * `viewModelScope`, not to this call, so the subtitle sheet still populates for a
+     * viewer who opens it afterwards. The cost of missing the window is a missing
+     * subtitle on a stream that is already playing; the cost of waiting for it is a
+     * late start on every stream that has no matching subtitle at all.
+     *
+     * A preference is not a request to block the first frame, which is why an unset
+     * preference skips both the wait and the match rather than defaulting into one.
+     */
+    private suspend fun attachPreferredAddonSubtitle(source: PlaybackSource): PlaybackSource {
+        val preferred =
+            resolvePreferredLanguage(playbackSettingsRepository.settings.value.defaultSubtitleLanguage)
+        // Already in hand from an earlier fetch of the same title: nothing to wait for.
+        val cached =
+            preferredAddonSubtitle(subtitleRepository.addonSubtitles.value, preferred)
+                ?: run {
+                    val job = subtitleFetchJob ?: return source
+                    withTimeoutOrNull(SUBTITLE_ATTACH_WINDOW_MS) { job.join() }
+                    preferredAddonSubtitle(subtitleRepository.addonSubtitles.value, preferred)
+                }
+                ?: return source
+        Log.d(TAG, "attach subtitle preferred=$preferred url=${cached.url.take(96)}")
+        return source.copy(
+            externalSubtitles =
+                source.externalSubtitles +
+                    PlaybackExternalSubtitle(
+                        url = cached.url,
+                        language = cached.language,
+                        name = cached.display,
+                    ),
+        )
+    }
+
+    /**
+     * Apply the preferred audio language to the engine's track list, once per stream.
+     *
+     * The engine's own default is the first track, which is what this replaces -- but
+     * **only where a match exists.** `preferredAudioTrack` returns `null` when nothing
+     * matches and that `null` is respected here, because treating it as "pick
+     * something" would re-encode the bug as a decision this file made, and would
+     * override a viewer's own pick on a track list that simply has no such language.
+     */
+    private fun applyPreferredAudioLanguage() {
+        if (audioAutoSelectApplied) {
+            return
+        }
+        val tracks = uiState.value.audioTracks
+        if (tracks.isEmpty()) {
+            return
+        }
+        val preferred =
+            resolvePreferredLanguage(playbackSettingsRepository.settings.value.defaultAudioLanguage)
+        val match = preferredAudioTrack(tracks, preferred) ?: return
+        audioAutoSelectApplied = true
+        Log.d(
+            TAG,
+            "audio auto-select preferred=$preferred id=${match.id} language=${match.language}",
+        )
+        playbackController.selectAudioTrack(match.id)
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     private fun languageFromTrack(trackId: String): String? {
@@ -564,12 +669,15 @@ class PlayerSessionViewModel(
 
     private suspend fun playResolvedStream(stream: AddonStream, target: PlayerStreamLookupTarget) {
         val source = resolvePlaybackSource(stream, target.lookupId) ?: return
-        activePlaybackSource = source
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
         fetchAddonSubtitles()
+        // Before the first frame, and before `requestPlayback` below: `play()` folds
+        // `externalSubtitles` into the media item, and Exo rebuilds it to add one.
+        activePlaybackSource = attachPreferredAddonSubtitle(source)
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
         resetPlaybackPosition()
+        audioAutoSelectApplied = false
         _uiState.update { state ->
             state.copy(
                 currentPlaybackUrl = source.url,
@@ -763,8 +871,11 @@ class PlayerSessionViewModel(
 
         viewModelScope.launch {
             val source = resolvePlaybackSource(stream, selectorSnapshot.lookupId) ?: return@launch
+            // Same window as playResolvedStream: the fetch was started above, and the
+            // match has to be in the source before switchPlayback reaches `play()`.
+            val attached = attachPreferredAddonSubtitle(source)
             switchPlayback(
-                source = source,
+                source = attached,
                 identity = nextIdentity,
                 title = nextTitle,
                 subtitle = nextSubtitle,
@@ -906,6 +1017,8 @@ class PlayerSessionViewModel(
         activeSubtitle = subtitle?.trim()?.ifBlank { null }
         activeArtworkUrl = artworkUrl?.trim()?.ifBlank { null }
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
+        // A new stream is a new track list, and the preference applies once to it.
+        audioAutoSelectApplied = false
 
         resetPlaybackPosition()
         _uiState.update { state ->
@@ -1058,6 +1171,11 @@ class PlayerSessionViewModel(
                 )
             }
         }
+
+        // After the state is updated, not inside it: this reads the track list the poll
+        // just published, and a side effect inside `update` would re-run on every
+        // concurrent writer.
+        applyPreferredAudioLanguage()
     }
 
     private fun resetPlaybackPosition() {
@@ -1251,3 +1369,17 @@ private class PlaybackMetricsHolder {
 }
 
 private const val TAG = "PlayerSessionViewModel"
+
+/**
+ * How long the subtitle-attach path waits for the entry fetch before letting playback
+ * start without a subtitle.
+ *
+ * The fetch resolves one manifest per configured seed and then GETs every subtitle
+ * endpoint it found, sequentially, so its honest cost is seconds. By the time a source
+ * has been resolved it has usually already finished, because it started in
+ * `startPlayback` and stream selection is the slower half. This is the budget for the
+ * case where it has not: **the viewer waits no more than this for a subtitle that may
+ * not exist at all**, and the fetch keeps running either way, so the sheet still
+ * populates for a viewer who opens it afterwards.
+ */
+private const val SUBTITLE_ATTACH_WINDOW_MS = 700L

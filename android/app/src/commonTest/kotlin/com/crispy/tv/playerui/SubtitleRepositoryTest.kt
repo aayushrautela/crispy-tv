@@ -4,8 +4,10 @@ import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.testing.FakeStreamResolver
 import com.crispy.tv.testing.RecordingAppLogger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -174,5 +176,51 @@ class SubtitleRepositoryTest {
 
         assertTrue(logger.debugs.any { it.first == "CrispySubtitles" })
         assertTrue("a successful fetch is not a warning", logger.warns.isEmpty())
+    }
+
+    /**
+     * The suspend half, and the reason the player can attach a matched subtitle before
+     * the first frame rather than after it.
+     *
+     * Two things are asserted, and the second is the one that carries the decision:
+     * **that `isLoading` is `true` when the call has not yet returned.** Without it the
+     * first assertion is vacuous -- an eager `assertFalse(settled)` would also hold if
+     * the coroutine had never started, because `runCurrent()` on a scheduler nothing has
+     * been posted to runs nothing. The gate is what holds the fetch, and the flag is
+     * the positive evidence the body ran past it.
+     */
+    @Test
+    fun `fetchAndAwait returns only once the resolver has answered`() = runTest {
+        val gate = CompletableDeferred<List<AddonSubtitle>>()
+        val resolver =
+            object : FakeStreamResolver() {
+                override suspend fun fetchAddonSubtitles(
+                    mediaType: MetadataLabMediaType,
+                    lookupId: String,
+                ): List<AddonSubtitle> = gate.await()
+            }
+        // A scope on this test's own scheduler. The class-level scope has its own, so
+        // work posted there could never be advanced from here.
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val repository = SubtitleRepository(resolver, RecordingAppLogger(), CoroutineScope(dispatcher))
+
+        var settled = false
+        val fetch =
+            launch(dispatcher) {
+                repository.fetchAndAwait(MetadataLabMediaType.MOVIE, "tt-1")
+                settled = true
+            }
+        testScheduler.advanceUntilIdle()
+        val held = "the gate is what holds the fetch, not the scheduler"
+        assertFalse(held, settled)
+        assertTrue(held, repository.isLoading.value)
+
+        gate.complete(listOf(subtitle("a")))
+        fetch.join()
+
+        assertTrue("a completed resolver settles the call", settled)
+        assertEquals("the same list the resolver returned", listOf("a"), repository.addonSubtitles.value.map { it.id })
+        assertFalse(repository.isLoading.value)
+        assertNull(repository.error.value)
     }
 }

@@ -16,10 +16,10 @@ private const val FALLBACK_PREFERRED_LANGUAGE = "en"
  * The language to match a track against: the persisted preference when there is one,
  * English otherwise.
  *
- * `normalizeLang` is applied here rather than at each comparison so that `"en"` and
- * `"eng"` name the same target however the preference was written -- and the history
- * in `PlayerSessionViewModel` says it is written from the *track's* spelling, which
- * for an Exo `Format` is an ISO 639-2 code.
+ * `normalizeLang` is applied here so that `"en"` and `"eng"` name the same target. That
+ * matters because the preference is written from the *track's* own spelling, and an
+ * Exo `Format` reports ISO 639-2 -- so an unnormalized store would hold `"eng"` after
+ * the first tap and never match an `"en"` tag again.
  *
  * A preference that resolves to `"und"` is treated as no preference at all rather
  * than as a request for unlabelled tracks, which is why the `takeIf` is there and
@@ -36,7 +36,11 @@ internal fun resolvePreferredLanguage(setting: String?): String =
 /**
  * Whether one track's language tag names [preferred].
  *
- * `preferred` must already be normalized -- [resolvePreferredLanguage] does it.
+ * Both sides go through [normalizeLang], not just the track's. **A caller passing the
+ * raw preference must still get the match** -- the preference is written from whichever
+ * track the viewer last tapped, so `"eng"` is the common spelling, and a matcher that
+ * trusted its caller to have normalized would silently match nothing on exactly the
+ * case it was built for.
  *
  * ## Why a secondary subtag is dropped
  *
@@ -45,11 +49,13 @@ internal fun resolvePreferredLanguage(setting: String?): String =
  * Comparing primary subtags only is what makes `"en"` match an add-on advertising
  * `"en-US"`, and it costs nothing in the other direction: an `"und"` track still
  * never matches, because [normalizeLang] has already reduced a blank tag to `"und"`
- * and a primary subtag is never `"und"` for a real tag.
+ * -- and a *preference* of `und` guards itself rather than asking for unlabelled
+ * tracks, which is why both sides are checked.
  */
 private fun languageTagMatches(candidate: String?, preferred: String): Boolean {
+    val target = normalizeLang(preferred).substringBefore('-')
     val tag = normalizeLang(candidate).substringBefore('-')
-    return tag != "und" && tag == preferred
+    return target != "und" && tag != "und" && tag == target
 }
 
 private inline fun <T> preferredByLanguage(
@@ -66,8 +72,9 @@ private inline fun <T> preferredByLanguage(
  * Falling back to the first track here would re-encode the bug as a decision this
  * file made, and would fight the user on a track they picked by hand.
  *
- * [preferred] is the resolved language, not the raw setting: pass
- * [resolvePreferredLanguage] rather than re-deriving the fallback at the call site.
+ * [preferred] is normalized here rather than trusted to have been normalized by the
+ * caller, because the stored preference is written from whatever spelling the last
+ * tapped track happened to send.
  */
 internal fun preferredAudioTrack(
     tracks: List<NativeTrack>,

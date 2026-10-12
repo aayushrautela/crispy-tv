@@ -5,6 +5,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamResolver
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,13 +76,24 @@ class SubtitleRepository(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /**
+     * Start a fetch and return without waiting for it.
+     *
+     * Returns the [Job] rather than `Unit` because one caller has to know when the
+     * fetch has actually finished, and the repository's own state cannot tell it:
+     * `isLoading` is raised *inside* the coroutine, so it is still `false` when this
+     * function returns. The player needs to attach a matched subtitle before the first
+     * `play()` call -- see [fetchAndAwait] for why that deadline is real -- and
+     * "wait on `isLoading`" was measured to wait on a signal that had not been sent.
+     *
+     * The caller that suspends is the only one that has to; `ViewState` observers keep
+     * ignoring the result.
+     */
     fun fetchAddonSubtitles(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         force: Boolean = false,
-    ) {
-        scope.launch { fetchAndAwait(mediaType, lookupId, force) }
-    }
+    ): Job = scope.launch { fetchAndAwait(mediaType, lookupId, force) }
 
     /**
      * The fetch, as a suspend function that returns when it has finished.

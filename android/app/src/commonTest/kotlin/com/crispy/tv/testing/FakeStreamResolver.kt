@@ -15,8 +15,15 @@ import com.crispy.tv.player.MetadataLabMediaType
  * repo already follows is that an exhaustive double belongs to the module that owns the
  * interface; `:app` now consumes `StreamResolver`, so `:app` keeps one. Throwing would
  * have been the smaller file and the one that rots silently when a member is added.
+ *
+ * `open`, and [fetchAddonSubtitles] `open` with it: a test that must hold a fetch
+ * mid-flight needs to suspend inside that one member and reuse the other three rather
+ * than write a second exhaustive double of a four-member port. Closing it is the wrong
+ * shape -- the alternative is two implementations of the same interface drifting apart
+ * the next time a member is added, which is the exact failure the paragraph above
+ * exists to prevent.
  */
-class FakeStreamResolver(
+open class FakeStreamResolver(
     var subtitles: List<AddonSubtitle> = emptyList(),
 ) : StreamResolver {
     val fetchCalls = mutableListOf<Pair<MetadataLabMediaType, String>>()
@@ -59,7 +66,7 @@ class FakeStreamResolver(
         return null
     }
 
-    override suspend fun fetchAddonSubtitles(
+    open override suspend fun fetchAddonSubtitles(
         mediaType: MetadataLabMediaType,
         lookupId: String,
     ): List<AddonSubtitle> {
