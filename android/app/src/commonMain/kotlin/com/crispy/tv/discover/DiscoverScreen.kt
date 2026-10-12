@@ -191,6 +191,17 @@ class DiscoverViewModel(
 private const val PAGE_SIZE = 60
 
 /**
+ * The spinner shown for the pager's append loading state, and the vertical space
+ * around it.
+ *
+ * 20dp read as a stray dot next to a full grid cell, which is the one place the
+ * user waits on a network round trip the app did not warn them about -- a skeleton
+ * covers first paint, but an append is a deliberate scroll to the end of a list.
+ */
+private val PaginationSpinnerSize = 40.dp
+private val PaginationSpinnerPadding = 32.dp
+
+/**
  * The Discover tab: a type filter, a genre chip and a sort, over one pager.
  *
  * `viewModelFactory` and `loadProfile` are the two things this screen used to reach the
@@ -472,10 +483,13 @@ private fun DiscoverScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = Dimensions.ListItemPadding),
+                                .padding(vertical = PaginationSpinnerPadding),
                             contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(20.dp), color = CrispyPalette.primary)
+                            LoadingIndicator(
+                                modifier = Modifier.size(PaginationSpinnerSize),
+                                color = CrispyPalette.primary
+                            )
                         }
                     }
                 } else if (appendState is LoadState.Error) {

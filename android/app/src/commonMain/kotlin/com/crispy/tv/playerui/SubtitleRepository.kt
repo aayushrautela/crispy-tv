@@ -80,28 +80,56 @@ class SubtitleRepository(
         lookupId: String,
         force: Boolean = false,
     ) {
-        scope.launch {
-            if (!force && serveFromCache(mediaType, lookupId)) {
-                return@launch
-            }
-            logger.debug(TAG, "fetch mediaType=$mediaType id=$lookupId force=$force")
-            _isLoading.value = true
-            _error.value = null
-            runCatching {
-                streamResolver.fetchAddonSubtitles(mediaType, lookupId)
-            }.onSuccess { subtitles ->
-                logger.debug(TAG, "success count=${subtitles.size}")
-                storeInCache(mediaType, lookupId, subtitles)
-                _addonSubtitles.value = subtitles
-                if (subtitles.isEmpty()) {
-                    _error.value = "No subtitles found"
-                }
-            }.onFailure { throwable ->
-                logger.debug(TAG, "failure ${throwable.message}")
-                _error.value = throwable.message ?: "Failed to fetch subtitles"
-            }
-            _isLoading.value = false
+        scope.launch { fetchAndAwait(mediaType, lookupId, force) }
+    }
+
+    /**
+     * The fetch, as a suspend function that returns when it has finished.
+     *
+     * This is the same work as [fetchAddonSubtitles], and it exists because the
+     * fire-and-forget one cannot be waited on. Two reasons, both measured rather than
+     * argued.
+     *
+     * **`isLoading` is not an answer to "has it finished".** It goes `false` before
+     * `launch` has even started -- `_isLoading.value = true` is set *inside* the
+     * coroutine -- so a caller that waits for it to fall has waited on a signal that
+     * was never raised, and returns with no subtitles and no error in a state that
+     * reads as "done".
+     *
+     * **The repository has no per-key state to ask about.** The cache is a single
+     * slot, so "has this key been fetched" is not a question it can answer without
+     * adding one. The suspend function is that answer, without the slot.
+     *
+     * `ViewState` observers keep using [fetchAddonSubtitles]. The one caller that
+     * suspends is the one that has to: the player must attach a matched subtitle
+     * *before* the first `play()` call, because the Exo path rebuilds the media item
+     * to add one afterwards and that is a visible re-prepare.
+     */
+    suspend fun fetchAndAwait(
+        mediaType: MetadataLabMediaType,
+        lookupId: String,
+        force: Boolean = false,
+    ) {
+        if (!force && serveFromCache(mediaType, lookupId)) {
+            return
         }
+        logger.debug(TAG, "fetch mediaType=$mediaType id=$lookupId force=$force")
+        _isLoading.value = true
+        _error.value = null
+        runCatching {
+            streamResolver.fetchAddonSubtitles(mediaType, lookupId)
+        }.onSuccess { subtitles ->
+            logger.debug(TAG, "success count=${subtitles.size}")
+            storeInCache(mediaType, lookupId, subtitles)
+            _addonSubtitles.value = subtitles
+            if (subtitles.isEmpty()) {
+                _error.value = "No subtitles found"
+            }
+        }.onFailure { throwable ->
+            logger.debug(TAG, "failure ${throwable.message}")
+            _error.value = throwable.message ?: "Failed to fetch subtitles"
+        }
+        _isLoading.value = false
     }
 
     // Sheet opens hit this instead of re-downloading every addon manifest; only the
