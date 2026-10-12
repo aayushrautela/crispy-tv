@@ -65,6 +65,7 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.lazyKey
 import com.crispy.tv.search.SearchGenreSuggestion
 import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.ChipRowTopSpacing
 import com.crispy.tv.ui.components.CrispyChip
 import com.crispy.tv.ui.components.CrispyChipRow
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
@@ -343,7 +344,11 @@ private fun DiscoverScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
-                top = Dimensions.SmallSpacing,
+                // Zero: the filter row carries [ChipRowTopSpacing] itself, so this page's pills sit
+                // at the library row's height rather than 8dp below it. The score is even either
+                // way -- content padding is consumed before the first item and the grid's
+                // `verticalArrangement` owns the gaps between items.
+                top = 0.dp,
                 end = pageHorizontalPadding,
                 bottom = safeBottomPadding(),
             ),
@@ -383,7 +388,15 @@ private fun DiscoverScreen(
                         )
                     CrispyChipRow(
                         chips = filterChips,
-                        horizontalPadding = pageHorizontalPadding,
+                        // The gap under the app bar, at the row rather than in the grid's
+                        // `contentPadding` where it used to hide: it is the same
+                        // [ChipRowTopSpacing] the library row takes, so the two pages' pills sit at
+                        // one height.
+                        modifier = Modifier.padding(top = ChipRowTopSpacing),
+                        // No `horizontalPadding` here: this grid's own `contentPadding` already
+                        // applies the page's horizontal inset, and passing it again indented the
+                        // pills a second time -- further in than both the library's row and the
+                        // posters directly below them.
                         chipHeight = DiscoverChipHeight,
                     )
                 }

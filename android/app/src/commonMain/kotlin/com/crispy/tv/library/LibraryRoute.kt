@@ -43,6 +43,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.ui.components.ChipRowTopSpacing
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ItemActionSheet
@@ -185,7 +186,17 @@ ProfileIconButton(
         listState = listState,
     ) {
         item(key = "filters") {
-            Box(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+            // `[ChipRowTopSpacing]` rather than a local padding: this row's page has
+            // `topPadding = 0.dp`, so without it the pills sat flush under the app bar while the
+            // discover row sat 8dp below it and the two rows jumped between pages.
+            Box(
+                modifier =
+                    Modifier.padding(
+                        start = horizontalPadding,
+                        top = ChipRowTopSpacing,
+                        end = horizontalPadding,
+                    ),
+            ) {
                 LibraryFiltersRow(
                     sections = sections,
                     selectedSectionId = selectedSectionId,

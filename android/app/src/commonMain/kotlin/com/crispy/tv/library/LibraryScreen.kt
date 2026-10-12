@@ -51,6 +51,10 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyChip
 import com.crispy.tv.ui.components.CrispyChipRow
 import com.crispy.tv.ui.components.LandscapeCard
+import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.ic_bookmark
+import com.crispy.tv.ui.resources.ic_history
+import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -68,6 +72,7 @@ import com.crispy.tv.domain.watch.civilMonthKey
 import com.crispy.tv.domain.watch.civilMonthKeyFromEpochMillis
 import com.crispy.tv.domain.watch.previousMonthKey
 import com.crispy.tv.backend.WatchGenerationsResponse
+import org.jetbrains.compose.resources.DrawableResource
 
 private const val LIBRARY_PAGE_SIZE = 60
 
@@ -85,17 +90,25 @@ internal const val WATCHLIST_GROUP_EARLIER_THIS_YEAR = "earlier_this_year"
 internal const val WATCHLIST_GROUP_LAST_YEAR = "last_year"
 internal const val WATCHLIST_GROUP_OLDER = "older"
 
+// Each section's icon is the same glyph that section already uses *elsewhere* in the app, so a pill
+// and the thing it filters never disagree: `ic_history` is the search screen's recent-searches
+// mark, `ic_bookmark` is the details header's watchlist toggle, and `ic_thumb_up` is what the
+// details header shows for `liked` -- which is what the Ratings section actually holds, Liked and
+// Disliked bands rather than scores. Deliberately not `ic_star_filled`: in this codebase a star is
+// always the IMDb score (hero meta, details, player sheet), so a star on a pill whose own rows
+// display star scores would mean two different things.
 private val LIBRARY_SECTIONS =
     listOf(
-        LibrarySectionUi(id = LIBRARY_SECTION_HISTORY, label = "History"),
-        LibrarySectionUi(id = LIBRARY_SECTION_WATCHLIST, label = "Watchlist"),
-        LibrarySectionUi(id = LIBRARY_SECTION_RATINGS, label = "Ratings"),
+        LibrarySectionUi(id = LIBRARY_SECTION_HISTORY, label = "History", icon = Res.drawable.ic_history),
+        LibrarySectionUi(id = LIBRARY_SECTION_WATCHLIST, label = "Watchlist", icon = Res.drawable.ic_bookmark),
+        LibrarySectionUi(id = LIBRARY_SECTION_RATINGS, label = "Ratings", icon = Res.drawable.ic_thumb_up),
     )
 
 @Immutable
 data class LibrarySectionUi(
     val id: String,
     val label: String,
+    val icon: DrawableResource,
 )
 
 @Immutable
@@ -772,13 +785,16 @@ internal fun LibraryFiltersRow(
     // their labels, so a section label is never truncated and every picker in the app is the same
     // control. This row used to be a connected `ToggleButton` group -- a segmented control, which
     // is a different component, and one that could only fit by giving each button an equal share of
-    // the full width.
+    // the full width. The switch dropped each section's icon with it, which is why it is passed
+    // through here: `[LibrarySectionUi.icon]` is the glyph the section already carries everywhere
+    // else, and a pill that reads "History" with no glyph next to it looks like a different control
+    // from the genre row beside it.
     val chips = remember(sections, selectedSectionId) {
         sections.map { section ->
             CrispyChip(
                 id = section.id,
                 label = section.label,
-                icon = null,
+                icon = section.icon,
                 selected = section.id == selectedSectionId,
                 onClick = { onSelectSection(section.id) },
             )

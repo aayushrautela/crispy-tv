@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.theme.Dimensions
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -54,6 +55,20 @@ data class CrispyChip(
 
 /** Material 3 Expressive's `ButtonGroupDefaults.ExpandedRatio`. */
 private const val DefaultExpandRatio = 0.15f
+
+/**
+ * The gap a chip row leaves below the top app bar, measured from the top of the page's content.
+ *
+ * One named value because the library row and the discover row are the same component in the same
+ * position and are read one after the other: the library row sits in a `CrispyScreen` list whose
+ * `topPadding` is 0, while the discover row sits in a `LazyVerticalGrid` whose `contentPadding`
+ * used to carry this gap -- so each page stated it somewhere different and they drifted 8dp apart,
+ * and the pills then sat at different heights depending on which page was on screen.
+ *
+ * The random-pick row is deliberately not one of them: its drum sits directly beneath it, so it
+ * stays flush.
+ */
+internal val ChipRowTopSpacing = Dimensions.SmallSpacing
 
 /**
  * A scrollable row of standalone filter chips, each hugging its own label so nothing truncates.
