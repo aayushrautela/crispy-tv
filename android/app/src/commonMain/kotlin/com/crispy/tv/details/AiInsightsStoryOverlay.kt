@@ -302,6 +302,7 @@ internal fun AiInsightsStoryOverlay(
                     artworkUrl = artworkUrl,
                 ),
             washColor = slideWashSeeds[safeIndex]?.let(::clampStoryWash) ?: StoryWashFallback,
+            accent = palette.accent,
             bottomReserve = slideBottomReserve,
             modifier = Modifier.fillMaxSize(),
         )
@@ -365,6 +366,7 @@ private fun AiInsightsStorySlide(
     slide: AiInsightSlide,
     imageUrl: String?,
     washColor: Color,
+    accent: Color,
     bottomReserve: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -404,7 +406,7 @@ private fun AiInsightsStorySlide(
             ) {
                 AiInsightsStorySticker(slide = slide)
                 Spacer(modifier = Modifier.height(20.dp))
-                AiInsightsStoryCopy(slide = slide)
+                AiInsightsStoryCopy(slide = slide, accent = accent)
             }
             // Measured footer height, not a constant: the chrome column sits
             // over this slide, so the copy must clear whatever it measures.
@@ -445,6 +447,7 @@ private fun Modifier.storyTreatment(washColor: Color): Modifier =
 @Composable
 private fun AiInsightsStoryCopy(
     slide: AiInsightSlide,
+    accent: Color,
     modifier: Modifier = Modifier,
 ) {
     val title = slide.storyTitle()
@@ -465,7 +468,7 @@ private fun AiInsightsStoryCopy(
                             shadow = StoryTextShadow,
                             lineHeight = 34.sp,
                         ),
-                    color = Color.White,
+                    color = accent,
                     maxLines = 20,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -481,7 +484,7 @@ private fun AiInsightsStoryCopy(
                             shadow = StoryTextShadow,
                             lineHeight = 32.sp,
                         ),
-                    color = Color.White,
+                    color = accent,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -750,12 +753,16 @@ private fun AiInsightsFooterActions(
                 text = if (isInWatchlist) "In watchlist" else "Add to watchlist",
                 icon = if (isInWatchlist) Res.drawable.ic_check_filled else Res.drawable.ic_playlist_add_filled,
                 onClick = onToggleWatchlist,
+                containerColor = palette.accent,
+                contentColor = palette.onAccent,
                 modifier = Modifier.weight(1f),
             )
             AiInsightsPillButton(
                 text = "Share",
                 icon = Res.drawable.ic_share,
                 onClick = onShare,
+                containerColor = palette.accent,
+                contentColor = palette.onAccent,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -772,20 +779,21 @@ private fun AiInsightsPillButton(
     text: String,
     icon: DrawableResource,
     onClick: () -> Unit,
+    containerColor: Color,
+    contentColor: Color,
     modifier: Modifier = Modifier,
 ) {
-    // Solid white pills, not the dynamic pastel accent: `palette.accent` is a
-    // TonalSpot primary, which is light *by design* in a dark scheme, so pills
-    // built from it read as washed out. White + near-black is the story-CTA
-    // look and wins on every backdrop.
+    // The details-page accent, not a fixed brand white: the pill ties to the
+    // same extracted seed the details screen tints from, so it holds one
+    // colour for the whole story. Per-slide washes never reach it.
     Button(
         onClick = onClick,
         modifier = modifier.height(44.dp),
         shape = RoundedCornerShape(999.dp),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = CrispyPalette.primary,
-                contentColor = CrispyPalette.onPrimary,
+                containerColor = containerColor,
+                contentColor = contentColor,
             ),
     ) {
         CrispyIcon(
