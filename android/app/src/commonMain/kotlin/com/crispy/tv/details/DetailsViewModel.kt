@@ -608,48 +608,29 @@ class DetailsViewModel internal constructor(
         val state = _uiState.value
         val details = state.details ?: return
         if (details.itemType.equals("movie", ignoreCase = true)) return
-        // If continue-watching entry exists, resolver already set the right CTA.
+        // Continue comes from the canonical list and Rewatch from the server
+        // watch flag — the resolver owns both. This only refines a plain
+        // "Watch now" into "Play S_:E_" for the first unwatched episode, once
+        // episode watch states have loaded.
         if (!state.continueVideoId.isNullOrBlank()) return
 
-        val episodes = state.seasonEpisodes.sortedBy { it.episode ?: Int.MAX_VALUE }
-        if (episodes.isEmpty()) return
-
-        val watchStates = state.episodeWatchStates
-        val firstUnwatched = episodes.firstOrNull { video ->
-            val ws = watchStates[video.id]
-            ws == null || !ws.isWatched
-        }
+        val firstUnwatched = state.seasonEpisodes
+            .sortedBy { it.episode ?: Int.MAX_VALUE }
+            .firstOrNull { video ->
+                val watchState = state.episodeWatchStates[video.id]
+                watchState == null || !watchState.isWatched
+            } ?: return
+        val season = firstUnwatched.season ?: return
+        val episode = firstUnwatched.episode ?: return
 
         val newCta =
-            if (firstUnwatched == null) {
-                WatchCta(
-                    kind = WatchCtaKind.REWATCH,
-                    label = "Rewatch",
-                    icon = WatchCtaIcon.REPLAY,
-                    remainingMinutes = null,
-                    lastWatchedAtEpochMs = null,
-                )
-            } else {
-                val season = firstUnwatched.season
-                val episode = firstUnwatched.episode
-                if (season != null && episode != null) {
-                    WatchCta(
-                        kind = WatchCtaKind.WATCH,
-                        label = "Play S$season:E$episode",
-                        icon = WatchCtaIcon.PLAY,
-                        remainingMinutes = null,
-                        lastWatchedAtEpochMs = null,
-                    )
-                } else {
-                    WatchCta(
-                        kind = WatchCtaKind.WATCH,
-                        label = "Watch now",
-                        icon = WatchCtaIcon.PLAY,
-                        remainingMinutes = null,
-                        lastWatchedAtEpochMs = null,
-                    )
-                }
-            }
+            WatchCta(
+                kind = WatchCtaKind.WATCH,
+                label = "Play S$season:E$episode",
+                icon = WatchCtaIcon.PLAY,
+                remainingMinutes = null,
+                lastWatchedAtEpochMs = null,
+            )
 
         _uiState.update { current ->
             if (current.watchCta.label == newCta.label && current.watchCta.kind == newCta.kind) current

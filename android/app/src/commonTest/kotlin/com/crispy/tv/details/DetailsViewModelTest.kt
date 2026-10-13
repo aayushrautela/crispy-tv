@@ -25,18 +25,12 @@ import com.crispy.tv.domain.optimistic.UserMutation
 import com.crispy.tv.domain.optimistic.WatchlistMutation
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
-import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.optimistic.MutationExecutor
 import com.crispy.tv.optimistic.MutationResult
 import com.crispy.tv.optimistic.PendingMutationStore
 import com.crispy.tv.optimistic.UserMutationOutbox
-import com.crispy.tv.player.CanonicalContinueWatchingResult
-import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchHistoryRequest
-import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchProgressSnapshot
 import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.streams.ProviderStreamsResult
@@ -44,6 +38,7 @@ import com.crispy.tv.addons.streams.StreamProviderDescriptor
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.testing.FakeStreamResolver
 import com.crispy.tv.testing.RecordingAppLogger
+import com.crispy.tv.testing.StubUserMediaRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -114,55 +109,6 @@ class DetailsViewModelTest {
 
     private class FixedSessionRepository : SessionRepository {
         override suspend fun ensureValidSession(): com.crispy.tv.domain.repository.CrispySession? = null
-    }
-
-    private class StubUserMediaRepository : UserMediaRepository {
-        var progressAnswer: WatchProgressSnapshot? = null
-        val continueWatchingNowMs = mutableListOf<Long>()
-
-        override suspend fun getTitleWatchState(
-            itemId: String,
-            contentType: MetadataLabMediaType,
-        ): CanonicalWatchStateSnapshot? = null
-
-        override suspend fun getCanonicalContinueWatching(
-            limit: Int,
-            nowMs: Long,
-        ): CanonicalContinueWatchingResult {
-            continueWatchingNowMs += nowMs
-            return CanonicalContinueWatchingResult(statusMessage = "")
-        }
-
-        override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? = progressAnswer
-
-        override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? =
-            throw AssertionError("getCanonicalWatchState is not stubbed")
-
-        override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult =
-            throw AssertionError("markWatched is not stubbed")
-
-        override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryResult =
-            throw AssertionError("unmarkWatched is not stubbed")
-
-        override suspend fun setInWatchlist(
-            request: WatchHistoryRequest,
-            inWatchlist: Boolean,
-        ): WatchHistoryResult = throw AssertionError("setInWatchlist is not stubbed")
-
-        override suspend fun setTitleInWatchlist(
-            itemId: String,
-            inWatchlist: Boolean,
-        ): WatchHistoryResult = throw AssertionError("setTitleInWatchlist is not stubbed")
-
-        override suspend fun setLiked(
-            request: WatchHistoryRequest,
-            liked: Boolean?,
-        ): WatchHistoryResult = throw AssertionError("setLiked is not stubbed")
-
-        override suspend fun setTitleLiked(
-            itemId: String,
-            liked: Boolean?,
-        ): WatchHistoryResult = throw AssertionError("setTitleLiked is not stubbed")
     }
 
     private class RecordingStore : PendingMutationStore {

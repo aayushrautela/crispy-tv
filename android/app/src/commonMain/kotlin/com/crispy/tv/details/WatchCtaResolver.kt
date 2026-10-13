@@ -175,6 +175,23 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
             )
         }
 
+        // Played with nothing left to continue is a rewatch, mirroring the web
+        // app's `played && !isContinue`. This arm sits after `canContinue`
+        // because an in-flight rewatch (progress in the continue window) is
+        // still a continue.
+        if (providerState.isWatched) {
+            return Resolution(
+                WatchCta(
+                    kind = WatchCtaKind.REWATCH,
+                    label = "Rewatch",
+                    icon = WatchCtaIcon.REPLAY,
+                    remainingMinutes = null,
+                    lastWatchedAtEpochMs = providerState.watchedAtEpochMs,
+                ),
+                continueVideoId = null,
+            )
+        }
+
         return Resolution(
             WatchCta(
                 kind = WatchCtaKind.WATCH,
