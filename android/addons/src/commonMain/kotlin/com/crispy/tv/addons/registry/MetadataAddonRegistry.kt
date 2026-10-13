@@ -515,7 +515,7 @@ private data class PersistedAddon(
     /**
      * **A null field is an ABSENT key here, and that is not a detail.**
      *
-     * `org.json`'s `put(key, null)` *removes* the mapping, so the five nullable
+     * `org.json`'s `put(key, null)` *removes* the mapping, so the four nullable
      * fields were written by omitting them. `buildJsonObject`'s
      * `put(key, value: String?)` does the opposite: it writes `JsonNull`. And the
      * two are not the same on the way back in — an absent key answers `""` to
@@ -528,7 +528,7 @@ private data class PersistedAddon(
             put("installation_id", installationId)
             put("addon_id_hint", addonIdHint)
             put("manifest_url", manifestUrl)
-            originalManifestUrl?.let { put("original_manifest_url", it) }
+            put("original_manifest_url", originalManifestUrl)
             put("base_url", baseUrl)
             encodedQuery?.let { put("encoded_query", it) }
             put("added_at_epoch_ms", addedAtEpochMs)
