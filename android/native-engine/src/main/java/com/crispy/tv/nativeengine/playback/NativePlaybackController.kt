@@ -751,6 +751,15 @@ class NativePlaybackController(
                         language = format.language?.takeIf { it.isNotBlank() },
                         title = format.label?.takeIf { it.isNotBlank() },
                         isExternal = stableId != null,
+                        // Both are optional data and neither is set for every
+                        // audio format: `channelCount` is `Format.NO_VALUE` until
+                        // the extractor has read the track, and an audio `Format`
+                        // usually carries a MIME type ("audio/eac3") where a
+                        // video one carries `codecs`. MIME first because it is
+                        // the half that is actually populated, and the display
+                        // strips the "audio/" prefix.
+                        codec = format.sampleMimeType?.takeIf { it.isNotBlank() } ?: format.codecs?.takeIf { it.isNotBlank() },
+                        channelCount = format.channelCount.takeIf { it != Format.NO_VALUE },
                     )
                 )
             }

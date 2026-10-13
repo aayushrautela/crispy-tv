@@ -441,6 +441,24 @@ internal class MpvPlaybackRuntime(
             val external = runCatching { mpv.getPropertyString("track-list/$i/external") }.getOrNull().equals("yes", true)
             val externalFilename =
                 runCatching { mpv.getPropertyString("track-list/$i/external-filename") }.getOrNull()?.takeIf { it.isNotBlank() }
+            // Read only for audio: mpv reports both under per-type names, and a
+            // subtitle track answers none of them.
+            val isAudio = type == "audio"
+            val codec =
+                if (isAudio) {
+                    runCatching { mpv.getPropertyString("track-list/$i/codec") }.getOrNull()?.takeIf { it.isNotBlank() }
+                } else {
+                    null
+                }
+            val channelCount =
+                if (isAudio) {
+                    runCatching { mpv.getPropertyString("track-list/$i/demux-channel-count") }
+                        .getOrNull()
+                        ?.toIntOrNull()
+                        ?.takeIf { it > 0 }
+                } else {
+                    null
+                }
             tracks.add(
                 NativeTrack(
                     // Externals keep the same stable ext:<hash(url)> identity Exo uses so
@@ -450,6 +468,8 @@ internal class MpvPlaybackRuntime(
                     language = lang,
                     title = title,
                     isExternal = external,
+                    codec = codec,
+                    channelCount = channelCount,
                 )
             )
         }

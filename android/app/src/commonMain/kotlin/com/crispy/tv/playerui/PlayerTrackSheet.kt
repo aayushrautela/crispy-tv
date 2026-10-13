@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.addons.streams.AddonSubtitle
@@ -61,12 +60,12 @@ private data class LanguageGroup<T>(
     val items: List<T>,
 )
 
-private fun groupAudioByLanguage(
-    tracks: List<NativeTrack>,
+private fun groupSubtitlesByLanguage(
+    options: List<SubtitleOption>,
     displayName: (String) -> String,
-): List<LanguageGroup<NativeTrack>> {
-    if (tracks.isEmpty()) return emptyList()
-    return tracks
+): List<LanguageGroup<SubtitleOption>> {
+    if (options.isEmpty()) return emptyList()
+    return options
         .groupBy { normalizeLang(it.language) }
         .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, displayName), items) }
         .sortedBy { it.label }
@@ -121,6 +120,19 @@ private fun groupSubtitlesByLanguage(
         .sortedBy { it.label }
 }
 
+/**
+ * The audio track picker, as a flat list in engine order.
+ *
+ * There are no language sections. A release carries a handful of audio tracks and
+ * nearly always one language each, so grouping spent a header and a count on
+ * structure the list already showed -- and it sorted by *language name*, which
+ * threw away the engine's own ordering for no gain. Rows now appear in the order
+ * the container declares them.
+ *
+ * Each row shows the engine's title when it has one and the language name
+ * otherwise, then the language, codec and channel count, which is the web panel's
+ * own row shape (`AudioPanel.tsx`): "Commentary" over "English • EAC3 • 6ch".
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PlayerAudioSheet(
@@ -135,7 +147,6 @@ internal fun PlayerAudioSheet(
     if (!visible) return
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-    val groups = groupAudioByLanguage(audioTracks, displayName)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -156,23 +167,23 @@ internal fun PlayerAudioSheet(
 
                 if (audioTracks.isEmpty()) {
                     item { EmptyHint("No audio tracks available") }
+                } else {
+                    // The section headers used to carry a per-language count. With
+                    // the sections gone the total is the one number worth showing,
+                    // and the subtitle sheet's own "Off" row needs no equivalent.
+                    item { SheetMeta("${audioTracks.size} available") }
                 }
 
-                groups.forEach { group ->
-                    item(key = "audio_header_${group.key}") {
-                        LanguageGroupHeader(label = group.label, count = group.items.size)
-                    }
-                    items(group.items, key = { it.id }) { track ->
-                        val title = track.title?.takeIf { it.isNotBlank() }
-                        TrackRow(
-                            label = title ?: languageLabelForCode(track.language, displayName),
-                            subtitle = title?.let { languageLabelForCode(track.language, displayName) },
-                            isSelected = track.id == selectedAudioTrackId,
-                            palette = palette,
-                            leadingIcon = if (track.language == null) Res.drawable.ic_music_note_filled else Res.drawable.ic_graphic_eq_filled,
-                            onClick = { onSelectAudioTrack(track.id) },
-                        )
-                    }
+                items(audioTracks, key = { it.id }) { track ->
+                    val languageName = languageLabelForCode(track.language, displayName)
+                    TrackRow(
+                        label = audioTrackName(track, languageName),
+                        subtitle = audioTrackSubtitle(track, languageName),
+                        isSelected = track.id == selectedAudioTrackId,
+                        palette = palette,
+                        leadingIcon = if (track.language == null) Res.drawable.ic_music_note_filled else Res.drawable.ic_graphic_eq_filled,
+                        onClick = { onSelectAudioTrack(track.id) },
+                    )
                 }
             }
         }
@@ -377,30 +388,20 @@ private fun EmptyHint(text: String) {
     )
 }
 
+/**
+ * The one quiet line under a sheet title, e.g. "3 available".
+ *
+ * Smaller and dimmer than a row's own second line, so it reads as caption text
+ * about the list rather than as something selected.
+ */
 @Composable
-private fun LanguageGroupHeader(
-    label: String,
-    count: Int,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (count > 1) {
-            Text(
-                text = "$count",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+private fun SheetMeta(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 4.dp),
+    )
 }
 
 @Composable
