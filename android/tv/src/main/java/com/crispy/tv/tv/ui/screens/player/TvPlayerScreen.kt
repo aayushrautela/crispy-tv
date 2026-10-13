@@ -148,7 +148,7 @@ private fun PlayerChrome(state: com.crispy.tv.tv.player.TvPlayerUiState) {
         }
         Spacer(Modifier.weight(1f))
         when {
-            state.error != null -> ErrorCard(message = state.error!!)
+            state.error != null -> ErrorCard(message = state.error)
             state.loading -> Text(
                 text = "Preparing playback…",
                 color = Color.White.copy(alpha = 0.8f),

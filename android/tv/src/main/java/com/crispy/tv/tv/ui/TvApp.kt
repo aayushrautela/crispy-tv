@@ -212,7 +212,7 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     onSetLiked = detailViewModel::setLiked,
                     onPlay = { id ->
                         val target = detailState
-                        if (target?.lookupMediaTypeName != null && !target.lookupId.isNullOrBlank()) {
+                        if (target.lookupMediaTypeName != null && !target.lookupId.isNullOrBlank()) {
                             navController.navigate("sources/$id/${target.lookupMediaTypeName}/${android.net.Uri.encode(target.lookupId)}")
                         } else {
                             navController.navigate("play/$id")

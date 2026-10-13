@@ -99,7 +99,7 @@ fun DetailScreen(
         when {
             state.loading -> TvDetailSkeleton(modifier = modifier)
             state.error != null -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(state.error!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(state.error, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             else -> DetailContent(
                 state = state,
@@ -264,7 +264,7 @@ private fun DetailContent(
                 if (state.subtitleMeta != null) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = state.subtitleMeta!!,
+                        text = state.subtitleMeta,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

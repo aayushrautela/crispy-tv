@@ -102,7 +102,7 @@ class TvPlayerViewModel(
             val item = resolved.item
             _state.value = TvPlayerUiState(
                 loading = false,
-                title = item.title ?: "Now playing",
+                title = item.title,
                 seasonNumber = item.parent?.seasonNumber,
                 episodeNumber = item.parent?.episodeNumber,
                 hasSource = !streamUrl.isNullOrBlank(),

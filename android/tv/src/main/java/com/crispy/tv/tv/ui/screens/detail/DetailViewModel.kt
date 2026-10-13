@@ -564,7 +564,7 @@ class DetailViewModel(
                         itemId = ep.itemId,
                         seasonNumber = ep.parent?.seasonNumber,
                         episodeNumber = ep.parent?.episodeNumber,
-                        title = ep.title ?: "Episode ${ep.parent?.episodeNumber ?: ""}".trim(),
+                        title = ep.title,
                         lookupId = buildAddonEpisodeLookupId(ep.providerIds?.imdb, ep.parent?.seasonNumber, ep.parent?.episodeNumber)
                             ?: ep.itemId,
                         airDate = ep.releaseDate,
