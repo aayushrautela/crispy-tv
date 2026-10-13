@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -94,7 +95,6 @@ fun LibraryRoute(
     val currentMonthKey = currentMonthKeyOf(clock, utcOffsetMillis())
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
     val horizontalPadding = responsivePageHorizontalPadding()
-    val listState = rememberLazyListState()
     val pullToRefreshState = rememberPullToRefreshState()
     var selectedLibraryItem by remember { mutableStateOf<CatalogItem?>(null) }
     val librarySheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -113,14 +113,18 @@ fun LibraryRoute(
 
     LaunchedEffect(selectedSectionId) {
         if (selectedSectionId !in visitedSectionIds) visitedSectionIds += selectedSectionId
-        listState.scrollToItem(0)
     }
 
-    // One retained pager per collected section. Each `key` group appears once
-    // and never moves, so a group composed later takes fresh slots rather than
-    // shifting its siblings'.
+    // One retained pager (and one list state) per collected section. Each `key`
+    // group appears once and never moves, so a group composed later takes fresh
+    // slots rather than shifting its siblings'. The list state is per section on
+    // purpose: a switch to a never-visited section starts at the top because a
+    // fresh state starts at the top, and a switch-back keeps its position --
+    // which is also what makes returning from details land where the user left,
+    // since no shared state exists for anything to reset.
     val sectionItems = mutableMapOf<String, LazyPagingItems<CatalogItem>>()
     val sectionLoadedItems = mutableMapOf<String, List<CatalogItem>>()
+    val sectionListStates = mutableMapOf<String, LazyListState>()
     for (section in sections) {
         if (section.id in collectedSectionIds) {
             key(section.id) {
@@ -131,12 +135,20 @@ fun LibraryRoute(
                     remember(items.itemCount) {
                         (0 until items.itemCount).mapNotNull { index -> items[index] }
                     }
+                sectionListStates[section.id] = rememberLazyListState()
             }
         }
     }
     val pagingItems =
         checkNotNull(sectionItems[selectedSectionId]) {
             "Selected library section $selectedSectionId was never collected"
+        }
+    // The selected section's state is what `CrispyScreen` (and the app bar's
+    // nested-scroll connection) scrolls; the switch animation swaps the content
+    // while the incoming section's own position is already in effect.
+    val listState =
+        checkNotNull(sectionListStates[selectedSectionId]) {
+            "Selected library section $selectedSectionId has no list state"
         }
     val refreshState = pagingItems.loadState.refresh
     val appendState = pagingItems.loadState.append
