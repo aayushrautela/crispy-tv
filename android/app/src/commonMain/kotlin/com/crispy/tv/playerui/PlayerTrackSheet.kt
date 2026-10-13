@@ -60,17 +60,6 @@ private data class LanguageGroup<T>(
     val items: List<T>,
 )
 
-private fun groupSubtitlesByLanguage(
-    options: List<SubtitleOption>,
-    displayName: (String) -> String,
-): List<LanguageGroup<SubtitleOption>> {
-    if (options.isEmpty()) return emptyList()
-    return options
-        .groupBy { normalizeLang(it.language) }
-        .map { (key, items) -> LanguageGroup(key, languageLabelForCode(key, displayName), items) }
-        .sortedBy { it.label }
-}
-
 private sealed interface SubtitleOption {
     val key: String
     val label: String
