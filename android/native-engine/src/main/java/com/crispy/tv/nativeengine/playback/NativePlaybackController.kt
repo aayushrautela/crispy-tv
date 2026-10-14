@@ -28,6 +28,10 @@ import androidx.media3.extractor.ts.TsExtractor
 import androidx.media3.ui.PlayerView
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 @UnstableApi
 class NativePlaybackController(
@@ -45,7 +49,6 @@ class NativePlaybackController(
             context = appContext,
             baseHttpDataSourceFactory = exoHttpDataSourceFactory,
             defaultResponseHeaders = emptyMap(),
-            externalSubtitles = emptyList(),
         )
 
     private val extractorsFactory =
@@ -77,6 +80,13 @@ class NativePlaybackController(
     private var extensionRendererMode: Int = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
     private var exoPlayer: ExoPlayer = buildExoPlayer(extensionRendererMode, exoDataSourceFactory)
     private val mpvRuntime = MpvPlaybackRuntime(appContext)
+    private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val sidecar =
+        ExoSidecarSubtitleController(
+            scope = controllerScope,
+            getPlayer = { exoPlayer },
+            getSubtitleDelayMs = { exoSubtitleDelayMs },
+        )
     private var currentEngine: NativePlaybackEngine = NativePlaybackEngine.EXO
     private var exoVideoLayout: NativeVideoLayout? = null
     private var exoError: NativePlaybackError? = null
@@ -233,22 +243,41 @@ class NativePlaybackController(
                 lastExoPositionMs = 0L
                 mpvRuntime.stop()
                 exoHttpDataSourceFactory.setDefaultRequestProperties(effectiveSource.headers)
+                // Only SSA and TTML travel in the media item. SubRip and WebVTT
+                // attach after prepare through the sidecar, with no rebuild, so
+                // the URL-guessed MIME that used to mislabel them is no longer
+                // on this path at all.
+                val mediaSubtitles = mediaItemSubtitlesOf(effectiveSource.externalSubtitles)
                 val mediaItem =
                     playbackMediaItemFromUrl(
                         url = effectiveSource.url,
                         streamType = effectiveSource.streamType,
-                        externalSubtitles = effectiveSource.externalSubtitles,
+                        externalSubtitles = mediaSubtitles,
                     )
                 exoPlayer.setMediaItem(mediaItem)
                 pendingSubtitleTrackId =
-                    carriedExternal?.let { externalSubtitleTrackId(it.url) }
-                        ?: effectiveSource.externalSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
+                    carriedExternal?.takeIf { it in mediaSubtitles }?.let { externalSubtitleTrackId(it.url) }
+                        ?: mediaSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
+                val sidecarCandidate =
+                    effectiveSource.externalSubtitles.firstOrNull { it !in mediaSubtitles }
+                if (sidecarCandidate != null) {
+                    // The sidecar owns selection from here: a stale pending id
+                    // must not linger into the engine override, and no embedded
+                    // track may win over the attachment.
+                    activeExternalSubtitle = sidecarCandidate
+                    pendingSubtitleTrackId = null
+                    setExoTextTracksDisabled(true)
+                } else {
+                    setExoTextTracksDisabled(false)
+                }
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
                 applyPersistedExoSettings()
+                sidecarCandidate?.let { sidecar.start(it) }
             }
 
             NativePlaybackEngine.MPV -> {
+                sidecar.stop()
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
                 mpvRuntime.play(effectiveSource)
@@ -294,6 +323,16 @@ class NativePlaybackController(
             mpvRuntime.selectSubtitleTrack(trackId)
             return
         }
+        if (trackId != null && trackId == sidecar.activeTrackId) {
+            // Re-pick of the sidecar attachment: already rendering. Only make
+            // sure the engine text path stays out of its way.
+            pendingSubtitleTrackId = null
+            setExoTextTracksDisabled(true)
+            return
+        }
+        if (sidecar.isActive()) {
+            sidecar.stop()
+        }
         pendingSubtitleTrackId = trackId
         applyExoTrackOverride(trackType = C.TRACK_TYPE_TEXT, trackId = trackId)
     }
@@ -305,22 +344,47 @@ class NativePlaybackController(
             mpvRuntime.setExternalSubtitle(subtitle)
             return
         }
+        if (subtitle == null) {
+            // Clearing the attachment is a selection change, not a media
+            // change: stop the sidecar and disable the engine text path.
+            sidecar.stop()
+            pendingSubtitleTrackId = null
+            applyExoTrackOverride(trackType = C.TRACK_TYPE_TEXT, trackId = null)
+            return
+        }
+        if (sidecar.start(subtitle)) {
+            // SubRip/WebVTT attach with no rebuild and no rebuffer. The pick
+            // leads the source list so the MPV fallback and the next play()
+            // carry it, and the snapshot reports it as selected immediately,
+            // while the body is still downloading.
+            val source = lastPlaybackSource
+            if (source != null) {
+                lastPlaybackSource =
+                    source.copy(
+                        externalSubtitles = (listOf(subtitle) + source.externalSubtitles).distinctBy { it.url },
+                    )
+            }
+            pendingSubtitleTrackId = null
+            setExoTextTracksDisabled(true)
+            return
+        }
+        // SSA and TTML stay on the media item -- the one rebuild the Exo path
+        // keeps. It replaces the media-item subtitle set instead of appending,
+        // so dead picks cannot accumulate into ever-longer track groups.
         val source = lastPlaybackSource ?: return
         val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
         exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
         val audioIdToPreserve = pendingAudioTrackId ?: selectedExoTrackId(C.TRACK_TYPE_AUDIO)
         if (audioIdToPreserve != null) pendingAudioTrackId = audioIdToPreserve
-        // Hard selection of the attached external track; Exo's default text selection
-        // must never pick an embedded track instead.
-        pendingSubtitleTrackId = subtitle?.let { externalSubtitleTrackId(it.url) }
-        val externalSubtitles =
-            (listOfNotNull(subtitle) + source.externalSubtitles).distinctBy { it.url }
-        lastPlaybackSource = source.copy(externalSubtitles = externalSubtitles)
+        sidecar.stop()
+        pendingSubtitleTrackId = externalSubtitleTrackId(subtitle.url)
+        val mergedExternals = (listOf(subtitle) + source.externalSubtitles).distinctBy { it.url }
+        lastPlaybackSource = source.copy(externalSubtitles = mergedExternals)
         val mediaItem =
             playbackMediaItemFromUrl(
                 url = source.url,
                 streamType = source.streamType,
-                externalSubtitles = externalSubtitles,
+                externalSubtitles = mediaItemSubtitlesOf(mergedExternals),
             )
         exoPlayer.setMediaItem(mediaItem, resumeMs)
         exoPlayer.prepare()
@@ -471,6 +535,7 @@ class NativePlaybackController(
 
     override fun stop() {
         Log.d(TAG, "stop currentEngine=$currentEngine")
+        sidecar.stop()
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         mpvRuntime.stop()
@@ -478,6 +543,7 @@ class NativePlaybackController(
 
     override fun release() {
         Log.d(TAG, "release currentEngine=$currentEngine")
+        controllerScope.cancel()
         probeExecutor.shutdownNow()
         exoPlayer.removeListener(exoListener)
         exoPlayer.release()
@@ -488,6 +554,7 @@ class NativePlaybackController(
         Log.d(TAG, "bindExoPlayerView viewHash=${System.identityHashCode(playerView)}")
         playerView.player = exoPlayer
         currentlyBoundPlayerView = playerView
+        sidecar.bindSubtitleView(playerView.subtitleView)
         syncLibassOverlay(playerView)
     }
 
@@ -623,17 +690,21 @@ class NativePlaybackController(
     ) {
         exoError = null
         exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
+        // Retries rebuild the media item but never the sidecar: it renders
+        // independently of the media pipeline and survives the rebuild. Only
+        // the media-item formats travel here.
+        val mediaSubtitles = mediaItemSubtitlesOf(source.externalSubtitles)
         val mediaItem =
             playbackMediaItemFromUrl(
                 url = source.url,
                 streamType = source.streamType,
                 mimeTypeOverride = mimeType,
-                externalSubtitles = source.externalSubtitles,
+                externalSubtitles = mediaSubtitles,
             )
         exoPlayer.setMediaItem(mediaItem)
         pendingSubtitleTrackId =
-            activeExternalSubtitle?.let { externalSubtitleTrackId(it.url) }
-                ?: source.externalSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
+            activeExternalSubtitle?.takeIf { it in mediaSubtitles }?.let { externalSubtitleTrackId(it.url) }
+                ?: mediaSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
         exoPlayer.prepare()
         if (lastExoPositionMs > 0L) {
             exoPlayer.seekTo(lastExoPositionMs)
@@ -658,17 +729,18 @@ class NativePlaybackController(
         boundView?.let { it.player = exoPlayer }
         if (source != null) {
             exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
+            val mediaSubtitles = mediaItemSubtitlesOf(source.externalSubtitles)
             val mediaItem =
                 playbackMediaItemFromUrl(
                     url = source.url,
                     streamType = source.streamType,
                     mimeTypeOverride = null,
-                    externalSubtitles = source.externalSubtitles,
+                    externalSubtitles = mediaSubtitles,
                 )
             exoPlayer.setMediaItem(mediaItem)
             pendingSubtitleTrackId =
-                activeExternalSubtitle?.let { externalSubtitleTrackId(it.url) }
-                    ?: source.externalSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
+                activeExternalSubtitle?.takeIf { it in mediaSubtitles }?.let { externalSubtitleTrackId(it.url) }
+                    ?: mediaSubtitles.firstOrNull()?.let { externalSubtitleTrackId(it.url) }
             exoPlayer.prepare()
             if (resumeMs > 0L) {
                 exoPlayer.seekTo(resumeMs)
@@ -713,9 +785,12 @@ class NativePlaybackController(
             }
 
         val audioTracks = collectExoTracks(C.TRACK_TYPE_AUDIO)
-        val subtitleTracks = collectExoTracks(C.TRACK_TYPE_TEXT)
+        val engineSubtitleTracks = collectExoTracks(C.TRACK_TYPE_TEXT)
+        val sidecarTrack = sidecarTrack()
+        val subtitleTracks =
+            if (sidecarTrack != null) engineSubtitleTracks + sidecarTrack else engineSubtitleTracks
         val selectedAudioId = selectedExoTrackId(C.TRACK_TYPE_AUDIO)
-        val selectedSubtitleId = selectedExoTrackId(C.TRACK_TYPE_TEXT)
+        val selectedSubtitleId = sidecar.activeTrackId ?: selectedExoTrackId(C.TRACK_TYPE_TEXT)
 
         return NativePlaybackSnapshot(
             engine = NativePlaybackEngine.EXO,
@@ -778,6 +853,51 @@ class NativePlaybackController(
             }
         }
         return null
+    }
+
+    /**
+     * The subtitle subset that travels inside the media item. Only the formats
+     * the engine pipeline itself renders: SSA/ASS (libass when on, Exo's own
+     * SSA decoder when off) and TTML. SubRip and WebVTT are owned by the
+     * sidecar and must never appear here -- that was the mislabelled-MIME
+     * failure and the per-pick rebuild.
+     */
+    private fun mediaItemSubtitlesOf(subtitles: List<PlaybackExternalSubtitle>): List<PlaybackExternalSubtitle> =
+        subtitles.filter {
+            when (subtitleFormatFromUrl(it.url)) {
+                SubtitleContainerFormat.SubStationAlpha,
+                SubtitleContainerFormat.Ttml,
+                -> true
+                SubtitleContainerFormat.SubRip,
+                SubtitleContainerFormat.WebVtt,
+                -> false
+            }
+        }
+
+    private fun setExoTextTracksDisabled(disabled: Boolean) {
+        exoPlayer.trackSelectionParameters =
+            exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, disabled)
+                .build()
+    }
+
+    /**
+     * The sidecar attachment as an engine-style track, so the sheet lists the
+     * picked subtitle with a checkmark while the body is still downloading.
+     * Identity is the same `ext:<hash>` the media-item path used, which keeps
+     * the sheet's catalog filter working unchanged.
+     */
+    private fun sidecarTrack(): NativeTrack? {
+        val url = sidecar.activeSubtitleUrl ?: return null
+        val subtitle = activeExternalSubtitle?.takeIf { it.url == url } ?: return null
+        return NativeTrack(
+            id = externalSubtitleTrackId(url),
+            index = -1,
+            language = subtitle.language?.takeIf { it.isNotBlank() },
+            title = subtitle.name?.takeIf { it.isNotBlank() },
+            isExternal = true,
+        )
     }
 
     private fun trackTypeName(trackType: Int): String =

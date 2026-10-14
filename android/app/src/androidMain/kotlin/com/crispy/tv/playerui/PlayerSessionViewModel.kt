@@ -459,14 +459,17 @@ class PlayerSessionViewModel(
      * Attach the add-on subtitle that matches the viewer's preferred language to
      * [source], before [playbackController] has ever seen it.
      *
-     * ## Why before, and not after
+     * ## Why in the source list, and not a second call after play
      *
-     * `NativePlaybackController.setExternalSubtitle` on the Exo path rebuilds the
-     * media item -- `setMediaItem(mediaItem, resumeMs)` + `prepare()` + `playWhenReady`
-     * -- so attaching once the picture is already moving is a visible re-prepare. On
-     * MPV it is a free `sub-add`. **The one place both engines agree is before `play()`**,
-     * because `PlaybackSource.externalSubtitles` is folded into the media item by
-     * `playbackMediaItemFromUrl` at play time, and that is where this attaches.
+     * Both engines treat the first entry of `externalSubtitles` as the default
+     * selection -- Exo auto-attaches it after `prepare()` (through the sidecar
+     * for SubRip/WebVTT, through the media item for SSA/TTML) and MPV runs
+     * `sub-add select` on index 0 -- so the match has to be first in the list
+     * for either engine to pick it up without being asked twice. A second
+     * `setExternalSubtitle` after `play()` would attach the same URL again;
+     * the controller dedupes that into a no-op, but the list is still the one
+     * place both engines agree on, and it is what retries and the MPV fallback
+     * carry.
      *
      * ## Why a bounded wait and not an unconditional one
      *
@@ -486,8 +489,9 @@ class PlayerSessionViewModel(
      * ## Why the match is first in the list, and when it is not attached at all
      *
      * Both engines select the first entry of `externalSubtitles` and ignore the rest
-     * (Exo: `pendingSubtitleTrackId` is the first URL's; MPV: `select` on index 0,
-     * `auto` on the others), so appending would attach a subtitle nobody selected.
+     * (Exo: the sidecar auto-attaches the first sidecar-admissible URL, SSA/TTML
+     * goes in the media item; MPV: `select` on index 0, `auto` on the others), so
+     * appending would attach a subtitle nobody selected.
      * But the match is also *not* attached when the stream already ships a subtitle
      * in the preferred language -- that subtitle is the first entry, and putting ours
      * in front of it would overrule an answer the stream already gave. The plan for
