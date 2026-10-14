@@ -685,7 +685,7 @@ private fun AiInsightsEmptyStory(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "AI insights unavailable",
+                    text = "Quick insights unavailable",
                     style = MaterialTheme.typography.headlineSmall,
                     color = palette.onPageBackground,
                     fontWeight = FontWeight.SemiBold,
