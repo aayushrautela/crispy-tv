@@ -89,6 +89,8 @@ internal fun PlayerEpisodesSheet(
 ) {
     if (seasons.isEmpty() && !episodesIsLoading) return
 
+    val rowPadding = rememberHorizontalCutoutPadding(minPadding = 16.dp)
+
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = visible,
@@ -127,7 +129,7 @@ internal fun PlayerEpisodesSheet(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp),
+                    .padding(vertical = 24.dp),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -137,6 +139,7 @@ internal fun PlayerEpisodesSheet(
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = rowPadding,
                     ) {
                         items(seasons, key = { it }) { season ->
                             FilterChip(
@@ -165,6 +168,7 @@ internal fun PlayerEpisodesSheet(
                     episodesIsLoading && episodes.isEmpty() -> {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = rowPadding,
                         ) {
                             items(4) {
                                 EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
@@ -190,6 +194,7 @@ internal fun PlayerEpisodesSheet(
                         LazyRow(
                             state = listState,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = rowPadding,
                         ) {
                             items(episodes, key = { it.id }) { video ->
                                 val isActive =
