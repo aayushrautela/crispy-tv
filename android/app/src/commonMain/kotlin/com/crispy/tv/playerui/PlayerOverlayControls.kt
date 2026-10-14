@@ -53,7 +53,7 @@ import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_arrow_back_filled
-import com.crispy.tv.ui.resources.ic_crop_filled
+import com.crispy.tv.ui.resources.ic_fit_screen
 import com.crispy.tv.ui.resources.ic_graphic_eq_filled
 import com.crispy.tv.ui.resources.ic_info
 import com.crispy.tv.ui.resources.ic_layers
@@ -307,7 +307,7 @@ internal fun PlayerBottomControls(
                             )
                         } else {
                             CrispyIcon(
-                                painter = painterResource(Res.drawable.ic_crop_filled),
+                                painter = painterResource(Res.drawable.ic_fit_screen),
                                 contentDescription = "Resize: ${resizeMode.label}",
                                 tint = palette.onPillBackground,
                                 modifier = Modifier.size(20.dp),

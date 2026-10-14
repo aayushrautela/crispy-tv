@@ -39,7 +39,7 @@ import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_brightness_6_filled
 import com.crispy.tv.ui.resources.ic_chevron_left_filled
 import com.crispy.tv.ui.resources.ic_chevron_right_filled
-import com.crispy.tv.ui.resources.ic_crop_filled
+import com.crispy.tv.ui.resources.ic_fit_screen
 import com.crispy.tv.ui.resources.ic_volume_off_filled
 import com.crispy.tv.ui.resources.ic_volume_up_filled
 import kotlinx.coroutines.CoroutineScope
@@ -205,7 +205,7 @@ internal object GestureIcons {
     val Brightness: DrawableResource = Res.drawable.ic_brightness_6_filled
     val VolumeUp: DrawableResource = Res.drawable.ic_volume_up_filled
     val VolumeMuted: DrawableResource = Res.drawable.ic_volume_off_filled
-    val Resize: DrawableResource = Res.drawable.ic_crop_filled
+    val Resize: DrawableResource = Res.drawable.ic_fit_screen
 }
 
 /**
