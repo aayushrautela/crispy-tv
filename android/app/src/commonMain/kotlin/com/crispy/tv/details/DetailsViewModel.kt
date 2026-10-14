@@ -445,7 +445,7 @@ class DetailsViewModel internal constructor(
         val details = state.details
         val aiItemId = details?.itemId?.trim()
         if (details == null || aiItemId.isNullOrBlank()) {
-            _uiState.update { it.copy(statusMessage = "AI insights aren't available for this title yet.") }
+            _uiState.update { it.copy(statusMessage = "Quick insights aren't available for this title yet.") }
             return
         }
 
@@ -504,7 +504,7 @@ class DetailsViewModel internal constructor(
                     _uiState.update {
                         it.copy(
                             aiIsLoading = false,
-                            statusMessage = e.message ?: "AI insights are unavailable right now.",
+                            statusMessage = e.message ?: "Quick insights are unavailable right now.",
                         )
                     }
                 }

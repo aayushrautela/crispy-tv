@@ -332,7 +332,7 @@ private fun SuggestionChip(
         maxLines = 1,
         modifier = Modifier
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     )
@@ -347,7 +347,7 @@ private fun RecentSearchChip(
     Row(
         modifier = Modifier
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
             .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

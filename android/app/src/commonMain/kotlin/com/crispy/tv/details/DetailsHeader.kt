@@ -76,7 +76,7 @@ import com.crispy.tv.ui.resources.ic_thumb_down
 import com.crispy.tv.ui.resources.ic_thumb_down_filled
 import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.resources.ic_thumb_up_filled
-import com.crispy.tv.ui.resources.ic_wand_stars
+import com.crispy.tv.ui.resources.ic_device_swoosh_star
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -433,7 +433,7 @@ internal fun HeaderInfoSection(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 CrispyIcon(
-                                    painter = painterResource(Res.drawable.ic_wand_stars),
+                                    painter = painterResource(Res.drawable.ic_device_swoosh_star),
                                     contentDescription = null,
                                 )
                             }
@@ -441,7 +441,7 @@ internal fun HeaderInfoSection(
                                 modifier = Modifier.weight(1f),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text("AI insights")
+                                Text("Quick insights")
                             }
                             Spacer(modifier = Modifier.width(34.dp))
                         }
@@ -588,7 +588,7 @@ internal fun HeaderInfoSection(
                         contentAlignment = Alignment.Center,
                     ) {
                         CrispyIcon(
-                            painter = painterResource(Res.drawable.ic_wand_stars),
+                            painter = painterResource(Res.drawable.ic_device_swoosh_star),
                             contentDescription = null,
                         )
                     }
@@ -596,7 +596,7 @@ internal fun HeaderInfoSection(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text("AI insights")
+                        Text("Quick insights")
                     }
                     Spacer(modifier = Modifier.width(34.dp))
                 }

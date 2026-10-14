@@ -130,7 +130,7 @@ fun SearchBar(
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
-            unfocusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+            unfocusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
         ),
     )
 }

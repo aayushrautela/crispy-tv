@@ -45,6 +45,8 @@ internal fun PlayerMoreSheet(
     onItemSelected: (CatalogItem) -> Unit,
     onClose: () -> Unit,
 ) {
+    val rowPadding = rememberHorizontalCutoutPadding(minPadding = 16.dp)
+
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = visible,
@@ -83,15 +85,16 @@ internal fun PlayerMoreSheet(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp),
+                    .padding(vertical = 24.dp),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "More",
+                    text = "Explore more",
                     style = MaterialTheme.typography.titleMedium,
                     color = palette.onPillBackground,
+                    modifier = Modifier.padding(rowPadding),
                 )
 
                 val items = recommendedItems
@@ -101,6 +104,7 @@ internal fun PlayerMoreSheet(
                             text = "Loading...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = palette.onPillBackground.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(rowPadding),
                         )
                     }
 
@@ -109,12 +113,14 @@ internal fun PlayerMoreSheet(
                             text = "Nothing here yet.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = palette.onPillBackground.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(rowPadding),
                         )
                     }
 
                     else -> {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = rowPadding,
                         ) {
                             items(items, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                                 HomeCatalogPosterCard(
