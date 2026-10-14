@@ -3,7 +3,6 @@ package com.crispy.tv.playerui
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,8 +13,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -29,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,43 +61,19 @@ private data class LanguageGroup<T>(
     val items: List<T>,
 )
 
-private sealed interface SubtitleOption {
-    val key: String
-    val label: String
-    val language: String?
-    val subtitle: String?
-    val isSelected: Boolean
-    val trackId: String
-}
-
-private data class EngineSubtitleOption(
-    val track: NativeTrack,
-    override val isSelected: Boolean,
-    private val displayName: (String) -> String,
-) : SubtitleOption {
-    override val key = track.id
-    override val label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, displayName)
-    override val language = track.language
-    override val subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, displayName) }
-    override val trackId = track.id
-}
-
-private data class CatalogSubtitleOption(
-    val addonSubtitle: AddonSubtitle,
-    private val displayName: (String) -> String,
-    private val selectedSubtitleTrackId: String?,
-) : SubtitleOption {
-    override val key = externalSubtitleTrackId(addonSubtitle.url)
-    override val label = addonSubtitle.display.ifBlank { languageLabelForCode(addonSubtitle.language, displayName) }
-    override val language = addonSubtitle.language
-    override val subtitle = addonSubtitle.addonName?.takeIf { it.isNotBlank() }
-    // Was hard-coded `false`, so an attached add-on subtitle that is actually playing
-    // never looked selected in the sheet -- the only row in this UI that could be.
-    // Both engines report an external subtitle back with the same `ext:<hash(url)>`
-    // identity the sheet uses for a catalog entry, so one comparison answers it.
-    override val isSelected = key == selectedSubtitleTrackId
-    override val trackId = key
-}
+/**
+ * One row of the subtitle sheet. Engine-only tracks and catalog entries share
+ * this shape and the `ext:<hash>` identity, so attaching a catalog subtitle
+ * flips its checkmark in place instead of moving it between sections.
+ */
+private data class SubtitleOption(
+    val key: String,
+    val label: String,
+    val language: String?,
+    val subtitle: String?,
+    val isSelected: Boolean,
+    val trackId: String,
+)
 
 private fun groupSubtitlesByLanguage(
     options: List<SubtitleOption>,
@@ -198,24 +175,61 @@ internal fun PlayerSubtitleSheet(
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
 
-    val engineTrackIds = subtitleTracks.mapTo(HashSet()) { it.id }
+    // One static list in a stable order: engine-only tracks (embedded or
+    // stream-shipped, in engine order) first, then the add-on catalog in
+    // published order. Attaching never adds or removes a row -- the catalog
+    // entry wins the shared `ext:<hash>` identity and only flips its checkmark --
+    // so the list only changes when the catalog itself does (fetch/refresh).
+    val catalogIds = addonSubtitles.mapTo(HashSet()) { externalSubtitleTrackId(it.url) }
     val options =
-        buildList<SubtitleOption> {
-            subtitleTracks.forEach { track ->
-                add(EngineSubtitleOption(track, isSelected = track.id == selectedSubtitleTrackId, displayName = displayName))
-            }
+        buildList {
+            subtitleTracks
+                .filter { it.id !in catalogIds }
+                .forEach { track ->
+                    add(
+                        SubtitleOption(
+                            key = track.id,
+                            label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, displayName),
+                            language = track.language,
+                            subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, displayName) },
+                            isSelected = track.id == selectedSubtitleTrackId,
+                            trackId = track.id,
+                        ),
+                    )
+                }
             addonSubtitles
                 .distinctBy { externalSubtitleTrackId(it.url) }
-                .filter { externalSubtitleTrackId(it.url) !in engineTrackIds }
                 .forEach { subtitle ->
-                    add(CatalogSubtitleOption(subtitle, displayName, selectedSubtitleTrackId))
+                    val key = externalSubtitleTrackId(subtitle.url)
+                    add(
+                        SubtitleOption(
+                            key = key,
+                            label = subtitle.display.ifBlank { languageLabelForCode(subtitle.language, displayName) },
+                            language = subtitle.language,
+                            subtitle = subtitle.addonName?.takeIf { it.isNotBlank() },
+                            isSelected = key == selectedSubtitleTrackId,
+                            trackId = key,
+                        ),
+                    )
                 }
         }
     val groups = groupSubtitlesByLanguage(options, displayName)
     val languagePills = groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) }
-    var selectedLang by remember { mutableStateOf<String?>(null) }
+    // Seeded from the current selection, not 'All': the sheet is disposed on
+    // close, so this runs once per open and only pill taps change it after.
+    // A selection the list does not contain (nothing picked yet) falls back to
+    // the first language; an empty list leaves it null and unfiltered.
+    var selectedLang by remember {
+        mutableStateOf(
+            options.firstOrNull { it.trackId == selectedSubtitleTrackId }
+                ?.let { normalizeLang(it.language) }
+                ?.takeIf { lang -> groups.any { it.key == lang } }
+                ?: groups.firstOrNull()?.key,
+        )
+    }
+    val showPills = groups.size > 1
     val visibleOptions =
-        if (selectedLang == null) {
+        if (!showPills || selectedLang == null) {
             options
         } else {
             options.filter { normalizeLang(it.language) == selectedLang }
@@ -264,13 +278,15 @@ internal fun PlayerSubtitleSheet(
                     }
                 }
 
-                item {
-                    LanguagePillsRow(
-                        languages = languagePills,
-                        selectedKey = selectedLang,
-                        palette = palette,
-                        onSelect = { selectedLang = it },
-                    )
+                if (showPills) {
+                    item {
+                        LanguagePillsRow(
+                            languages = languagePills,
+                            selectedKey = selectedLang,
+                            palette = palette,
+                            onSelect = { selectedLang = it },
+                        )
+                    }
                 }
 
                 item {
@@ -314,24 +330,20 @@ private fun LanguagePillsRow(
     languages: List<LanguagePill>,
     selectedKey: String?,
     palette: DetailsPaletteColors,
-    onSelect: (String?) -> Unit,
+    onSelect: (String) -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedKey, languages.size) {
+        val index = languages.indexOfFirst { it.key == selectedKey }
+        if (index >= 0) {
+            listState.scrollToItem(index)
+        }
+    }
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
-            selected = selectedKey == null,
-            onClick = { onSelect(null) },
-            label = { Text("All") },
-            shape = RoundedCornerShape(16.dp),
-            border = null,
-            colors = LanguagePillColors(palette, selectedKey == null),
-        )
-        languages.forEach { lang ->
+        items(languages, key = { it.key }) { lang ->
             FilterChip(
                 selected = selectedKey == lang.key,
                 onClick = { onSelect(lang.key) },
