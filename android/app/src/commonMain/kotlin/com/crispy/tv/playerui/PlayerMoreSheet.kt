@@ -91,7 +91,7 @@ internal fun PlayerMoreSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "More",
+                    text = "Explore more",
                     style = MaterialTheme.typography.titleMedium,
                     color = palette.onPillBackground,
                     modifier = Modifier.padding(rowPadding),
