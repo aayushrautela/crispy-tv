@@ -130,6 +130,75 @@ class SubtitleFormatDetectionTest {
         assertEquals(4, fromExtensionlessBody.size, "sniffed and URL entries that coincide must dedupe")
     }
 
+    @Test
+    fun `adjustableInCroppedArea is true only for plain text formats`() {
+        assertEquals(true, SubtitleContainerFormat.SubRip.adjustableInCroppedArea)
+        assertEquals(true, SubtitleContainerFormat.WebVtt.adjustableInCroppedArea)
+        assertEquals(
+            false,
+            SubtitleContainerFormat.SubStationAlpha.adjustableInCroppedArea,
+            "styled subs carry authored placement and must not be moved",
+        )
+        assertEquals(
+            false,
+            SubtitleContainerFormat.Ttml.adjustableInCroppedArea,
+            "TTML positions itself; the runtime must not reposition it",
+        )
+    }
+
+    @Test
+    fun `embedded codec is adjustable only for subrip and webvtt`() {
+        assertEquals(true, isAdjustableEmbeddedSubtitleCodec("subrip"))
+        assertEquals(true, isAdjustableEmbeddedSubtitleCodec("webvtt"))
+        assertEquals(true, isAdjustableEmbeddedSubtitleCodec("SubRip"), "codec names must be case-insensitive")
+        assertEquals(true, isAdjustableEmbeddedSubtitleCodec("WEBVTT"), "codec names must be case-insensitive")
+
+        val untouched =
+            listOf("ass", "ssa", "ttml", "hdmv_pgs_subtitle", "dvd_subtitle", "dvb_subtitle", "mov_text", "")
+        for (codec in untouched) {
+            assertEquals(
+                false,
+                isAdjustableEmbeddedSubtitleCodec(codec),
+                "codec \"$codec\" must stay untouched under the crop",
+            )
+        }
+    }
+
+    @Test
+    fun `codec answer wins over the url hint`() {
+        assertEquals(
+            true,
+            isAdjustableSubtitle(codec = "subrip", externalUrl = "https://cdn.example/subs/movie.ass"),
+            "a demuxed subrip track must be movable even if the URL claims an ASS file",
+        )
+        assertEquals(
+            false,
+            isAdjustableSubtitle(codec = "hdmv_pgs_subtitle", externalUrl = "https://cdn.example/subs/movie.srt"),
+            "a demuxed bitmap track must stay put even if the URL claims an SRT file",
+        )
+    }
+
+    @Test
+    fun `url hint is the fallback when the codec is missing`() {
+        assertEquals(true, isAdjustableSubtitle(codec = null, externalUrl = "https://cdn.example/subs/movie.srt"))
+        assertEquals(true, isAdjustableSubtitle(codec = null, externalUrl = "https://cdn.example/subs/movie.vtt"))
+        assertEquals(
+            false,
+            isAdjustableSubtitle(codec = null, externalUrl = "https://cdn.example/subs/movie.ass"),
+            "an ASS URL must not be repositioned",
+        )
+        assertEquals(
+            false,
+            isAdjustableSubtitle(codec = null, externalUrl = "https://cdn.example/subs/download?id=42"),
+            "an extensionless URL carries no format signal, so the track stays untouched",
+        )
+        assertEquals(
+            false,
+            isAdjustableSubtitle(codec = null, externalUrl = null),
+            "no codec and no URL means nothing to go on, so the track stays untouched",
+        )
+    }
+
     private companion object {
         const val WEBVTT_BODY = "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nHello world\n"
         const val SUBRIP_BODY = "1\n00:00:02,000 --> 00:00:04,500\nHello world\n\n2\n00:00:05,000 --> 00:00:07,000\nAgain\n"
