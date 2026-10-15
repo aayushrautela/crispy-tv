@@ -35,6 +35,7 @@ internal class MpvPlaybackRuntime(
     private var hasStartedPlayback: Boolean = false
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
+    private var resizeMode: PlayerResizeMode = PlayerResizeMode.Fit
 
     private val eventObserver = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = Unit
@@ -65,12 +66,14 @@ internal class MpvPlaybackRuntime(
                 "sid" -> {
                     if (value <= 0L) {
                         selectedSubtitleTrackId = null
+                        restoreSubtitleMargins()
                     } else {
                         val current = mpv
                         if (current != null && subtitleTracks.none { it.index == value.toInt() }) {
                             subtitleTracks = readTrackList(current, "sub")
                         }
                         selectedSubtitleTrackId = resolveSelectedSubtitleTrackId(value.toString())
+                        applySubtitleStyleForSelectedTrack()
                     }
                 }
             }
@@ -337,6 +340,7 @@ internal class MpvPlaybackRuntime(
         if (trackId == null) {
             runCatching { mpv.setPropertyString("sid", "no") }
             selectedSubtitleTrackId = null
+            restoreSubtitleMargins()
             return
         }
         val track = subtitleTracks.firstOrNull { it.id == trackId }
@@ -346,6 +350,7 @@ internal class MpvPlaybackRuntime(
         }
         runCatching { mpv.setPropertyInt("sid", track.index) }
         selectedSubtitleTrackId = trackId
+        applySubtitleStyleForSelectedTrack()
     }
 
     fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?) {
@@ -355,7 +360,14 @@ internal class MpvPlaybackRuntime(
             removeExternalSubtitleTracks(mpv)
             if (subtitle != null) {
                 mpv.command(arrayOf("sub-add", subtitle.url, "select", subtitle.name ?: "", subtitle.language ?: ""))
-                applySubtitleStyle()
+                // sub-add fires the sid observer, which recomputes this from
+                // the track codec; apply directly too because the URL-derived
+                // decision is available here without waiting for track-list
+                // re-reads.
+                applySubtitleStyle(
+                    allowMargins = resizeMode == PlayerResizeMode.Zoom &&
+                        isAdjustableSubtitle(codec = null, externalUrl = subtitle.url),
+                )
             }
         }
     }
@@ -379,6 +391,7 @@ internal class MpvPlaybackRuntime(
     }
 
     fun applyResizeMode(mode: PlayerResizeMode) {
+        resizeMode = mode
         val mpv = mpv ?: return
         runCatching {
             when (mode) {
@@ -392,15 +405,42 @@ internal class MpvPlaybackRuntime(
                 }
             }
         }
+        // Zoom crops plain-text subs off the video rect unless they are
+        // allowed into the margins; re-run the selection-aware decision so a
+        // ratio change restores the flag for the active track's format.
+        applySubtitleStyleForSelectedTrack()
     }
 
-    private fun applySubtitleStyle() {
+    /**
+     * Common subtitle styling. Plain-text tracks (subrip/webvtt) selected
+     * while Zoom is active are laid into the letterbox margins
+     * (`sub-use-margins=yes`) so panscan's crop cannot clip them; everything
+     * else — styled ASS/SSA, TTML, bitmap (pgs/dvd/dvb) and anything
+     * unrecognized — keeps the previous behavior (`sub-use-margins=no`,
+     * `sub-pos=92`) untouched. Margins affect plain-text formats only, never
+     * ASS placement (`sub-ass-override=no`), and `sub-ass-force-margins` is
+     * never set.
+     */
+    private fun applySubtitleStyle(allowMargins: Boolean) {
         val mpv = mpv ?: return
         runCatching {
             mpv.setPropertyString("sub-ass-override", "no")
-            mpv.setPropertyString("sub-use-margins", "no")
+            mpv.setPropertyString("sub-use-margins", if (allowMargins) "yes" else "no")
             mpv.setPropertyInt("sub-pos", 92)
         }
+    }
+
+    /** mpv defaults (`sub-use-margins=yes` is only safe for text formats). */
+    private fun restoreSubtitleMargins() {
+        applySubtitleStyle(allowMargins = false)
+    }
+
+    /** Reapply the margin decision for the currently selected track. */
+    private fun applySubtitleStyleForSelectedTrack() {
+        val id = selectedSubtitleTrackId ?: return restoreSubtitleMargins()
+        val track = subtitleTracks.firstOrNull { it.id == id } ?: return restoreSubtitleMargins()
+        val allowMargins = resizeMode == PlayerResizeMode.Zoom && isAdjustableSubtitle(track.codec, null)
+        applySubtitleStyle(allowMargins)
     }
 
     private fun refreshTrackLists() {
@@ -412,6 +452,7 @@ internal class MpvPlaybackRuntime(
         selectedSubtitleTrackId = resolveSelectedSubtitleTrackId(
             runCatching { mpv.getPropertyString("sid") }.getOrNull(),
         )
+        applySubtitleStyleForSelectedTrack()
         Log.d(
             TAG,
             "refreshTrackLists audio=${audioTracks.joinToString { "${it.id}:${it.language}" }}" +
@@ -441,15 +482,11 @@ internal class MpvPlaybackRuntime(
             val external = runCatching { mpv.getPropertyString("track-list/$i/external") }.getOrNull().equals("yes", true)
             val externalFilename =
                 runCatching { mpv.getPropertyString("track-list/$i/external-filename") }.getOrNull()?.takeIf { it.isNotBlank() }
-            // Read only for audio: mpv reports both under per-type names, and a
-            // subtitle track answers none of them.
+            // mpv answers "codec" for every track type; demux-channel-count is
+            // audio-only, so the channel read stays behind the audio gate.
             val isAudio = type == "audio"
             val codec =
-                if (isAudio) {
-                    runCatching { mpv.getPropertyString("track-list/$i/codec") }.getOrNull()?.takeIf { it.isNotBlank() }
-                } else {
-                    null
-                }
+                runCatching { mpv.getPropertyString("track-list/$i/codec") }.getOrNull()?.takeIf { it.isNotBlank() }
             val channelCount =
                 if (isAudio) {
                     runCatching { mpv.getPropertyString("track-list/$i/demux-channel-count") }
@@ -531,7 +568,10 @@ internal class MpvPlaybackRuntime(
                         )
                     }
                 }
-                applySubtitleStyle()
+                applySubtitleStyle(
+                    allowMargins = resizeMode == PlayerResizeMode.Zoom &&
+                        isAdjustableSubtitle(codec = null, externalUrl = source.externalSubtitles.first().url),
+                )
             }
         }
     }
@@ -592,6 +632,7 @@ internal class MpvPlaybackRuntime(
         subtitleTracks = emptyList()
         selectedAudioTrackId = null
         selectedSubtitleTrackId = null
+        restoreSubtitleMargins()
     }
 
     private fun debugUrl(url: String): String {

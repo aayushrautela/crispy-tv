@@ -22,6 +22,40 @@ enum class SubtitleContainerFormat {
 }
 
 /**
+ * Whether the runtime may move this format's cues into the letterbox margins
+ * (mpv's `sub-use-margins`) to keep them visible while `panscan` crops the
+ * video frame. Only plain-text formats qualify: styled (ASS/SSA) subs carry
+ * authored placement we must not override, TTML similarly positions itself,
+ * and any unlisted format is treated as untouchable by default.
+ */
+val SubtitleContainerFormat.adjustableInCroppedArea: Boolean
+    get() = this == SubtitleContainerFormat.SubRip || this == SubtitleContainerFormat.WebVtt
+
+/**
+ * Whether mpv's `track-list/N/codec` string denotes an embedded subtitle track
+ * whose placement mpv allows us to move (into the margins, via `sub-pos`).
+ * Plain text containers (subrip, webvtt) are movable; styled (ass, ttml) and
+ * bitmap (pgs, dvd, dvb) tracks are left alone, as is anything unrecognized.
+ */
+fun isAdjustableEmbeddedSubtitleCodec(codec: String): Boolean =
+    when (codec.lowercase()) {
+        "subrip", "webvtt" -> true
+        else -> false
+    }
+
+/**
+ * Decision for whether the currently selected subtitle may be moved into the
+ * margins while `panscan` crops the video frame: answer from the demuxer
+ * codec when mpv reports one, else fall back to the external-file URL hint.
+ * Anything unrecognized (including bitmap tracks, which report codecs like
+ * `hdmv_pgs_subtitle`) stays put.
+ */
+fun isAdjustableSubtitle(codec: String?, externalUrl: String?): Boolean =
+    codec?.let(::isAdjustableEmbeddedSubtitleCodec)
+        ?: externalUrl?.let(::subtitleFormatHintFromUrl)?.adjustableInCroppedArea
+        ?: false
+
+/**
  * Format derived from the URL alone, `null` when the URL carries no usable
  * signal. Kept nullable so a caller can ask "what does the URL claim" without
  * inheriting the SubRip fallback that [subtitleFormatFromUrl] bakes in.
