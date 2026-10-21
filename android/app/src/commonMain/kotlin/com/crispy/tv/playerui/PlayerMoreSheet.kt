@@ -66,7 +66,12 @@ internal fun PlayerMoreSheet(
             ) {
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.align(Alignment.TopEnd),
+                    // The scrim is full-bleed, so an unpadded close button sits in the
+                    // screen's corner with no margin at all. Padding after `align`
+                    // insets the button inside the corner it was placed in.
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp),
                 ) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_close_filled),
