@@ -1,7 +1,7 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: In progress. Landings 1 (contract v3) and 2 (seams) are done; landing 3 (the libmpv
-engine) is the current work.
+Status: In progress. Landings 1 (contract v3), 2 (seams) and 3 (the libmpv engine) are done;
+landing 4 (the player chrome) is the current work.
 
 ## Goal
 
@@ -53,11 +53,11 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 |---|---|---|---|
 | 1 | **Contract v3** (`player_machine`) | Terminal error phase + engine-fallback rules, in SPEC + fixtures + Kotlin `PlayerReducer` + Swift `reducePlayerState`, in lockstep | done |
 | 2 | Seams | `PlaybackEngine` protocol, `PlayerSession` owning the contract reducer, `PlaybackSource` (url + headers + resume) | done |
-| 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | **current** |
-| 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | pending |
+| 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | done |
+| 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | **current** |
 | 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | pending |
 | 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | pending |
-| 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | pending |
+| 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | partial (the screen exists; the launch argument does not) |
 
 ## Seams (landing 2) — what is in place now
 
@@ -89,6 +89,50 @@ and shutdown. `apple.yml` runs it as `swift test --package-path ios/CrispyKit`.
 One consequence: `CrispyKit`'s macOS floor moved from 13 to **14**, because `Observation` (the
 `@Observable` macro) needs macOS 14. The macOS platform exists only so the suite can run in
 CI; the apps themselves are iOS and tvOS.
+
+## Engine (landing 3) — what is in place now
+
+The engine lives in the **iOS app target** (`ios/Apps/iOS/Player/`), not in `CrispyKit`. That is
+deliberate: `CrispyKit` is a Swift package that CI also builds for macOS and that the tvOS app
+links, and the `MPVKit` product carries ~35 binary xcframeworks. Keeping it in the app target
+means the tvOS app does not link the binary and the package graph does not carry it either.
+
+- `MPVMetalLayer` — a `CAMetalLayer` whose `drawableSize` drops 1×1 writes (MoltenVK writes a
+  1×1 size before the real one, and the swapchain would resize to it) and whose
+  `wantsExtendedDynamicRangeContent` is routed to the main thread, because mpv's vo thread sets
+  it while holding the core lock and setting it off the main thread deadlocks.
+- `MPVPlaybackEngine` — the `PlaybackEngine` implementation. It owns the metal layer, creates the
+  mpv handle with `wid` bound to that layer, and runs a background queue blocking in
+  `mpv_wait_event`. Events are delivered as a `PlaybackEvent` `AsyncStream`; the chrome consumes
+  the stream, never the handle.
+- `MPVPlayerSurface` — a `UIViewRepresentable` hosting the engine's metal layer and sizing it to
+  the view.
+- `MPVSmokeScreen` — a `#if DEBUG` screen (reached from Account settings → Developer) that plays
+  one URL through a real `PlayerSession` and shows the contract phase, position and error.
+
+The mpv option set is the one measured from Nuvio and upstream's build flags: `vo=gpu-next`,
+`gpu-api=vulkan`, `gpu-context=moltenvk`, `hwdec=videotoolbox`, `ao=avfoundation`,
+`audio-channels=auto`, `audio-fallback-to-null=yes`, `vulkan-swap-mode=fifo`,
+`vulkan-queue-count=1`, `vulkan-async-compute=no`, `vulkan-async-transfer=no`,
+`vulkan-disable-interop=yes`, `keep-open=yes`, `target-colorspace-hint=yes`, `video-rotate=no`,
+`subs-match-os-language=yes`, `subs-fallback=yes`, `terminal=no`, `idle=yes`. Failures of
+`vo`, `gpu-api` and `gpu-context` are fatal (there is no picture without a video output); every
+other option failing is logged and ignored.
+
+Two decisions worth stating, because both look like omissions:
+
+- **The playhead is polled, the state is not.** Position, duration and buffered range are read
+  with `mpv_get_property` on a 200 ms timer, because mpv exposes them as properties that change
+  constantly, and an observer callback per change would wake the UI on every frame. Everything
+  that is a *state transition* (file loaded, video reconfig, end of file, cache stall) comes
+  through `mpv_wait_event` and is pushed on the stream.
+- **There is no `mpv_observe_property` for the position**, so the position the chrome shows is
+  up to 200 ms stale. The contract's `positionChanged` carries no timestamp, so nothing depends
+  on it being exact.
+
+`ios/project.yml` gains the package `MPVKit` (url `https://github.com/mpvkit/MPVKit`, exact
+version `1.1.0-n9.0.2`) and links it — with `ContractRunner`, for the contract's phase names —
+on the **iOS target only**. The tvOS target is untouched.
 
 ## Contract v3 (landing 1) — what changes and why
 

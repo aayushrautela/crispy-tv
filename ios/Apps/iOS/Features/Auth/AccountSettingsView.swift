@@ -64,6 +64,16 @@ struct AccountSettingsScreen: View {
                 }
             }
 
+#if DEBUG
+            Section("Developer") {
+                NavigationLink {
+                    MPVSmokeScreen()
+                } label: {
+                    Label("MPV smoke test", systemImage: "play.rectangle")
+                }
+            }
+#endif
+
             Section {
                 Button(role: .destructive) {
                     Task { await signOut() }
