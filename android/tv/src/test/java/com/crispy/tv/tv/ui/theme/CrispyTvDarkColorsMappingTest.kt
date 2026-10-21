@@ -32,7 +32,7 @@ import org.junit.Test
  * That is checked rather than assumed, which is why it is a test and not a comment.
  *
  * **A swap among value-equal roles is *not* caught, and cannot be.** Ten of the
- * palette's 37 roles carry the identical value `0xFFFFFFFF` — `primary`,
+ * palette's 36 roles carry the identical value `0xFFFFFFFF` — `primary`,
  * `onPrimaryContainer`, `inversePrimary`, `onSecondaryContainer`, `onTertiary`,
  * `onTertiaryContainer`, `onBackground`, `onSurface`, `onError`, `surfaceTint`. Wiring
  * `onError` to `onBackground` would leave every assertion in this file green. So the
@@ -56,7 +56,7 @@ import org.junit.Test
  * set from another by value is the trap this file would otherwise have walked into:
  * `surfaceContainer` holds `0xFF1F1F1F`, the same value as the mapped `surface`, so a
  * value-based set difference would delete it from the unmapped list and make the
- * "eight roles have no slot" assertion pass for the wrong reason.
+ * "seven roles have no slot" assertion pass for the wrong reason.
  */
 class CrispyTvDarkColorsMappingTest {
 
@@ -317,7 +317,7 @@ class CrispyTvDarkColorsMappingTest {
         // make the partition above over-count rather than fail. This closes that: the
         // expected total is the measured one, and the count is stated in the message.
         assertEquals("CrispyPalette's role count changed; update paletteRoles and the two " +
-            "unmapped assertions", 37, paletteRoles.size)
+            "unmapped assertions", 36, paletteRoles.size)
     }
 
     @Test

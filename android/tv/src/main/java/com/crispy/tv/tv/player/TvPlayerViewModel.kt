@@ -288,8 +288,8 @@ class TvPlayerViewModel(
         }
         viewModelScope.launch {
             val metadata = loadTitleMetadata()
-            val episode = parseAddonEpisodeLookupId(selection?.lookupId)
-            val contentType = contentTypeFor(selection?.lookupMediaTypeName, episode != null)
+            val episode = parseAddonEpisodeLookupId(selection.lookupId)
+            val contentType = contentTypeFor(selection.lookupMediaTypeName, episode != null)
             identity = PlaybackIdentity(
                 itemId = itemId,
                 seriesItemId = if (contentType == MetadataLabMediaType.MOVIE) null else itemId,
@@ -304,8 +304,8 @@ class TvPlayerViewModel(
             _state.value = _state.value.copy(
                 title = metadata?.title,
                 episodeLabel = episode?.let { "S${it.season} E${it.episode}" },
-                lookupMediaTypeName = selection?.lookupMediaTypeName,
-                lookupId = selection?.lookupId,
+                lookupMediaTypeName = selection.lookupMediaTypeName,
+                lookupId = selection.lookupId,
             )
             val engine = ensureController()
             // The stream is resolved here rather than in the picker, because a magnet
