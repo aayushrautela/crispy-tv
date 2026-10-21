@@ -38,6 +38,7 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
     private var isStopped = false
     private var hasReportedFailure = false
     private var lastPositionMs: Int64 = -1
+    private var lastTracks: [PlaybackTrack] = []
 
     init() {
         let events = AsyncStream.makeStream(of: PlaybackEvent.self)
@@ -97,6 +98,16 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         guard let handle, !stopped() else { return }
         let seconds = Double(positionMs) / 1000
         command(handle, "seek", arguments: [String(format: "%.3f", seconds), "absolute+exact"])
+    }
+
+    func selectTrack(_ selection: PlaybackTrackSelection) {
+        guard let handle, !stopped() else { return }
+        switch selection {
+        case .track(let track):
+            mpv_set_property_string(handle, track.kind.mpvProperty, track.id)
+        case .disabled(let kind):
+            mpv_set_property_string(handle, kind.mpvProperty, "no")
+        }
     }
 
     func shutdown() {
@@ -212,6 +223,15 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         // The cache runs dry and the player stalls. mpv reports that as a
         // property, and it is the only buffering signal there is.
         mpv_observe_property(handle, 0, "paused-for-cache", MPV_FORMAT_FLAG)
+        // The tracks the media carries, and the ones that are selected. The
+        // list and the selection are observed separately: mpv reports a new
+        // list when the file is opened, and a new selection when the user
+        // picks a track.
+        mpv_observe_property(handle, 0, "track-list", MPV_FORMAT_NONE)
+        mpv_observe_property(handle, 0, "current-tracks", MPV_FORMAT_NONE)
+        mpv_observe_property(handle, 0, "aid", MPV_FORMAT_NONE)
+        mpv_observe_property(handle, 0, "sid", MPV_FORMAT_NONE)
+        mpv_observe_property(handle, 0, "vid", MPV_FORMAT_NONE)
 
         let group = eventGroup
         group.enter()
@@ -236,6 +256,8 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         switch event.event_id {
         case MPV_EVENT_FILE_LOADED:
             continuation.yield(.ready)
+            // The file is open, so the media's tracks are known.
+            emitTracks()
         case MPV_EVENT_VIDEO_RECONFIG:
             // The video output was set up, which is as close to "the first
             // frame is on screen" as mpv gets.
@@ -268,15 +290,76 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
     private func handlePropertyChange(_ event: mpv_event) {
         guard let data = event.data else { return }
         let property = data.assumingMemoryBound(to: mpv_event_property.self).pointee
-        guard let name = property.name, let value = property.data else { return }
-        guard String(cString: name) == "paused-for-cache" else { return }
-        // The flag is an int, not a bool.
-        let pausedForCache = value.assumingMemoryBound(to: Int32.self).pointee != 0
-        if pausedForCache {
-            continuation.yield(.buffering)
-        } else {
-            continuation.yield(.ready)
+        guard let name = property.name else { return }
+        switch String(cString: name) {
+        case "paused-for-cache":
+            guard let value = property.data else { return }
+            // The flag is an int, not a bool.
+            let pausedForCache = value.assumingMemoryBound(to: Int32.self).pointee != 0
+            if pausedForCache {
+                continuation.yield(.buffering)
+            } else {
+                continuation.yield(.ready)
+            }
+        case "track-list", "current-tracks", "aid", "sid", "vid":
+            // The list of tracks, or the track that plays, has changed.
+            emitTracks()
+        default:
+            break
         }
+    }
+
+    // MARK: - Tracks
+
+    /// Reports the tracks of the media, and the ones that are selected.
+    private func emitTracks() {
+        guard let handle, !stopped() else { return }
+        let tracks = readTracks(handle)
+        lock.lock()
+        let unchanged = tracks == lastTracks
+        lastTracks = tracks
+        lock.unlock()
+        guard !unchanged else { return }
+        continuation.yield(.tracksChanged(tracks))
+    }
+
+    /// Reads the tracks out of mpv's track list.
+    ///
+    /// mpv keeps the list in a property tree, and every track is a node of
+    /// it, so the tracks are read one path at a time.
+    private func readTracks(_ handle: OpaquePointer) -> [PlaybackTrack] {
+        guard let count = intProperty(handle, "track-list/count") else { return [] }
+        // The track that plays is the one mpv reports in its current tracks;
+        // the aliases are the fallback for a player that has no such node.
+        let selectedAudio = selectedTrackId(handle, node: "audio", alias: "aid")
+        let selectedSubtitle = selectedTrackId(handle, node: "sub", alias: "sid")
+        let selectedVideo = selectedTrackId(handle, node: "video", alias: "vid")
+
+        var tracks: [PlaybackTrack] = []
+        for index in 0..<Int(count) {
+            guard let id = intProperty(handle, "track-list/\(index)/id") else { continue }
+            guard let kind = PlaybackTrackKind(mpvType: stringProperty(handle, "track-list/\(index)/type")) else {
+                continue
+            }
+            let selected: Bool
+            switch kind {
+            case .audio: selected = selectedAudio == id
+            case .subtitle: selected = selectedSubtitle == id
+            case .video: selected = selectedVideo == id
+            }
+            tracks.append(
+                PlaybackTrack(
+                    id: String(id),
+                    kind: kind,
+                    title: stringProperty(handle, "track-list/\(index)/title"),
+                    language: stringProperty(handle, "track-list/\(index)/lang"),
+                    isDefault: flagProperty(handle, "track-list/\(index)/default"),
+                    isForced: flagProperty(handle, "track-list/\(index)/forced"),
+                    isSelected: selected
+                )
+            )
+        }
+        return tracks
     }
 
     private func handleLogMessage(_ event: mpv_event) {
@@ -360,6 +443,29 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         return value.isFinite ? value : 0
     }
 
+    private func intProperty(_ handle: OpaquePointer, _ name: String) -> Int64? {
+        var value: Int64 = 0
+        guard mpv_get_property(handle, name, MPV_FORMAT_INT64, &value) >= 0 else { return nil }
+        return value
+    }
+
+    private func stringProperty(_ handle: OpaquePointer, _ name: String) -> String? {
+        guard let raw = mpv_get_property_string(handle, name) else { return nil }
+        defer { mpv_free(raw) }
+        return String(cString: raw)
+    }
+
+    private func flagProperty(_ handle: OpaquePointer, _ name: String) -> Bool {
+        var value: Int32 = 0
+        guard mpv_get_property(handle, name, MPV_FORMAT_FLAG, &value) >= 0 else { return false }
+        return value != 0
+    }
+
+    /// The id of the track that plays, of one kind.
+    private func selectedTrackId(_ handle: OpaquePointer, node: String, alias: String) -> Int64? {
+        intProperty(handle, "current-tracks/\(node)/id") ?? intProperty(handle, alias)
+    }
+
     private func command(_ handle: OpaquePointer, _ name: String, arguments: [String]) {
         var commandArguments: [UnsafePointer<CChar>?] = []
         for argument in [name] + arguments {
@@ -389,5 +495,27 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         lock.lock()
         isStopped = true
         lock.unlock()
+    }
+}
+
+/// mpv's own vocabulary for the tracks a media carries.
+private extension PlaybackTrackKind {
+    /// mpv calls a subtitle track `sub`.
+    init?(mpvType: String?) {
+        switch mpvType {
+        case "audio": self = .audio
+        case "video": self = .video
+        case "sub": self = .subtitle
+        default: return nil
+        }
+    }
+
+    /// The mpv property that chooses the track of this kind.
+    var mpvProperty: String {
+        switch self {
+        case .audio: return "audio-track"
+        case .video: return "video-track"
+        case .subtitle: return "sub-track"
+        }
     }
 }

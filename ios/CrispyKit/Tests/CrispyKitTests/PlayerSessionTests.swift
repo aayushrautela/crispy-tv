@@ -129,6 +129,81 @@ final class PlayerSessionTests: XCTestCase {
         XCTAssertEqual(engine.shutdownCount, 1)
     }
 
+    func testTracksEventPopulatesTheSessionTracks() async {
+        let engine = FakePlaybackEngine()
+        let session = makeSession(engine: engine)
+        let track = PlaybackTrack(
+            id: "2",
+            kind: .audio,
+            title: "English",
+            language: "eng",
+            isSelected: true
+        )
+
+        engine.emit(.tracksChanged([track]))
+        await waitUntil("the tracks reach the session") { session.tracks.count == 1 }
+
+        guard let received = session.tracks.first else {
+            return XCTFail("The session has no track")
+        }
+        XCTAssertEqual(received.id, "2")
+        XCTAssertEqual(received.kind, .audio)
+        XCTAssertEqual(received.language, "eng")
+        XCTAssertTrue(received.isSelected)
+    }
+
+    func testSelectTrackIsForwardedToTheEngine() {
+        let engine = FakePlaybackEngine()
+        let session = makeSession(engine: engine)
+        let track = PlaybackTrack(id: "3", kind: .subtitle, title: "Deutsch")
+
+        session.selectTrack(.track(track))
+        session.selectTrack(.disabled(.subtitle))
+
+        XCTAssertEqual(engine.trackSelections.count, 2)
+        XCTAssertEqual(engine.trackSelections, [.track(track), .disabled(.subtitle)])
+    }
+
+    func testOpenClearsTheTracksOfThePreviousMedia() async {
+        let engine = FakePlaybackEngine()
+        let session = makeSession(engine: engine)
+
+        engine.emit(.tracksChanged([PlaybackTrack(id: "1", kind: .audio)]))
+        await waitUntil("the tracks reach the session") { session.tracks.count == 1 }
+
+        session.open(PlaybackSource(url: makeURL("https://example.com/other.mkv")))
+
+        XCTAssertTrue(session.tracks.isEmpty)
+    }
+
+    func testReplayReopensTheMediaFromTheBeginning() {
+        let engine = FakePlaybackEngine()
+        let session = makeSession(engine: engine)
+        session.open(
+            PlaybackSource(url: makeURL("https://example.com/stream.mkv"), resumePositionMs: 42_000)
+        )
+
+        session.replay()
+
+        XCTAssertEqual(session.positionMs, 0)
+        XCTAssertEqual(session.state.phase, .loading_media)
+        XCTAssertEqual(engine.openedSources.count, 2)
+        XCTAssertEqual(engine.openedSources.last?.resumePositionMs, 0)
+    }
+
+    func testReplayLeavesTheTerminalErrorPhase() async {
+        let engine = FakePlaybackEngine()
+        let session = makeSession(engine: engine)
+        session.open(PlaybackSource(url: makeURL("https://example.com/stream.mkv")))
+
+        engine.emit(.failed("decoder crashed"))
+        await waitUntil("the failure reaches the error phase") { session.state.phase == .error }
+
+        session.replay()
+
+        XCTAssertEqual(session.state.phase, .loading_media)
+    }
+
     private func makeSession(engine: PlaybackEngine, clock: ManualClock = ManualClock()) -> PlayerSession {
         PlayerSession(engine: engine, sessionId: "session-1", nowMs: { clock.nowMs })
     }

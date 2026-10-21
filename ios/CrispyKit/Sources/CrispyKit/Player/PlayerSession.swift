@@ -18,6 +18,11 @@ public final class PlayerSession {
     public private(set) var positionMs: Int64 = 0
     public private(set) var durationMs: Int64 = 0
     public private(set) var bufferedMs: Int64 = 0
+    /// The tracks the media carries, and the one that plays. Not contract
+    /// state: the contract machine has no vocabulary for a track.
+    public private(set) var tracks: [PlaybackTrack] = []
+    /// The media that is open, so the session can play it again.
+    public private(set) var source: PlaybackSource?
     /// The message of the last failure, kept beside the contract state
     /// because the contract has no field for it.
     public private(set) var lastErrorMessage: String?
@@ -53,9 +58,21 @@ public final class PlayerSession {
         positionMs = source.resumePositionMs
         durationMs = 0
         bufferedMs = 0
+        tracks = []
         lastErrorMessage = nil
+        self.source = source
         reduce(.openHttp(engine: engine.engineId))
         engine.open(source)
+    }
+
+    /// Play the media again, from the beginning.
+    ///
+    /// The contract has no "restart" action, and its `ended` phase would
+    /// stay `ended` if the session only seeked. Opening the media again is
+    /// the one thing that leaves a finished or failed session.
+    public func replay() {
+        guard let source else { return }
+        open(source.resuming(at: 0))
     }
 
     public func play() {
@@ -74,6 +91,12 @@ public final class PlayerSession {
     public func seek(to positionMs: Int64) {
         self.positionMs = positionMs
         engine.seek(to: positionMs)
+    }
+
+    /// Choose the track that plays, or turn a kind of track off. The engine
+    /// reports the new list back through a `tracksChanged` event.
+    public func selectTrack(_ selection: PlaybackTrackSelection) {
+        engine.selectTrack(selection)
     }
 
     /// Release the engine and stop observing it. Called when the player is
@@ -107,6 +130,8 @@ public final class PlayerSession {
             reduce(.nativeBuffering)
         case .ended:
             reduce(.nativeEnded)
+        case .tracksChanged(let tracks):
+            self.tracks = tracks
         case .codecError:
             reduce(.nativeCodecError)
         case .failed(let message):

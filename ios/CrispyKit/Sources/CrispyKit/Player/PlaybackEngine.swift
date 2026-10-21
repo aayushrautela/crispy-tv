@@ -14,6 +14,9 @@ public enum PlaybackEvent: Equatable, Sendable {
     case ready
     case buffering
     case ended
+    /// The media carries tracks, and one of them is the one that plays.
+    /// The contract has no vocabulary for tracks, so this is transport state.
+    case tracksChanged([PlaybackTrack])
     /// The media could not be decoded. On a platform whose only engine is
     /// `mpv` this is terminal — there is no second engine to fall back to.
     case codecError
@@ -41,6 +44,8 @@ public protocol PlaybackEngine: AnyObject {
     func play()
     func pause()
     func seek(to positionMs: Int64)
+    /// Choose the track that plays, or turn a kind of track off.
+    func selectTrack(_ selection: PlaybackTrackSelection)
     /// Stop and release the engine. Called when the player is dismissed.
     func shutdown()
 }

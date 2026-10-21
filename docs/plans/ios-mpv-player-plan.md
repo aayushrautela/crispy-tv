@@ -1,7 +1,7 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: In progress. Landings 1 (contract v3), 2 (seams) and 3 (the libmpv engine) are done;
-landing 4 (the player chrome) is the current work.
+Status: In progress. Landings 1 (contract v3), 2 (seams), 3 (the libmpv engine) and 4 (the
+player chrome) are done; landing 5 (progress reporting) is the current work.
 
 ## Goal
 
@@ -54,7 +54,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 1 | **Contract v3** (`player_machine`) | Terminal error phase + engine-fallback rules, in SPEC + fixtures + Kotlin `PlayerReducer` + Swift `reducePlayerState`, in lockstep | done |
 | 2 | Seams | `PlaybackEngine` protocol, `PlayerSession` owning the contract reducer, `PlaybackSource` (url + headers + resume) | done |
 | 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | done |
-| 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | **current** |
+| 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | done |
 | 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | pending |
 | 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | pending |
 | 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | partial (the screen exists; the launch argument does not) |
@@ -108,7 +108,7 @@ means the tvOS app does not link the binary and the package graph does not carry
 - `MPVPlayerSurface` — a `UIViewRepresentable` hosting the engine's metal layer and sizing it to
   the view.
 - `MPVSmokeScreen` — a `#if DEBUG` screen (reached from Account settings → Developer) that plays
-  one URL through a real `PlayerSession` and shows the contract phase, position and error.
+  one URL through a real `PlayerSession` and shows the contract phase.
 
 The mpv option set is the one measured from Nuvio and upstream's build flags: `vo=gpu-next`,
 `gpu-api=vulkan`, `gpu-context=moltenvk`, `hwdec=videotoolbox`, `ao=avfoundation`,
@@ -133,6 +133,37 @@ Two decisions worth stating, because both look like omissions:
 `ios/project.yml` gains the package `MPVKit` (url `https://github.com/mpvkit/MPVKit`, exact
 version `1.1.0-n9.0.2`) and links it — with `ContractRunner`, for the contract's phase names —
 on the **iOS target only**. The tvOS target is untouched.
+
+## Chrome (landing 4) — what is in place now
+
+The chrome lives in the **iOS app target** (`ios/Apps/iOS/Features/Player/`), because the surface
+it draws is the engine's metal layer and the engine is an app-target type.
+
+- `PlayerScreen` — the chrome, written against the session and not against an engine: the video
+  surface, the controls that fade out while the video plays, the seek bar, ±10s, the buffering
+  curtain, and the error and ended curtains the contract's phase decides. The surface is a
+  parameter, so the chrome does not know which engine it drives.
+- `PlayerTrackSheet` — the track picker, fed by the engine's `track-list`.
+- `NowPlayingController` — the lock screen, the control centre and the remote control buttons.
+- `MPVPlayerScreen` — the composition root: it creates the engine and the session, opens the
+  source, takes the audio session, and hosts the chrome.
+
+The contract machine has no vocabulary for a track, so tracks are transport state, like the
+playhead. The seam grew a third caller and the protocol grew with it: `PlaybackTrack`,
+`PlaybackTrackKind`, `PlaybackTrackSelection`, a `tracksChanged` event and a `selectTrack`
+engine method. The session holds the tracks and forwards a selection.
+
+mpv keeps its tracks in a property tree, and the engine reads them one path at a time:
+`track-list/count`, then `track-list/N/id`, `/type`, `/title`, `/lang`, `/default`, `/forced`.
+The track that plays comes from `current-tracks/audio|sub|video/id`, with `aid`/`sid`/`vid` as
+the fallback. Choosing a track sets mpv's `audio-track`, `sub-track` or `video-track` property,
+and "no" turns a kind of track off. The list is read again when mpv reports a change to
+`track-list`, `current-tracks` or the selection aliases, and the engine only reports a change
+when the list actually differs.
+
+There is **no Picture in Picture**: mpv draws its own frames, so the system's picture-in-picture
+controller has no video layer to show, and Nuvio's iOS build has no `AVPictureInPictureController`
+at all.
 
 ## Contract v3 (landing 1) — what changes and why
 

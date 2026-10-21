@@ -20,4 +20,9 @@ public struct PlaybackSource: Equatable, Sendable {
         self.headers = headers
         self.resumePositionMs = resumePositionMs
     }
+
+    /// The same media, starting somewhere else.
+    public func resuming(at positionMs: Int64) -> PlaybackSource {
+        PlaybackSource(url: url, headers: headers, resumePositionMs: positionMs)
+    }
 }

@@ -14,6 +14,7 @@ final class FakePlaybackEngine: PlaybackEngine {
     private(set) var playCount = 0
     private(set) var pauseCount = 0
     private(set) var seekPositionsMs: [Int64] = []
+    private(set) var trackSelections: [PlaybackTrackSelection] = []
     private(set) var shutdownCount = 0
 
     init(engineId: String = "mpv") {
@@ -41,6 +42,10 @@ final class FakePlaybackEngine: PlaybackEngine {
 
     func seek(to positionMs: Int64) {
         seekPositionsMs.append(positionMs)
+    }
+
+    func selectTrack(_ selection: PlaybackTrackSelection) {
+        trackSelections.append(selection)
     }
 
     func shutdown() {

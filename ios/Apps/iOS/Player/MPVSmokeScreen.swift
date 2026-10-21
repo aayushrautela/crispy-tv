@@ -1,5 +1,4 @@
 #if DEBUG
-import ContractRunner
 import CrispyKit
 import SwiftUI
 
@@ -9,11 +8,12 @@ import SwiftUI
 /// stream source to play: the URL is typed in by hand.
 struct MPVSmokeScreen: View {
     @State private var urlText = ""
-    @State private var engine: MPVPlaybackEngine?
-    @State private var session: PlayerSession?
+    @State private var source: PlaybackSource?
+    @State private var isPlayerPresented = false
+    @State private var status = ""
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             HStack(spacing: 8) {
                 TextField("https://…", text: $urlText)
                     .textFieldStyle(.roundedBorder)
@@ -26,33 +26,24 @@ struct MPVSmokeScreen: View {
             }
             .padding(.horizontal)
 
-            if let engine {
-                MPVPlayerSurface(engine: engine)
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .background(Color.black)
+            if !status.isEmpty {
+                Text(status)
+                    .font(.caption.monospaced())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
             }
 
-            if let session {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("phase: \(session.state.phase.rawValue)")
-                    Text("position: \(session.positionMs / 1000)s of \(session.durationMs / 1000)s")
-                    if let message = session.lastErrorMessage {
-                        Text(message)
-                            .foregroundStyle(.red)
-                    }
-                }
-                .font(.caption.monospaced())
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-            }
+            Spacer(minLength: 0)
         }
         .padding(.vertical)
         .navigationTitle("MPV smoke test")
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear {
-            session?.close()
-            session = nil
-            engine = nil
+        .fullScreenCover(isPresented: $isPlayerPresented) {
+            if let source {
+                MPVPlayerScreen(source: source, onStatus: { status in
+                    self.status = status
+                })
+            }
         }
     }
 
@@ -66,12 +57,8 @@ struct MPVSmokeScreen: View {
 
     private func play() {
         guard let url = playableURL else { return }
-        session?.close()
-        let engine = MPVPlaybackEngine()
-        let session = PlayerSession(engine: engine)
-        self.engine = engine
-        self.session = session
-        session.open(PlaybackSource(url: url))
+        source = PlaybackSource(url: url)
+        isPlayerPresented = true
     }
 }
 #endif
