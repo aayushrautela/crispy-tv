@@ -38,7 +38,9 @@ final class MPVPlayerView: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         metalLayer.frame = bounds
-        metalLayer.contentsScale = window?.screen.nativeScale ?? UIScreen.main.nativeScale
+        if let screen = window?.screen {
+            metalLayer.contentsScale = screen.nativeScale
+        }
         CATransaction.commit()
     }
 }

@@ -174,7 +174,8 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         }
 
         // mpv renders into the layer, and it identifies the layer by address.
-        var windowId = Int64(Int(bitPattern: layer))
+        let layerAddress = Unmanaged.passUnretained(layer).toOpaque()
+        var windowId = Int64(bitPattern: layerAddress)
         if mpv_set_option(handle, "wid", MPV_FORMAT_INT64, &windowId) < 0 {
             mpv_terminate_destroy(handle)
             return (nil, "libmpv rejected the render surface")
