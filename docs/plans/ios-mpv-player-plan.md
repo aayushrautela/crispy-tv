@@ -1,6 +1,7 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: In progress. Landing 1 (contract v3) is the current work.
+Status: In progress. Landings 1 (contract v3) and 2 (seams) are done; landing 3 (the libmpv
+engine) is the current work.
 
 ## Goal
 
@@ -50,13 +51,44 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 
 | # | Landing | What it is | State |
 |---|---|---|---|
-| 1 | **Contract v3** (`player_machine`) | Terminal error phase + engine-fallback rules, in SPEC + fixtures + Kotlin `PlayerReducer` + Swift `reducePlayerState`, in lockstep | **current** |
-| 2 | Seams | `PlaybackEngine` protocol, `PlayerSession` owning the contract reducer, `PlaybackSource` (url + headers + resume) | pending |
-| 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | pending |
+| 1 | **Contract v3** (`player_machine`) | Terminal error phase + engine-fallback rules, in SPEC + fixtures + Kotlin `PlayerReducer` + Swift `reducePlayerState`, in lockstep | done |
+| 2 | Seams | `PlaybackEngine` protocol, `PlayerSession` owning the contract reducer, `PlaybackSource` (url + headers + resume) | done |
+| 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | **current** |
 | 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | pending |
 | 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | pending |
 | 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | pending |
 | 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | pending |
+
+## Seams (landing 2) — what is in place now
+
+`ios/CrispyKit/Sources/CrispyKit/Player/`:
+
+- `PlaybackSource` — url, request headers, resume position in **milliseconds**, the unit the
+  contract and the whole player use. A caller holding `WatchState.resumePositionSeconds`
+  converts once, at the call site.
+- `PlaybackEngine` — the protocol the session is written against: `engineId`, an event stream
+  (`makeEventStream()`, called once — an `AsyncStream` is consumed once), and
+  `open`/`play`/`pause`/`seek`/`shutdown`. The libmpv engine implements it; the chrome never
+  sees it.
+- `PlaybackEvent` — what an engine reports: position ticks, `firstFrame`, `ready`, `buffering`,
+  `ended`, `codecError`, `failed(String)`. Every case maps onto exactly one contract action.
+- `PlayerSession` — `@MainActor @Observable`. It owns the contract state (written only by
+  `reducePlayerState`) and the transport state the contract has no vocabulary for (position,
+  duration, buffered range, the last error message). The clock is injected, so the session is
+  deterministic under test.
+
+The session lives in `CrispyKit` because that package already depends on `ContractRunner` and
+the app already links it; the chrome (landing 4) stays in `ios/Apps/iOS`.
+
+`CrispyKit` had no test target, so it has one now (`ios/CrispyKit/Tests/CrispyKitTests`): a
+`FakePlaybackEngine` records the commands the session issues and pushes events back, and
+`PlayerSessionTests` covers the open path, the resume position, the event→phase mapping, the
+terminal codec error and fatal error, the frozen intent, the transport ticks, play/pause/seek
+and shutdown. `apple.yml` runs it as `swift test --package-path ios/CrispyKit`.
+
+One consequence: `CrispyKit`'s macOS floor moved from 13 to **14**, because `Observation` (the
+`@Observable` macro) needs macOS 14. The macOS platform exists only so the suite can run in
+CI; the apps themselves are iOS and tvOS.
 
 ## Contract v3 (landing 1) — what changes and why
 
@@ -100,7 +132,8 @@ absent), so the local gates available here are the Python ones (`scripts/validat
 with `jsonschema==4.23.0` installed via `ensurepip`/`pip`). Everything else is proven by CI:
 
 - `android.yml` — the Kotlin side (`:android:core-domain` tests, `:android:app` tests).
-- `apple.yml` — the Swift side (`swift test --package-path ios/ContractRunner`), the Kotlin
+- `apple.yml` — the Swift side (`swift test --package-path ios/ContractRunner` for the contract
+  suite, `swift test --package-path ios/CrispyKit` for the player's own suite), the Kotlin
   Apple targets, and the xcodebuild gate for `CrispyRewriteiOS` / `CrispyRewritetvOS`.
 
 Both are `workflow_dispatch`-only by deliberate choice, so a change is verified by pushing the
