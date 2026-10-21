@@ -143,14 +143,30 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
-                    // "Play" from home knows an item id and nothing else: the picker
-                    // works out the lookup from it, and the pick goes to the player
-                    // from there.
-                    onPlayItem = { itemId -> navController.navigate("sources/$itemId") },
+                    // A home card knows the episode it means: a Continue Watching row
+                    // names the episode the viewer was watching, and a calendar row
+                    // names the episode that aired. The picker is asked for that
+                    // episode, and the pick goes to the player from there.
+                    onPlayItem = { target ->
+                        val query = buildList {
+                            target.mediaTypeName?.takeIf { it.isNotBlank() }
+                                ?.let { add("mediaType=" + android.net.Uri.encode(it)) }
+                            target.lookupId?.takeIf { it.isNotBlank() }
+                                ?.let { add("lookupId=" + android.net.Uri.encode(it)) }
+                            target.season?.let { add("season=$it") }
+                            target.episode?.let { add("episode=$it") }
+                        }.joinToString("&")
+                        val route = if (query.isEmpty()) {
+                            "sources/${target.itemId}"
+                        } else {
+                            "sources/${target.itemId}?$query"
+                        }
+                        navController.navigate(route)
+                    },
                 )
             }
             composable(
-                "sources/{itemId}?mediaType={mediaType}&lookupId={lookupId}",
+                "sources/{itemId}?mediaType={mediaType}&lookupId={lookupId}&season={season}&episode={episode}",
                 arguments = listOf(
                     navArgument("itemId") { type = NavType.StringType },
                     navArgument("mediaType") {
@@ -163,15 +179,32 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                         nullable = true
                         defaultValue = null
                     },
+                    // The season and the episode travel as text because a nullable
+                    // integer argument is not one navigation-compose can carry, and
+                    // the picker reads them as numbers anyway.
+                    navArgument("season") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("episode") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
                 ),
             ) { entry ->
                 val itemIdArg = entry.arguments?.getString("itemId").orEmpty()
                 val mediaTypeArg = entry.arguments?.getString("mediaType")
                 val lookupIdArg = entry.arguments?.getString("lookupId")
+                val seasonArg = entry.arguments?.getString("season")?.toIntOrNull()
+                val episodeArg = entry.arguments?.getString("episode")?.toIntOrNull()
                 val appCtx = LocalContext.current.applicationContext as Application
                 val sourcesViewModel: TvSourcesViewModel = viewModel(
-                    key = "sources-$itemIdArg-$mediaTypeArg-$lookupIdArg",
-                    initializer = { TvSourcesViewModel(appCtx, itemIdArg, mediaTypeArg, lookupIdArg) },
+                    key = "sources-$itemIdArg-$mediaTypeArg-$lookupIdArg-$seasonArg-$episodeArg",
+                    initializer = {
+                        TvSourcesViewModel(appCtx, itemIdArg, mediaTypeArg, lookupIdArg, seasonArg, episodeArg)
+                    },
                 )
                 val sourcesState by sourcesViewModel.state.collectAsStateWithLifecycle()
                 TvSourcesScreen(
@@ -224,6 +257,8 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                                 ?.let { add("mediaType=" + android.net.Uri.encode(it)) }
                             playerState.lookupId?.takeIf { it.isNotBlank() }
                                 ?.let { add("lookupId=" + android.net.Uri.encode(it)) }
+                            playerState.season?.let { add("season=$it") }
+                            playerState.episode?.let { add("episode=$it") }
                         }.joinToString("&")
                         val route = if (query.isEmpty()) "sources/$itemId" else "sources/$itemId?$query"
                         navController.navigate(route) {

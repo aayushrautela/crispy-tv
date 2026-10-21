@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.addons.lookup.buildAddonEpisodeLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
+import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.player.MetadataLabMediaType
@@ -73,6 +74,16 @@ data class SourcesUiState(
     /** What the sources were resolved from, kept so the player can offer a change. */
     val lookupMediaTypeName: String? = null,
     val lookupId: String? = null,
+    /**
+     * The episode the sources were resolved for, when they were resolved for one.
+     *
+     * **The season and the episode travel beside the lookup id** because a lookup id
+     * cannot always carry them: the calendar rows name an episode but no imdb id,
+     * so the episode is resolved from the series' episode list and the numbers are
+     * what the player needs to file the progress under.
+     */
+    val season: Int? = null,
+    val episode: Int? = null,
 ) {
     val hasAnyRows: Boolean get() = rows.isNotEmpty()
 }
@@ -82,6 +93,8 @@ class TvSourcesViewModel(
     private val itemId: String,
     private val mediaTypeName: String?,
     private val lookupId: String?,
+    private val season: Int? = null,
+    private val episode: Int? = null,
 ) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(SourcesUiState())
@@ -113,6 +126,8 @@ class TvSourcesViewModel(
             stream = row.stream,
             lookupMediaTypeName = _state.value.lookupMediaTypeName,
             lookupId = _state.value.lookupId,
+            season = _state.value.season,
+            episode = _state.value.episode,
         )
     }
 
@@ -138,6 +153,8 @@ class TvSourcesViewModel(
             _state.value = _state.value.copy(
                 lookupMediaTypeName = target.mediaType.name,
                 lookupId = target.lookupId,
+                season = season ?: _state.value.season,
+                episode = episode ?: _state.value.episode,
             )
 
             try {
@@ -181,13 +198,41 @@ class TvSourcesViewModel(
             val mediaType = mediaTypeName
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
-                ?.let { name -> runCatching { MetadataLabMediaType.valueOf(name) }.getOrNull() }
+                ?.let { name ->
+                    // The media type can be named either way round: the enum's own
+                    // name, which is what the detail screen sends, or its label,
+                    // which is what a title's own type says.
+                    name.toMetadataLabMediaTypeOrNull()
+                        ?: runCatching { MetadataLabMediaType.valueOf(name) }.getOrNull()
+                }
                 ?: MetadataLabMediaType.MOVIE
             return StreamLookupTarget(mediaType = mediaType, lookupId = knownLookupId)
         }
 
         val appContext = getApplication<Application>()
         val context = TvServices.contextResolver(appContext).resolve() ?: return null
+
+        // An episode that is known but has no address yet. The calendar rows name a
+        // season and an episode but carry no imdb id, and the providers are asked by
+        // imdb id -- so the episode's own id is read from the series' episode list.
+        // **Without this the picker would ask for the series' next episode** and the
+        // viewer's episode would be missed.
+        val requestedSeason = season
+        val requestedEpisode = episode
+        if (requestedSeason != null && requestedEpisode != null) {
+            val episodeLookupId = resolveEpisodeLookupId(
+                accessToken = context.accessToken,
+                seasonNumber = requestedSeason,
+                episodeNumber = requestedEpisode,
+            )
+            if (episodeLookupId != null) {
+                return StreamLookupTarget(
+                    mediaType = MetadataLabMediaType.SERIES,
+                    lookupId = episodeLookupId,
+                )
+            }
+        }
+
         val detail = TvServices.backendClient(appContext).getMetadataItemDetail(context.accessToken, itemId)
         val item = detail.item
         val isSeries = item.mediaType.equals("show", ignoreCase = true) ||
@@ -209,6 +254,41 @@ class TvSourcesViewModel(
             nextEpisode?.parent?.episodeNumber,
         )
         return base.copy(lookupId = episodeLookupId ?: base.lookupId)
+    }
+
+    /**
+     * The lookup id of one episode of a series.
+     *
+     * The episode list is the only place an episode's own imdb id is written down,
+     * and the episode is matched on its season and its number -- **not** on its
+     * position in the list, because a list that is short one episode would then
+     * name the wrong one.
+     *
+     * A series that cannot be listed is not a failure: the picker falls back to the
+     * series itself, and the viewer picks from what the providers offer.
+     */
+    private suspend fun resolveEpisodeLookupId(
+        accessToken: String,
+        seasonNumber: Int,
+        episodeNumber: Int,
+    ): String? {
+        return try {
+            val episodes = TvServices.backendClient(getApplication<Application>())
+                .getSeriesEpisodes(accessToken, seriesItemId = itemId, season = seasonNumber)
+                .items
+            val match = episodes.firstOrNull { candidate ->
+                candidate.parent?.seasonNumber == seasonNumber &&
+                    candidate.parent?.episodeNumber == episodeNumber
+            }
+            buildAddonEpisodeLookupId(
+                match?.providerIds?.imdb,
+                match?.parent?.seasonNumber ?: seasonNumber,
+                match?.parent?.episodeNumber ?: episodeNumber,
+            )
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            null
+        }
     }
 
     private fun appendResult(providerId: String, providerName: String, streams: List<AddonStream>) {

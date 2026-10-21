@@ -10,6 +10,15 @@ Date: 2026-10-21. Repo: `~/Downloads/crispy-tv`, branch `master`.
 **L1 — home.** "Play" from home no longer opens a dead-end player: it opens the source picker
 (`TvApp.kt`), which works out the lookup from the item id alone (`TvSourcesViewModel.resolveLookupTarget`).
 
+**L1 (continued) — play from a rail card, and the episode it means.** OK on a home card now **plays** it, and the
+details are one long-press away (the card's menu offers play / open details / remove; the hero keeps both buttons).
+What "play" means is a value, `TvHomePlayTarget`: a Continue Watching row names the episode the viewer was watching
+(its imdb id becomes the episode lookup id `tt123:2:5`), a calendar row names the episode that aired (no imdb id on
+that model, so the picker resolves the episode's id from the series' episode list, `resolveEpisodeLookupId`), and the
+season and episode travel beside the lookup id in `TvPlaybackSelection` because a lookup id cannot always be built.
+Without this the picker asked for the series' *next* episode and the viewer's episode was missed. Pinned by
+`TvHomePlayTargetTest`.
+
 **L2 — picker.** The picker carries the whole stream, not a URL: `SourceRowUi` holds the `AddonStream`, so
 the request headers and the sidecar subtitles reach the player (`toDirectPlaybackSource`). Every row is a
 focus target that says so (`TvSourcesScreen`). The order is a rule, not an accident of arrival

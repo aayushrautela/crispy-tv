@@ -79,6 +79,9 @@ data class TvPlayerUiState(
     /** The lookup the picked source came from, so "change source" can go back to it. */
     val lookupMediaTypeName: String? = null,
     val lookupId: String? = null,
+    /** The episode being played, when it is one. */
+    val season: Int? = null,
+    val episode: Int? = null,
 ) {
     val hasError: Boolean get() = !errorMessage.isNullOrBlank()
 
@@ -288,24 +291,33 @@ class TvPlayerViewModel(
         }
         viewModelScope.launch {
             val metadata = loadTitleMetadata()
-            val episode = parseAddonEpisodeLookupId(selection.lookupId)
-            val contentType = contentTypeFor(selection.lookupMediaTypeName, episode != null)
+            // The episode is known two ways and read both: out of the lookup id when
+            // it carries one, and from the pick's own season and episode when it
+            // does not -- the calendar rows resolve their episode from the series'
+            // episode list, and the numbers are what the progress key needs.
+            val parsedEpisode = parseAddonEpisodeLookupId(selection.lookupId)
+            val seasonNumber = selection.season ?: parsedEpisode?.season
+            val episodeNumber = selection.episode ?: parsedEpisode?.episode
+            val isEpisode = seasonNumber != null && episodeNumber != null
+            val contentType = contentTypeFor(selection.lookupMediaTypeName, isEpisode)
             identity = PlaybackIdentity(
                 itemId = itemId,
                 seriesItemId = if (contentType == MetadataLabMediaType.MOVIE) null else itemId,
-                imdbId = episode?.imdbId,
+                imdbId = parsedEpisode?.imdbId,
                 contentType = contentType,
-                season = episode?.season,
-                episode = episode?.episode,
+                season = seasonNumber,
+                episode = episodeNumber,
                 title = metadata?.title ?: itemId,
                 year = metadata?.year,
                 showTitle = if (contentType == MetadataLabMediaType.MOVIE) null else metadata?.title,
             )
             _state.value = _state.value.copy(
                 title = metadata?.title,
-                episodeLabel = episode?.let { "S${it.season} E${it.episode}" },
+                episodeLabel = if (isEpisode) "S$seasonNumber E$episodeNumber" else null,
                 lookupMediaTypeName = selection.lookupMediaTypeName,
                 lookupId = selection.lookupId,
+                season = seasonNumber,
+                episode = episodeNumber,
             )
             val engine = ensureController()
             // The stream is resolved here rather than in the picker, because a magnet

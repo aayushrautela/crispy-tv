@@ -70,7 +70,9 @@ import com.crispy.tv.home.HomeWideRailSectionKind
 import com.crispy.tv.home.HomeWideRailSectionUi
 import com.crispy.tv.home.HomeCatalogRowSectionUi
 import com.crispy.tv.home.RailLoadState
+import com.crispy.tv.tv.home.TvHomePlayTarget
 import com.crispy.tv.tv.home.TvHomeViewModel
+import com.crispy.tv.tv.home.toPlayTarget
 import com.crispy.tv.tv.ui.components.CrispyCardItem
 import com.crispy.tv.tv.ui.components.LocalTvContentFocusRequester
 import com.crispy.tv.tv.ui.components.TvCatalogPosterCard
@@ -100,7 +102,7 @@ private val RowsFocusTopInsetDp = 40.dp
 fun HomeScreen(
     viewModel: TvHomeViewModel,
     onOpenItem: (String) -> Unit,
-    onPlayItem: (String) -> Unit,
+    onPlayItem: (TvHomePlayTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -117,8 +119,8 @@ fun HomeScreen(
         onDispose { viewModel.onHomeHidden() }
     }
 
-    var activePreview by remember { mutableStateOf<CrispyCardItem?>(null) }
-    var committedPreview by remember { mutableStateOf<CrispyCardItem?>(null) }
+    var activePreview by remember { mutableStateOf<TvHomePreview?>(null) }
+    var committedPreview by remember { mutableStateOf<TvHomePreview?>(null) }
     var actionsItemKey by remember { mutableStateOf<String?>(null) }
 
     val heroItems = state.heroState.items
@@ -127,7 +129,7 @@ fun HomeScreen(
         heroItems.firstOrNull { it.id == selected } ?: heroItems.firstOrNull()
     }
 
-    val previewCard: CrispyCardItem? = committedPreview ?: heroFeedItem?.toHeroCard()
+    val previewCard: CrispyCardItem? = committedPreview?.card ?: heroFeedItem?.toHeroCard()
 
     LaunchedEffect(activePreview) {
         if (activePreview != null) {
@@ -174,7 +176,14 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         OutlinedButton(onClick = { onOpenItem(card.id) }) { Text(text = "Details") }
-                        Button(onClick = { onPlayItem(card.id) }) { Text(text = "Play") }
+                        Button(
+                            onClick = {
+                                // The hero panel and the play target are the same card:
+                                // a panel that shows one title and plays another is
+                                // worse than no hero panel at all.
+                                onPlayItem(committedPreview?.playTarget ?: TvHomePlayTarget(itemId = card.id))
+                            },
+                        ) { Text(text = "Play") }
                     }
                     card.progressFraction?.let { progress ->
                         Box(
@@ -234,11 +243,17 @@ fun HomeScreen(
                                             onOpenDetails = { item ->
                                                 item.detailsItemId?.let(onOpenItem)
                                             },
+                                            onPlayItem = { item ->
+                                                onPlayItem(item.toPlayTarget())
+                                            },
                                             onRemove = { item ->
                                                 item.continueWatchingItem?.let(viewModel::removeContinueWatchingItem)
                                             },
                                             onItemPreview = { item ->
-                                                activePreview = item.toHeroCard()
+                                                activePreview = TvHomePreview(
+                                                    card = item.toHeroCard(),
+                                                    playTarget = item.toPlayTarget(),
+                                                )
                                             },
                                         )
                                     }
@@ -250,7 +265,14 @@ fun HomeScreen(
                                         HomeCatalogSectionBlock(
                                             sectionUi = sectionUi,
                                             onItemClick = { item -> onOpenItem(item.itemId) },
-                                            onItemPreview = { item -> activePreview = item.toHeroCard() },
+                                            onItemPreview = { item ->
+                                                activePreview = TvHomePreview(
+                                                    card = item.toHeroCard(),
+                                                    // A catalog row names a title, not an
+                                                    // episode: the picker works the rest out.
+                                                    playTarget = TvHomePlayTarget(itemId = item.itemId),
+                                                )
+                                            },
                                         )
                                     }
                                 }
@@ -355,6 +377,7 @@ private fun HomeWideRailBlock(
     actionsItemKey: String?,
     onToggleActions: (String) -> Unit,
     onOpenDetails: (HomeWideRailItemUi) -> Unit,
+    onPlayItem: (HomeWideRailItemUi) -> Unit,
     onRemove: (HomeWideRailItemUi) -> Unit,
     onItemPreview: (HomeWideRailItemUi) -> Unit,
 ) {
@@ -382,16 +405,13 @@ private fun HomeWideRailBlock(
                     key = { item -> item.key },
                     contentType = { "wideRailCard" },
                 ) { item ->
-                    val canRemove = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING &&
-                        item.continueWatchingItem != null
                     TvWideRailCard(
                         item = item,
-                        onClick = { item.detailsItemId?.let { onOpenDetails(item) } },
-                        onLongClick = if (canRemove) {
-                            { onToggleActions(item.key) }
-                        } else {
-                            null
-                        },
+                        // OK plays: on a TV the shortest path to a picture is the
+                        // one the viewer expects, and the details are one long-press
+                        // away rather than one screen away.
+                        onClick = { onPlayItem(item) },
+                        onLongClick = { onToggleActions(item.key) },
                         onFocused = { onItemPreview(item) },
                     )
                 }
@@ -406,6 +426,10 @@ private fun HomeWideRailBlock(
         showRemove = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING &&
             actionItem.continueWatchingItem != null,
         onDismiss = { onToggleActions(currentActionsKey) },
+        onPlay = {
+            onToggleActions(currentActionsKey)
+            onPlayItem(actionItem)
+        },
         onOpenDetails = {
             onToggleActions(currentActionsKey)
             onOpenDetails(actionItem)
@@ -417,11 +441,25 @@ private fun HomeWideRailBlock(
     )
 }
 
+/**
+ * The card the hero panel is showing, and what "play" means for it.
+ *
+ * **The two travel together because they are the same card**: a hero panel that
+ * shows one title and plays another is worse than no hero panel at all. The panel
+ * settles on a card after a short delay, so the card and its play target are
+ * committed together and the panel never changes under the viewer.
+ */
+private data class TvHomePreview(
+    val card: CrispyCardItem,
+    val playTarget: TvHomePlayTarget,
+)
+
 @Composable
 private fun TvWideRailItemActionsDialog(
     item: HomeWideRailItemUi,
     showRemove: Boolean,
     onDismiss: () -> Unit,
+    onPlay: () -> Unit,
     onOpenDetails: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -439,13 +477,18 @@ private fun TvWideRailItemActionsDialog(
                 )
             },
             confirmButton = {
-                Button(onClick = onOpenDetails) { Text(text = "Open details") }
+                // Playing is what the card does when it is pressed, so it is what
+                // the menu's primary button does too.
+                Button(onClick = onPlay) { Text(text = "Play") }
             },
             dismissButton = {
-                if (showRemove) {
-                    TextButton(onClick = onRemove) { Text(text = "Remove") }
-                } else {
-                    TextButton(onClick = onDismiss) { Text(text = "Cancel") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onOpenDetails) { Text(text = "Open details") }
+                    if (showRemove) {
+                        TextButton(onClick = onRemove) { Text(text = "Remove") }
+                    } else {
+                        TextButton(onClick = onDismiss) { Text(text = "Cancel") }
+                    }
                 }
             },
         )

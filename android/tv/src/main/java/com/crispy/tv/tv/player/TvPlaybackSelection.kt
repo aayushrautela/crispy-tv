@@ -36,6 +36,16 @@ data class TvPlaybackSelection(
     /** The lookup the source was resolved from, so the player can offer "change source". */
     val lookupMediaTypeName: String? = null,
     val lookupId: String? = null,
+    /**
+     * The episode the sources were resolved for, when there was one.
+     *
+     * These are carried **beside** the lookup id, not inside it, because a lookup id
+     * cannot always name an episode -- the calendar rows resolve their episode from
+     * the series' episode list, and even then the player needs the season and the
+     * episode number to file the progress under the key the phone wrote.
+     */
+    val season: Int? = null,
+    val episode: Int? = null,
 )
 
 /**

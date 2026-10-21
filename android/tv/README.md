@@ -19,7 +19,8 @@ for saying which key does what -- visibly, on screen, while the chrome is up.
 
 | Key | Home | Source picker | Player |
 | --- | --- | --- | --- |
-| Centre / OK | open the item, or play it | pick the focused source | play/pause, or retry when there is an error |
+| Centre / OK | **play** the focused card | pick the focused source | play/pause, or retry when there is an error |
+| Long-press | the card's menu (play / open details / remove) | -- | -- |
 | Left / Right | move along a rail | -- | seek ∓10 s |
 | Up / Down | move between rails | move between rows | wake the chrome / open the options sheet |
 | Back | open the sidebar | back | close the sheet, then leave the player |
@@ -31,10 +32,29 @@ The rules that follow from that:
    (`TvSourcesScreen`).
 2. **Nothing is a dead end.** "Play" from home used to open a player with no stream;
    it now opens the source picker.
-3. **A sheet is part of the state.** The open sheet lives in the view model, because
+3. **OK plays, and the details are one long-press away** rather than one screen away.
+   The hero keeps both buttons because both are already on screen.
+4. **A sheet is part of the state.** The open sheet lives in the view model, because
    the keys it handles depend on it (`TvPlayerOverlay`).
-4. **The chrome hides itself, but never while a sheet is open.** A sheet the viewer
+5. **The chrome hides itself, but never while a sheet is open.** A sheet the viewer
    cannot see is a sheet they cannot use.
+
+## What "play" means for a home card
+
+A home card knows more than an item id, and the difference decides **which episode
+is played** (`TvHomePlayTarget`):
+
+- a **Continue Watching** row names the episode the viewer was watching: its imdb id
+  turns into the episode lookup id (`tt1234567:2:5`), and the season and the episode
+  travel with it;
+- a **calendar** row names the episode that aired but carries no imdb id, so the
+  season and the episode travel alone and the picker resolves the episode's id from
+  the series' episode list (`TvSourcesViewModel.resolveEpisodeLookupId`);
+- any other card names its title and leaves the rest to the picker.
+
+Without this, the picker would ask the providers for the series' *next* episode --
+its rule when it knows nothing else -- and the episode the viewer meant would be
+missed.
 
 ## The identity rule
 
@@ -47,7 +67,9 @@ progress the TV reads:
   `<series id>:<season>:<episode>`;
 - the season and the episode come out of the **episode lookup id**
   (`tt1234567:2:5`), which is the only place they survive between the detail
-  screen, the picker and the player.
+  screen, the picker and the player -- and out of the pick itself, because a
+  lookup id cannot always be built (`TvPlaybackSelection.season/episode` is read
+  when the lookup id names no episode).
 
 So `parseAddonEpisodeLookupId` lives in `:addons` `commonMain` and is used by both
 apps, and `TvPlayerViewModel` builds its `PlaybackIdentity` with the title id -- not
