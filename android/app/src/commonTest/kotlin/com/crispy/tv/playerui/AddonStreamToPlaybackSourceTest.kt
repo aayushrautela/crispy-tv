@@ -14,7 +14,16 @@ import kotlin.test.assertTrue
 /**
  * `PlayerSessionSupport.kt` had **no coverage in any source set** before it moved to
  * `commonMain`, and it is the file that decides how an addon's chosen stream becomes
- * something an engine can play. Seven decisions live in 49 lines, and each of them picks
+ * something an engine can play.
+ *
+ * **The rule itself now lives in `:android:addons`** -- `com.crispy.tv.addons.playback.resolvePlaybackSource`
+ * -- because the TV app needs the same answer and `:tv` cannot depend on `:app`. The
+ * suite is kept here anyway: it pins the phone's own path into that rule, which is a
+ * call site with its own contract (the phone always has a resolver, even when the
+ * resolver is the one that fails fast), and it is the suite that would notice the day
+ * the delegation stops delegating.
+ *
+ * Seven decisions live in the rule, and each of them picks
  * between two answers that are not otherwise distinguishable from the outside:
  *
  *  - a direct URL wins over a torrent, and only if it is non-blank;
