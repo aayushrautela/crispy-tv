@@ -42,7 +42,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.crispy.tv"
+        // Its own id, not the phone's. The TV app used to claim `com.crispy.tv`,
+        // which is the id the phone's store build ships under -- so the two apps
+        // could not be installed side by side, and their debug builds could not
+        // either, because the debug suffix landed on the same string. `com.crispy.tv.tv`
+        // keeps the module's namespace and separates the two apps on a device.
+        applicationId = "com.crispy.tv.tv"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -149,6 +154,18 @@ dependencies {
     // rather than through a distribution seam. It used to get it transitively
     // from :android:network's sideload variant; that flavour axis is gone.
     implementation(project(":android:youtube-extractor"))
+    // The torrent engine, for the same reason as the YouTube extractor above: the
+    // TV app is a sideload-only surface, so it takes the engines directly instead
+    // of through the phone's distribution seam. The engine is not UI -- it is a
+    // service and a resolver -- so the TV's player uses it exactly as the phone's
+    // does, through the shared rule in `:android:addons`.
+    //
+    // The module declares `missingDimensionStrategy("distribution", "sideload")`,
+    // so a consumer with no such dimension (this one) still resolves it. A store
+    // TV build would need the phone's `distribution` flavour axis, so that this
+    // module and the YouTube extractor are excluded structurally rather than by a
+    // runtime check.
+    implementation(project(":android:torrent-engine"))
     implementation(project(":android:watchhistory"))
     implementation(project(":android:platform-android"))
     implementation(project(":android:backend"))

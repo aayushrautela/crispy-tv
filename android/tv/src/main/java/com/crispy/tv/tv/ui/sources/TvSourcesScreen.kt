@@ -1,7 +1,10 @@
 package com.crispy.tv.tv.ui.sources
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,10 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.tv.sources.SourceRowUi
@@ -34,6 +39,18 @@ import com.crispy.tv.tv.sources.SourcesUiState
 
 private val PanelPadding = 48.dp
 
+/**
+ * The stream picker.
+ *
+ * ## Why every row is focusable
+ *
+ * The rows used to be plain clickable rows, which on a television means **rows the
+ * viewer cannot land on**: the D-pad moved the selection, the selection was never
+ * drawn, and the viewer had no way of telling which row the centre key would pick.
+ * Each row is now a focus target that says so -- it grows a little and draws a
+ * border when it has the focus -- and the list scrolls itself as the selection
+ * moves.
+ */
 @Composable
 fun TvSourcesScreen(
     state: SourcesUiState,
@@ -83,6 +100,7 @@ fun TvSourcesScreen(
                     )
                 }
             }
+
             else -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.rows, key = { it.id }) { row ->
@@ -110,11 +128,24 @@ private fun SourceRow(
     onPick: (SourceRowUi) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (focused) 1.03f else 1f,
+        label = "source-row-scale",
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .clickable { onPick(row) }
+            .scale(scale)
             .clip(RoundedCornerShape(12.dp))
+            .border(
+                width = 2.dp,
+                color = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(12.dp),
+            )
             .background(
                 if (focused) {
                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
@@ -122,7 +153,6 @@ private fun SourceRow(
                     MaterialTheme.colorScheme.surface
                 },
             )
-            .clickable { onPick(row) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Box(
@@ -145,10 +175,10 @@ private fun SourceRow(
             Text(
                 text = row.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (row.isTorrent) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
+                color = if (row.isPlayable) {
                     MaterialTheme.colorScheme.onBackground
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -164,20 +194,31 @@ private fun SourceRow(
             }
         }
         Spacer(Modifier.width(10.dp))
+        if (row.subtitleCount > 0) {
+            SourceBadge(text = "${row.subtitleCount} subs")
+            Spacer(Modifier.width(6.dp))
+        }
         val badge = when {
             row.cached -> "Cached"
+            // A torrent plays here: the engine resolves the magnet link when the
+            // player starts. The badge says what the row is, not that it is refused.
             row.isTorrent -> "Torrent"
             else -> null
         }
         if (badge != null) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            ) {
-                Text(badge, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            }
+            SourceBadge(text = badge)
         }
+    }
+}
+
+@Composable
+private fun SourceBadge(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
     }
 }

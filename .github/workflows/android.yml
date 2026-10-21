@@ -137,6 +137,13 @@ jobs:
       - name: Run app unit tests
         run: ./gradlew :android:androidApp:testStoreDebugUnitTest
 
+      - name: Run Android TV unit tests
+        # The TV module had a test suite that nothing ran, so a broken test was
+        # indistinguishable from a passing one. `:tv` is a plain
+        # com.android.application, so `test` is the task that covers both of its
+        # build types' unit tests.
+        run: ./gradlew :android:tv:test
+
       # ---- build ------------------------------------------------------------
 
       - name: Download TorrServer binaries

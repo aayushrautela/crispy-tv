@@ -31,6 +31,7 @@ import com.crispy.tv.ui.brand.CrispyIntroSplash
 import kotlinx.coroutines.delay
 import com.crispy.tv.tv.player.TvPlayerViewModel
 import com.crispy.tv.tv.sources.TvSourcesViewModel
+import com.crispy.tv.tv.di.TvServices
 import com.crispy.tv.tv.home.TvHomeViewModel
 import com.crispy.tv.tv.session.TvSessionState
 import com.crispy.tv.tv.session.TvSessionViewModel
@@ -142,40 +143,56 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
-                    onPlayItem = { itemId -> navController.navigate("play/$itemId") },
+                    // "Play" from home knows an item id and nothing else: the picker
+                    // works out the lookup from it, and the pick goes to the player
+                    // from there.
+                    onPlayItem = { itemId -> navController.navigate("sources/$itemId") },
                 )
             }
             composable(
-                "sources/{itemId}/{mediaType}/{lookupId}",
+                "sources/{itemId}?mediaType={mediaType}&lookupId={lookupId}",
                 arguments = listOf(
                     navArgument("itemId") { type = NavType.StringType },
-                    navArgument("mediaType") { type = NavType.StringType },
-                    navArgument("lookupId") { type = NavType.StringType },
+                    navArgument("mediaType") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("lookupId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
                 ),
             ) { entry ->
                 val itemIdArg = entry.arguments?.getString("itemId").orEmpty()
-                val mediaTypeArg = entry.arguments?.getString("mediaType").orEmpty()
-                val lookupIdArg = entry.arguments?.getString("lookupId").orEmpty()
+                val mediaTypeArg = entry.arguments?.getString("mediaType")
+                val lookupIdArg = entry.arguments?.getString("lookupId")
                 val appCtx = LocalContext.current.applicationContext as Application
                 val sourcesViewModel: TvSourcesViewModel = viewModel(
                     key = "sources-$itemIdArg-$mediaTypeArg-$lookupIdArg",
-                    initializer = { TvSourcesViewModel(appCtx, mediaTypeArg, lookupIdArg) },
+                    initializer = { TvSourcesViewModel(appCtx, itemIdArg, mediaTypeArg, lookupIdArg) },
                 )
                 val sourcesState by sourcesViewModel.state.collectAsStateWithLifecycle()
                 TvSourcesScreen(
                     state = sourcesState,
                     onPick = { row ->
-                        if (sourcesViewModel.onSourcePicked(row) && !row.url.isNullOrBlank()) {
-                            navController.navigate("play/$itemIdArg?streamUrl=" + android.net.Uri.encode(row.url))
+                        // The pick is stored in process and named by an id: the route
+                        // carries the id, not the URL, because a route cannot carry a
+                        // provider's headers or the stream's subtitles.
+                        val selection = sourcesViewModel.onSourcePicked(row)
+                        if (selection != null) {
+                            val selId = TvServices.playbackSelectionStore(appCtx).put(selection)
+                            navController.navigate("play/$itemIdArg?sel=$selId")
                         }
                     },
                 )
             }
             composable(
-                "play/{itemId}?streamUrl={streamUrl}",
+                "play/{itemId}?sel={sel}",
                 arguments = listOf(
                     navArgument("itemId") { type = NavType.StringType },
-                    navArgument("streamUrl") {
+                    navArgument("sel") {
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
@@ -183,13 +200,37 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                 ),
             ) { entry ->
                 val itemId = entry.arguments?.getString("itemId").orEmpty()
-                val streamUrl = entry.arguments?.getString("streamUrl")
+                val selId = entry.arguments?.getString("sel")
                 val app = LocalContext.current.applicationContext as Application
                 val playerViewModel: TvPlayerViewModel = viewModel(
-                    key = "play-$itemId",
-                    initializer = { TvPlayerViewModel(app, itemId, streamUrl) },
+                    key = "play-$itemId-$selId",
+                    initializer = {
+                        // The pick is taken, not read: it is consumed by the one
+                        // player that plays it. A player restored after a process
+                        // death finds the table empty and says so plainly.
+                        TvPlayerViewModel(app, itemId, TvServices.playbackSelectionStore(app).take(selId))
+                    },
                 )
-                TvPlayerScreen(viewModel = playerViewModel)
+                val playerState by playerViewModel.state.collectAsStateWithLifecycle()
+                TvPlayerScreen(
+                    viewModel = playerViewModel,
+                    onChangeSource = {
+                        // The old player is gone and the picker is where it was: back
+                        // from the next player lands on the picker, where "change
+                        // source" started. The lookup travels with it, so the picker
+                        // asks for the same episode rather than working it out again.
+                        val query = buildList {
+                            playerState.lookupMediaTypeName?.takeIf { it.isNotBlank() }
+                                ?.let { add("mediaType=" + android.net.Uri.encode(it)) }
+                            playerState.lookupId?.takeIf { it.isNotBlank() }
+                                ?.let { add("lookupId=" + android.net.Uri.encode(it)) }
+                        }.joinToString("&")
+                        val route = if (query.isEmpty()) "sources/$itemId" else "sources/$itemId?$query"
+                        navController.navigate(route) {
+                            popUpTo(TvDestination.default.route)
+                        }
+                    },
+                )
             }
             composable("detail/{itemId}") { entry ->
                 val itemId = entry.arguments?.getString("itemId").orEmpty()
@@ -211,12 +252,16 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     onDismissAiInsights = detailViewModel::dismissAiInsightsStory,
                     onSetLiked = detailViewModel::setLiked,
                     onPlay = { id ->
+                        // The detail screen knows the lookup it wants; the picker
+                        // takes it from there, and the pick goes to the player.
                         val target = detailState
-                        if (target.lookupMediaTypeName != null && !target.lookupId.isNullOrBlank()) {
-                            navController.navigate("sources/$id/${target.lookupMediaTypeName}/${android.net.Uri.encode(target.lookupId)}")
-                        } else {
-                            navController.navigate("play/$id")
-                        }
+                        val query = buildList {
+                            target.lookupMediaTypeName?.takeIf { it.isNotBlank() }
+                                ?.let { add("mediaType=" + android.net.Uri.encode(it)) }
+                            target.lookupId?.takeIf { it.isNotBlank() }
+                                ?.let { add("lookupId=" + android.net.Uri.encode(it)) }
+                        }.joinToString("&")
+                        navController.navigate(if (query.isEmpty()) "sources/$id" else "sources/$id?$query")
                     },
                 )
             }

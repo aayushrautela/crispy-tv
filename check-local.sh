@@ -71,6 +71,12 @@
 # :android:androidApp:testStoreDebugUnitTest runs the app module's Robolectric
 # unit tests. The tests live in :androidApp rather than :app because they need
 # the merged manifest and the real app theme.
+#
+# :android:tv:test runs the TV module's unit tests. The module is a plain
+# com.android.application, so its tests are plain JUnit with no Robolectric: they
+# can only assert pure decisions, and the ones that exist are the source ordering
+# and the token mapping. The gate is here and in android.yml because the module
+# had a test suite that no gate ran.
 
 set -euo pipefail
 
@@ -141,6 +147,7 @@ fi
     :android:androidApp:testSideloadDebugUnitTest \
     :android:androidApp:assembleStoreDebug \
     :android:androidApp:assembleSideloadDebug \
+    :android:tv:test \
     :android:tv:assembleDebug \
     "$@"
 

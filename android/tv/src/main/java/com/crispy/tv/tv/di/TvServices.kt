@@ -1,6 +1,8 @@
 package com.crispy.tv.tv.di
 
 import android.content.Context
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.addons.registry.metadataAddonRegistry
@@ -13,11 +15,15 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CachingBackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.AppHttp
+import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.platform.android.AndroidAppLogger
 import com.crispy.tv.platform.android.AndroidMonotonicClock
 import com.crispy.tv.platform.android.AndroidTimeSource
 import com.crispy.tv.platform.android.SharedPreferencesKeyValueStore
+import com.crispy.tv.player.TorrentResolver
+import com.crispy.tv.torrentengine.NativeTorrentResolver
 import com.crispy.tv.tv.BuildConfig
+import com.crispy.tv.tv.player.TvPlaybackSelectionStore
 import kotlinx.coroutines.Dispatchers
 
 object TvServices {
@@ -41,6 +47,12 @@ object TvServices {
 
     @Volatile
     private var watchHistoryService: BackendWatchHistoryService? = null
+
+    @Volatile
+    private var playbackSelectionStore: TvPlaybackSelectionStore? = null
+
+    @Volatile
+    private var torrentResolver: TorrentResolver? = null
 
     fun secureTokenStore(context: Context): com.crispy.tv.accounts.SecureTokenStore {
         secureTokenStore?.let { return it }
@@ -154,9 +166,68 @@ object TvServices {
         }
     }
 
+    /**
+     * The torrent engine.
+     *
+     * **The TV app is a sideload-only surface**, the same posture it already takes
+     * with the YouTube extractor: it depends on the engines directly rather than
+     * through the phone's distribution seam. So the engine is here, and a magnet link
+     * resolves the way it resolves on the phone -- through the shared rule in
+     * `com.crispy.tv.addons.playback.resolvePlaybackSource`.
+     *
+     * A store TV build would need the phone's `distribution` flavour axis so that
+     * this module, and the YouTube extractor beside it, are excluded structurally
+     * rather than by a runtime check. That is release work, not playback work.
+     */
+    fun torrentResolver(context: Context): TorrentResolver {
+        torrentResolver?.let { return it }
+        synchronized(this) {
+            torrentResolver?.let { return it }
+            val created = NativeTorrentResolver(context.applicationContext)
+            torrentResolver = created
+            return created
+        }
+    }
+
     suspend fun signOut(context: Context) {
         accountClient(context).signOut()
         secureTokenStore(context).clear()
         contextResolver(context).clear()
+    }
+
+    /**
+     * The table of stream picks waiting to be played.
+     *
+     * Process-scoped on purpose: a pick lives for as long as it takes the user to walk
+     * from the source picker to the player, and it dies with the process, because a
+     * pick is a choice the viewer made in this sitting -- not state worth restoring
+     * after a reboot.
+     */
+    fun playbackSelectionStore(context: Context): TvPlaybackSelectionStore {
+        playbackSelectionStore?.let { return it }
+        synchronized(this) {
+            playbackSelectionStore?.let { return it }
+            val created = TvPlaybackSelectionStore()
+            playbackSelectionStore = created
+            return created
+        }
+    }
+
+    /**
+     * A fresh playback engine for one playback session.
+     *
+     * **A new controller per session, not a shared one**: the controller owns an
+     * `ExoPlayer`, a libmpv runtime and a sidecar controller, and `release()` on any
+     * of them ends the session for whoever holds it. The phone gets the same rule for
+     * the same reason -- `PlaybackDependencies.playbackControllerFactory` is a factory
+     * for one session's controller.
+     *
+     * Libass is off here, as it is by default on the phone: a TV box is the device
+     * least likely to be missing a codec, and the libass overlay path is the one with
+     * a surface of its own to keep in step with the video surface.
+     */
+    @OptIn(UnstableApi::class)
+    fun newPlaybackController(context: Context): NativePlaybackController {
+        return NativePlaybackController(context.applicationContext)
     }
 }
