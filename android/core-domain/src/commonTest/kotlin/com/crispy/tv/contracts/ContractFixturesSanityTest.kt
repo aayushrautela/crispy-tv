@@ -36,7 +36,7 @@ class ContractFixturesSanityTest {
         // every suite has exactly one version directory today.
         //
         // Enforcing it matters because `PlayerMachineContractTest` pins
-        // "player_machine/v2" explicitly. If a second version ever appeared, that pin
+        // "player_machine/v3" explicitly. If a second version ever appeared, that pin
         // would silently stop covering the new cases and the suite would report
         // success while testing nothing new. A second version is a spec revision and
         // should arrive as a failure here, not as a quiet change of coverage.

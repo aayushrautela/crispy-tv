@@ -61,6 +61,8 @@ final class PlayerMachineContractTests: XCTestCase {
             return .nativeEnded
         case "NATIVE_CODEC_ERROR":
             return .nativeCodecError
+        case "NATIVE_FATAL_ERROR":
+            return .nativeFatalError
         case "USER_INTENT_PLAY", "PLAY":
             return .userIntentPlay
         case "USER_INTENT_PAUSE", "PAUSE":

@@ -1,0 +1,31 @@
+{
+  "contract_version": 3,
+  "suite": "player_machine",
+  "case_id": "codec_error_on_mpv_is_terminal",
+  "now_ms": 1739923200000,
+  "steps": [
+    {
+      "t_ms": 0,
+      "event": {
+        "type": "OPEN_HTTP",
+        "engine": "mpv"
+      },
+      "expect": {
+        "phase": "loading_media",
+        "intent": "play",
+        "engine": "mpv"
+      }
+    },
+    {
+      "t_ms": 450,
+      "event": {
+        "type": "NATIVE_CODEC_ERROR"
+      },
+      "expect": {
+        "phase": "error",
+        "intent": "play",
+        "engine": "mpv"
+      }
+    }
+  ]
+}

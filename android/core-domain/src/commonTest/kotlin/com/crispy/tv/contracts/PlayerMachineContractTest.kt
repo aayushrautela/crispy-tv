@@ -19,15 +19,15 @@ import kotlin.test.fail
 class PlayerMachineContractTest {
 
     /**
-     * Pinned to `v2` rather than taking the suite's only version directory.
+     * Pinned to `v3` rather than taking the suite's only version directory.
      *
-     * That is the point: when the spec revises and `v3` appears, this test
+     * That is the point: when the spec revises and `v4` appears, this test
      * should keep exercising the behaviour it was written against and the
      * mismatch should be a deliberate decision, not an accident of the
      * directory walk. `ContractFixturesSanityTest` enforces the "one version
      * directory per suite" invariant that makes the pin unambiguous.
      */
-    private val directory = "player_machine/v2"
+    private val directory = "player_machine/v3"
 
     @Test
     fun playerMachineFixtures() {
@@ -93,6 +93,7 @@ class PlayerMachineContractTest {
             "NATIVE_BUFFERING" -> PlayerAction.NativeBuffering
             "NATIVE_END", "NATIVE_ENDED" -> PlayerAction.NativeEnded
             "NATIVE_CODEC_ERROR" -> PlayerAction.NativeCodecError
+            "NATIVE_FATAL_ERROR" -> PlayerAction.NativeFatalError
             "USER_INTENT_PLAY", "PLAY" -> PlayerAction.UserIntentPlay
             "USER_INTENT_PAUSE", "PAUSE" -> PlayerAction.UserIntentPause
             else -> fail("Unsupported event type '$type' in $fixture step[$stepIndex]")

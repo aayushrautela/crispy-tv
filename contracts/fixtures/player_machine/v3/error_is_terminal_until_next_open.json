@@ -1,0 +1,65 @@
+{
+  "contract_version": 3,
+  "suite": "player_machine",
+  "case_id": "error_is_terminal_until_next_open",
+  "now_ms": 1739923200000,
+  "steps": [
+    {
+      "t_ms": 0,
+      "event": {
+        "type": "OPEN_HTTP",
+        "engine": "exo"
+      },
+      "expect": {
+        "phase": "loading_media",
+        "intent": "play",
+        "engine": "exo"
+      }
+    },
+    {
+      "t_ms": 300,
+      "event": {
+        "type": "NATIVE_FATAL_ERROR"
+      },
+      "expect": {
+        "phase": "error",
+        "intent": "play",
+        "engine": "exo"
+      }
+    },
+    {
+      "t_ms": 400,
+      "event": {
+        "type": "NATIVE_READY"
+      },
+      "expect": {
+        "phase": "error",
+        "intent": "play",
+        "engine": "exo"
+      }
+    },
+    {
+      "t_ms": 500,
+      "event": {
+        "type": "USER_INTENT_PAUSE"
+      },
+      "expect": {
+        "phase": "error",
+        "intent": "play",
+        "engine": "exo"
+      }
+    },
+    {
+      "t_ms": 600,
+      "event": {
+        "type": "OPEN_HTTP",
+        "engine": "mpv"
+      },
+      "expect": {
+        "phase": "loading_media",
+        "intent": "play",
+        "engine": "mpv"
+      }
+    }
+  ]
+}

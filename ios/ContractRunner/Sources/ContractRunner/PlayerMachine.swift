@@ -51,8 +51,21 @@ public enum PlayerAction {
     case nativeReady
     case nativeEnded
     case nativeCodecError
+    case nativeFatalError
     case userIntentPlay
     case userIntentPause
+}
+
+extension PlayerAction {
+    /// Opening a source is the only thing that leaves the terminal `error` phase.
+    var opensNewSource: Bool {
+        switch self {
+        case .openHttp, .openTorrent:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 public func initialPlayerState(sessionId: String, nowMs: Int64) -> PlayerState {
@@ -66,7 +79,28 @@ public func initialPlayerState(sessionId: String, nowMs: Int64) -> PlayerState {
     )
 }
 
+/// The playback state machine, mirrored by Kotlin's `reducePlayerState` in
+/// `android/core-domain`. The two must change together: the `player_machine`
+/// contract suite exercises both against the same fixtures.
+///
+/// Three rules make the `error` phase meaningful (`contract_version` 3):
+///
+/// 1. A codec error falls back to the `mpv` engine **only** while the active
+///    engine is `exo`. On a platform whose engine already is `mpv` there is no
+///    second engine to fall back to, so the failure is terminal.
+/// 2. `nativeFatalError` is the generic "the engine failed and cannot recover"
+///    event, kept distinct from a codec error so a caller can report an mpv
+///    failure without mislabelling it.
+/// 3. The `error` phase is terminal: once the machine has failed, only opening
+///    a new source changes the state. A frame that was already in flight when
+///    the failure arrived must not resurrect the session.
 public func reducePlayerState(_ state: PlayerState, action: PlayerAction, nowMs: Int64) -> PlayerState {
+    if state.phase == .error, !action.opensNewSource {
+        var frozen = state
+        frozen.updatedAtMs = nowMs
+        return frozen
+    }
+
     var next = state
     next.updatedAtMs = nowMs
 
@@ -96,10 +130,18 @@ public func reducePlayerState(_ state: PlayerState, action: PlayerAction, nowMs:
         next.phase = .ended
 
     case .nativeCodecError:
-        next.phase = .loading_media
+        // A codec error falls back to the `mpv` engine only while the active
+        // engine is `exo`. Any other engine is the last one there is, so the
+        // failure is terminal.
         if next.engine.lowercased() == "exo" {
+            next.phase = .loading_media
             next.engine = "mpv"
+        } else {
+            next.phase = .error
         }
+
+    case .nativeFatalError:
+        next.phase = .error
 
     case .userIntentPlay:
         next.intent = .play
