@@ -64,6 +64,14 @@ struct AccountSettingsScreen: View {
                 }
             }
 
+            Section("Addons") {
+                NavigationLink {
+                    AddonsSettingsScreen()
+                } label: {
+                    Label("Manage addons", systemImage: "puzzlepiece.extension")
+                }
+            }
+
 #if DEBUG
             Section("Developer") {
                 NavigationLink {

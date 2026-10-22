@@ -321,6 +321,60 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         )
     }
 
+    /// Installs an addon from its manifest URL.
+    ///
+    /// The manifest is read before this call by the screen doing the install;
+    /// the backend stores the URL (and the addon's own answer for it) against
+    /// the profile.
+    public func installAddon(
+        accessToken: String,
+        profileId: String,
+        manifestUrl: String,
+        type: String = "stremio",
+        payload: [String: String] = [:]
+    ) async throws -> AddonDescriptor {
+        var body: [String: Any] = [
+            "manifestUrl": manifestUrl.trimmingCharacters(in: .whitespacesAndNewlines),
+            "type": type,
+        ]
+        if !payload.isEmpty {
+            body["payload"] = payload
+        }
+        let response = try await httpClient.postJson(
+            url: try requireURL(queryComponents(path: "/v1/account/addons").url),
+            jsonBody: try JsonParser.encodeObject(body),
+            headers: authHeaders(accessToken, profileId: profileId)
+        )
+        let json = try perform(response)
+        guard let addon = json.jsonObject("addon").flatMap(parseAddon) else {
+            throw CrispyBackendError(
+                httpCode: response.code,
+                code: nil,
+                message: "Backend did not return an installed addon.",
+                category: nil,
+                retryable: false,
+                requestId: nil,
+                details: nil
+            )
+        }
+        return addon
+    }
+
+    /// Removes one installed addon.
+    public func uninstallAddon(accessToken: String, profileId: String, addonId: String) async throws {
+        let trimmed = addonId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw CrispyHttpError.invalidResponse }
+        // The id is a path segment, so it is encoded the way the stream resolver
+        // encodes the ids it puts in a path.
+        let response = try await httpClient.delete(
+            url: try requireURL(queryComponents(path: "/v1/account/addons/\(StreamLookup.encodePathSegment(trimmed))").url),
+            headers: authHeaders(accessToken, profileId: profileId)
+        )
+        guard (200..<300).contains(response.code) else {
+            throw errorEnvelope(code: response.code, body: response.body)
+        }
+    }
+
     // MARK: - Calendar
 
     public func getCalendarThisWeek(accessToken: String, profileId: String) async throws -> [SearchMediaItem] {
@@ -686,6 +740,19 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             "Content-Type": "application/json",
             "Accept": "application/json",
         ]
+    }
+
+    /// The headers a profile-scoped call sends.
+    ///
+    /// The profile is what an installation belongs to, so a call that installs
+    /// or removes one names it.
+    private func authHeaders(_ accessToken: String, profileId: String) -> [String: String] {
+        var headers = authHeaders(accessToken)
+        let trimmed = profileId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            headers["X-Profile-ID"] = trimmed
+        }
+        return headers
     }
 
     private func queryComponents(path: String) throws -> URLComponents {

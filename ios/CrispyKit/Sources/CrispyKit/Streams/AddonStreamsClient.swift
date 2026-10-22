@@ -96,7 +96,8 @@ public struct AddonStreamsClient {
         streamTimeout: TimeInterval
     ) async -> [StreamSource] {
         guard let manifestURL = URL(string: addon.manifestUrl) else { return [] }
-        guard let manifest = await fetchJSON(url: manifestURL, http: http, timeout: manifestTimeout) else { return [] }
+        let manifests = AddonManifestClient(http: http, timeout: manifestTimeout)
+        guard let manifest = await manifests.fetchManifest(url: manifestURL) else { return [] }
         guard let support = StreamSupport.parse(manifest: manifest, manifestURL: manifestURL, addon: addon) else { return [] }
         guard support.supports(mediaType: mediaType, lookupId: encodedLookupId) else { return [] }
         guard let resourceURL = support.resourceURL(mediaType: mediaType, encodedLookupId: encodedLookupId) else { return [] }
@@ -109,15 +110,12 @@ public struct AddonStreamsClient {
         http: StreamHttpFetching,
         timeout: TimeInterval
     ) async -> [String: Any]? {
-        guard let response = try? await http.get(url: url, headers: requestHeaders, timeout: timeout) else { return nil }
+        guard let response = try? await http.get(url: url, headers: AddonManifestClient.requestHeaders, timeout: timeout) else {
+            return nil
+        }
         guard (200..<300).contains(response.code) else { return nil }
         return try? JsonParser.parseObject(response.body)
     }
-
-    private static let requestHeaders: [String: String] = [
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-    ]
 
     private static func parseStreams(_ payload: [String: Any], support: StreamSupport) -> [StreamSource] {
         payload.jsonArray("streams").compactMap { stream in
@@ -196,7 +194,7 @@ private struct StreamSupport {
     /// A manifest with no `resources` at all is taken to serve everything,
     /// which is what the protocol says and what the Android client does.
     static func parse(
-        manifest: [String: Any],
+        manifest: AddonManifest,
         manifestURL: URL,
         addon: AddonDescriptor
     ) -> StreamSupport? {
@@ -205,39 +203,29 @@ private struct StreamSupport {
         // separators of a signed URL.
         let encodedQuery = URLComponents(url: manifestURL, resolvingAgainstBaseURL: false)?.percentEncodedQuery
 
-        let providerId = manifest.jsonString("id") ?? addon.id
-        let providerName = manifest.jsonString("name") ?? (addon.name.isEmpty ? providerId : addon.name)
+        let providerId = manifest.id ?? addon.id
+        let providerName = manifest.name ?? (addon.name.isEmpty ? providerId : addon.name)
 
-        let manifestTypes = parseTypes(manifest.jsonStringList("types"))
+        let manifestTypes = parseTypes(manifest.types)
         let defaultTypes = manifestTypes.isEmpty ? Set(StreamMediaType.allCases) : manifestTypes
-        let defaultPrefixes = manifest.jsonStringList("idPrefixes")
+        let defaultPrefixes = manifest.idPrefixes
 
         var supportedTypes = Set<StreamMediaType>()
         var supportedPrefixes: [String] = []
         var declaresStreams = false
 
-        let resources = manifest["resources"] as? [Any] ?? []
-        if resources.isEmpty {
+        if manifest.resources.isEmpty {
             declaresStreams = true
             supportedTypes = defaultTypes
             supportedPrefixes = defaultPrefixes
         } else {
-            for resource in resources {
-                if let name = resource as? String {
-                    if name.lowercased() == "stream" {
-                        declaresStreams = true
-                        supportedTypes.formUnion(defaultTypes)
-                        supportedPrefixes.append(contentsOf: defaultPrefixes)
-                    }
-                    continue
-                }
-                guard let object = resource as? [String: Any] else { continue }
-                guard object.jsonString("name")?.lowercased() == "stream" else { continue }
+            // A resource that is a bare name narrows nothing, so it keeps the
+            // manifest's own types and prefixes.
+            for resource in manifest.resources where resource.name.lowercased() == "stream" {
                 declaresStreams = true
-                let types = parseTypes(object.jsonStringList("types"))
+                let types = parseTypes(resource.types)
                 supportedTypes.formUnion(types.isEmpty ? defaultTypes : types)
-                let prefixes = object.jsonStringList("idPrefixes")
-                supportedPrefixes.append(contentsOf: prefixes.isEmpty ? defaultPrefixes : prefixes)
+                supportedPrefixes.append(contentsOf: resource.idPrefixes.isEmpty ? defaultPrefixes : resource.idPrefixes)
             }
         }
 

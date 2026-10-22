@@ -1,7 +1,7 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: **Complete** for the seven original landings, all done and green on CI. Two follow-ups are
-now in flight: 8 (addon subtitles reach the player) and 9 (addon management screens).
+Status: **Complete**, including both follow-ups: 8 (addon subtitles reach the player) and 9 (addon
+management screens). Everything below is landed and green on CI.
 
 ## Goal
 
@@ -64,7 +64,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | # | Landing | What it is | State |
 |---|---|---|---|
 | 8 | Addon subtitles | The subtitles a stream carries reach the player: `PlaybackSubtitle` on `PlaybackSource`, mpv `sub-add` for each of them | done |
-| 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | in progress |
+| 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | done |
 
 ## Seams (landing 2) — what is in place now
 
@@ -248,9 +248,8 @@ serves an episode, not a series — so the show's button plays the first episode
 season, and each episode row plays its own episode. The identity the watch events carry is the
 episode's, not the show's.
 
-Two things the resolver deliberately does not do: it does not resolve torrents, and it does not
-hand the addon's subtitles to the player. The subtitles are carried on the stream, and the player
-does not use them yet.
+One thing the resolver deliberately does not do: it does not resolve torrents. The addon's
+subtitles are carried on the stream and handed to the player (landing 8).
 
 ## Smoke harness (landing 7) — what is in place now
 
@@ -302,6 +301,62 @@ inside the stream payload — and those now travel with the media:
 Tests: `ios/CrispyKit/Tests/CrispyKitTests/PlaybackSourceTests.swift` pins what
 travels with a stream (headers and subtitles survive `resuming(at:)`, the
 addon's subtitles become `PlaybackSubtitle`s, an unparseable URL is dropped).
+
+## Addon management (landing 9) — what is in place now
+
+The app could read the account's addons (landing 6 needs them to resolve streams) but had no way
+to change the list: a fresh account's "This account has no addons installed yet." was a dead end.
+The backend already had the endpoints — `GET`/`POST /v1/account/addons` and
+`DELETE /v1/account/addons/{id}` — and the Android app uses them; iOS has no local addon registry
+and no `:addons` module, so the backend is the source of truth and the screen is its list plus the
+two calls that change it.
+
+`ios/CrispyKit/Sources/CrispyKit/Addons/`:
+
+- `AddonManifestURL` — the pure rules that turn what a user typed into a manifest URL, mirroring
+  the Android `ManifestUri`: a bare host becomes `https://`, a `stremio://` share link becomes
+  `https://`, `manifest.json` is appended unless the last path segment already is it
+  (case-insensitively), and the query survives. `base(of:)` is the addon's own directory (the URL
+  without the manifest's file name), and `resolveAsset(base:raw:)` resolves a logo against it the
+  way HTML does (absolute, protocol-relative, root-relative, or beside the manifest) — including a
+  `data:` URL, which is why the scheme check does not require `//`.
+- `AddonManifest` / `AddonManifestResource` — the manifest, read leniently. **This is the single
+  home for the protocol's "a resource is a string or an object" rule**: the stream resolver reads
+  it from here too (`AddonStreamsClient`'s private manifest parser was replaced by
+  `AddonManifestClient`/`AddonManifest` in this landing, so the two screens cannot drift).
+  `resourceNames` is the order-preserving dedupe the preview shows; the resolver still sees every
+  declaration.
+- `AddonManifestPreview` — what the install card shows, with the Android app's four warnings in
+  its order (insecure HTTP, no addon id, no resources, no media types) and the name falling back
+  `manifest.name ?? manifest.id ?? "Unknown addon"`.
+- `AddonManifestClient` / `AddonManifestFetching` — the manifest fetch, over the same
+  `StreamHttpFetching` transport the resolver uses and with the same request headers. A manifest
+  that cannot be fetched and one that cannot be read are the same answer: there is nothing to
+  install. The protocol is the seam a test fake goes through.
+- `AddonStore` — `listAddons` / `installAddon` / `uninstallAddon`, with
+  `extension CrispyBackendClient: AddonStore`. The concrete methods
+  (`CrispyBackendClient.installAddon` / `uninstallAddon`) are new; the uninstall path needed a
+  profile-scoped header, so the client grew a private `authHeaders(_:profileId:)` — nothing in the
+  iOS client had sent `X-Profile-ID` before.
+- `AddonsSettingsViewModel` — the sequence: load the account's addons once (unless refreshed),
+  check the draft (empty → "Enter an addon manifest URL first."; unnormalizable → "The addon URL is
+  invalid. Try a full manifest URL."; already installed, compared case-insensitively → "That addon
+  is already installed."; unreadable manifest → "Unable to load addon manifest from that URL."),
+  preview it, install it (`Installed <name>.`), remove it (`Removed <name>.`). The store and the
+  manifest fetch are protocols and the backend context is a closure, so the whole sequence is
+  testable without a network.
+
+`ios/Apps/iOS/Features/Settings/AddonsSettingsView.swift` is the screen (List: *Add addon* with
+the URL field and the check step, *Install this addon?* with the preview and its warnings,
+*Installed* with a destructive row action behind a confirmation alert, and a messages section),
+reached from Account settings → Addons → Manage addons. It follows the app's existing shape:
+`@Environment(AppEnvironment.self)`, `@State private var viewModel: …?`, `Binding(get:set:)` for
+the field, and no `@Bindable` (which the app does not use).
+
+Tests: `AddonManifestTests` (the URL rules, both resource shapes, the base and the asset
+resolution, the preview and its warnings) and `AddonsSettingsViewModelTests` (load once and
+forced, no sign-in, every `checkDraft` answer, install with the profile and the previewed URL, a
+failed install that keeps the preview, remove by id and by host).
 
 ## Contract v3 (landing 1) — what changes and why
 
