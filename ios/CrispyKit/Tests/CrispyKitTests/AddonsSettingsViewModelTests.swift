@@ -180,7 +180,7 @@ final class AddonsSettingsViewModelTests: XCTestCase {
         let manifests = FakeManifestFetching(manifests: [
             "https://addon.example/manifest.json": exampleManifest,
         ])
-        let viewModel = makeViewModel(store: store, manifests: manifests)
+        let viewModel = makeViewModel(store: store, manifests: manifests, context: { nil })
         viewModel.updateDraftUrl("addon.example")
         await viewModel.checkDraft()
 
