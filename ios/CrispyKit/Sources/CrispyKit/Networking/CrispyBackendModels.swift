@@ -483,4 +483,57 @@ public let resumePositionSeconds: Double?
 public let durationSeconds: Double?
 public let progressPercent: Double?
 public let liked: Bool?
+
+/// Where playback should resume, in the milliseconds the player counts in.
+///
+/// The backend counts in seconds and the player counts in milliseconds, so
+/// the conversion happens here — once, at the boundary — rather than at every
+/// call site.
+public var resumePositionMs: Int64? {
+    guard let resumePositionSeconds, resumePositionSeconds > 0 else { return nil }
+    return Int64((resumePositionSeconds * 1000).rounded())
+}
+}
+
+/// A playback event, mirroring the Android `PlaybackEventInput`.
+///
+/// The backend records what was watched from these, so the field names are
+/// the backend's vocabulary and not the player's.
+public struct PlaybackEventInput: Equatable, Sendable {
+    /// A unique id for this event, so the backend can drop a duplicate.
+    public let clientEventId: String
+    /// What happened: `playback_progress`, `playback_progress_snapshot` or
+    /// `playback_completed`.
+    public let eventType: String
+    public let itemId: String
+    public let positionSeconds: Double?
+    public let durationSeconds: Double?
+    public let seasonNumber: Int?
+    public let episodeNumber: Int?
+    /// When it happened, as a UTC ISO-8601 instant.
+    public let occurredAt: String?
+    /// Free-form context, such as the title and the client that sent it.
+    public let payload: [String: String]
+
+    public init(
+        clientEventId: String,
+        eventType: String,
+        itemId: String,
+        positionSeconds: Double? = nil,
+        durationSeconds: Double? = nil,
+        seasonNumber: Int? = nil,
+        episodeNumber: Int? = nil,
+        occurredAt: String? = nil,
+        payload: [String: String] = [:]
+    ) {
+        self.clientEventId = clientEventId
+        self.eventType = eventType
+        self.itemId = itemId
+        self.positionSeconds = positionSeconds
+        self.durationSeconds = durationSeconds
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
+        self.occurredAt = occurredAt
+        self.payload = payload
+    }
 }

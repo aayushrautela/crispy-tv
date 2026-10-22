@@ -26,6 +26,12 @@ public final class PlayerSession {
     /// The message of the last failure, kept beside the contract state
     /// because the contract has no field for it.
     public private(set) var lastErrorMessage: String?
+    /// Called after the playhead is moved on purpose.
+    ///
+    /// The session does not report progress itself — it only says that the
+    /// playhead jumped, so a progress reporter can arm its settle window
+    /// instead of persisting the engine's transient position of 0.
+    @ObservationIgnored public var onSeek: (@MainActor (Int64) -> Void)?
 
     @ObservationIgnored private let engine: PlaybackEngine
     @ObservationIgnored private let nowMs: () -> Int64
@@ -91,6 +97,7 @@ public final class PlayerSession {
     public func seek(to positionMs: Int64) {
         self.positionMs = positionMs
         engine.seek(to: positionMs)
+        onSeek?(positionMs)
     }
 
     /// Choose the track that plays, or turn a kind of track off. The engine

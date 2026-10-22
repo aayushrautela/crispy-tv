@@ -450,6 +450,34 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
         try await postWatchMutation(accessToken: accessToken, profileId: profileId, path: "unmark-watched", itemId: itemId)
     }
 
+    /// Records what the player did, mirroring the Android `sendWatchEvent`.
+    ///
+    /// The optional fields are left out of the payload rather than sent as
+    /// null, because the backend reads "absent" and "null" differently.
+    public func sendWatchEvent(
+        accessToken: String,
+        profileId: String,
+        input: PlaybackEventInput
+    ) async throws -> WatchActionResponse {
+        var payload: [String: Any] = [
+            "clientEventId": input.clientEventId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "eventType": input.eventType.trimmingCharacters(in: .whitespacesAndNewlines),
+            "itemId": input.itemId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "payload": input.payload,
+        ]
+        if let positionSeconds = input.positionSeconds { payload["positionSeconds"] = positionSeconds }
+        if let durationSeconds = input.durationSeconds { payload["durationSeconds"] = durationSeconds }
+        if let seasonNumber = input.seasonNumber { payload["seasonNumber"] = seasonNumber }
+        if let episodeNumber = input.episodeNumber { payload["episodeNumber"] = episodeNumber }
+        if let occurredAt = input.occurredAt?.nilIfBlank { payload["occurredAt"] = occurredAt }
+        let json = try await postJson(
+            path: "/v1/profiles/\(profileId)/watch/events",
+            accessToken: accessToken,
+            payload: payload
+        )
+        return parseWatchActionResponse(json)
+    }
+
     // MARK: - Parsers
 
     private func parseUser(_ json: [String: Any]) -> BackendUser {

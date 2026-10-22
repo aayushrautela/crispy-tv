@@ -1,7 +1,7 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: In progress. Landings 1 (contract v3), 2 (seams), 3 (the libmpv engine) and 4 (the
-player chrome) are done; landing 5 (progress reporting) is the current work.
+Status: In progress. Landings 1 (contract v3), 2 (seams), 3 (the libmpv engine), 4 (the player
+chrome) and 5 (progress reporting) are done; landing 6 (a playable stream) is the current work.
 
 ## Goal
 
@@ -55,7 +55,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 2 | Seams | `PlaybackEngine` protocol, `PlayerSession` owning the contract reducer, `PlaybackSource` (url + headers + resume) | done |
 | 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | done |
 | 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | done |
-| 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | pending |
+| 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | done |
 | 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | pending |
 | 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | partial (the screen exists; the launch argument does not) |
 
@@ -164,6 +164,54 @@ when the list actually differs.
 There is **no Picture in Picture**: mpv draws its own frames, so the system's picture-in-picture
 controller has no video layer to show, and Nuvio's iOS build has no `AVPictureInPictureController`
 at all.
+
+## Progress (landing 5) — what is in place now
+
+iOS could **read** progress (`getWatchState`) but could not write any: `CrispyBackendClient` had
+no `sendWatchEvent`, so nothing the player did reached the backend. It does now, and the player
+reports what it did.
+
+- `CrispyBackendClient.sendWatchEvent(accessToken:profileId:input:)` — posts to
+  `/v1/profiles/{profileId}/watch/events`. The optional fields are left out of the payload
+  rather than sent as null, because the backend reads "absent" and "null" differently.
+- `PlaybackEventInput` — the event's shape, mirroring the Android `PlaybackEventInput`: the
+  client event id, the event type, the item, the position and duration in seconds, the season
+  and episode, the moment it happened, and a free-form payload.
+- `PlaybackIdentity` — what is playing, in the shape the watch events carry. The Android
+  identity carries more (the content type, the external ids, the year); only the fields that
+  reach an event are here.
+- `PlaybackProgressReporter` — owns every "the player moved" report, member for member with the
+  Android `PlaybackProgressReporter`: `syncWatchHistory` (the poll), `scheduleProgressSyncAfterSeek`
+  (the settle window) and `reportPlaybackStopped` (the end of playback, once). It applies the
+  contract's `resolveProgressWrite` itself, because iOS has no `WatchHistoryService` port to
+  apply it for it. The two clocks are injected — a wall clock for the event's instant and a
+  monotonic clock for the settle window and the persist interval — so the reporter is
+  deterministic under test.
+- `PlaybackEventType` — the backend's vocabulary: `playback_progress`,
+  `playback_progress_snapshot`, `playback_completed`.
+- `WatchState.resumePositionMs` — the resume position in the milliseconds the player counts in,
+  converted once at the boundary.
+
+Two deliberate differences from Android, both documented in the code:
+
+- Android sends **two** events when playback stops (a snapshot, then the completion). The two
+  carry the same position and the backend needs one, so this sends one. The `player_progress`
+  contract covers the gating rules, not the number of events.
+- Android clears the settle window on a timer; here the first poll after the window clears it.
+  Nothing is sent between polls, so the only thing the timer could do was clear the last-sync
+  stamp — which that poll does too.
+
+The app wiring lives in `MPVPlayerScreen`: it owns the reporter, polls the session every 500 ms
+(the cadence the Android player polls on), arms the settle window when the session reports a
+seek, and reports the stop when the player closes. The reporter's send resolves the backend
+context when it sends, because the token may have been refreshed since the player opened. The
+player also asks the backend where to resume: `getWatchState` gives the resume position, and a
+position the caller already put on the source wins over it.
+
+`PlaybackProgressReporterTests` covers the start, the minimum position, the missing duration,
+the missing identity, the persist interval, the paused snapshot, the settle window, the stop
+(latched once, pinned to the duration when the item completed), the client event id and the
+instant.
 
 ## Contract v3 (landing 1) — what changes and why
 
