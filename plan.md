@@ -1,9 +1,10 @@
 # Android TV app — home, stream picker, player (`crispy-rewrite`)
 
-Status: **Implemented, not compiled.** The landings below have been written; nothing has been built, because
-no Gradle is installed on the machine this was written on. The first thing to do on a machine with Gradle is
-`./gradlew :android:tv:assembleDebug` and a manual D-pad pass.
-Date: 2026-10-21. Repo: `~/Downloads/crispy-tv`, branch `master`.
+Status: **Implemented and built by CI.** The landings below have been written and compiled by the GitHub workflow
+(there is no Gradle on the machine this was written on, so CI is the compiler): Android run `39732786947` and
+Android Release run `39733319923`, both green on 2026-10-22. What CI cannot do is the **manual D-pad pass** — home →
+card → picker → player → subtitles/audio/speed → change source → back — which still has to be done on a real TV.
+Date: 2026-10-21 (updated 2026-10-22). Repo: `~/Downloads/crispy-tv`, branch `master`.
 
 ## What landed (2026-10-21)
 
