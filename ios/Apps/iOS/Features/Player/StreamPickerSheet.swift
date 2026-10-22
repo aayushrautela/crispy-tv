@@ -101,6 +101,14 @@ struct StreamPickerSheet: View {
             lookupId: request.lookupId,
             environment: environment
         )
+        // The picker is also the loading state, so "auto-select" means the
+        // sheet plays the best stream the moment it has one. An account that
+        // turned it on but has nothing to play still lands on the message.
+        if let stream = model.autoPlayStream(
+            autoSelect: environment.playbackSettings.settings.autoSelectStream
+        ) {
+            play(stream)
+        }
     }
 
     private func play(_ stream: StreamSource) {

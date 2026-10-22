@@ -1,7 +1,8 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: **Complete**, including both follow-ups: 8 (addon subtitles reach the player) and 9 (addon
-management screens). Everything below is landed and green on CI.
+Status: **Complete** for the seven original landings, and for the three follow-ups that followed:
+8 (addon subtitles reach the player), 9 (addon management screens) and 10 (playback settings).
+Everything below is landed and green on CI.
 
 ## Goal
 
@@ -65,6 +66,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 |---|---|---|---|
 | 8 | Addon subtitles | The subtitles a stream carries reach the player: `PlaybackSubtitle` on `PlaybackSource`, mpv `sub-add` for each of them | done |
 | 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | done |
+| 10 | Playback settings | Default audio/subtitle language, playback speed and auto-select stream — stored on the device, honoured by the engine and the stream picker | done |
 
 ## Seams (landing 2) — what is in place now
 
@@ -358,6 +360,78 @@ resolution, the preview and its warnings) and `AddonsSettingsViewModelTests` (lo
 forced, no sign-in, every `checkDraft` answer, install with the profile and the previewed URL, a
 failed install that keeps the preview, remove by id and by host).
 
+## Playback settings (landing 10) — what is in place now
+
+**Four preferences, and only the four iOS has a consumer for:** default audio language, default
+subtitle language, playback speed, and auto-select stream. Android's
+`PlaybackSettingsRepository` carries twelve; the other eight are absent here on purpose — a
+setting nothing reads is a switch that lies.
+
+CrispyKit (`ios/CrispyKit/Sources/CrispyKit/Player/`):
+
+- `LanguageTags` — the ISO 639 vocabulary. `normalize(_:)` stores a two-letter code (`eng` → `en`,
+  `fre` → `fr`, `cmn` → `zh`, a blank tag → `und`), `label(for:)` renders a tag as a language name
+  and gives the keywords a backend sends (`none`/`off`, `forced`, `default`, `device`, `original`,
+  `und`) their own labels, and `selectableLanguages` offers the table's own codes in name order,
+  so the picker cannot offer a language the matcher would not recognise. It is the Swift twin of
+  `android/app/src/commonMain/.../playerui/LanguageLabels.kt` — including its 639-2/B table, which
+  carries both spellings (`fre`/`fr`, `ger`/`de`, `ice`/`is`) rather than canonicalising the input.
+  The Android file takes an `englishDisplayName` slot because `Locale.forLanguageTag` is Android
+  work; here Foundation answers the same question inside the file, so no slot is needed.
+- `PlaybackSettings` — the value: two optional languages, a finite positive speed, an auto-select
+  flag.
+- `PlaybackSettingsStore` — `@MainActor @Observable`, over `UserDefaults`. One writer, one
+  snapshot in memory (the same shape Android's repository arrived at after its change listener
+  turned out to be for a writer that no longer exists). The keys are the strings Android stores
+  (`default_audio_language`, `default_subtitle_language`, `playback_speed`, `auto_select_stream`)
+  — legibility, not a compatibility contract, since the two stores are different stores. A blank
+  language is stored as no language and `nil` *removes* the key, so "Automatic" is an absent key
+  rather than an empty string a later reader has to know to treat as absent. A rate that is not
+  finite and positive falls back to 1, on write and again on read.
+
+Where each preference is honoured:
+
+- **Languages** reach mpv as `alang` / `slang`, set as options before `mpv_initialize`, so the
+  file opens with the right tracks selected instead of being corrected afterwards. mpv matches
+  its own language aliases, so the stored two-letter code is what it wants; an unmatched language
+  means mpv picks a track itself, which is also what "Automatic" means — which is why these
+  options are never critical.
+- **Speed** reaches mpv as the `speed` option, for the same reason: the source opens at the rate.
+- **Auto-select** is the stream picker: `StreamPickerSheet.load()` plays the best stream the moment
+  the resolver returns one (`StreamPickerViewModel.autoPlayStream(autoSelect:)`, whose "best" is
+  the resolver's own quality-then-title order). An account with nothing to play still lands on the
+  picker's message.
+- **The language preference is also written from the player.** `PlayerSession.onTrackSelected`
+  reports the track a viewer picked, mirroring Android's `selectAudioTrack`/`selectSubtitleTrack`;
+  `MPVPlayerScreen.rememberSelection` stores the language of a real track and ignores an "off"
+  pick, because "no subtitles right now" is not a statement about subtitles in general. So the
+  settings screen and the track sheet are the same preference in the same place.
+
+The settings screen itself (`ios/Apps/iOS/Features/Settings/`): `PlaybackSettingsScreen` — a
+Languages section whose rows navigate to `LanguagePickerScreen` (a searchable list of Automatic
+plus every mapped language, checkmark on the current one) and a Playback section with a speed
+menu (0.5×–2×) and the auto-select toggle, its footer describing what iOS actually does. Reached
+from Account settings → Playback.
+
+**Deliberately absent, and why:** skip-intro controls (no segment data on iOS — that is IntroDB/
+AniSkip work), trailer autoplay/muted (the details rail plays a trailer on tap and the engine has
+no mute command), libass render type and engine preference (one engine), resize mode (no mapping
+decided), image quality (its Android consumer is Coil's decoded-image cache; iOS has no
+equivalent).
+
+**A change applies the next time a source is opened** — the engine reads the settings once, when
+it is built. That is documented rather than papered over: a mid-playback speed change would need a
+property write on the running handle and a UI that does not pretend otherwise.
+
+Tests: `LanguageTagsTests` (the three-letter reductions, trimming and case, the keywords, the
+unknown-tag fallback, and that the picker's list is unique and in name order),
+`PlaybackSettingsStoreTests` (the defaults, every preference surviving a second store over the
+same defaults, trimming, blank = absent = key removed, rates of 0/negative/infinite/NaN falling
+back to 1, and a junk stored rate reading back as 1), and one `PlayerSessionTests` case for
+`onTrackSelected` reporting both a track and an "off" pick. The picker's auto-play rule itself is
+not covered by a suite: it is one line over an already-sorted list, and the picker's `load` needs a
+real `AppEnvironment`.
+
 ## Contract v3 (landing 1) — what changes and why
 
 The contract reducer is used by exactly two callers: `android/core-domain` and
@@ -412,8 +486,9 @@ branch and dispatching them; a dispatched run has to be *read* (204 means accept
 - Picture in Picture on iOS (see above).
 - Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
   engine; only direct streams are offered.
-- Playback settings (preferred audio/subtitle language, default quality) and the rest of the
-  settings surface iOS does not have yet.
+- The rest of the settings surface iOS does not have: the Android-only playback rows are named in
+  the landing-10 section above, and there is no image-quality screen, because its Android consumer
+  is Coil's decoded-image cache.
 - A Compose Multiplatform Apple host (the KMP `CrispyUI` framework exists and is exported by
   `:sharedUI`, but no Apple app consumes it; that is a different, larger decision).
 - Apple implementations of `:platform-core`'s six ports (still zero).

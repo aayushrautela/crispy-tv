@@ -64,6 +64,14 @@ struct AccountSettingsScreen: View {
                 }
             }
 
+            Section("Playback") {
+                NavigationLink {
+                    PlaybackSettingsScreen()
+                } label: {
+                    Label("Playback", systemImage: "slider.horizontal.3")
+                }
+            }
+
             Section("Addons") {
                 NavigationLink {
                     AddonsSettingsScreen()

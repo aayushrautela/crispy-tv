@@ -164,6 +164,19 @@ final class PlayerSessionTests: XCTestCase {
         XCTAssertEqual(engine.trackSelections, [.track(track), .disabled(.subtitle)])
     }
 
+    func testAChosenTrackIsReportedToTheCaller() {
+        let engine = FakePlaybackEngine()
+        let session = makeSession(engine: engine)
+        var reported: [PlaybackTrackSelection] = []
+        session.onTrackSelected = { reported.append($0) }
+        let track = PlaybackTrack(id: "3", kind: .audio, title: "English", language: "eng")
+
+        session.selectTrack(.track(track))
+        session.selectTrack(.disabled(.subtitle))
+
+        XCTAssertEqual(reported, [.track(track), .disabled(.subtitle)])
+    }
+
     func testOpenClearsTheTracksOfThePreviousMedia() async {
         let engine = FakePlaybackEngine()
         let session = makeSession(engine: engine)

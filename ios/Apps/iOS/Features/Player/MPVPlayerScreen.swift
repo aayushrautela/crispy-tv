@@ -57,16 +57,39 @@ struct MPVPlayerScreen: View {
         try? AVAudioSession.sharedInstance().setActive(true)
 
         let resumePositionMs = await resumePositionMs()
-        let engine = MPVPlaybackEngine()
+        let engine = MPVPlaybackEngine(settings: environment.playbackSettings.settings)
         let session = PlayerSession(engine: engine)
         let reporter = makeReporter()
         // A seek moves the playhead on purpose, so the engine's transient
         // position of 0 must not be persisted as progress.
         session.onSeek = { _ in reporter.scheduleProgressSyncAfterSeek() }
+        // A track the viewer picks is the preference: the player is the only
+        // place a language is chosen, so it is the only writer.
+        session.onTrackSelected = { selection in rememberSelection(selection) }
         self.engine = engine
         self.session = session
         self.reporter = reporter
         session.open(source.resuming(at: resumePositionMs))
+    }
+
+    /// Store the language of a picked track, the way the Android player does.
+    ///
+    /// Only a real track with a language is remembered. An "off" pick and a
+    /// track mpv reports no language for both leave the preference alone — a
+    /// pick of "no subtitles right now" is not a statement about subtitles in
+    /// general, and a track with no language tag has nothing to store.
+    private func rememberSelection(_ selection: PlaybackTrackSelection) {
+        guard case .track(let track) = selection else { return }
+        guard let language = track.language?.nilIfBlank else { return }
+        let code = LanguageTags.normalize(language)
+        switch track.kind {
+        case .audio:
+            environment.playbackSettings.setDefaultAudioLanguage(code)
+        case .subtitle:
+            environment.playbackSettings.setDefaultSubtitleLanguage(code)
+        case .video:
+            break
+        }
     }
 
     /// Where playback should resume, from the backend's watch state.

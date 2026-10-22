@@ -55,6 +55,8 @@ public let contextResolver: BackendContextResolver
 public let bootstrap: BootstrapViewModel
 /// Resolves the streams the account's addons offer for a title.
 public let streamsClient: AddonStreamsClient
+/// The playback preferences the player and the stream picker honour.
+public let playbackSettings: PlaybackSettingsStore
 
 public init(config: AppConfig = .load()) {
         self.config = config
@@ -71,6 +73,7 @@ public init(config: AppConfig = .load()) {
         self.contextResolver = BackendContextResolver(supabase: supabase, profileStore: profileStore)
         self.bootstrap = BootstrapViewModel(supabase: supabase, profileStore: profileStore)
         self.streamsClient = AddonStreamsClient(http: httpClient)
+        self.playbackSettings = PlaybackSettingsStore()
     }
 
     /// Resolves the current backend context, refreshing the session if needed.

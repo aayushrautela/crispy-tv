@@ -40,7 +40,7 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
     private var lastPositionMs: Int64 = -1
     private var lastTracks: [PlaybackTrack] = []
 
-    init() {
+    init(settings: PlaybackSettings = .default) {
         let events = AsyncStream.makeStream(of: PlaybackEvent.self)
         stream = events.stream
         continuation = events.continuation
@@ -48,7 +48,7 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         let layer = MPVPlaybackEngine.makeMetalLayer()
         metalLayer = layer
 
-        let started = MPVPlaybackEngine.startHandle(for: layer)
+        let started = MPVPlaybackEngine.startHandle(for: layer, settings: settings)
         handle = started.handle
         if let handle = started.handle {
             startEventLoop(handle)
@@ -185,6 +185,30 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
     /// The options the engine cannot run without.
     private static let criticalOptions: Set<String> = ["vo", "gpu-api", "gpu-context"]
 
+    /// The options the viewer's settings add to the ones the engine needs.
+    ///
+    /// `alang` and `slang` are mpv's own preference lists: they decide which
+    /// audio and which subtitle track is selected when a file opens, and mpv
+    /// matches them against its own language aliases, so the stored two-letter
+    /// code is what it wants. The rate is an option as well, so a source opens
+    /// playing at it rather than being seeked into agreement afterwards.
+    ///
+    /// These are never critical: a language no track matches just means mpv
+    /// picks a track itself, which is also what "Automatic" means.
+    private static func playbackOptions(_ settings: PlaybackSettings) -> [(name: String, value: String)] {
+        var options: [(name: String, value: String)] = []
+        if let language = settings.defaultAudioLanguage?.nilIfBlank {
+            options.append(("alang", language))
+        }
+        if let language = settings.defaultSubtitleLanguage?.nilIfBlank {
+            options.append(("slang", language))
+        }
+        if settings.playbackSpeed != 1 {
+            options.append(("speed", String(format: "%.2f", settings.playbackSpeed)))
+        }
+        return options
+    }
+
     private static func makeMetalLayer() -> MPVMetalLayer {
         // A layer belongs to the thread that draws it, so it is made on the
         // main thread even when the engine is built elsewhere.
@@ -197,7 +221,10 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
         return layer
     }
 
-    private static func startHandle(for layer: MPVMetalLayer) -> (handle: OpaquePointer?, error: String) {
+    private static func startHandle(
+        for layer: MPVMetalLayer,
+        settings: PlaybackSettings
+    ) -> (handle: OpaquePointer?, error: String) {
         guard let handle = mpv_create() else {
             return (nil, "libmpv could not be created")
         }
@@ -226,6 +253,12 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
             }
             mpv_terminate_destroy(handle)
             return (nil, "libmpv rejected the option \(option.name)")
+        }
+
+        for option in playbackOptions(settings) {
+            // A preference mpv will not take is a preference it does without:
+            // the options above are the ones that make a player playable.
+            _ = mpv_set_option_string(handle, option.name, option.value)
         }
 
         if mpv_initialize(handle) < 0 {

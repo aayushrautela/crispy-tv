@@ -42,4 +42,16 @@ public final class StreamPickerViewModel {
             errorMessage = "No playable source was found for this title."
         }
     }
+
+    /// The stream to play without being asked, when the viewer turned
+    /// auto-select on.
+    ///
+    /// The best stream is the first one: the resolver sorts by quality and then
+    /// by title, and the picker lists them in that order. No streams means no
+    /// answer — the caller keeps the picker, which is where the empty case's
+    /// message already lives.
+    public func autoPlayStream(autoSelect: Bool) -> StreamSource? {
+        guard autoSelect else { return nil }
+        return streams.first
+    }
 }

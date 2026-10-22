@@ -32,6 +32,13 @@ public final class PlayerSession {
     /// playhead jumped, so a progress reporter can arm its settle window
     /// instead of persisting the engine's transient position of 0.
     @ObservationIgnored public var onSeek: (@MainActor (Int64) -> Void)?
+    /// Called after a track is chosen.
+    ///
+    /// The session has no preference store and no business owning one: it only
+    /// says which track a viewer picked, and the app decides whether that pick
+    /// is worth remembering. It fires for an "off" pick too, so the two call
+    /// sites cannot disagree about what counts as a pick.
+    @ObservationIgnored public var onTrackSelected: (@MainActor (PlaybackTrackSelection) -> Void)?
 
     @ObservationIgnored private let engine: PlaybackEngine
     @ObservationIgnored private let nowMs: () -> Int64
@@ -104,6 +111,7 @@ public final class PlayerSession {
     /// reports the new list back through a `tracksChanged` event.
     public func selectTrack(_ selection: PlaybackTrackSelection) {
         engine.selectTrack(selection)
+        onTrackSelected?(selection)
     }
 
     /// Release the engine and stop observing it. Called when the player is
