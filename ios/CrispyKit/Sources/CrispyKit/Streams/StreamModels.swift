@@ -120,10 +120,22 @@ public struct StreamSource: Equatable, Sendable, Identifiable {
     ///
     /// The headers travel with it: an addon that needs a referer or a
     /// user-agent to serve the file says so in the stream's behavior hints, and
-    /// the player has to send them.
+    /// the player has to send them. The subtitles travel with it too — they are
+    /// files the same addon offers for the same stream, so playing the stream
+    /// and playing it with those subtitles are one decision.
     public var playbackSource: PlaybackSource? {
         guard let url, let parsed = URL(string: url), parsed.scheme != nil else { return nil }
-        return PlaybackSource(url: parsed, headers: headers)
+        return PlaybackSource(
+            url: parsed,
+            headers: headers,
+            subtitles: subtitles.compactMap { subtitle in
+                PlaybackSubtitle(
+                    rawUrl: subtitle.url,
+                    label: subtitle.name,
+                    language: subtitle.language
+                )
+            }
+        )
     }
 
     /// The height the title claims, when it claims one.

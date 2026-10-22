@@ -82,6 +82,24 @@ final class MPVPlaybackEngine: PlaybackEngine, @unchecked Sendable {
             arguments.append(String(format: "start=%.3f", seconds))
         }
         command(handle, "loadfile", arguments: arguments)
+
+        // The subtitles the stream came with. `auto` leaves the choice to mpv's
+        // own selection: an embedded track the user's language matches still
+        // wins, and the external one is listed in the track sheet either way.
+        // The label and the language are positional, so a language without a
+        // label needs the label's empty string.
+        for subtitle in source.subtitles {
+            var subtitleArguments = [subtitle.url.absoluteString, "auto"]
+            let label = subtitle.label ?? ""
+            let language = subtitle.language ?? ""
+            if !language.isEmpty {
+                subtitleArguments.append(label)
+                subtitleArguments.append(language)
+            } else if !label.isEmpty {
+                subtitleArguments.append(label)
+            }
+            command(handle, "sub-add", arguments: subtitleArguments)
+        }
     }
 
     func play() {

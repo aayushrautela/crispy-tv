@@ -1,8 +1,7 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: **Complete.** All seven landings are done and green on CI: 1 (contract v3), 2 (seams),
-3 (the libmpv engine), 4 (the player chrome), 5 (progress reporting), 6 (the streams) and
-7 (the launch-argument smoke harness). The known gaps are stated at the end of this file.
+Status: **Complete** for the seven original landings, all done and green on CI. Two follow-ups are
+now in flight: 8 (addon subtitles reach the player) and 9 (addon management screens).
 
 ## Goal
 
@@ -59,6 +58,13 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | done |
 | 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | done |
 | 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | done |
+
+### Follow-ups
+
+| # | Landing | What it is | State |
+|---|---|---|---|
+| 8 | Addon subtitles | The subtitles a stream carries reach the player: `PlaybackSubtitle` on `PlaybackSource`, mpv `sub-add` for each of them | done |
+| 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | in progress |
 
 ## Seams (landing 2) — what is in place now
 
@@ -266,6 +272,37 @@ xcrun simctl launch booted com.crispy.rewrite.ios -mpvSmokeURL https://example.c
 
 Both are `#if DEBUG`, so neither is in a release build.
 
+## Addon subtitles (landing 8) — what is in place now
+
+An addon offers subtitles next to the stream it offers — one URL per language,
+inside the stream payload — and those now travel with the media:
+
+- `PlaybackSubtitle` (`CrispyKit/Player/`) is a subtitle file: its URL, the
+  provider's name for it, and its language. `PlaybackSubtitle(rawUrl:label:language:)`
+  is the lenient door the addon payload comes through, and it refuses anything
+  without a scheme.
+- `PlaybackSource` carries `subtitles: [PlaybackSubtitle]`, and `resuming(at:)`
+  keeps them — a replay has to send the same requests as the first open.
+- `StreamSource.playbackSource` maps the addon's own `subtitles` payload into
+  them, so choosing a stream in the picker chooses its subtitles with it. A
+  subtitle entry whose URL does not parse is dropped, not failed on.
+- `MPVPlaybackEngine.open` runs `sub-add <url> auto <title> <lang>` for each of
+  them, right after `loadfile`. `auto` is mpv's "add it, but let the default
+  selection decide": an embedded track that matches the user's language still
+  wins, and the external one is listed in the track sheet either way (mpv
+  reports external subtitle tracks through `track-list` like any other, so the
+  sheet and the selection needed no change).
+- The subtitle request uses the stream's own `http-header-fields`, which is
+  what mpv applies to every request it makes for the file. An addon whose
+  subtitles live behind a *different* header set than its streams is the known
+  limit of this, and nothing in the addon protocol says otherwise; the way out
+  would be `file-local-options/http-header-fields` around the `sub-add`, which
+  mpv refuses to scope to a subtitle track alone.
+
+Tests: `ios/CrispyKit/Tests/CrispyKitTests/PlaybackSourceTests.swift` pins what
+travels with a stream (headers and subtitles survive `resuming(at:)`, the
+addon's subtitles become `PlaybackSubtitle`s, an unparseable URL is dropped).
+
 ## Contract v3 (landing 1) — what changes and why
 
 The contract reducer is used by exactly two callers: `android/core-domain` and
@@ -320,10 +357,8 @@ branch and dispatching them; a dispatched run has to be *read* (204 means accept
 - Picture in Picture on iOS (see above).
 - Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
   engine; only direct streams are offered.
-- The subtitles an addon carries on a stream (`StreamSource.subtitles`) are resolved but not yet
-  handed to the player.
-- Addon-management screens: the iOS app reads the account's addon list from the backend but has
-  no screens to install, remove or configure an addon.
+- Playback settings (preferred audio/subtitle language, default quality) and the rest of the
+  settings surface iOS does not have yet.
 - A Compose Multiplatform Apple host (the KMP `CrispyUI` framework exists and is exported by
   `:sharedUI`, but no Apple app consumes it; that is a different, larger decision).
 - Apple implementations of `:platform-core`'s six ports (still zero).
