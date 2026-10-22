@@ -10,6 +10,8 @@ struct DetailsScreen: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: DetailsViewModel?
     @State private var showPlaybackNotice = false
+    @State private var playbackNotice = "This title has no playable source yet."
+    @State private var streamRequest: StreamRequest?
     @State private var ratings: TitleRatings?
 
     var body: some View {
@@ -25,6 +27,9 @@ struct DetailsScreen: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+        .sheet(item: $streamRequest) { request in
+            StreamPickerSheet(request: request)
+        }
         .task {
             let vm = ensureViewModel()
             await vm.loadIfNeeded(environment: environment)
@@ -250,9 +255,9 @@ struct DetailsScreen: View {
     private func watchCta(_ viewModel: DetailsViewModel) -> some View {
         HStack(spacing: 10) {
             Button {
-                showPlaybackNotice = true
+                play(viewModel)
             } label: {
-                Label("Play", systemImage: "play.fill")
+                Label(viewModel.ctaLabel, systemImage: viewModel.ctaIconSystemName)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -260,12 +265,69 @@ struct DetailsScreen: View {
             .alert("Playback", isPresented: $showPlaybackNotice) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("The player arrives with the next milestone.")
+                Text(playbackNotice)
             }
 
             voteButton(viewModel, isLike: true)
             voteButton(viewModel, isLike: false)
         }
+    }
+
+    /// Opens the stream picker for what this title is.
+    ///
+    /// A show has no streams of its own — an addon serves an episode, not a
+    /// series — so the show's button plays the first episode of the selected
+    /// season, and each episode row plays its own episode.
+    private func play(_ viewModel: DetailsViewModel) {
+        guard let detail = viewModel.detail else { return }
+        if viewModel.isShow {
+            guard let episode = viewModel.episodes.first else {
+                playbackNotice = "This season has no episode to play yet."
+                showPlaybackNotice = true
+                return
+            }
+            play(episode, showTitle: detail.item.title)
+            return
+        }
+        play(detail.item, showTitle: nil)
+    }
+
+    private func play(_ card: ClientMediaCard, showTitle: String?) {
+        guard let request = makeStreamRequest(for: card, showTitle: showTitle) else {
+            playbackNotice = "This title has no playable source yet."
+            showPlaybackNotice = true
+            return
+        }
+        streamRequest = request
+    }
+
+    private func makeStreamRequest(
+        for card: ClientMediaCard,
+        showTitle: String?
+    ) -> StreamRequest? {
+        let season = card.parent?.seasonNumber
+        let episode = card.parent?.episodeNumber
+        guard let lookupId = StreamLookup.lookupId(
+            imdbId: card.providerIds.imdb,
+            itemId: card.itemId,
+            season: season,
+            episode: episode
+        ) else { return nil }
+        let mediaType: StreamMediaType = showTitle == nil
+            ? (StreamMediaType(metadataMediaType: card.mediaType) ?? .movie)
+            : .series
+        return StreamRequest(
+            mediaType: mediaType,
+            lookupId: lookupId,
+            identity: PlaybackIdentity(
+                itemId: card.itemId,
+                title: card.title,
+                showTitle: showTitle,
+                season: season,
+                episode: episode
+            ),
+            title: card.title
+        )
     }
 
     private func voteButton(_ viewModel: DetailsViewModel, isLike: Bool) -> some View {
@@ -346,7 +408,9 @@ struct DetailsScreen: View {
             } else {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(viewModel.episodes) { episode in
-                        EpisodeRow(episode: episode)
+                        EpisodeRow(episode: episode) {
+                            play(episode, showTitle: viewModel.detail?.item.title)
+                        }
                     }
                 }
             }
@@ -401,6 +465,8 @@ struct DetailsScreen: View {
 
 struct EpisodeRow: View {
     let episode: ClientMediaCard
+    /// Plays this episode, when the row is asked to.
+    var onPlay: (() -> Void)?
 
     private var stillUrl: String? {
         episode.images.still.medium ?? episode.images.still.large ?? episode.images.still.small
@@ -440,6 +506,15 @@ struct EpisodeRow: View {
                 }
             }
             Spacer(minLength: 0)
+
+            if let onPlay {
+                Button(action: onPlay) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title2)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(episode.title)")
+            }
         }
     }
 }

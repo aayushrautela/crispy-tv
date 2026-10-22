@@ -53,6 +53,8 @@ public let tokenStore: SessionStoring
 public let profileStore: ActiveProfileStore
 public let contextResolver: BackendContextResolver
 public let bootstrap: BootstrapViewModel
+/// Resolves the streams the account's addons offer for a title.
+public let streamsClient: AddonStreamsClient
 
 public init(config: AppConfig = .load()) {
         self.config = config
@@ -68,6 +70,7 @@ public init(config: AppConfig = .load()) {
         )
         self.contextResolver = BackendContextResolver(supabase: supabase, profileStore: profileStore)
         self.bootstrap = BootstrapViewModel(supabase: supabase, profileStore: profileStore)
+        self.streamsClient = AddonStreamsClient(http: httpClient)
     }
 
     /// Resolves the current backend context, refreshing the session if needed.

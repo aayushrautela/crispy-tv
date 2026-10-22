@@ -1,7 +1,8 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
 Status: In progress. Landings 1 (contract v3), 2 (seams), 3 (the libmpv engine), 4 (the player
-chrome) and 5 (progress reporting) are done; landing 6 (a playable stream) is the current work.
+chrome), 5 (progress reporting) and 6 (the streams) are done; landing 7 (the launch-argument smoke
+harness) is the current work.
 
 ## Goal
 
@@ -56,7 +57,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | done |
 | 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | done |
 | 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | done |
-| 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | pending |
+| 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | done |
 | 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | partial (the screen exists; the launch argument does not) |
 
 ## Seams (landing 2) — what is in place now
@@ -212,6 +213,38 @@ position the caller already put on the source wins over it.
 the missing identity, the persist interval, the paused snapshot, the settle window, the stop
 (latched once, pinned to the duration when the item completed), the client event id and the
 instant.
+
+## Streams (landing 6) — what is in place now
+
+iOS had no way to get a playable URL: there was no addon client at all, and the backend has no
+resolve-streams endpoint. The streams are resolved the way the Android app resolves them — against
+the account's addons, over the addon's own protocol — with one difference: iOS reads the addon list
+from the backend (`/v1/account/addons`) instead of keeping a local registry in sync with it.
+
+- `CrispyBackendClient.listAddons(accessToken:)` — the account's addons.
+- `AddonStreamsClient` — the resolver. It fetches each addon's manifest, reads what the manifest
+  serves (`resources`, `types`, `idPrefixes`), builds the addon's stream resource URL
+  (`{base}/stream/{type}/{id}.json`, with the id percent-encoded and the manifest's own query
+  carried over) and parses the answer. The addons are asked in parallel and their answers are
+  merged in the account's addon order.
+- `StreamLookup` — the id an addon knows an item by: the IMDb id, with the season and the episode
+  for an episode. A backend id that is not an IMDb id is not an addon's id, so it is not used.
+- `StreamSource` — one stream: its title, its URL, the request headers the addon's behavior hints
+  ask for, and the subtitles it offers. A stream with an info hash is a torrent, and iOS has no
+  torrent engine, so the resolver does not offer it.
+- `StreamMediaType` — movie, series or anime.
+- `StreamPickerViewModel` — resolves the streams for one title and holds them.
+- `StreamPickerSheet` — the picker, in the app target. It presents the player over itself, so
+  choosing a stream and watching it is one gesture.
+
+The details screen's Play button opens the picker. A show has no streams of its own — an addon
+serves an episode, not a series — so the show's button plays the first episode of the selected
+season, and each episode row plays its own episode. The identity the watch events carry is the
+episode's, not the show's.
+
+Two things the resolver deliberately does not do: it does not resolve torrents, and it does not
+hand the addon's subtitles to the player. The subtitles are carried on the stream, and the player
+does not use them yet.
 
 ## Contract v3 (landing 1) — what changes and why
 

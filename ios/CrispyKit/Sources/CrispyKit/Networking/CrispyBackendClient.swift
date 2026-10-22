@@ -297,6 +297,30 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         _ = try perform(response)
     }
 
+    // MARK: - Addons
+
+    /// The addons the account has installed.
+    ///
+    /// This is where the player learns where to look for streams: the addons
+    /// live in the account, and the Android app syncs the same list into a
+    /// local registry. iOS has no local registry, so it asks the backend each
+    /// time it needs a stream.
+    public func listAddons(accessToken: String) async throws -> [AddonDescriptor] {
+        let json = try await getJson(path: "/v1/account/addons", accessToken: accessToken)
+        return json.jsonArray("addons").compactMap(parseAddon)
+    }
+
+    private func parseAddon(_ json: [String: Any]) -> AddonDescriptor? {
+        guard let manifestUrl = json.jsonString("manifestUrl") else { return nil }
+        let id = json.jsonString("id") ?? manifestUrl
+        return AddonDescriptor(
+            id: id,
+            manifestUrl: manifestUrl,
+            name: json.jsonString("name") ?? "",
+            type: json.jsonString("type") ?? "stremio"
+        )
+    }
+
     // MARK: - Calendar
 
     public func getCalendarThisWeek(accessToken: String, profileId: String) async throws -> [SearchMediaItem] {
