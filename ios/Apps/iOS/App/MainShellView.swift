@@ -48,6 +48,7 @@ struct MainShellView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        .task { await environment.refreshActiveProfile() }
         .onChange(of: selection) { oldValue, newValue in
             if oldValue == newValue {
                 popToRoot(oldValue)

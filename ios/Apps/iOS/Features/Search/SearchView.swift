@@ -90,6 +90,7 @@ struct SearchScreen: View {
         .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.inline)
         .task { viewModel.loadHistoryIfNeeded() }
+        .profileMenu(onDismissed: {})
     }
 
     private var searchField: some View {

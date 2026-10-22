@@ -57,6 +57,9 @@ public let bootstrap: BootstrapViewModel
 public let streamsClient: AddonStreamsClient
 /// The playback preferences the player and the stream picker honour.
 public let playbackSettings: PlaybackSettingsStore
+/// The active profile the tab chrome shows. Resolved by
+/// `refreshActiveProfile()` (or adopted from a list a screen just fetched).
+public private(set) var activeProfile: ActiveProfileSnapshot?
 
 public init(config: AppConfig = .load()) {
         self.config = config
@@ -81,6 +84,30 @@ public func backendContext() async -> BackendContext? {
         await contextResolver.resolve()
     }
 
+    /// Re-resolves the active profile from the backend and publishes it for the
+    /// tab chrome, mirroring Android's `loadActiveProfile`. A failed or empty
+    /// fetch keeps the last snapshot rather than clearing the avatar.
+public func refreshActiveProfile() async {
+        guard let context = await backendContext() else { return }
+        guard let profiles = try? await backend.listProfiles(accessToken: context.accessToken),
+              !profiles.isEmpty else { return }
+        activeProfile = ActiveProfileSnapshot.resolve(
+            profiles: profiles,
+            activeId: profileStore.activeProfileId(userId: supabase.currentSession()?.userId)
+        )
+    }
+
+    /// Adopts the snapshot from a profile list the caller already fetched (the
+    /// profile menu, profile management), so chrome updates without a second
+    /// round trip. An empty list is ignored for the same reason as above.
+public func adoptActiveProfile(profiles: [BackendProfile]) {
+        guard !profiles.isEmpty else { return }
+        activeProfile = ActiveProfileSnapshot.resolve(
+            profiles: profiles,
+            activeId: profileStore.activeProfileId(userId: supabase.currentSession()?.userId)
+        )
+    }
+
     /// One locked sequence: revoke server-side first, then always wipe local.
 public func signOut() async {
         let userId = supabase.currentSession()?.userId
@@ -88,5 +115,6 @@ public func signOut() async {
         tokenStore.clear()
         profileStore.clear(userId: userId)
         contextResolver.clear()
+        activeProfile = nil
     }
 }

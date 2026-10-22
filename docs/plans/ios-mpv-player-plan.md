@@ -1,8 +1,8 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: **Complete** for the seven original landings, and for the three follow-ups that followed:
-8 (addon subtitles reach the player), 9 (addon management screens) and 10 (playback settings).
-Everything below is landed and green on CI.
+Status: **Complete** for the seven original landings, and for the four follow-ups that followed:
+8 (addon subtitles reach the player), 9 (addon management screens), 10 (playback settings) and
+11 (the settings hub behind the profile menu). Everything below is landed and green on CI.
 
 ## Goal
 
@@ -67,6 +67,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 8 | Addon subtitles | The subtitles a stream carries reach the player: `PlaybackSubtitle` on `PlaybackSource`, mpv `sub-add` for each of them | done |
 | 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | done |
 | 10 | Playback settings | Default audio/subtitle language, playback speed and auto-select stream — stored on the device, honoured by the engine and the stream picker | done |
+| 11 | Settings & account navigation | The profile menu's "Open settings" opens a hub (account and profiles, playback, addons, about), account settings moves behind profile management, and every tab shows the active profile's avatar | done |
 
 ## Seams (landing 2) — what is in place now
 
@@ -432,6 +433,49 @@ back to 1, and a junk stored rate reading back as 1), and one `PlayerSessionTest
 not covered by a suite: it is one line over an already-sorted list, and the picker's `load` needs a
 real `AppEnvironment`.
 
+## Settings & account navigation (landing 11) — what is in place now
+
+Android's shape, mirrored with measured paths: every tab pushes the profile menu
+(`HomeNavGraph`, `DiscoverNavGraph`, `LibraryNavGraph`, `SearchNavGraph` each push `ProfileMenuRoute`),
+the menu leads with "Open settings", and the hub (`SettingsScreen.kt`) owns the settings IA —
+`ProfileManagementRoute` then carries the "Account settings" row (`AuthScreens.kt:898`), so that
+screen does not duplicate the hub's rows.
+
+CrispyKit:
+
+- `ActiveProfileSnapshot` — `id`, `name?`, `avatarUrl?`, resolved by `resolve(profiles:activeId:)`
+  with the same rule as Android's `ProfileMenuRoute.loadActiveProfile`: the stored id wins while it
+  still names a profile, otherwise the first profile, otherwise nothing. `AppEnvironment` holds
+  `activeProfile` and publishes it two ways: `refreshActiveProfile()` reads the backend and the
+  store, `adoptActiveProfile(profiles:)` takes a list a screen just fetched — so the menu's own load
+  and profile management's saves keep every avatar current without a second request. Sign-out clears
+  it.
+
+App (`ios/Apps/iOS`):
+
+- `ProfileMenuPresentation` / `.profileMenu(onDismissed:)` — one modifier owns the trailing avatar
+  and its sheet, so each screen states only what a dismissal means: Home reloads, Discover and
+  Library reload, Search does nothing. Before this, only Home had an avatar; the other two were
+  inert.
+- `SettingsHubScreen` — List sections Account (footer "Customize your experience", as in
+  `SettingsScreen.kt`), Personalization → Playback, Integrations → Addons, System → About.
+- `AboutScreen` — version and build from the bundle, and credits.
+- `ProfileMenuSheet` — "Open settings" (a new `MenuRoute.settings`), "Manage profiles", Sign out.
+- `ProfileManagementScreen` — an "Account settings" section, matching Android's row of the same
+  name.
+- `AccountSettingsScreen` — lost its Playback and Addons sections; the hub is where settings live
+  now. It keeps email, connected services, sign out and delete.
+
+**Deliberately absent, and why:** the Subtitles, Image Quality, Language & Region and Plugins rows.
+Android has the first two live and the others inert (no `onClick` in `SettingsScreen.kt`); iOS omits
+all four rather than drawing a row that does nothing, and each arrives with its own landing. Plugins
+is additionally sideload-built on Android and has no iOS engine.
+
+Tests: `ActiveProfileSnapshotTests` covers the selection rule (stored id wins, unknown id → first,
+no id → first, empty list → nothing), trimming, and blank-as-nothing. The screens are not covered by
+a suite — they are presentation over the snapshot, per the house convention that app-target screens
+stay untested.
+
 ## Contract v3 (landing 1) — what changes and why
 
 The contract reducer is used by exactly two callers: `android/core-domain` and
@@ -486,9 +530,10 @@ branch and dispatching them; a dispatched run has to be *read* (204 means accept
 - Picture in Picture on iOS (see above).
 - Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
   engine; only direct streams are offered.
-- The rest of the settings surface iOS does not have: the Android-only playback rows are named in
-  the landing-10 section above, and there is no image-quality screen, because its Android consumer
-  is Coil's decoded-image cache.
+- The rest of the settings surface iOS does not have: the rows Android draws are named in the
+  landing-10 and landing-11 sections above — Subtitles styling, Image Quality, Language & Region and
+  Plugins are absent here, each until its own landing, and there is no image-quality screen, because
+  its Android consumer is Coil's decoded-image cache.
 - A Compose Multiplatform Apple host (the KMP `CrispyUI` framework exists and is exported by
   `:sharedUI`, but no Apple app consumes it; that is a different, larger decision).
 - Apple implementations of `:platform-core`'s six ports (still zero).

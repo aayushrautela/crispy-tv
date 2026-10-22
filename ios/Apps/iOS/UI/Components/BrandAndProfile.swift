@@ -19,13 +19,13 @@ struct CrispyWordmark: View {
 /// Avatar button in the top bar mirroring `ProfileIconButton`: avatar image,
 /// else initials, else person glyph.
 struct ProfileMenuButton: View {
-    let profileName: String?
+    let name: String?
     let avatarUrl: String?
     var action: () -> Void
 
-    init(profile: BackendProfile?, action: @escaping () -> Void) {
-        self.profileName = profile?.name
-        self.avatarUrl = profile?.avatarUrl
+    init(name: String? = nil, avatarUrl: String? = nil, action: @escaping () -> Void) {
+        self.name = name
+        self.avatarUrl = avatarUrl
         self.action = action
     }
 
@@ -60,9 +60,44 @@ struct ProfileMenuButton: View {
     }
 
     private func initials() -> String? {
-        guard let name = profileName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return nil }
+        guard let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return nil }
         let parts = name.split(separator: " ").prefix(2)
         let joined = parts.compactMap { $0.first }.map(String.init).joined()
         return joined.isEmpty ? nil : joined.uppercased()
+    }
+}
+
+/// Owns the profile-menu sheet and the avatar toolbar button for a tab root, so
+/// every tab gets the Android `ProfileMenuRoute` entry point without repeating
+/// the presentation state. Reads the active profile off the environment.
+struct ProfileMenuPresentation: ViewModifier {
+    var onDismissed: () -> Void
+
+    @Environment(AppEnvironment.self) private var environment
+    @State private var showProfileMenu = false
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProfileMenuButton(
+                        name: environment.activeProfile?.name,
+                        avatarUrl: environment.activeProfile?.avatarUrl
+                    ) {
+                        showProfileMenu = true
+                    }
+                }
+            }
+            .sheet(isPresented: $showProfileMenu) {
+                ProfileMenuSheet(onDismissed: onDismissed)
+            }
+    }
+}
+
+extension View {
+    /// Adds the avatar button and the sheet it opens; `onDismissed` refreshes
+    /// the screen behind the menu, mirroring Android's load key on re-entry.
+    func profileMenu(onDismissed: @escaping () -> Void) -> some View {
+        modifier(ProfileMenuPresentation(onDismissed: onDismissed))
     }
 }

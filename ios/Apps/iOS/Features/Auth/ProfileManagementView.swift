@@ -48,6 +48,14 @@ struct ProfileManagementScreen: View {
                     } label: {
                         Label("Add profile", systemImage: "plus.circle")
                     }
+
+                    Section {
+                        NavigationLink {
+                            AccountSettingsScreen()
+                        } label: {
+                            Label("Account settings", systemImage: "gearshape")
+                        }
+                    }
                 }
             }
             if let errorMessage {
@@ -86,6 +94,7 @@ struct ProfileManagementScreen: View {
         do {
             guard let context = await environment.backendContext() else { return }
             profiles = try await environment.backend.listProfiles(accessToken: context.accessToken)
+            environment.adoptActiveProfile(profiles: profiles)
             if avatars.isEmpty {
                 avatars = (try? await environment.backend.getAvatars(accessToken: context.accessToken)) ?? []
             }

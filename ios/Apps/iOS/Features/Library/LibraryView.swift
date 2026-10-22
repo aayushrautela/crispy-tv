@@ -82,13 +82,9 @@ struct LibraryScreen: View {
         }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ProfileMenuButton(profile: nil) {}
-            }
-        }
         .refreshable { await viewModel.reload(environment: environment) }
         .task { await viewModel.loadIfNeeded(environment: environment) }
+        .profileMenu(onDismissed: { Task { await viewModel.reload(environment: environment) } })
     }
 
     @ViewBuilder
