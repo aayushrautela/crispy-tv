@@ -58,7 +58,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | done |
 | 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | done |
 | 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | done |
-| 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | partial (the screen exists; the launch argument does not) |
+| 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | done |
 
 ## Seams (landing 2) — what is in place now
 
@@ -245,6 +245,26 @@ episode's, not the show's.
 Two things the resolver deliberately does not do: it does not resolve torrents, and it does not
 hand the addon's subtitles to the player. The subtitles are carried on the stream, and the player
 does not use them yet.
+
+## Smoke harness (landing 7) — what is in place now
+
+The engine is only proven by playing something, so the app can be asked to play
+one URL by a launch argument:
+
+```sh
+xcrun simctl launch booted com.crispy.rewrite.ios -mpvSmokeURL https://example.com/movie.mkv
+```
+
+- `SmokeLaunchArguments` reads the argument out of `ProcessInfo`'s arguments,
+  once, at launch. A URL that is not there is not an error: the app starts
+  normally.
+- `CrispyRewriteiOSApp` presents the player over the root when the argument
+  was given, so the harness works whatever the app was showing.
+- `MPVSmokeScreen` is the manual half of the same thing: a debug screen
+  (Account settings → Developer) with a URL field, for when the URL is not
+  known in advance.
+
+Both are `#if DEBUG`, so neither is in a release build.
 
 ## Contract v3 (landing 1) — what changes and why
 
