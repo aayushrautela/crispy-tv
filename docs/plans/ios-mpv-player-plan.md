@@ -1,8 +1,8 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: In progress. Landings 1 (contract v3), 2 (seams), 3 (the libmpv engine), 4 (the player
-chrome), 5 (progress reporting) and 6 (the streams) are done; landing 7 (the launch-argument smoke
-harness) is the current work.
+Status: **Complete.** All seven landings are done and green on CI: 1 (contract v3), 2 (seams),
+3 (the libmpv engine), 4 (the player chrome), 5 (progress reporting), 6 (the streams) and
+7 (the launch-argument smoke harness). The known gaps are stated at the end of this file.
 
 ## Goal
 
@@ -318,6 +318,12 @@ branch and dispatching them; a dispatched run has to be *read* (204 means accept
 ## Not in this plan
 
 - Picture in Picture on iOS (see above).
+- Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
+  engine; only direct streams are offered.
+- The subtitles an addon carries on a stream (`StreamSource.subtitles`) are resolved but not yet
+  handed to the player.
+- Addon-management screens: the iOS app reads the account's addon list from the backend but has
+  no screens to install, remove or configure an addon.
 - A Compose Multiplatform Apple host (the KMP `CrispyUI` framework exists and is exported by
   `:sharedUI`, but no Apple app consumes it; that is a different, larger decision).
 - Apple implementations of `:platform-core`'s six ports (still zero).
