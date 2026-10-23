@@ -62,7 +62,10 @@ public final class UserMutationOutbox {
         // pending entry again, exactly on load.
         var loaded = await store.loadAll()
         loaded = loaded.map { copy($0, status: .pending) }
-        mutations = coalesceMutations(loaded)
+        // An enqueue can win the race into the queue while the file is still
+        // loading — startOnce hands the load to a Task — so the file's half
+        // and the live half merge, and coalescing keeps one entry per target.
+        mutations = coalesceMutations(loaded + mutations)
         await persist()
         processor = Task { await processLoop() }
     }
