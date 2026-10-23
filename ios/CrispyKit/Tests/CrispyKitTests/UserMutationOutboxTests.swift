@@ -290,6 +290,9 @@ final class UserMutationOutboxTests: XCTestCase {
         await waitUntil { executor.executed.count == 2 && outbox.failedMutations.count == 2 }
 
         clock.now = 500_000
+        // The drain is stopped first: a requeued entry is due immediately, so
+        // a live loop would execute — and re-fail — it before the assertion.
+        outbox.stop()
         await outbox.retryFailed()
 
         XCTAssertTrue(outbox.failedMutations.isEmpty, "every failure is pending again")
@@ -297,6 +300,12 @@ final class UserMutationOutboxTests: XCTestCase {
             XCTAssertEqual(mutation.status, .pending)
             XCTAssertEqual(mutation.nextAttemptAtMs, 500_000)
         }
+
+        // And the next start drains them once the backend answers.
+        executor.result = MutationResult(success: true)
+        outbox.startOnce()
+        await waitUntil { outbox.mutations.isEmpty }
+        XCTAssertEqual(executor.executed.count, 4)
     }
 
     func testStartOnceIsIdempotent() async {
