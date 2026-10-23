@@ -1,8 +1,9 @@
 # iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
 
-Status: **Complete** for the seven original landings, and for the four follow-ups that followed:
-8 (addon subtitles reach the player), 9 (addon management screens), 10 (playback settings) and
-11 (the settings hub behind the profile menu). Everything below is landed and green on CI.
+Status: **Complete** for the seven original landings, and for the five follow-ups that followed:
+8 (addon subtitles reach the player), 9 (addon management screens), 10 (playback settings),
+11 (the settings hub behind the profile menu) and 12 (the offline mutation outbox and the local
+watch-progress store). Everything below is landed and green on CI.
 
 ## Goal
 
@@ -68,6 +69,7 @@ Measured from Nuvio's iOS bridge and upstream's build flags:
 | 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | done |
 | 10 | Playback settings | Default audio/subtitle language, playback speed and auto-select stream — stored on the device, honoured by the engine and the stream picker | done |
 | 11 | Settings & account navigation | The profile menu's "Open settings" opens a hub (account and profiles, playback, addons, about), account settings moves behind profile management, and every tab shows the active profile's avatar | done |
+| 12 | Offline outbox & local progress | Mutations (watchlist, watched, rating) queue durably and replay with backoff while a Retry banner surfaces failures, and every playback event is written to a local progress store before any network send, with resume reading that store first | done |
 
 ## Seams (landing 2) — what is in place now
 
@@ -476,6 +478,59 @@ no id → first, empty list → nothing), trimming, and blank-as-nothing. The sc
 a suite — they are presentation over the snapshot, per the house convention that app-target screens
 stay untested.
 
+## Offline outbox & local progress (landing 12) — what is in place now
+
+Android's `UserMutationOutbox` and its `WatchProgressStore`, mirrored in CrispyKit at the same
+seams: mutations queue durably before any send, and progress is written locally before any send.
+
+CrispyKit `Sync/`:
+
+- `PendingMutationStore` — the one JSON file Android names `pending_mutations.json` (Application
+  Support), read tolerantly and replaced wholesale on save. The decode table is Android's: an
+  unknown kind or a missing required field drops the entry, `inflight` reads as `pending` (the
+  backend never saw it), an unlabelled failed entry is retryable, a rating's `nil` desired survives
+  as an explicit null (clear is not absent), and a stored episode `0` stays a real 0 while an
+  absent key means none. File IO runs on a serial queue with atomic writes.
+- `MutationExecutor` — maps each mutation kind onto the backend's watch actions (watchlist
+  put/delete, rating set/delete, mark/unmark watched). Episode and season kinds reject with a
+  "no iOS surface yet" failure rather than executing nothing silently.
+- `UserMutationOutbox` — the drain: `startOnce()` loads, coerces and coalesces the queue, then
+  replays due entries on its own clock with Android's backoff (`planOutbox`,
+  `nextBackoffDelayMs`, max 8 attempts). Enqueue coalesces against the **live** queue (the Android
+  lesson: rapid-fire toggles of different targets both survive; the same target collapses to the
+  latest toggle), success removes, failure re-stamps with backoff, conflict records
+  `serverValue` and waits. Inflight is memory-only — a process death mid-send replays the entry.
+
+CrispyKit `Player/`:
+
+- `WatchProgressStore` — the durability write, `UserDefaults` standing in for Android's
+  `KeyValueStore`: `setWatchProgress`/`getWatchProgress` under `@watch_progress:{type}:{id}`
+  (plus `:{episodeId}` for episodes), `setContentDuration`/`getContentDurationSeconds` under
+  `@content_duration:`, the type segment `movie`/`show`/`anime`, a tolerant read (malformed blob →
+  nil, numeric remote id stringified, blank/null metadata → nothing), and
+  `updateProgressDuration` with Android's 60-second threshold — percentage-preserving re-stamp
+  for a longer cut, skip inside the threshold.
+- `WatchProgressRecorder` — the shared key agreement (`watchProgressKeyParts`) and the
+  record-then-send step: one `PlaybackEventInput` written to the store before the network send,
+  merging whatever the previous entry knew (`remoteImdbId`, `addonId`).
+
+App:
+
+- `MPVPlayerScreen` — `makeReporter`'s send closure calls `recordWatchProgress` first, then the
+  unchanged best-effort send; `resumePositionMs` reads the local store **first** (via the shared
+  key parts), falling back to the backend `getWatchState`.
+- `LibraryViewModel` / `DetailsViewModel` — watchlist, watched and rating toggles are optimistic
+  and enqueue; no revert-on-failure, because the outbox owns the retry now.
+- `LibraryView` — a "Changes waiting to sync" banner with Retry above the grid, and a per-row
+  sync badge (failed → warning triangle, else queued → sync icon).
+
+Tests: `PendingMutationStoreTests` (file round trip for all five kinds and status variants, the
+decode tolerances directly), `UserMutationOutboxTests` (coalescing both ways, due execution,
+failure/backoff, thrown error → "Update failed.", conflict, 8-attempt exhaustion, retry and
+retryFailed, idempotent start, inflight coercion — all on a movable clock), and
+`WatchProgressStoreTests` + `WatchProgressRecorderTests` (round trips, key shapes, thresholds,
+merges, no-op identities).
+
 ## Contract v3 (landing 1) — what changes and why
 
 The contract reducer is used by exactly two callers: `android/core-domain` and
@@ -527,6 +582,20 @@ branch and dispatching them; a dispatched run has to be *read* (204 means accept
 
 ## Not in this plan
 
+- The queue is app-scoped, not profile-scoped, and **sign-out does not clear it** — the mirror of
+  Android's app-level store. If that becomes a product decision, it gets its own landing.
+- Episode/season watched toggles: the outbox's executor rejects those kinds ("no iOS surface
+  yet") because iOS has no episode or season toggle UI; they arrive with the screens that call
+  for them.
+- The Details screen's watchlist button: still a plain backend call; the library rows are what
+  enqueue today.
+- Continue-watching's consumption of the local store, plus the APIs Android carries around the
+  same store with no iOS caller — tombstones, the removal list, `getAll`, debounced change
+  notifications. Each lands with the flow that calls for it.
+- Stop-event parity: iOS still sends one stop event where Android's reporter sends two; deferred
+  with the player's own stop-semantics work.
+- Conflict resolution UI: `MutationResult.conflict` records `serverValue` and waits; nothing on
+  iOS surfaces it yet.
 - Picture in Picture on iOS (see above).
 - Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
   engine; only direct streams are offered.

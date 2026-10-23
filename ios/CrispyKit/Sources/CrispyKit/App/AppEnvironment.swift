@@ -57,6 +57,12 @@ public let bootstrap: BootstrapViewModel
 public let streamsClient: AddonStreamsClient
 /// The playback preferences the player and the stream picker honour.
 public let playbackSettings: PlaybackSettingsStore
+/// The local half of progress persistence: every playback report is written
+/// here before it goes to the backend, and the resume lookup reads it first.
+public let watchProgressStore: WatchProgressStore
+/// The offline outbox for user mutations (watchlist, watched, ratings),
+/// started in the composition root like Android's.
+public let userMutationOutbox: UserMutationOutbox
 /// The active profile the tab chrome shows. Resolved by
 /// `refreshActiveProfile()` (or adopted from a list a screen just fetched).
 public private(set) var activeProfile: ActiveProfileSnapshot?
@@ -77,6 +83,12 @@ public init(config: AppConfig = .load()) {
         self.bootstrap = BootstrapViewModel(supabase: supabase, profileStore: profileStore)
         self.streamsClient = AddonStreamsClient(http: httpClient)
         self.playbackSettings = PlaybackSettingsStore()
+        self.watchProgressStore = WatchProgressStore()
+        self.userMutationOutbox = UserMutationOutbox(
+            store: FileBackedPendingMutationStore(),
+            executor: MediaMutationExecutor(environment: self)
+        )
+        userMutationOutbox.startOnce()
     }
 
     /// Resolves the current backend context, refreshing the session if needed.

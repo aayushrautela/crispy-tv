@@ -92,30 +92,49 @@ struct MPVPlayerScreen: View {
         }
     }
 
-    /// Where playback should resume, from the backend's watch state.
+    /// Where playback should resume: the local progress store first, the
+    /// backend's watch state second.
     ///
     /// A position the caller already put on the source wins: the caller knows
-    /// something about the item that the watch state does not.
+    /// something about the item that neither the store nor the watch state
+    /// does.
+    ///
+    /// The local read is what makes an offline resume work — the event the
+    /// player reported is on disk before any send — and the backend read
+    /// covers progress this device never saw.
     private func resumePositionMs() async -> Int64 {
         if source.resumePositionMs > 0 { return source.resumePositionMs }
-        guard let identity, let itemId = identity.itemId.nilIfBlank else { return 0 }
+        guard let parts = watchProgressKeyParts(identity: identity) else { return 0 }
+        if let local = environment.watchProgressStore.getWatchProgress(
+            id: parts.id,
+            type: parts.type,
+            episodeId: parts.episodeId
+        ), local.currentTimeSeconds > 0 {
+            return Int64(local.currentTimeSeconds * 1000)
+        }
         guard let context = await environment.backendContext() else { return 0 }
         guard let state = try? await environment.backend.getWatchState(
             accessToken: context.accessToken,
             profileId: context.profileId,
-            itemId: itemId
+            itemId: parts.id
         ) else { return 0 }
         return state.resumePositionMs ?? 0
     }
 
     /// The reporter that owns every "the player moved" report.
     ///
-    /// The send closure resolves the backend context when it sends, because
-    /// the token may have been refreshed since the player opened.
+    /// The send closure records the event into the local progress store first
+    /// — the durability write, so a dropped send is a replay rather than a
+    /// loss — and then sends best-effort. The send resolves the backend
+    /// context when it sends, because the token may have been refreshed since
+    /// the player opened.
     private func makeReporter() -> PlaybackProgressReporter {
         let environment = environment
+        let identity = identity
+        let store = environment.watchProgressStore
         return PlaybackProgressReporter(
             sendEvent: { input in
+                recordWatchProgress(store: store, identity: identity, event: input)
                 guard let context = await environment.backendContext() else { return }
                 _ = try? await environment.backend.sendWatchEvent(
                     accessToken: context.accessToken,

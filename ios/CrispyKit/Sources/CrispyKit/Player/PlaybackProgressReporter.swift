@@ -35,8 +35,9 @@ public enum PlaybackEventType: String, Equatable, Sendable {
 /// not the number of events, so nothing observable changes.
 ///
 /// Android also writes the progress into a local watch-progress store on every
-/// report. iOS reads the progress back from the backend, so there is nothing to
-/// write here.
+/// report. iOS does the same now: the send closure the app passes in records
+/// every event into its local store (`recordWatchProgress`) before sending it,
+/// so a dropped send is a delayed write rather than a lost one.
 ///
 /// And the settle window after a seek is cleared by the first poll that arrives
 /// after it rather than by a timer — see `scheduleProgressSyncAfterSeek`.

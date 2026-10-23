@@ -1,3 +1,4 @@
+import ContractRunner
 import Foundation
 
 /// The kinds of media an addon can serve streams for.
@@ -24,6 +25,14 @@ public enum StreamMediaType: String, Equatable, Sendable, CaseIterable {
         case "anime": self = .anime
         default: return nil
         }
+    }
+}
+
+extension MediaContentType {
+    /// The backend's content type for an addon's media type — the two speak
+    /// the same single-word vocabulary (`movie`, `series`, `anime`).
+    public init(_ mediaType: StreamMediaType) {
+        self = MediaContentType(rawValue: mediaType.rawValue) ?? .movie
     }
 }
 

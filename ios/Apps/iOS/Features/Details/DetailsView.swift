@@ -324,7 +324,8 @@ struct DetailsScreen: View {
                 title: card.title,
                 showTitle: showTitle,
                 season: season,
-                episode: episode
+                episode: episode,
+                contentType: MediaContentType(mediaType)
             ),
             title: card.title
         )
