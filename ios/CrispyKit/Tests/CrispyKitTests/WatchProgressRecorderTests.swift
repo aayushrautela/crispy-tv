@@ -59,23 +59,23 @@ final class WatchProgressRecorderTests: XCTestCase {
     }
 
     func testKeyPartsForMovieAndShowAndAnime() {
-        XCTAssertEqual(
-            watchProgressKeyParts(identity: identity(contentType: .movie, season: 1, episode: 2)),
-            (id: "tt1", type: "movie", episodeId: nil),
-            "a movie never carries an episode suffix, whatever the identity happens to know"
-        )
-        XCTAssertEqual(
-            watchProgressKeyParts(identity: identity(contentType: .series, season: 1, episode: 2)),
-            (id: "tt1", type: "show", episodeId: "tt1:1:2")
-        )
-        XCTAssertEqual(
-            watchProgressKeyParts(identity: identity(contentType: .anime, season: 3, episode: 4)),
-            (id: "tt1", type: "anime", episodeId: "tt1:3:4")
-        )
-        XCTAssertNil(
-            watchProgressKeyParts(identity: identity(contentType: .series, season: 1, episode: nil)),
-            "an episode without its number has no episode suffix at all"
-        )
+        let movie = watchProgressKeyParts(identity: identity(contentType: .movie, season: 1, episode: 2))
+        XCTAssertEqual(movie?.id, "tt1")
+        XCTAssertEqual(movie?.type, "movie")
+        XCTAssertNil(movie?.episodeId, "a movie never carries an episode suffix, whatever the identity happens to know")
+
+        let show = watchProgressKeyParts(identity: identity(contentType: .series, season: 1, episode: 2))
+        XCTAssertEqual(show?.id, "tt1")
+        XCTAssertEqual(show?.type, "show")
+        XCTAssertEqual(show?.episodeId, "tt1:1:2")
+
+        let anime = watchProgressKeyParts(identity: identity(contentType: .anime, season: 3, episode: 4))
+        XCTAssertEqual(anime?.id, "tt1")
+        XCTAssertEqual(anime?.type, "anime")
+        XCTAssertEqual(anime?.episodeId, "tt1:3:4")
+
+        let noEpisode = watchProgressKeyParts(identity: identity(contentType: .series, season: 1, episode: nil))
+        XCTAssertNil(noEpisode, "an episode without its number has no episode suffix at all")
     }
 
     func testNilOrBlankIdentityIsNoOp() {

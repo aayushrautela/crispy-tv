@@ -197,7 +197,7 @@ final class PendingMutationStoreTests: XCTestCase {
     }
 
     func testUnlabelledFailedReadsAsRetryable() {
-        let encoded = encodePendingMutation(rating(status: .failed(reason: "boom", retryable: false)))
+        var encoded = encodePendingMutation(rating(status: .failed(reason: "boom", retryable: false)))
         encoded.removeValue(forKey: "statusReason")
         encoded.removeValue(forKey: "retryable")
 
@@ -221,7 +221,7 @@ final class PendingMutationStoreTests: XCTestCase {
     }
 
     func testUnknownContentTypeReadsAsMovie() {
-        let encoded = encodePendingMutation(titleWatched(contentType: .series))
+        var encoded = encodePendingMutation(titleWatched(contentType: .series))
         encoded["contentType"] = "mystery"
         let decoded = decodePendingMutation(encoded) as? TitleWatchedMutation
         XCTAssertEqual(decoded?.contentType, .movie)
