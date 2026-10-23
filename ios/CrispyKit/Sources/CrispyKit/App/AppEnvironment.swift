@@ -61,8 +61,11 @@ public let playbackSettings: PlaybackSettingsStore
 /// here before it goes to the backend, and the resume lookup reads it first.
 public let watchProgressStore: WatchProgressStore
 /// The offline outbox for user mutations (watchlist, watched, ratings),
-/// started in the composition root like Android's.
-public let userMutationOutbox: UserMutationOutbox
+/// started in the composition root like Android's. Implicitly unwrapped
+/// because its executor needs the environment itself: the property is nil
+/// only until init's second phase assigns it the finished instance, one
+/// line later, on the main actor.
+public private(set) var userMutationOutbox: UserMutationOutbox!
 /// The active profile the tab chrome shows. Resolved by
 /// `refreshActiveProfile()` (or adopted from a list a screen just fetched).
 public private(set) var activeProfile: ActiveProfileSnapshot?
@@ -84,7 +87,9 @@ public init(config: AppConfig = .load()) {
         self.streamsClient = AddonStreamsClient(http: httpClient)
         self.playbackSettings = PlaybackSettingsStore()
         self.watchProgressStore = WatchProgressStore()
-        self.userMutationOutbox = UserMutationOutbox(
+        // Every stored property is initialized from here, so `self` can be
+        // passed as an argument — which is what the executor needs.
+        userMutationOutbox = UserMutationOutbox(
             store: FileBackedPendingMutationStore(),
             executor: MediaMutationExecutor(environment: self)
         )

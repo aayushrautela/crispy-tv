@@ -38,6 +38,9 @@ public func watchProgressKeyParts(identity: PlaybackIdentity?) -> (id: String, t
 /// `duration` from the event, and the content duration recorded beside it.
 /// Whatever a previous entry knew about the metadata (`remoteImdbId`,
 /// `addonId`) survives the merge.
+/// Main-actor isolation, because the store is `UserDefaults` on the main
+/// actor and the reporter's send closure is already `@MainActor`.
+@MainActor
 public func recordWatchProgress(
     store: WatchProgressStore,
     identity: PlaybackIdentity?,
@@ -58,7 +61,7 @@ public func recordWatchProgress(
         id: parts.id,
         type: parts.type,
         progress: WatchProgress(
-            currentTimeSeconds: event.positionSeconds,
+            currentTimeSeconds: event.positionSeconds ?? 0,
             durationSeconds: durationSeconds,
             lastUpdatedEpochMs: 0, // the store stamps its own now
             remoteImdbId: existing?.remoteImdbId,
