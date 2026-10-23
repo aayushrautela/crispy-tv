@@ -217,7 +217,11 @@ final class UserMutationOutboxTests: XCTestCase {
         XCTAssertEqual(executor.executed.count, 1)
     }
 
-    func testExhaustedAttemptsStopRetrying() async {
+    /// The Android lesson the exhaustion case teaches: a failure is never
+    /// re-planned on its own — `planOutbox` only plans `pending` — so the
+    /// retry chain is driven by `retry`, and the attempt counter walks to the
+    /// limit one retry at a time, where the last failure is not retryable.
+    func testTheRetryChainEndsAtTheLastAttempt() async {
         let clock = TimeBox()
         clock.now = 100
         let executor = RecordingExecutor()
@@ -228,7 +232,17 @@ final class UserMutationOutboxTests: XCTestCase {
         await outbox.enqueue(watchlist(id: "a", entityId: "tt1", createdAtMs: 1))
         outbox.startOnce()
 
-        await waitUntil(clock: clock, advanceMs: 5_000) { executor.executed.count >= 8 }
+        // The first failure happens on the drain's own; everything after it
+        // waits for a human, exactly like Android's outbox.
+        await waitUntil { outbox.mutations.count == 1 && outbox.mutations[0].attempt == 1 }
+        clock.now += 60_000
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(executor.executed.count, 1, "a failed mutation is never re-planned by the drain")
+
+        for attempt in 2...8 {
+            await outbox.retry(id: "a")
+            await waitUntil { outbox.mutations.count == 1 && outbox.mutations[0].attempt == attempt }
+        }
 
         XCTAssertEqual(executor.executed.count, 8)
         let entry = outbox.mutations[0]
@@ -239,11 +253,6 @@ final class UserMutationOutboxTests: XCTestCase {
             XCTFail("expected a failed status, got \(entry.status)")
         }
         XCTAssertEqual(outbox.failedMutations.map(\.id), ["a"], "it now waits for a human")
-
-        // The queue stays put after the last attempt, however far the clock runs.
-        clock.now += 600_000
-        try? await Task.sleep(nanoseconds: 20_000_000)
-        XCTAssertEqual(executor.executed.count, 8)
     }
 
     func testRetryRequeuesOneMutationNow() async {

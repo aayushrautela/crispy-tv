@@ -498,8 +498,12 @@ CrispyKit `Sync/`:
   replays due entries on its own clock with Android's backoff (`planOutbox`,
   `nextBackoffDelayMs`, max 8 attempts). Enqueue coalesces against the **live** queue (the Android
   lesson: rapid-fire toggles of different targets both survive; the same target collapses to the
-  latest toggle), success removes, failure re-stamps with backoff, conflict records
+  latest toggle), success removes, failure re-stamps with backoff and **waits for a human** —
+  `planOutbox` only plans `pending`, so a failed entry re-drives through `retry`/`retryFailed`
+  or a fresh toggle of the same target, exactly as Android's does. Conflict records
   `serverValue` and waits. Inflight is memory-only — a process death mid-send replays the entry.
+  An enqueue that races the load (start hands the file read to a Task) merges with the loaded
+  half instead of being overwritten by it.
 
 CrispyKit `Player/`:
 

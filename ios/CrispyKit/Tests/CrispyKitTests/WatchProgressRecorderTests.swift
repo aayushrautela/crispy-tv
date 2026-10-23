@@ -75,7 +75,10 @@ final class WatchProgressRecorderTests: XCTestCase {
         XCTAssertEqual(anime?.episodeId, "tt1:3:4")
 
         let noEpisode = watchProgressKeyParts(identity: identity(contentType: .series, season: 1, episode: nil))
-        XCTAssertNil(noEpisode, "an episode without its number has no episode suffix at all")
+        XCTAssertNotNil(noEpisode)
+        XCTAssertEqual(noEpisode?.id, "tt1")
+        XCTAssertEqual(noEpisode?.type, "show")
+        XCTAssertNil(noEpisode?.episodeId, "an episode without its number has no episode suffix at all")
     }
 
     func testNilOrBlankIdentityIsNoOp() {
