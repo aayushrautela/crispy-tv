@@ -97,8 +97,8 @@ class DefaultUserMediaRepository(
 }
 
 /**
- * The resume rule [DefaultUserMediaRepository.getResumePositionMs] owns, as a
- * pure function so a test can call the decision itself.
+ * The resume rule [DefaultUserMediaRepository.getResumePositionMs] owns, as one
+ * function so a test can call the decision itself.
  *
  * The local store answers first: this device's own recorder wrote the position,
  * and it answers offline. The server is asked second — when the local store has
@@ -110,16 +110,19 @@ class DefaultUserMediaRepository(
  * `loadServer` is a lambda because "do not ask the server when the local store
  * already answered" is part of the rule, not an optimisation.
  */
-internal fun resumePositionMs(
+internal suspend fun resumePositionMs(
     local: WatchProgressSnapshot?,
-    loadServer: () -> CanonicalWatchStateSnapshot?,
+    loadServer: suspend () -> CanonicalWatchStateSnapshot?,
 ): Long {
     val localAnswer = local?.takeIf { it.progressPercent in RESUME_PROGRESS_RANGE }
     if (localAnswer != null) {
         return (localAnswer.currentTimeSeconds * 1000.0).toLong()
     }
     val server = loadServer() ?: return 0L
-    if (server.progressPercent != null && server.progressPercent !in RESUME_PROGRESS_RANGE) return 0L
+    // `progressPercent` is a derived property on a class from another module,
+    // so the null check needs a local before the range check can see it.
+    val serverPercent = server.progressPercent
+    if (serverPercent != null && serverPercent !in RESUME_PROGRESS_RANGE) return 0L
     val resumeSeconds = server.resumePositionSeconds?.takeIf { it > 0.0 } ?: return 0L
     return (resumeSeconds * 1000.0).toLong()
 }
