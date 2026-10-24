@@ -187,11 +187,7 @@ internal class HomeSelectorViewModel(
             )
         val resumePositionMs =
             withContext(ioDispatcher) {
-                userMediaRepository
-                    .getLocalWatchProgress(identity)
-                    ?.takeIf { it.progressPercent in 1.0..95.0 }
-                    ?.let { (it.currentTimeSeconds * 1000.0).toLong() }
-                    ?: 0L
+                userMediaRepository.getResumePositionMs(identity)
             }
         _playStream.tryEmit(
             HomeStreamSelection(

@@ -38,6 +38,23 @@ class DefaultUserMediaRepository(
         return watchHistoryService.getLocalWatchProgress(identity)
     }
 
+    override suspend fun getResumePositionMs(identity: PlaybackIdentity): Long =
+        resumePositionMs(
+            local = watchHistoryService.getLocalWatchProgress(identity),
+            // A lambda, not a value: the second question must not be asked when
+            // the local store already answered. A fresh install or a second
+            // device has an empty local store while the server still knows
+            // where the profile got to, so the server is the fallback, never
+            // the first question.
+            loadServer = {
+                // `itemId` is nullable on the identity; a title the app cannot
+                // name is not a question the server can answer.
+                identity.itemId?.let { itemId ->
+                    watchHistoryService.getTitleWatchState(itemId, identity.contentType)
+                }
+            },
+        )
+
     override suspend fun markWatched(
         request: WatchHistoryRequest,
     ): WatchHistoryResult {
@@ -78,3 +95,38 @@ class DefaultUserMediaRepository(
         return watchHistoryService.setTitleLiked(itemId, liked)
     }
 }
+
+/**
+ * The resume rule [DefaultUserMediaRepository.getResumePositionMs] owns, as a
+ * pure function so a test can call the decision itself.
+ *
+ * The local store answers first: this device's own recorder wrote the position,
+ * and it answers offline. The server is asked second — when the local store has
+ * no in-band answer — because the two former call sites each ran an identical
+ * `progressPercent in 1.0..95.0` block and neither ever asked the server, so a
+ * device with an empty local store resumed at zero while the server knew where
+ * the profile got to.
+ *
+ * `loadServer` is a lambda because "do not ask the server when the local store
+ * already answered" is part of the rule, not an optimisation.
+ */
+internal fun resumePositionMs(
+    local: WatchProgressSnapshot?,
+    loadServer: () -> CanonicalWatchStateSnapshot?,
+): Long {
+    val localAnswer = local?.takeIf { it.progressPercent in RESUME_PROGRESS_RANGE }
+    if (localAnswer != null) {
+        return (localAnswer.currentTimeSeconds * 1000.0).toLong()
+    }
+    val server = loadServer() ?: return 0L
+    if (server.progressPercent != null && server.progressPercent !in RESUME_PROGRESS_RANGE) return 0L
+    val resumeSeconds = server.resumePositionSeconds?.takeIf { it > 0.0 } ?: return 0L
+    return (resumeSeconds * 1000.0).toLong()
+}
+
+/**
+ * The band a resume point must fall inside. Below it the user never really
+ * started; above it the title is finished — in both cases "resume" is the wrong
+ * verb and the answer is the beginning.
+ */
+private val RESUME_PROGRESS_RANGE = 1.0..95.0

@@ -43,6 +43,18 @@ interface UserMediaRepository {
 
     suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot?
 
+    /**
+     * Where playback should resume, in milliseconds: the local store first, the
+     * server second, `0` when nothing wants a resume point.
+     *
+     * Both answers are gated to the `1.0..95.0` progress band — below it the
+     * user never really started, above it the title is finished — and the local
+     * store answers without asking the server. The rule lives in
+     * `DefaultUserMediaRepository` rather than at the call sites so the details
+     * and home tap paths cannot answer differently.
+     */
+    suspend fun getResumePositionMs(identity: PlaybackIdentity): Long
+
     suspend fun markWatched(
         request: WatchHistoryRequest,
     ): WatchHistoryResult

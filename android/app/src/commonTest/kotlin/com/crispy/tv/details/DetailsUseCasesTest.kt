@@ -103,6 +103,8 @@ class DetailsUseCasesTest {
 
         override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? = null
 
+        override suspend fun getResumePositionMs(identity: PlaybackIdentity): Long = unused("getResumePositionMs")
+
         override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? =
             unused("getCanonicalWatchState")
 

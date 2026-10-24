@@ -1,10 +1,13 @@
 package com.crispy.tv.testing
 
 import com.crispy.tv.player.CanonicalContinueWatchingResult
+import com.crispy.tv.player.CanonicalWatchStateSnapshot
+import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.player.WatchProgressSnapshot
 import kotlinx.coroutines.delay
 
 /**
@@ -39,6 +42,13 @@ internal class FakeWatchHistoryService : WatchHistoryService {
     val continueWatchingCalls = mutableListOf<Long>()
     var removeAnswer: WatchHistoryResult = WatchHistoryResult(statusMessage = "", accepted = true)
     val removedIds = mutableListOf<String>()
+
+    /** The local store's answer for the resume rule, or null for "nothing recorded". */
+    var localProgressAnswer: WatchProgressSnapshot? = null
+
+    /** The server's answer, with one recorded call per question so laziness is observable. */
+    var titleWatchStateAnswer: CanonicalWatchStateSnapshot? = null
+    val titleWatchStateCalls = mutableListOf<String>()
 
     /** One entry per `playback_started`, in the order the reporter sent them. */
     val startedReports = mutableListOf<PlaybackReport>()
@@ -108,6 +118,16 @@ internal class FakeWatchHistoryService : WatchHistoryService {
     override suspend fun removeFromPlayback(playbackId: String): WatchHistoryResult {
         removedIds += playbackId
         return removeAnswer
+    }
+
+    override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? = localProgressAnswer
+
+    override suspend fun getTitleWatchState(
+        itemId: String,
+        contentType: MetadataLabMediaType,
+    ): CanonicalWatchStateSnapshot? {
+        titleWatchStateCalls += itemId
+        return titleWatchStateAnswer
     }
 
     override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult =

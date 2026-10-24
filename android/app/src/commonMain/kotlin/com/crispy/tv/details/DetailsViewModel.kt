@@ -951,11 +951,7 @@ class DetailsViewModel internal constructor(
                 absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
             )
             val resumePositionMs = withContext(ioDispatcher) {
-                detailsUseCases.userMediaRepository
-                    .getLocalWatchProgress(identity)
-                    ?.takeIf { it.progressPercent in 1.0..95.0 }
-                    ?.let { (it.currentTimeSeconds * 1000.0).toLong() }
-                    ?: 0L
+                detailsUseCases.userMediaRepository.getResumePositionMs(identity)
             }
 
             val chosenStreamHandoffKey = stashHandoff(stream, resolvedLookupId)
