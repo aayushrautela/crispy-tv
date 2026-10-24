@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,6 +22,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -42,6 +44,7 @@ import com.crispy.tv.watchhistory.sync.WatchSyncSource
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.domain.optimistic.MutationStatus
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
+import com.crispy.tv.domain.optimistic.UserMutation
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.optimistic.toContentType
@@ -326,6 +329,15 @@ class LibraryViewModel internal constructor(
         )
     }
 
+    /**
+     * Failed mutations the sync banner offers to requeue. The outbox owns the
+     * flow; the route collects it with the lifecycle, so the subscription lives
+     * exactly as long as the screen is visible.
+     */
+    val failedSync: Flow<List<UserMutation>> = outbox.failedMutations
+
+    /** Requeues everything that failed for good, for the banner's Retry. */
+    fun retryFailedSync() = outbox.retryFailed()
 }
 
 internal fun WatchGenerationsResponse.generationMsFor(sectionId: String): Long? {
@@ -804,6 +816,33 @@ internal fun LibraryFiltersRow(
 }
 
 private val LibraryChipHeight = 40.dp
+
+@Composable
+internal fun LibrarySyncBanner(
+    failedMutations: List<UserMutation>,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // The iOS library's banner shape: it appears only when something failed for
+    // good, and its Retry requeues every one of those mutations. A pending
+    // toggle still in flight does not warrant one -- it usually lands in
+    // seconds, and a banner for it would flicker on every tap.
+    if (failedMutations.isEmpty()) return
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Changes waiting to sync",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onRetry) {
+            Text("Retry")
+        }
+    }
+}
 
 @Composable
 internal fun LibraryStatusMessage(

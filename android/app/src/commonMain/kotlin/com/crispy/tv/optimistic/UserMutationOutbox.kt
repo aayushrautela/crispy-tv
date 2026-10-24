@@ -8,6 +8,7 @@ import com.crispy.tv.domain.optimistic.SeasonWatchedMutation
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.optimistic.UserMutation
 import com.crispy.tv.domain.optimistic.WatchlistMutation
+import com.crispy.tv.domain.optimistic.coalesceMutations
 import com.crispy.tv.domain.optimistic.nextBackoffDelayMs
 import com.crispy.tv.domain.optimistic.planOutbox
 import com.crispy.tv.home.HomeRefreshBus
@@ -15,6 +16,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -75,7 +77,18 @@ class UserMutationOutbox(
                         mutation
                     }
                 }
-            commit(loaded, persist = true)
+            // Merge, never replace: `loadAll` suspends, so an intent enqueued
+            // while it was in flight is live state, not stale state -- and a
+            // whole-map replace here would erase it from memory *and* from the
+            // file, because this commit persists. `coalesceMutations` keeps the
+            // most recently created intent per target, so a fresh toggle beats
+            // a stored copy of the same target.
+            mutex.withLock {
+                commitLocked(
+                    coalesceMutations(_byItem.value.values.flatten() + loaded),
+                    persist = true,
+                )
+            }
             processLoop()
         }
     }
@@ -129,6 +142,44 @@ class UserMutationOutbox(
         }
     }
 
+    /**
+     * Requeue every mutation that failed for good. A screen's Retry button
+     * wires to this: a retry is a fresh intent from the user, and the queue
+     * never re-runs a failure on its own. A conflict stays untouched -- it
+     * waits for a decision, not a retry.
+     */
+    fun retryFailed() {
+        val now = clock()
+        scope.launch {
+            // Same lost-update shape as [enqueue] and [retry]: read under the
+            // commit lock.
+            mutex.withLock {
+                val next =
+                    _byItem.value.values.flatten().map {
+                        if (it.status is MutationStatus.Failed) {
+                            it.copyStatus(MutationStatus.Pending).copyNextAttempt(now)
+                        } else {
+                            it
+                        }
+                    }
+                commitLocked(next, persist = true)
+            }
+        }
+    }
+
+    /**
+     * Everything the queue holds that failed for good, for a sync banner. Cold
+     * on purpose: a collector owns the subscription, so constructing an outbox
+     * starts no coroutine and a test scope never gains an unkillable child.
+     */
+    val failedMutations: Flow<List<UserMutation>> =
+        _byItem.map { byItem ->
+            byItem.values
+                .flatten()
+                .filter { it.status is MutationStatus.Failed }
+                .sortedWith(compareBy({ it.createdAtMs }, { it.id }))
+        }
+
     private suspend fun processLoop() {
         while (true) {
             val due = planOutbox(allMutations(), clock())
@@ -157,36 +208,50 @@ class UserMutationOutbox(
             }
 
         val now = clock()
-        val all = allMutations().toMutableList()
-        val index = all.indexOfFirst { it.id == mutation.id }
-        if (index < 0) return
 
-        when {
-            result?.success == true -> {
-                all.removeAt(index)
-                commit(all, persist = true)
-                publishMutationSuccessEvents(mutation)
+        // The outcome is computed from the live queue under the same lock as
+        // every other writer. The previous shape snapshotted `allMutations()`
+        // and committed that snapshot from outside the lock, and `commit`
+        // suspends on the mutex: an enqueue that committed while this
+        // coroutine waited to re-enter was then overwritten, and the overwrite
+        // persisted. `enqueue`'s comment documents the same lost update; this
+        // is its second half.
+        val committed =
+            mutex.withLock {
+                val all = _byItem.value.values.flatten().toMutableList()
+                val index = all.indexOfFirst { it.id == mutation.id }
+                if (index < 0) return@withLock false
+                when {
+                    result?.success == true -> {
+                        all.removeAt(index)
+                        commitLocked(all, persist = true)
+                    }
+                    result?.conflict == true -> {
+                        all[index] =
+                            mutation.copyStatus(
+                                MutationStatus.Conflict(serverValue = result.serverValue),
+                            )
+                        commitLocked(all, persist = true)
+                    }
+                    else -> {
+                        val nextAttempt = now + nextBackoffDelayMs(mutation.attempt + 1, policy)
+                        val retryable = mutation.attempt + 1 < policy.maxAttempts
+                        all[index] =
+                            mutation
+                                .copyStatus(
+                                    MutationStatus.Failed(
+                                        reason = result?.reason ?: "Update failed.",
+                                        retryable = retryable,
+                                    ),
+                                ).copyNextAttempt(nextAttempt)
+                                .copyAttempt(mutation.attempt + 1)
+                        commitLocked(all, persist = true)
+                    }
+                }
+                true
             }
-            result?.conflict == true -> {
-                all[index] = mutation.copyStatus(
-                    MutationStatus.Conflict(serverValue = result.serverValue),
-                )
-                commit(all, persist = true)
-            }
-            else -> {
-                val nextAttempt = now + nextBackoffDelayMs(mutation.attempt + 1, policy)
-                val retryable = mutation.attempt + 1 < policy.maxAttempts
-                all[index] =
-                    mutation
-                        .copyStatus(
-                            MutationStatus.Failed(
-                                reason = result?.reason ?: "Update failed.",
-                                retryable = retryable,
-                            ),
-                        ).copyNextAttempt(nextAttempt)
-                        .copyAttempt(mutation.attempt + 1)
-                commit(all, persist = true)
-            }
+        if (committed && result?.success == true) {
+            publishMutationSuccessEvents(mutation)
         }
     }
 
@@ -212,11 +277,10 @@ class UserMutationOutbox(
         return (kept + incoming)
     }
 
-    private suspend fun commit(mutations: List<UserMutation>, persist: Boolean) {
-        mutex.withLock { commitLocked(mutations, persist) }
-    }
-
-    /** The commit itself, for call sites that already hold [mutex] ([enqueue], [retry]). */
+    /**
+     * The commit itself, for call sites that already hold [mutex] ([enqueue],
+     * [retry], [retryFailed], [start], [runMutation]).
+     */
     private suspend fun commitLocked(mutations: List<UserMutation>, persist: Boolean) {
         _byItem.value = mutations.groupBy { it.titleItemId }
         if (persist) {

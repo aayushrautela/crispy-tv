@@ -4,8 +4,10 @@ import com.crispy.tv.domain.optimistic.MutationStatus
 import com.crispy.tv.domain.optimistic.RetryPolicy
 import com.crispy.tv.domain.optimistic.UserMutation
 import com.crispy.tv.domain.optimistic.WatchlistMutation
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -48,8 +50,12 @@ class UserMutationOutboxTest {
         val saved = mutableListOf<List<UserMutation>>()
         private var stored = seed
 
+        /** Set to park `loadAll` so a test can enqueue while a load is in flight. */
+        var loadGate: CompletableDeferred<Unit>? = null
+
         override suspend fun loadAll(): List<UserMutation> {
             loadAllCalls += "load"
+            loadGate?.await()
             return stored
         }
 
@@ -69,6 +75,27 @@ class UserMutationOutboxTest {
         override suspend fun execute(mutation: UserMutation): MutationResult {
             calls += mutation
             return result(mutation)
+        }
+    }
+
+    /**
+     * A [MutationExecutor] that parks every call on its own gate, so a test can
+     * enqueue a second intent while the first is on the wire and release the
+     * first outcome on demand. `release(i, result)` completes call `i`.
+     */
+    private class GatedExecutor : MutationExecutor {
+        val calls = mutableListOf<UserMutation>()
+        val gates = mutableListOf<CompletableDeferred<MutationResult>>()
+
+        override suspend fun execute(mutation: UserMutation): MutationResult {
+            calls += mutation
+            val gate = CompletableDeferred<MutationResult>()
+            gates += gate
+            return gate.await()
+        }
+
+        fun release(index: Int, result: MutationResult) {
+            gates[index].complete(result)
         }
     }
 
@@ -185,6 +212,74 @@ class UserMutationOutboxTest {
 
             assertEquals(listOf<MutationStatus>(MutationStatus.Pending), store.lastSave().map { it.status })
             assertEquals(false, (box.mutationsForItem("movie-1").single() as WatchlistMutation).desired)
+        } finally {
+            box.stop()
+        }
+    }
+
+    // --------------------------------------------------------- the lost updates
+
+    @Test
+    fun `an enqueue that lands while start is loading survives the merge`() = runTest {
+        val store = RecordingStore()
+        val loadGate = CompletableDeferred<Unit>()
+        store.loadGate = loadGate
+        val executor = GatedExecutor()
+        val box = outbox(store, executor, scope(testScheduler), { 0L })
+
+        try {
+            box.start()
+            runCurrent() // the processor is parked inside loadAll
+
+            box.enqueue(watchlist())
+            runCurrent() // committed while the load is still in flight
+            assertEquals(
+                "the race premise: the enqueue is live before the load returns",
+                1,
+                box.mutationsForItem("movie-1").size,
+            )
+
+            loadGate.complete(Unit)
+            runCurrent() // the load resumes: merge-commit, then the processor picks the intent up
+
+            // A whole-map replace would erase the enqueue from memory and from
+            // the file, because start() persists. The save and the executor call
+            // are both observations of the survivor.
+            assertTrue(
+                "the load must merge the in-memory enqueue, not replace the queue with the file",
+                store.lastSave().any { it.id == "m1" },
+            )
+            assertEquals(listOf("m1"), executor.calls.map { it.id })
+        } finally {
+            box.stop()
+        }
+    }
+
+    @Test
+    fun `an enqueue landing while a send is in flight is not dropped by its outcome`() = runTest {
+        val store = RecordingStore()
+        val executor = GatedExecutor()
+        val box = outbox(store, executor, scope(testScheduler), { 0L })
+
+        try {
+            box.start()
+            runCurrent()
+
+            box.enqueue(watchlist(id = "m1", entityId = "movie-1"))
+            advanceTimeBy(100L) // the processor takes m1 and parks inside the executor
+
+            box.enqueue(watchlist(id = "m2", entityId = "movie-2"))
+            runCurrent() // committed while m1 is on the wire
+            assertEquals(1, box.mutationsForItem("movie-2").size)
+
+            executor.release(0, MutationResult(success = true))
+            runCurrent() // m1's outcome: remove m1 under the lock, keep m2
+
+            assertTrue("m1 succeeded and left", box.mutationsForItem("movie-1").isEmpty())
+            // A stale outcome snapshot would overwrite the m2 enqueue and persist
+            // the overwrite; presence here is the survivor.
+            assertEquals(listOf("m2"), box.mutationsForItem("movie-2").map { it.id })
+            assertEquals(listOf("m1", "m2"), executor.calls.map { it.id })
         } finally {
             box.stop()
         }
@@ -455,6 +550,92 @@ class UserMutationOutboxTest {
 
             assertEquals(MutationStatus.Pending, box.mutationsForItem("movie-1").single().status)
             assertEquals(MutationStatus.Pending, box.mutationsForItem("movie-2").single().status)
+        } finally {
+            box.stop()
+        }
+    }
+
+    @Test
+    fun `failedMutations lists failures that wait for a human and not conflicts`() = runTest {
+        val store = RecordingStore()
+        val executor =
+            RecordingExecutor { mutation ->
+                if (mutation.entityId == "movie-2") {
+                    MutationResult(success = false, conflict = true, serverValue = "true")
+                } else {
+                    MutationResult(success = false, reason = "offline")
+                }
+            }
+        val box = outbox(store, executor, scope(testScheduler), { 0L })
+
+        try {
+            box.start()
+            runCurrent()
+
+            box.enqueue(watchlist(id = "m1", entityId = "movie-1"))
+            box.enqueue(watchlist(id = "m2", entityId = "movie-2"))
+            advanceTimeBy(100L)
+            runCurrent()
+
+            // A failure waits for a human; a conflict waits for a decision. The
+            // banner's Retry must only ever requeue the former.
+            assertEquals(listOf("m1"), box.failedMutations.first().map { it.id })
+        } finally {
+            box.stop()
+        }
+    }
+
+    @Test
+    fun `retryFailed leaves a conflict alone`() = runTest {
+        val store = RecordingStore()
+        val executor = RecordingExecutor { MutationResult(success = false, conflict = true, serverValue = "true") }
+        val box = outbox(store, executor, scope(testScheduler), { 0L })
+
+        try {
+            box.start()
+            runCurrent()
+            box.enqueue(watchlist())
+            advanceTimeBy(100L)
+            runCurrent()
+            assertEquals(MutationStatus.Conflict(serverValue = "true"), box.mutationsForItem("movie-1").single().status)
+
+            box.retryFailed()
+            runCurrent()
+
+            // A conflict is not an error to retry; the state must survive the sweep.
+            assertEquals(MutationStatus.Conflict(serverValue = "true"), box.mutationsForItem("movie-1").single().status)
+        } finally {
+            box.stop()
+        }
+    }
+
+    @Test
+    fun `retryFailed requeues every failure with the current time`() = runTest {
+        val store = RecordingStore()
+        val executor = RecordingExecutor { MutationResult(success = false, reason = "offline") }
+        var now = 1_000L
+        val box = outbox(store, executor, scope(testScheduler), { now })
+
+        try {
+            box.start()
+            runCurrent()
+            box.enqueue(watchlist(id = "m1", entityId = "movie-1"))
+            box.enqueue(watchlist(id = "m2", entityId = "movie-2"))
+            advanceTimeBy(100L)
+            runCurrent() // parks the poller again, so the assertions below run between ticks
+            assertEquals(2, box.failedMutations.first().size)
+
+            now = 9_000L
+            box.retryFailed()
+            // No time advance on purpose: the revival itself is committed
+            // synchronously, and advancing would let the still-failing executor
+            // fail both a second time before the assertions run.
+            runCurrent()
+
+            assertTrue("every failure is pending again", box.failedMutations.first().isEmpty())
+            val revived = box.allMutations().sortedBy { it.id }
+            assertEquals(listOf(MutationStatus.Pending, MutationStatus.Pending), revived.map { it.status })
+            assertEquals(listOf(9_000L, 9_000L), revived.map { it.nextAttemptAtMs })
         } finally {
             box.stop()
         }
