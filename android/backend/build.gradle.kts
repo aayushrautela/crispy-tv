@@ -51,8 +51,6 @@ kotlin {
         withHostTest {}
     }
 
-    jvm("desktop")
-
     // Compile-only verification target, never shipped and never run. See
     // :android:core-domain for why it exists and why the import-based purity gate
     // cannot substitute for it.
@@ -126,7 +124,7 @@ kotlin {
         // `withHostTest {}` above is what keeps that choice honest rather than
         // accidental. Without it, a `commonTest` source set on a KMP module makes
         // AGP print "android host tests are not enabled" -- i.e. the tests would run
-        // on desktop and Apple but not on Android, which is the platform the module
+        // on Apple but not on Android, which is the platform the module
         // actually ships to. :android:core-domain declares the same block.
         commonTest.dependencies {
             implementation(kotlin("test"))

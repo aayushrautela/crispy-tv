@@ -6,67 +6,50 @@
 # Kotlin/Native cannot compile Apple targets on a Linux host. Aggregate tasks
 # reach those targets and fail for reasons unrelated to your change.
 #
-# Linux proves Android, desktop JVM, and -- via the compile-only linuxX64
-# target -- Kotlin/Native. Apple targets are proven by macOS CI
-# .github/workflows/apple.yml.
+# Linux proves Android and, via the compile-only linuxX64 target, Kotlin/Native.
+# Apple targets are proven by macOS CI in .github/workflows/apple.yml.
 #
 # :android:app and :android:sharedUI have no linuxX64 target on purpose: both are
-# Compose modules, and Compose Multiplatform publishes no linuxX64 artifacts --
-# its targets are Android, iOS and Desktop (JVM) only -- so declaring it makes
-# every compose.* dependency fail to resolve. desktop JVM is their local purity
-# gate. :android:core-domain and :android:platform-core are pure Kotlin and do
-# use linuxX64, because that is the one Kotlin/Native target a Linux host can
+# Compose modules, and Compose Multiplatform publishes no linuxX64 artifacts, so
+# declaring it makes every compose.* dependency fail to resolve. For :app the
+# local non-Android signal is compileCommonMainKotlinMetadata -- it compiles
+# commonMain against the metadata variant of every dependency, which is the only
+# task that catches a JVM-only symbol the Android compile would accept.
+# :android:core-domain, :android:platform-core and the other pure-Kotlin modules
+# do use linuxX64, because that is the one Kotlin/Native target a Linux host can
 # build and it enforces the same "no JVM API" rule for them.
 #
 # The contract suite lives in :android:core-domain's commonTest, not a module of
-# its own, so `desktopTest` and `testAndroidHostTest` both run all 96 fixtures.
-# `compileTestKotlinLinuxX64` is the gate that proves the suite holds no JVM API,
-# which is what lets the Apple targets compile it at all -- and the import-based
-# purity gate cannot see that class of bug, because it only scans commonMain.
-#
-# :android:desktopApp is the seam proof: a real Compose Multiplatform render on a
-# plain JVM. It needs libGL.so.1, libX11.so.6 and libfontconfig.so.1 for Skia, and
-# a font (bundled in test-fonts/, pointed at by a generated fonts.conf). A bare
-# container with none of those reports `Could not load font` or a Skiko native-load
-# error, neither of which says anything about the seam -- see AGENTS.md.
+# its own, so `testAndroidHostTest` runs all 96 fixtures on the Android host and
+# apple.yml runs the same suite on the simulator. `compileTestKotlinLinuxX64` is
+# the gate that proves the suite holds no JVM API, which is what lets the Apple
+# targets compile it at all -- and the import-based purity gate cannot see that
+# class of bug, because it only scans commonMain.
 #
 # :android:app is a KMP library. Phase 1 proved the module graph; Phase 4 has
-# since moved the design-agnostic half of it into commonMain (54 of the 160 files
-# at the time of writing, 106 still in androidMain -- re-measure with
+# since moved the design-agnostic half of it into commonMain (re-measure with
 # `find android/app/src/commonMain android/app/src/androidMain -name '*.kt' | wc -l`
-# per directory rather than trusting this number), so the purity gate now has
-# real work to do there. commonMain is a strict subset of the Android build, so
-# androidMain and desktopMain both have to compile and the two catch different
-# mistakes.
+# per directory rather than trusting a number), so the purity gate now has real
+# work to do there.
 #
-# :android:app:testAndroidHostTest is the composition root's gate. `:app` has no
-# other way to be tested: `desktopTest` sees only commonMain + appUi, and the
-# composition root is in androidMain. Robolectric is there for a `Context` and
-# nothing else -- no view is inflated and no resource is read, so
+# :android:app:testAndroidHostTest is the composition root's gate and the only way
+# the module is tested. It compiles both halves in one JVM: commonTest, which sees
+# commonMain + appUi but not androidMain, so it covers the settings repositories
+# and nothing in the composition root -- and androidHostTest, which sees
+# androidMain and covers exactly the reverse. Robolectric is there for a `Context`
+# and nothing else -- no view is inflated and no resource is read, so
 # `@Config(manifest = Config.NONE)` is enough and these tests do not need the
 # merged manifest or the real app theme a rendering test would require.
 #
-# :android:backend:desktopTest covers BackendContextResolver, which moved to
-# commonMain when AccountApi replaced SupabaseAccountClient. It runs on desktop
-# rather than the Android host test on purpose: a test that only ran on Android
-# would not notice that file reaching for a JVM API again.
+# :android:backend:testAndroidHostTest covers BackendContextResolver, which moved
+# to commonMain when AccountApi replaced SupabaseAccountClient. The same suite runs
+# on the Apple targets in apple.yml, which is what notices the file reaching for a
+# JVM API again; a local Android-only run would not.
 #
-# :android:app:desktopTest and :android:app:testAndroidHostTest are two halves of
-# one module and neither replaces the other. `commonTest` reaches only commonMain,
-# so it covers the settings repositories that moved onto `KeyValueStore` and
-# nothing in the composition root; `androidHostTest` reaches androidMain and
-# covers the opposite. A module that declares `commonTest` without
-# `withHostTest {}` gets an AGP warning instead of an error, and its common tests
-# then run on no Android target at all -- :android:backend had exactly that.
-#
-# :android:home:desktopTest and :android:home:testAndroidHostTest cover the two
-# home services that moved to commonMain -- CalendarService's bucketing and key
-# building, and UpNextService's drop rules and clock fallback. Desktop on
-# purpose, for the same reason as :android:backend: a test that only ran on
-# Android would not notice either file reaching for a JVM API again, and both
-# were moved specifically to stop them doing so. :home also has to run
-# :android:home:compileKotlinLinuxX64 because it declares iosArm64 and
-# iosSimulatorArm64, and the native compile is the only check of those on Linux.
+# :android:home:testAndroidHostTest covers the two home services that moved to
+# commonMain -- CalendarService's bucketing and key building, and UpNextService's
+# drop rules and clock fallback -- and :android:home:compileKotlinLinuxX64 is the
+# native compile, the only check of the Apple targets a Linux host can make.
 #
 # :android:androidApp:testStoreDebugUnitTest runs the app module's Robolectric
 # unit tests. The tests live in :androidApp rather than :app because they need
@@ -77,6 +60,17 @@
 # can only assert pure decisions, and the ones that exist are the source ordering
 # and the token mapping. The gate is here and in android.yml because the module
 # had a test suite that no gate ran.
+#
+# :android:addons:testAndroidHostTest found the argument-order break nothing
+# compiled: ten commonTest files plus one androidHostTest, and no gate ran either.
+# UriBehaviourHostTest is Robolectric-only, for Android's `Uri`, so a Linux
+# aarch64 host reports eleven failures and every one of them is
+# `DefaultNativeRuntimeLoader` -- the native runtime, not the code. An x86_64
+# runner is where those tests are meaningful.
+#
+# :android:watchhistory, :player, :network, :platform-core and :sharedUI host
+# tests are one to three files each and sat in the same hole: small suites that no
+# gate compiled, which is how a break survives review.
 
 set -euo pipefail
 
@@ -122,26 +116,23 @@ fi
 # spawn a second daemon with different opts, so we let the user-level config apply.
 
 ./gradlew \
-    :android:core-domain:compileKotlinDesktop \
-    :android:core-domain:desktopTest \
     :android:core-domain:testAndroidHostTest \
     :android:core-domain:compileKotlinLinuxX64 \
     :android:core-domain:compileTestKotlinLinuxX64 \
-    :android:platform-core:compileKotlinDesktop \
     :android:platform-core:compileKotlinLinuxX64 \
-    :android:sharedUI:compileKotlinDesktop \
     :android:sharedUI:compileAndroidMain \
+    :android:app:compileCommonMainKotlinMetadata \
     :android:app:compileAndroidMain \
-    :android:app:compileKotlinDesktop \
-    :android:app:desktopTest \
     :android:app:testAndroidHostTest \
-    :android:backend:desktopTest \
     :android:backend:testAndroidHostTest \
     :android:home:compileKotlinLinuxX64 \
-    :android:home:desktopTest \
     :android:home:testAndroidHostTest \
-    :android:desktopApp:compileKotlin \
-    :android:desktopApp:test \
+    :android:addons:testAndroidHostTest \
+    :android:watchhistory:testAndroidHostTest \
+    :android:player:testAndroidHostTest \
+    :android:network:testAndroidHostTest \
+    :android:platform-core:testAndroidHostTest \
+    :android:sharedUI:testAndroidHostTest \
     :android:androidApp:verifyDistributionExclusions \
     :android:androidApp:testStoreDebugUnitTest \
     :android:androidApp:testSideloadDebugUnitTest \

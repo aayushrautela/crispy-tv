@@ -34,9 +34,8 @@ TARGET = ROOT / "android/app/src/androidMain/kotlin/com/crispy/tv/playerui/Playe
 TASK = ":android:app:testAndroidHostTest"
 CLASS_FILTER = "com.crispy.tv.playerui.PlayerSessionDecisionsTest"
 
-# Group 3 is the method name. `desktopTest` prints `Class[desktop] > method FAILED`
-# and the host task prints `Class > method FAILED` with no bracket, so the bracket
-# is optional in both halves.
+# Group 3 is the method name. The host task prints `Class > method FAILED` with no
+# bracket, so the bracket is optional in both halves.
 #
 # MULTILINE is passed to `compile`, never to `finditer`. `Pattern.finditer(s, re.M)`
 # does not raise and does not set a flag: the second argument is `pos`, so the integer

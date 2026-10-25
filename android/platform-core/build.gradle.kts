@@ -19,8 +19,8 @@ plugins {
  * an application module's per-variant Kotlin source sets do not reliably.
  *
  * Architecturally this is the right home regardless: it is shared configuration,
- * so it belongs in `sharedLogic` where the iOS SwiftUI shell and the desktop app
- * can both read it, not in an Android-only application module.
+ * so it belongs in a `commonMain` source set the Android app and the iOS
+ * SwiftUI shell can both read, not in an Android-only application module.
  */
 fun String.escapedForKotlin() = this.replace("\\", "\\\\").replace("\"", "\\\"")
 
@@ -91,16 +91,14 @@ kotlin {
         minSdk = 26
 
         // This module had no test source set at all, which is why `SecretFormat`
-        // -- the encrypted-secret contract that the Android store, the desktop
-        // store and any future Apple one all implement -- was pinned by neither.
+        // -- the encrypted-secret contract that the Android store and any
+        // future Apple one both implement -- was pinned by neither.
         // Without this block a `commonTest` directory exists, nothing compiles or
         // runs it on Android, and AGP only *warns*. See the same finding on
         // `:android:addons`, where five Android-shaped files meant nobody created
         // a test source set for the module at all.
         withHostTest {}
     }
-
-    jvm("desktop")
 
     // Compile-only verification target; see the note in :android:core-domain.
     // It applies the same "no JVM API" rule as the Apple targets and is the

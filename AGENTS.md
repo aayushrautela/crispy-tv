@@ -2,29 +2,27 @@
 
 ## Goal
 
-**This project is a Kotlin Multiplatform app: one codebase runs on Android, Android TV, iOS/tvOS and desktop (Windows, macOS, Linux).**
+**This project is a Kotlin Multiplatform app: one codebase runs on Android, Android TV, iOS and tvOS.**
 
-Android and TV ship today. **The desktop app is the work in front of you** — `:android:desktopApp`
-builds its own `AppServices` and `AppGraph` and boots the shared shell's **real** intro/auth/
-profile gate, so it is an app that authenticates rather than a hardcoded pair of screens. **`AppRoot`
-and its `MainAppShell` are already `commonMain` and already callable off Android** — `MainAppShell` is
-a `private fun` at `AppRoot.kt:96`, private to a file that sits in `commonMain`, so nothing about
-them is an Android pin. The one thing between `:desktopApp` and the shared shell is that it cannot
-build an `AppNavHostDependencies`: 40 members, of which the four `@Composable` Android-only slots
-(the Media3 trailer layer, the two `:ui-assets` badge composables, the YouTube dialog), the player
-destination, and the factories behind `StreamResolverProvider`/`PlayerStreamHandoff` have no desktop
-answer yet.
+**There is no desktop app, and no desktop target anywhere.** `:android:desktopApp`,
+`:android:platform-desktop`, `:app`'s `desktopMain`, `:network`'s `desktopMain`, `test-fonts/` and the
+`jvm("desktop")` test target were all removed; do not reintroduce one. Phone, tablet, TV and the
+Apple devices are the clients.
+
+Android and Android TV ship today. **iOS and tvOS are native SwiftUI apps over the Kotlin engine** —
+`ios/Apps/iOS` and `ios/Apps/tvOS` are the apps, and `docs/plans/ios-native-plan.md` is the plan. The
+Kotlin side answers them through `:platform-core`'s ports (which have **no** Apple implementation
+yet) and through a `CrispyHttpClient` in `:network`'s **`iosMain`** — which does not exist either.
+**The Compose shell the Android apps render is `:app`'s `commonMain`**: `AppRoot` and its
+`MainAppShell` are `commonMain` (`MainAppShell` is a `private fun` at `AppRoot.kt:96`), and
+`AppNavHostDependencies` is 40 members behind a `@Composable () -> AppNavHostDependencies` producer
+seam. None of it is an Android pin, and the Apple targets compile `commonMain` + `appUi` in
+`apple.yml` — but nothing renders them off Android, because the Apple apps are SwiftUI.
 
 **The route-argument seam is not a blocker and never was.** `NavBackStackEntry.arguments` is a
 common `SavedState?`, not an `android.os.Bundle`, and `:app` reads route arguments off
 `savedStateHandle` — `HomeRouteArguments.kt`, three `internal` readers, and **zero** `.arguments`
-reads left anywhere under `android/app/src`. What *is* still true is the `when`: `desktopApp/Main.kt`
-keeps a `private enum class DesktopScreen` that exists only because the shell could not be reached,
-and its own KDoc says it was written to be deleted rather than extended. The next landings are a
-desktop `AppNavHostDependencies`, the deletion of that `when`, and then the desktop chrome — which is
-a `:app` `commonMain` decision, because `MainAppShell` already owns the chrome and puts a
-`FloatingBottomBar` at the bottom where Crispy-web puts a top topbar. Desktop playback (a real
-player behind `:player`'s interfaces, from Nuvio) and the Apple wiring come after that.
+reads left anywhere under `android/app/src`.
 
 This file describes the project as it is. It is not a phase map and holds no migration history —
 the multiplatform port is finished.
@@ -50,13 +48,11 @@ Repo agent rules:
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours |
-| `:android:app` | KMP + Compose | the shared UI and presentation. **174 `commonMain` / 39 `androidMain` / 9 `jvmMain` / 9 `desktopMain`** — counted by `verify_kmp_structure.py --json`, not by eye. `jvmMain` is the JVM layer **both** JVM targets compile, and holds what a JVM API (not Android) pins; a factory split across it puts only its wiring there, because `create(Class<T>)` has no common spelling. |
-| `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; produces the `CrispyUI` iOS framework |
+| `:android:app` | KMP + Compose | the shared UI and presentation. **176 `commonMain` / 48 `androidMain` / 4 `androidHostTest` / 87 `commonTest`** — counted by `verify_kmp_structure.py --json`, not by eye. `androidMain` carries the Android halves of the factories and everything a `Context`, a media3 type or a `Class<T>` pins; `iosMain` is declared (the Apple seam) and empty. |
+| `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; declares both Apple targets as a purity gate, and the `CrispyUI` framework it exports is imported by **no** Swift file (see `docs/plans/ios-native-plan.md`) |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |
 | `:android:player`, `:network`, `:addons`, `:home`, `:backend`, `:watchhistory`, `:platform-core` | KMP | the feature and port modules |
-| `:android:platform-desktop` | `kotlin.jvm` | the desktop side of all seven ports. Exists because `desktopApp` is a real caller |
-| `:android:desktopApp` | `kotlin.jvm` | the desktop entry point. **Boots the shared bootstrap gate off one `DesktopAppServices` + `AppGraph`** |
 | `:android:tv` | `com.android.application` | Android TV app; stays on the Android source set |
 | `:android:youtube-extractor`, `:android:torrent-engine` | sideload-only | optional engines, excluded **structurally** from the store build |
 | `:android:native-engine` | `com.android.library` | the MPV/Media3 player and nothing else optional |
@@ -71,24 +67,25 @@ Six facts about this layout that cost time to learn:
   source set; the error is an ambiguous-variant listing that never hints the cause is the module
   *type*.
 - **A `commonMain` file is worth nothing until a non-Android target consumes it**, so a file count
-  is not progress: ask what runs it. `:android:app` now has a **`desktopMain`** source set of its own
-  (4 files: `DesktopAppServices`, `DesktopAppRoot`, and the two desktop factory files), and
-  `:desktopApp` is its only caller.
+  is not progress: ask what runs it. `:android:app` declares both Apple targets and `apple.yml`
+  compiles `commonMain` + `appUi` for them, so the *compile* half is real — the *run* half is not,
+  because nothing renders Compose off Android any more. **`androidMain` is 48 files that no Apple
+  target can see.**
 - **A `ViewModelProvider.Factory` cannot be written once for both platforms.** `javap` on
   lifecycle-viewmodel 2.11.0's Android artifact shows **three** `default` members (`create(Class<T>)`
   throws, `create(Class<T>, extras)` and `create(KClass<T>, extras)` funnel into it), while the
   **common metadata declares exactly one overridable signature**, `create(KClass<T>, extras)`. And
   `KClass.isAssignableFrom` **does not exist** in Kotlin 2.4.10's common `KClass` — so the Android
   factories' `isAssignableFrom` guard has no portable spelling. That is why the ViewModel *wiring*
-  is `commonMain` (`AccountViewModelBuilders.kt`) and the *factory objects* are per platform: two
-  androidMain twins plus two desktopMain twins of the same names, which is legal because sibling
-  source sets are separate compilations. `compileCommonMainKotlinMetadata` is what catches the wrong
-  attempt, with `'create' overrides nothing`.
+  is `commonMain` (`AccountViewModelBuilders.kt`) and the *factory objects* are per platform: an
+  `androidMain` object today and an `iosMain` twin when the Apple wiring lands — legal because
+  sibling source sets are separate compilations. `compileCommonMainKotlinMetadata` is what catches
+  the wrong attempt, with `'create' overrides nothing`.
 - **`:android:home` shares the package `com.crispy.tv.home` with `:app`**, so a type declared in its
   `androidMain` is reachable from `:app` **with no import at all** — the purest form of the trap
   that makes an import-only audit report confidently-empty answers.
-- **The 39 remaining `:app` `androidMain` files are not a backlog.** Each carries a real platform
-  pin. Measured by import, and **these sets overlap** — a pin is per file, so a file holding two pins
+- **The 48 `:app` `androidMain` files are not a backlog.** Each carries a real platform pin.
+  Measured by import, and **these sets overlap** — a pin is per file, so a file holding two pins
   appears twice and a first-match partition would report only the first (see Rules §1):
 
   | token | files |
@@ -96,7 +93,7 @@ Six facts about this layout that cost time to learn:
   | `import android.content.Context` | 23 |
   | `androidx.media3.*` | 6 |
   | `androidx.compose.ui.platform.LocalContext` | 7 |
-  | `import java.util.Locale` | 2 |
+  | `import java.util.Locale` | 6 |
   | a `R.<type>` reference | 3 |
   | `androidx.navigation.*` | 1 |
 
@@ -104,118 +101,49 @@ Six facts about this layout that cost time to learn:
   factory, so a bucket that lumps them reads as 23 blocked files when many are correct. **Expect to add
   files here, not to drain them.**
 
-  **But "pinned by `Context`" no longer means "stays in `androidMain`".** `jvmMain` exists, both JVM
-  targets compile it, and a `Context` used only to reach `AppGraph` or an `AppServices` member is
-  discharged by taking that object instead — which is the difference between a file that is written
-  once and a file written twice as an androidMain/desktopMain pair. What genuinely cannot leave is
-  what needs `Class<T>` (the factory's `create`, which has no common spelling) or a `java.awt`/media3
-  type. `CatalogViewModelBuild.kt` was the proof of the shape — the wiring moved, the `create(Class<T>)`
-  shim stayed — and it now has siblings: `DiscoverViewModelBuild.kt`, `RandomWheelViewModelBuild.kt`,
-  `PersonDetailsViewModelBuild.kt`, `CalendarViewModelBuild.kt`, `SearchViewModelBuild.kt` each took
-  their factory's wiring into `jvmMain` while the same-named `androidMain` file shrank to the
-  `create(Class<T>)` shim, and three functions moved whole with no shim at all
-  (`BirthdayDateFormat.kt`, `AndroidLanguageLabels.kt`, `DeviceUtcOffsetMillis.kt`).
-  `AndroidAppLogger(appContext)` became `graph.services.logger` and
-  `SharedPreferencesKeyValueStore(context, name)` became `graph.services.keyValueStores.store(name)`:
-  `AppGraph.services` is an `internal` member of `:app`, so `jvmMain` can read it.
-  **The reverse also holds — a move is blocked when the collaborator itself is platform-bound**:
-  `AddonsSettingsViewModelFactory` could not move because `metadataAddonRegistry(context)` lives in
-  `:addons` `androidMain`, and a plain `com.android.library` publishes no `jvmMain` variant.
+  **The bucket that grew is `java.util.Locale`, from 2 to 6, and the reason is worth keeping.** Nine
+  files had been split so that their wiring could live in a `jvmMain` that a `jvm("desktop")` target
+  compiled; with that target gone the split has no consumer left, so the files are back in
+  `androidMain` beside the Android factories that call them — `AndroidLanguageLabels.kt`,
+  `BirthdayDateFormat.kt`, `PersonDetailsViewModelBuild.kt` and `SearchViewModelBuild.kt` are the four
+  that brought a `Locale` with them, `DeviceUtcOffsetMillis.kt` and the five `*ViewModelBuild.kt`
+  files brought no new pin. **`AppGraph.services` is still an `internal` member of `:app`**, and a
+  build file that takes `graph.services.logger` instead of `AndroidAppLogger(appContext)` is still how
+  a wiring `Context` is discharged — that is the shape the Apple wiring will use, not a JVM source
+  set. What genuinely cannot leave `androidMain` is what needs `Class<T>` (the factory's `create`,
+  which has no common spelling), a media3 type, or a collaborator that is itself Android-only:
+  `AddonsSettingsViewModelFactory` is the standing example, because `metadataAddonRegistry(context)`
+  lives in `:addons` `androidMain` and a plain `com.android.library` publishes no Apple variant.
 - **`:android:sharedUI`** — CMP `1.11.1` pinned to Kotlin `2.4.10`; bump together or not at all.
   **Do not re-litigate Material3 Expressive, and do not "fix" it by dropping it.** `android { }` is
   current, `androidLibrary { }` is deprecated; **CMP 1.11.x ships `androidx.compose.*`, not
   `org.jetbrains.compose.*`**, so moving a file changes *coordinates*, never imports;
   **`platform(...)` does not exist on a KMP source set**, so a KMP library pins versions itself; and
-  **no `linuxX64` on Compose modules** (its purity gate is `jvm("desktop")`). **A missing
+  **no `linuxX64` on Compose modules** (Compose publishes no linuxX64 artifacts, so the non-Android
+  signal is `:android:app:compileCommonMainKotlinMetadata` plus the Apple compiles `apple.yml` runs).
+  **A missing
   `CrispyPalette` role mapping in `:tv` is a silent colour change, not a compile error.**
 
 `android/app/build.gradle.kts` carries a per-file table of what holds what. Read it before planning
 any change to `:app`.
 
-### The two reference projects for the desktop work
+### Reference projects
 
-Two reference projects, and **the division between them is the whole point — do not blur it.**
+**Crispy-web** (this project's React/Vite predecessor) is worth reading for one thing and no more:
+**what is on screen and roughly where** — what the topbar carries, what the sidebar carries, what the
+hero shows, that details open over the content, which panels the player has. **Its implementation is
+the old one and does not come across**: no shadcn wrappers, no Tailwind class soup, no CSS custom
+properties. Any new surface is built from Compose + Material3 + `CrispyPalette` on Android (the
+shared shell already carries `TopLevelDestination`, `SearchTopBar`, `FloatingBottomBar` and
+`CrispySharedTransitionLayout`) and from SwiftUI on iOS/tvOS.
 
-| | comes from | because |
-|---|---|---|
-| **Player and desktop mechanics** | **Nuvio** | It has solved the hard half: libmpv on three OSes, a native AWT surface peered into Compose, fullscreen, PiP, window chrome. **This is the most important thing we take from anywhere.** |
-| **Layout, information architecture, feel** | **Crispy-web, roughly** | It is this project's own predecessor, so it already knows the product. **Its implementation is the part we are replacing.** |
-| **Composition and wiring** | **neither — `:app`** | The desktop plugs into the seams `:app` already exposes, and **all of them are already `commonMain`**: `AppBootstrapGate(…, ready)` (intro → auth → profile selection, and `ready` gets `onSignedOut`), and `AppRoot`, which calls the gate with `MainAppShell` and takes the `@Composable () -> AppNavHostDependencies` producer. `AndroidAppRoot` is the *Android* wrapper around it — the one that reads the graph off the `Application` — and `DesktopAppRoot` is its desktop twin; neither is what the desktop is waiting for. |
-| **Widget vocabulary** | **neither — Compose + `:sharedUI`** | See below; this is the line that is easiest to cross by accident. |
+**Nuvio's desktop player is no longer a reference** — the app it was measured for is gone, and what
+it taught about the Android player is already landed in `:native-engine`/`:torrent-engine`. Native
+playback on Apple is AVPlayer/AVKit behind `:player`'s interfaces, and those interfaces are the seam,
+not a Compose window.
 
-**Neither is a code source.** Do not port files across, and do not build a transliteration layer.
-**The vocabulary stays Compose + Material3 + `CrispyPalette`**: read the web app for *what is on
-screen and roughly where*, then build it from `Scaffold`, `TopAppBar`, `NavigationRail`,
-`ModalBottomSheet`, `Dialog`, `LazyRow`, `LazyVerticalGrid`, `WindowInsets`, `onKeyEvent` +
-`FocusRequester`, `detectTransformGestures`. **Its shadcn wrappers, Tailwind class soup and CSS
-custom properties are the old implementation and do not come across** — and if this work ends up
-producing Compose wrappers whose names mirror shadcn components, it has become a port of the web
-app rather than a desktop app. `:app`'s `commonMain` already carries `TopLevelDestination`,
-`SearchTopBar`, `FloatingBottomBar` and `CrispySharedTransitionLayout`; assemble the desktop
-chrome from the shared shell's own components instead of modelling it on `Topbar.tsx`.
-
-Nuvio keeps desktop as a `jvm("desktop")` target *inside* its shared module (132 `desktopMain`
-files against 127 `androidMain`), so it is a reference for **how much** desktop surface a real app
-carries, not for where to put ours.
-
-**From Nuvio — the mechanics, and this is the priority.** Measured in
-`desktopMain/kotlin/com/nuvio/app/Main.kt`, 285 lines:
-
-- **`SwingWindow`, not `Window`** — required because the native player surface is an AWT
-  `JComponent` peer. Ours uses `Window` today and will have to change when a player lands.
-- **An ordered `main()` preamble**, each step a named one-line initialiser, in a fixed order that
-  is not interchangeable: `initGtkEarly()` on Linux **before** AWT/Compose/Skia (Skiko otherwise
-  half-loads GDK and you get a `GdkDisplayManager` type-registration conflict), then Swing/HiDPI
-  globals **before** anything touches AWT (installing the open-URI handler first left HiDPI Linux
-  at 1×), then cached profiles **before the first Compose frame** so the first frame already has
-  the profile colour.
-- **`jvmArgs`**: `-Djdk.gtk.version=0` plus five `--add-opens` (`java.awt`, `sun.lwawt`,
-  `sun.lwawt.macosx`, `sun.awt.windows`, `sun.awt.X11`).
-- **`nativeDistributions`** formats `Dmg, Msi, Deb, Rpm, AppImage`, with per-OS icon files
-  (`.icns`/`.ico`/`.png`), `CFBundleURLTypes` for custom schemes, and nullable credential-driven
-  signing + notarization.
-- **Window state as a global, non-profile-scoped preference** persisted from `snapshotFlow` on
-  every change — including position, maximized and fullscreen — with the rule **persist geometry
-  only while windowed**, because fullscreen coordinates are not a meaningful position to restore.
-  Ours persists width/height only, on close.
-- **A `smokePlayerUrl` harness branch** driven by a gradle property / env var that renders just the
-  player surface instead of the app — a CLI-drivable "does this actually decode" gate.
-- **Its player is a native-bridge problem, not a dependency problem**: hand-written libmpv bridges
-  per OS plus **bundled runtimes** (macOS 115 MB, Windows 111 MB checked in) and explicit task
-  ordering ahead of every desktop run task. `features/player/desktop/` is **3,283 lines** across 13
-  files, `NativePlayerController.kt` alone being 1,872. **Budget for that order of magnitude —
-  `:player`'s existing interfaces are the seam, and this is the work behind them.**
-
-**From Crispy-web — the layout, roughly, and its implementation not at all.** It is the
-React/Vite **predecessor of this very project**, so its information architecture is the one worth
-reading. **Its layout already *is* the desktop layout** — only three files carry a `*Desktop`
-suffix (`HeroDesktop`, `MetaDetailsDesktop`, `PlayerDesktop`), one of them is a 12-line shim, and
-there is **no `isDesktop` / media-query branch anywhere**, so there is no responsive switch to
-reproduce and no mobile variant to design around. Read it for what the topbar carries, what the
-sidebar carries, what the hero shows, that details open over the content, and which panels the
-player has — then build those in Compose.
-
-**Two of its mechanics are worth knowing about even though the code is not coming across.** Its
-`index.css` hides the header on immersive routes
-(`.app-layout-root[data-route-type="meta"|"player"|"auth"]`), and its "Dual Layer Architecture
-(MPV Mode)" makes `html, body, #root` transparent with `!important` "to let native video show
-through". **That is the web's version of the transparent-window fullscreen problem, and Nuvio's
-answer to the same problem is the opposite one** — an opaque AWT window/`rootPane`/`contentPane`
-at `0x0D0D0D` with `isOpaque = true`, and fullscreen handled by `WindowPlacement`. Ours is the
-Nuvio kind.
-
-**The palette is a nudge, not a merge.** Crispy-web's tokens are a shadcn set (`--background:
-0 0% 2%`, `--card: 4%`, `--accent: 12%`, `--muted-foreground: 60%`, `--radius: 1rem`,
-`--font-display: 'Archivo Variable'`). Ours, `CrispyPalette`, is a **Material3 role set** and
-reads two-to-three steps lighter: `background 0xFF141414` against ≈`#050505`, `surface 0xFF1F1F1F`
-against a 4% card, `surfaceVariant 0xFF2A2A2A` and `outline 0xFF333333` **above anything in the
-web's token set**. Exactly one role coincides —
-`surfaceContainerLowest`/`surfaceDim` `0xFF0A0A0A` is the web's *card*, not its background. **So
-the two are not transcriptions of each other and must not be reconciled into one vocabulary:
-`CrispyPalette` stays a Material3 role set and a few of its roles move a step darker where the
-desktop should read like the web app.** That touches the shipping Android app and `:tv`, and a
-missing `:tv` role mapping is a silent colour change rather than a compile error — so it is a
-product decision about shipped surfaces, and it gets **its own landing**.
+**`CrispyPalette` is settled as it is**: a Material3 role set, unchanged. The darker-roles idea was
+argued from a desktop surface reading like the web app, and there is no desktop surface.
 
 ## Commands
 
@@ -223,18 +151,17 @@ Contracts (fast):
 ```sh
 python3 -m pip install jsonschema==4.23.0
 python3 scripts/validate_contracts.py
-./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest
+./gradlew :android:core-domain:testAndroidHostTest
 swift test --package-path ios/ContractRunner
 ```
 
 Frequently used tasks:
 ```sh
 ./gradlew :android:app:testAndroidHostTest --tests 'com.crispy.tv.distribution.AppDistributionTest'
-./gradlew :android:app:desktopTest --tests 'com.crispy.tv.settings.KeyValueStorePlaybackSettingsRepositoryTest'
-./gradlew :android:desktopApp:compileKotlin   # proves an :app commonMain change still renders off-Android
-./gradlew :android:desktopApp:test
-./gradlew :android:backend:desktopTest        # gate before changing BackendApi or AccountApi
-./gradlew :android:home:desktopTest :android:home:testAndroidHostTest
+./gradlew :android:app:testAndroidHostTest --tests 'com.crispy.tv.settings.KeyValueStorePlaybackSettingsRepositoryTest'
+./gradlew :android:app:compileCommonMainKotlinMetadata  # catches a JVM-only symbol in :app's commonMain
+./gradlew :android:backend:testAndroidHostTest        # gate before changing BackendApi or AccountApi
+./gradlew :android:home:testAndroidHostTest
 ```
 
 Android builds and lint: `./gradlew :android:androidApp:assemble{Sideload,Store}{Debug,Release}`,
@@ -290,7 +217,8 @@ changed a result.
   "cannot access", not "unresolved". **The only instrument that finds this family is a metadata
   compilation** — `:android:app:compileCommonMainKotlinMetadata` compiles `commonMain` against the
   **metadata** variant of every dependency, so it is the only task that catches both directions.
-  `compileKotlinDesktop` and `compileAndroidMain` each miss one. **"The import list is clean" is not a
+  `compileAndroidMain` misses it, because it compiles against the Android artifacts where a JVM-only
+  symbol resolves. **"The import list is clean" is not a
   measurement.**
 - **Run the audit in both directions.** A forbidden-token scan answers *pinned by an import*.
   Subtracting every type declared in every module's `commonMain` from the capitalised identifiers a
@@ -502,9 +430,14 @@ changed a result.
   behaviour-preserving.
 - **`org.junit.Assert.assertEquals` has no four-argument overload, and swapping expected for actual
   still compiles.** A three-argument call whose first argument was the *expected value* compiles, runs,
-  and reports a failure that reads as a production bug. `:androidApp` tests use the JUnit order
-  (message first), `commonTest` suites use `kotlin.test` (message last). **When a failure message quotes
-  your own label text as the *actual*, the assertion is misordered.**
+  and reports a failure that reads as a production bug. **Which order is right is decided by the
+  file's import, not by its module or its source set** — measured: `:app`'s commonTest/androidHostTest
+  is 61 files on `kotlin.test` against 20 on `org.junit.Assert`, `:addons` 10 against 1, `:core-domain`
+  32 against 1. `kotlin.test` is `(expected, actual, message)` and `assertNull(actual, message)`;
+  `org.junit.Assert` is `(message, expected, actual)`. **A file that imports `kotlin.test` and writes
+  the JUnit order does not compile** — `AddonStreamPlaybackResolverTest.kt` had never been compiled by
+  any gate for exactly that reason. **When a failure message quotes your own label text as the
+  *actual*, the assertion is misordered.**
 - **Read test XML with `ElementTree`, iterating `testcase` → `failure` as nested elements.** A greedy
   regex pairs a *passing* test's name with the next *failing* one's message.
 - **Clear every module you will read, and read no wider than the tasks you ran** — a shorter `rm -rf`
@@ -554,7 +487,9 @@ because a driver runs unattended.
   the log **per entry**; a superset of the `expect` set means the log is shared. **Never pass a method
   name to `--tests` — it names a class**, and a filter matching nothing fails as `BUILD FAILED` with no
   `e:` line, which a name-reading driver scores SURVIVED. **A test-filtered task only observes the
-  source sets it compiles** — `:app:desktopTest` cannot see an `androidMain` mutation however extreme.
+  source sets it compiles** — `:android:addons:testAndroidHostTest` compiles `:addons`'s `commonTest`
+  and `androidHostTest` and nothing else, so a mutation in `:player` is invisible to it however
+  extreme.
 - **Pass `--no-build-cache` and guard on `> Task … (FROM-CACHE|UP-TO-DATE)` as text.** A `FROM-CACHE`
   task never compiles the mutated source and reports success in 1s — **a one-second green from a task
   you just perturbed is not a result.**
@@ -750,12 +685,13 @@ live in `:android:sharedUI` as `composeResources`. `:ui-assets` keeps only what 
 
 - `python3 scripts/validate_contracts.py`
 - `python3 scripts/validate_workflows.py`
-- `./gradlew :android:core-domain:desktopTest :android:core-domain:testAndroidHostTest`
+- `./gradlew :android:core-domain:testAndroidHostTest`
 - `./gradlew :android:app:testAndroidHostTest` (the composition root; the gate before touching `PlaybackDependencies`, `AppDistribution`, `AppServices` or `AppGraph`)
-- `./gradlew :android:app:compileCommonMainKotlinMetadata` (`:app`'s `commonMain` against the **metadata** variant of every dependency, so it is the only task that catches a *JVM-only* symbol in `commonMain`; `compileKotlinDesktop` and `compileAndroidMain` each miss one.)
-- `./gradlew :android:app:desktopTest` (`:app`'s `commonTest`)
-- `./gradlew :android:desktopApp:compileKotlin` (after any `:app` `commonMain` change — the task that proves it still renders off-Android)
-- `./gradlew :android:backend:desktopTest` (the gate before changing `BackendApi` or `AccountApi`)
+- `./gradlew :android:app:compileCommonMainKotlinMetadata` (`:app`'s `commonMain` against the **metadata** variant of every dependency, so it is the only task that catches a *JVM-only* symbol in `commonMain`; `compileAndroidMain` misses it.)
+- `./gradlew :android:backend:testAndroidHostTest` (the gate before changing `BackendApi` or `AccountApi`)
 - `python3 scripts/verify_kmp_outputs.py` (after any compile; catches a stale class a green build cannot)
 - `swift test --package-path ios/ContractRunner` (if Swift logic touched)
 - Ensure `:android:tv` and tvOS placeholder builds still compile
+- Nothing on a Linux machine proves an `:app` `commonMain` change still renders — there is no desktop
+  app and no off-Android Compose consumer left. The Apple compiles in `apple.yml` are the other half,
+  and they are compile-only.

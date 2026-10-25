@@ -36,13 +36,13 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # full pass.
 RECHECK: set[str] = set()
 
-TASK = ":android:app:desktopTest"
+TASK = ":android:app:testAndroidHostTest"
 
-# `:app`'s `desktopTest` builds the **desktop** target only, so a mutation in an
-# `androidMain` file cannot fail under it however it is written. `testAndroidHostTest`
-# is the module's only test compilation that compiles `androidMain` as well, so an
-# entry whose file lives there must name this task instead. An entry that picks the
-# wrong task reports SURVIVED and the verdict is a fact about the driver, not the code.
+# An entry whose file lives in `androidMain` must name `HOST_TASK`: it is the
+# module's only test compilation that compiles `androidMain` as well as `commonTest`,
+# and a mutation in a file no task compiles cannot fail however it is written. An
+# entry that picks the wrong task reports SURVIVED and the verdict is a fact about
+# the driver, not the code.
 HOST_TASK = ":android:app:testAndroidHostTest"
 GESTURES = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerGestures.kt"
 SHEET = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerEpisodesSheet.kt"
@@ -203,8 +203,9 @@ MUTATIONS = [
 # Every entry below names `HOST_TASK`. These are the implementation behind a port
 # the same landing created, and before this suite they had **no** verification at
 # all: the original entry turned the class `abstract` -- which cannot compile at
-# its one construction site -- and `desktopTest` reported SURVIVED, because the
-# desktop target never sees `androidMain`. That verdict was a fact about the task.
+# its one construction site -- and the mutation reported SURVIVED, because the task
+# the driver ran then compiled `commonMain` only and never saw `androidMain`. That
+# verdict was a fact about the task.
 MUTATIONS += [
     (
         "the-android-implementation-stops-implementing-the-port",

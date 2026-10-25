@@ -299,9 +299,8 @@ resume position, progress reporting, preferred audio/subtitle language, auto-pic
 surfaces render their own UI. **Measure first:** list the decisions, mark each portable / Android-pinned,
 and only move the portable ones. A decision that only the phone makes does not move.
 
-**Verify:** `:android:app:testAndroidHostTest` and `:android:app:desktopTest` (the phone must not
-regress), `:android:core-domain:desktopTest :android:core-domain:testAndroidHostTest`, and the TV
-manual pass again.
+**Verify:** `:android:app:testAndroidHostTest` (the phone must not regress),
+`:android:core-domain:testAndroidHostTest`, and the TV manual pass again.
 
 ### L5 — Release readiness for TV
 

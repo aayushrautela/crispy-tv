@@ -7,8 +7,9 @@ Run unattended:  python3 scripts/mutate_secret_format.py
 ## What this suite is for
 
 `SecretFormat` is the encrypted-secret contract that the Android store
-(`SecureTokenStore`), the desktop store (`DesktopSecretStore`) and any future
-Apple one all implement. The constants were already shared; this landing moved
+(`SecureTokenStore`) and any future Apple one all implement -- the Apple
+implementation is `:android:platform-ios` in `docs/plans/ios-native-plan.md`,
+Landing 1. The constants were already shared; this landing moved
 the *shape* -- joining and splitting the two halves -- here as well, so two
 implementations cannot disagree about it without the compiler noticing.
 
@@ -54,7 +55,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "android/platform-core/src/commonMain/kotlin/com/crispy/tv/platform/SecretFormat.kt"
-TASK = ":android:platform-core:desktopTest"
+TASK = ":android:platform-core:testAndroidHostTest"
 CLASS = "com.crispy.tv.platform.SecretFormatTest"
 LOG = Path("/tmp/opencode/mutate-secret-format.log")
 

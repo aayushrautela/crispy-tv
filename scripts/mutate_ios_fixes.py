@@ -58,8 +58,9 @@ Driver rules this obeys, and why each is here:
   which a name-reading driver scores as 19 of 23 SURVIVED.
 * The log is truncated **per entry**; an accumulating log makes every entry report every
   earlier failure as its own evidence.
-* Both `FAILED` line shapes are accepted, because both occur here: `desktopTest` prints
-  `Class[desktop] > method FAILED` and a host task prints `Class > method FAILED`.
+* Both `FAILED` line shapes are accepted: the host task prints `Class > method
+  FAILED`, and the suffixed `Class[desktop] > method FAILED` a removed desktop
+  target used to print stays acceptable so an old log cannot be read as a pass.
 * A surviving mutation is a claim about the code, not about the suite.
 """
 
@@ -73,8 +74,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOG = Path("/tmp/opencode/mutate-ios-entry.log")
-TASK = ":android:core-domain:desktopTest"
-RESULTS = "android/core-domain/build/test-results/desktopTest"
+TASK = ":android:core-domain:testAndroidHostTest"
+RESULTS = "android/core-domain/build/test-results/testAndroidHostTest"
 
 ISO = "android/core-domain/src/commonMain/kotlin/com/crispy/tv/domain/watch/Iso8601.kt"
 

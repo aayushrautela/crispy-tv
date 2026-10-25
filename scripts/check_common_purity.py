@@ -3,9 +3,9 @@
 """Fail the build when platform-specific imports leak into a KMP commonMain.
 
 The Kotlin compiler already enforces this for declared targets, but only for
-targets you happen to build. CI proves Android + desktop JVM; Apple targets are
-only compiled on macOS. This check is the cheap, host-independent gate that
-runs everywhere.
+targets you happen to build. CI proves Android and -- through the compile-only
+linuxX64 target -- Kotlin/Native; Apple targets are only compiled on macOS. This
+check is the cheap, host-independent gate that runs everywhere.
 
 Scans every `src/commonMain` tree in the repo for imports that cannot resolve
 in a platform-neutral source set.
@@ -30,9 +30,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #
 # Consequence, and it is an accepted one: an *Android-only* androidx.compose API
 # in a commonMain (e.g. LocalConfiguration) passes this grep and is caught by the
-# compiler instead, because :android:sharedUI declares desktop and iOS targets
-# that do not have it. check-local.sh compiles the desktop target, so the inner
-# loop still fails fast on a Linux host.
+# compiler instead, because :android:sharedUI declares iOS targets that do not
+# have it and apple.yml compiles them. A Linux host cannot make that check for a
+# Compose module, since Compose Multiplatform publishes no linuxX64 artifacts.
 FORBIDDEN_PREFIXES = (
     "android.",
     "androidx.activity",
@@ -60,29 +60,30 @@ FORBIDDEN_PREFIXES = (
 # `paging-compose` remain Android-only and are why `Pager`, `PagingConfig`,
 # `cachedIn` and `LazyPagingItems` still live in androidMain. So the name is
 # no longer a signal in either direction, and the real check is the compiler:
-# the same argument the androidx.compose note above makes. :app declares
-# desktop and both iOS targets, so an Android-only paging type in its
-# commonMain fails `compileKotlinDesktop` in check-local.sh, and `apple.yml`
-# covers the iOS half. Re-add the prefix if `paging-common` ever stops
-# publishing the non-Android targets.
+# the same argument the androidx.compose note above makes. :app declares both iOS
+# targets, so an Android-only paging type in its commonMain fails the iOS compile
+# in apple.yml, and `:android:app:compileCommonMainKotlinMetadata` is the local
+# instrument -- it compiles commonMain against every dependency's metadata
+# variant, which is the same classpath the Apple targets see. Re-add the prefix
+# if `paging-common` ever stops publishing the non-Android targets.
 
 # `androidx.lifecycle` is forbidden in the list above and now is not, for exactly
 # the same reason, and the evidence is stronger than paging's because it came out
 # of the resolved graph rather than out of a `.module` file. Declaring
-# `androidx.lifecycle:lifecycle-viewmodel:2.11.0` in :app's commonMain and running
-# `./gradlew :android:app:dependencyInsight --configuration desktopCompileClasspath
-# --dependency androidx.lifecycle:lifecycle-viewmodel` names
+# `androidx.lifecycle:lifecycle-viewmodel:2.11.0` in :app's commonMain and asking
+# the dependency graph for that configuration named
 # `androidx.lifecycle:lifecycle-viewmodel-desktop:2.11.0` -- a real per-target KMP
 # artifact, which is what makes ViewModel, ViewModelProvider and viewModelScope
-# usable from commonMain. The Android-flavoured halves of the same family
+# usable from commonMain. That measurement named a JVM target this repository has
+# since removed; the same classpath question is now answered locally by
+# `:android:app:compileCommonMainKotlinMetadata`, and by apple.yml for iOS.
+# The Android-flavoured halves of the same family
 # (`lifecycle-viewmodel-ktx`, `lifecycle-runtime-ktx`, `lifecycle-runtime-compose`,
 # `lifecycle-viewmodel-compose`) are still Android-only and are why the
 # `factory(context)` for each viewmodel stays in androidMain. So the package name
 # stopped being a signal in either direction, and the compiler is the real check:
-# :app declares desktop and both iOS targets, so an Android-only lifecycle type in
-# its commonMain fails `compileKotlinDesktop` in check-local.sh, and `apple.yml`
-# covers the iOS half. Re-add the prefix if `lifecycle-viewmodel` ever stops
-# publishing the non-Android targets.
+# re-add the prefix if `lifecycle-viewmodel` ever stops publishing the
+# non-Android targets.
 
 # `androidx.navigation` is forbidden in the list above and now is not, and this
 # is the third removal of a prefix that was right when written -- but it differs
@@ -111,9 +112,9 @@ FORBIDDEN_PREFIXES = (
 # that artifact is ever placed on a `commonMain` classpath the name becomes a
 # signal in the negative direction again and the prefix must come back. The
 # compiler remains the real check on the same argument the other blocks make:
-# `:app` declares desktop and both iOS targets, so an Android-only navigation type
-# in its `commonMain` fails `compileKotlinDesktop` in check-local.sh, and
-# `apple.yml` compiles the iOS half.
+# `:app` declares both iOS targets, so an Android-only navigation type in its
+# `commonMain` fails the iOS compile in apple.yml, and
+# `:android:app:compileCommonMainKotlinMetadata` is the local instrument.
 #
 # Re-add the prefix if `org.jetbrains.androidx.navigation:navigation-compose`
 # ever stops publishing the non-Android targets, if it ever stops keeping the
@@ -167,8 +168,8 @@ def main() -> int:
     if total:
         print(
             f"\ncheck_common_purity: {total} platform import(s) in commonMain.\n"
-            "commonMain must compile for every declared target, including desktop "
-            "JVM and iOS.\nMove the code to androidMain, or hide the platform type "
+            "commonMain must compile for every declared target, including the "
+            "Apple ones.\nMove the code to androidMain, or hide the platform type "
             "behind an interface in :android:platform-core."
         )
         return 1

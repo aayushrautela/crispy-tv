@@ -98,16 +98,11 @@ jobs:
             printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/.keystores/crispy-debug-key.jks"
           fi
 
-      - name: Run JVM contract tests
-        # The contract suite lives in :core-domain's commonTest, so one suite
-        # runs on both the Android host JVM and desktop. :desktopApp is the
-        # Compose Multiplatform seam proof; it needs a real render, which is
-        # why it is a separate task rather than folded into the line above.
-        run: |
-          ./gradlew \
-            :android:core-domain:desktopTest \
-            :android:core-domain:testAndroidHostTest \
-            :android:desktopApp:test
+      - name: Run contract tests
+        # The contract suite lives in :core-domain's commonTest, so the host-test
+        # task runs all of it on a JVM. The Apple simulator run in apple.yml is
+        # the other half: it is what notices the suite holding a JVM API.
+        run: ./gradlew :android:core-domain:testAndroidHostTest
 
       - name: Run plugins module unit tests
         run: ./gradlew :android:plugins:testDebugUnitTest

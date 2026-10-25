@@ -28,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/SeasonEpisodesLoader.kt"
-TASK = ":android:app:desktopTest"
+TASK = ":android:app:testAndroidHostTest"
 CLASS = "com.crispy.tv.playerui.SeasonEpisodesLoaderTest"
 LOG = Path("/tmp/opencode/mutate-season-episodes.log")
 RECHECK: list[str] = []

@@ -178,10 +178,11 @@ plugins {
  * ## No `linuxX64` here
  *
  * Unlike :core-domain and :platform-core, this is a Compose module. Compose
- * Multiplatform publishes no `linuxX64` artifacts -- its targets are Android,
- * iOS and Desktop (JVM) only -- so declaring it makes every `compose.*`
- * dependency fail to resolve. `jvm("desktop")` is the local purity gate
- * instead.
+ * Multiplatform publishes no `linuxX64` artifacts, so declaring it makes every
+ * `compose.*` dependency fail to resolve. The local non-Android signal is
+ * `compileCommonMainKotlinMetadata` instead, which compiles `commonMain` against
+ * the metadata variant of every dependency and so catches a JVM-only symbol the
+ * Android compile alone would accept.
  */
 kotlin {
     jvmToolchain(21)
@@ -204,19 +205,12 @@ kotlin {
         }
         // Gives this KMP library a host unit test compilation, and with it the
         // `testAndroidHostTest` task. Without it `:app` has no way to be tested at
-        // all: `desktopTest` sees only `commonMain` + `appUi`, and the composition
-        // root -- the thing every future migration step unwinds -- lives in
-        // `androidMain`. `:core-domain` declares the same block.
+        // all: that task compiles both `commonTest` and `androidMain` against the
+        // same `commonMain` + `appUi` sources, and the composition root -- the
+        // thing every future migration step unwinds -- lives in `androidMain`.
+        // `:core-domain` declares the same block.
         withHostTest {}
     }
-
-    jvm("desktop")
-
-    // No linuxX64(), unlike :core-domain and :platform-core. This is a Compose
-    // module, and Compose Multiplatform publishes no linuxX64 artifacts -- its
-    // targets are Android, iOS and Desktop (JVM) only -- so declaring it makes
-    // every compose dependency fail to resolve. `jvm("desktop")` is the local
-    // purity gate instead.
 
     listOf(iosArm64(), iosSimulatorArm64())
 
@@ -231,26 +225,12 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
-        // Compose UI shared by phone, tablet and desktop -- everything except
-        // the 10-foot TV surface, which :android:tv owns outright.
+        // Compose UI shared by phone and tablet -- everything except the
+        // 10-foot TV surface, which :android:tv owns outright.
         val appUi = create("appUi") { dependsOn(commonMain.get()) }
         androidMain.get().dependsOn(appUi)
-        jvmMain.get().dependsOn(appUi)
-
-        // The JVM layer BOTH JVM targets compile. `applyDefaultHierarchyTemplate`
-        // registers `jvmMain` and hangs it off `appUi`, but by default nothing
-        // dependsOn it, so it is a source set the build never compiles -- and a
-        // file placed there is silently inert rather than an error. Android and
-        // desktop are both JVM targets, so these two edges are what turn it
-        // into the shared layer for everything pinned by `java.*`/`Dispatchers.IO`
-        // rather than Android alone.
-        //
-        // `named("desktopMain")` and not `desktopMain`: `jvm("desktop")` renames its
-        // own source set, so there is no typed accessor for it. `androidMain` DOES
-        // have one. Proven in both directions with a probe calling across the edge
-        // and a negative test with each edge removed.
-        named("desktopMain").get().dependsOn(jvmMain.get())
-        androidMain.get().dependsOn(jvmMain.get())
+        // The Apple seam. `iosMain` has no files yet; the edge exists so a file
+        // placed there is compiled rather than silently inert.
         iosMain.get().dependsOn(appUi)
 
         // What every target needs. These are the dependencies a `commonMain`
@@ -419,11 +399,11 @@ kotlin {
     // package on Android and nowhere else. Read-only use only: this module
     // never registers a handler, it only observes `transitionState`.
     implementation(libs.androidx.navigationevent.compose)
-    // androidx.lifecycle:lifecycle-viewmodel is a genuine KMP artifact at 2.11.0 - this was
-    // measured by declaring it here and compiling the `desktop` target, not read from a
-    // doc. ViewModel, ViewModelProvider and viewModelScope are therefore all reachable
-    // from commonMain, which is what lets a viewmodel move there whole instead of being
-    // split factory-from-viewmodel.
+    // androidx.lifecycle:lifecycle-viewmodel is a genuine KMP artifact at 2.11.0 -- this was
+    // measured by declaring it here and compiling it for a non-Android target, not read
+    // from a doc. ViewModel, ViewModelProvider and viewModelScope are therefore all
+    // reachable from commonMain, which is what lets a viewmodel move there whole instead
+    // of being split factory-from-viewmodel.
     implementation(libs.androidx.lifecycle.viewmodel)
     // `lifecycle-viewmodel-compose` is the fifth premise in this file that did not
     // survive checking. The comment above used to say it "stays in androidMain" as one of
@@ -440,28 +420,6 @@ kotlin {
             // so it publishes no JVM variant and cannot be consumed from a KMP
             // `commonMain` at all -- the same constraint `:ui-assets` hit. The one
             // file that needs it, `PlayerSessionSupport`, stays in `androidMain`.
-        }
-
-        // The desktop side of the ports, for `DesktopAppServices` in this module's
-        // `desktopMain`. It is declared **here and not at module level** because
-        // `:android:platform-desktop` is a plain `kotlin.jvm` module -- it publishes
-        // no metadata variant, so a `commonMain` line asking for it would fail to
-        // resolve the same way `:android:native-engine` does two blocks below. This
-        // is the desktop mirror of the `platform-android` edge that
-        // `AndroidAppServices` already uses, and the two implementations of the
-        // same interface sit at the same level in the hierarchy on purpose.
-        //
-        // Note what is *not* added: `:android:network` is already a `commonMain`
-        // dependency above, so `DesktopHttpClients` -- the desktop half of the
-        // transport `AppServices.httpClient` names -- is visible here without a
-        // second line, and adding one would be a claim nothing needs.
-        // `named("desktopMain")` rather than a `desktopMain` accessor: `jvm("desktop")`
-        // does not publish a typed accessor for its own source set, and
-        // `:android:network` reaches the same set the same way. The name is the
-        // target's, not a compilation's -- there is no `jvmMain` here to hang a
-        // custom set off.
-        named("desktopMain").get().dependencies {
-            implementation(project(":android:platform-desktop"))
         }
 
         // Everything the current code actually needs. Listed as `androidMain`
@@ -484,7 +442,7 @@ kotlin {
             //
             // Phase 4 replaces this block with the `compose.*` accessors, which
             // is also when Material3 Expressive has to be dropped or replaced
-            // with something that exists on desktop and iOS.
+            // with something that exists on iOS.
             implementation(libs.androidx.compose.runtime)
             implementation(libs.androidx.compose.foundation)
             implementation(libs.androidx.compose.ui)
@@ -527,7 +485,7 @@ kotlin {
             // `coil-compose` and `coil-core` are declared in `commonMain` above,
             // because the image layer moved there. These two stay here: they are
             // Android/JVM artifacts, and which fetcher and which decoder the
-            // desktop and iOS builds configure is a Phase 5/6 runtime question.
+            // iOS build configures is a Phase 5/6 runtime question.
             implementation(libs.coil.network.okhttp)
             implementation(libs.coil.svg)
             implementation(libs.metrics.performance)
@@ -541,12 +499,12 @@ kotlin {
             implementation(libs.coroutines.android)
         }
 
-        // The `commonMain` half of this module's tests, and it is what
-        // `desktopTest` runs. The two halves are complementary and neither
-        // substitutes for the other: `commonTest` cannot see androidMain, so it
-        // covers the settings repositories, the account repositories, the
-        // `EpisodeWatchStateResolver` and nothing in the composition root, while
-        // `androidHostTest` below covers exactly the reverse.
+        // The `commonMain` half of this module's tests. `testAndroidHostTest`
+        // compiles this set and `androidHostTest` together and runs them in one
+        // JVM: `commonTest` cannot see `androidMain`, so it covers the settings
+        // repositories, the account repositories, the `EpisodeWatchStateResolver`
+        // and nothing in the composition root, while `androidHostTest` below
+        // covers exactly the reverse.
         commonTest.dependencies {
             implementation(kotlin("test"))
             // `runTest`, for the suspend-shaped ports. The settings tests are all

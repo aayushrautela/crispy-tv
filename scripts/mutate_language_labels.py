@@ -161,7 +161,7 @@ MUTATIONS = [
 
 def gradle(filt):
     return subprocess.run(
-        ["./gradlew", ":android:app:desktopTest", "--tests", filt],
+        ["./gradlew", ":android:app:testAndroidHostTest", "--tests", filt],
         cwd=ROOT,
         capture_output=True,
         text=True,

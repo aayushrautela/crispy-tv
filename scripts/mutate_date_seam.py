@@ -33,7 +33,7 @@ MUTATIONS = [
         ISO,
         "val (year, month, _) = civilFromEpochDay(utcEpochDayOf(epochMillis + utcOffsetMillis))",
         "val (year, month, _) = civilFromEpochDay(utcEpochDayOf(epochMillis - utcOffsetMillis))",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -41,7 +41,7 @@ MUTATIONS = [
         ISO,
         "utcEpochDayOf(epochMillis + utcOffsetMillis)",
         "utcEpochDayOf(epochMillis)",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -49,7 +49,7 @@ MUTATIONS = [
         ISO,
         "return if (month == 1) monthKeyOf(year - 1, 12) else monthKeyOf(year, month - 1)",
         "return if (month == 1) monthKeyOf(year, 12) else monthKeyOf(year, month - 1)",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -57,7 +57,7 @@ MUTATIONS = [
         ISO,
         "return if (month == 1) monthKeyOf(year - 1, 12) else monthKeyOf(year, month - 1)",
         "return if (month == 1) monthKeyOf(year - 1, 11) else monthKeyOf(year, month - 1)",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -68,7 +68,7 @@ MUTATIONS = [
         # disambiguating line is the one above it, which only this function has.
         "    val month = monthKey.readDigits(5, 7) ?: return null\n    if (month !in 1..12) return null",
         "    val month = monthKey.readDigits(5, 7) ?: return null\n    if (month !in 0..12) return null",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -76,7 +76,7 @@ MUTATIONS = [
         ISO,
         "if (month == 1 && year == 0) return null",
         "if (month == 1 && year == 1) return null",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -84,7 +84,7 @@ MUTATIONS = [
         ISO,
         "year.toString().padStart(4, '0') + \"-\" + month.toString().padStart(2, '0')",
         "year.toString() + \"-\" + month.toString().padStart(2, '0')",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -92,7 +92,7 @@ MUTATIONS = [
         ISO,
         "year.toString().padStart(4, '0') + \"-\" + month.toString().padStart(2, '0')",
         "year.toString().padStart(4, '0') + \"-\" + month.toString()",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     (
@@ -100,7 +100,7 @@ MUTATIONS = [
         ISO,
         "parseIso8601InstantToEpochMillis(value) ?: return null,",
         "parseIso8601InstantToEpochMillis(value) ?: 0L,",
-        ":android:core-domain:desktopTest",
+        ":android:core-domain:testAndroidHostTest",
         "CivilMonthKeyTest",
     ),
     # ---- LibraryScreen.kt / LibraryMonthKeyTest ------------------------------
@@ -109,7 +109,7 @@ MUTATIONS = [
         LIB,
         "if (timestamp.isNullOrBlank()) \"unknown\" else civilMonthKey(timestamp, utcOffsetMillis) ?: \"unknown\"",
         "if (timestamp.isNullOrBlank()) \"unknown\" else civilMonthKey(timestamp, 0L) ?: \"unknown\"",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -117,7 +117,7 @@ MUTATIONS = [
         LIB,
         "if (timestamp.isNullOrBlank()) \"unknown\" else",
         "if (timestamp.isNullOrEmpty()) \"unknown\" else",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -125,7 +125,7 @@ MUTATIONS = [
         LIB,
         'monthKey == "unknown" -> "Unknown date"\n    monthKey == currentMonthKey -> "This Month"',
         'monthKey == currentMonthKey -> "This Month"\n    monthKey == "unknown" -> "Unknown date"',
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -133,7 +133,7 @@ MUTATIONS = [
         LIB,
         "else -> monthName(monthKey)",
         'else -> monthKey',
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -141,7 +141,7 @@ MUTATIONS = [
         LIB,
         "val key = historyMonthKey(item.lastActivityAt ?: item.watchedAt, utcOffsetMillis)",
         "val key = historyMonthKey(item.watchedAt, utcOffsetMillis)",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -149,7 +149,7 @@ MUTATIONS = [
         LIB,
         "return result.map { section -> section.copy(items = collapseEpisodesByShow(section.items)) }",
         "return result",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -157,7 +157,7 @@ MUTATIONS = [
         LIB,
         "val updated = existing.copy(episodeCount = (existing.episodeCount ?: 0) + (item.episodeCount ?: 1))",
         "val updated = existing.copy(episodeCount = existing.episodeCount ?: 0)",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -165,7 +165,7 @@ MUTATIONS = [
         LIB,
         "val existing = mergedByShow[item.itemId]",
         "val existing = mergedByShow[item.id]",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -173,7 +173,7 @@ MUTATIONS = [
         LIB,
         "addedMonthKey == currentMonthKey -> WATCHLIST_GROUP_THIS_MONTH",
         "addedYear == currentYear -> WATCHLIST_GROUP_THIS_MONTH",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -181,7 +181,7 @@ MUTATIONS = [
         LIB,
         "addedMonthKey == previousMonthKey(currentMonthKey) -> WATCHLIST_GROUP_LAST_MONTH",
         "addedMonthKey == previousMonthKey(currentMonthKey) && addedYear == currentYear -> WATCHLIST_GROUP_LAST_MONTH",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -189,7 +189,7 @@ MUTATIONS = [
         LIB,
         "if (addedAt.isNullOrBlank()) return WATCHLIST_GROUP_OLDER",
         "if (addedAt.isNullOrEmpty()) return WATCHLIST_GROUP_OLDER",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -197,7 +197,7 @@ MUTATIONS = [
         LIB,
         "val addedMonthKey = civilMonthKey(addedAt, utcOffsetMillis) ?: return WATCHLIST_GROUP_OLDER",
         "val addedMonthKey = civilMonthKey(addedAt, utcOffsetMillis) ?: currentMonthKey",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -205,7 +205,7 @@ MUTATIONS = [
         LIB,
         "addedYear == currentYear - 1 -> WATCHLIST_GROUP_LAST_YEAR",
         "addedYear == currentYear - 2 -> WATCHLIST_GROUP_LAST_YEAR",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -213,7 +213,7 @@ MUTATIONS = [
         LIB,
         'WATCHLIST_GROUP_LAST_YEAR -> "Last Year"',
         'WATCHLIST_GROUP_LAST_YEAR -> "Older"',
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -221,7 +221,7 @@ MUTATIONS = [
         LIB,
         '        WATCHLIST_GROUP_OLDER -> "Older"\n        else -> "Older"',
         '        WATCHLIST_GROUP_OLDER -> "Older"\n        else -> groupKey',
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -229,7 +229,7 @@ MUTATIONS = [
         LIB,
         "val key = watchlistGroupKey(item.addedAt, currentMonthKey, utcOffsetMillis)",
         "val key = item.addedAt ?: WATCHLIST_GROUP_OLDER",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -237,7 +237,7 @@ MUTATIONS = [
         LIB,
         "if (key != currentKey && currentKey != null && currentItems.isNotEmpty()) {\n            result.add(WatchlistDateSectionUi(currentKey, watchlistGroupLabel(currentKey), currentItems.toList()))",
         "if (true) {\n            result.add(WatchlistDateSectionUi(currentKey, watchlistGroupLabel(currentKey), currentItems.toList()))",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -245,7 +245,7 @@ MUTATIONS = [
         LIB,
         "RATING_BAND_LIKED to \"Liked\",\n            RATING_BAND_DISLIKED to \"Disliked\",",
         "RATING_BAND_DISLIKED to \"Disliked\",\n            RATING_BAND_LIKED to \"Liked\",",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -253,7 +253,7 @@ MUTATIONS = [
         LIB,
         "}.filter { it.items.isNotEmpty() }",
         "}",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -261,7 +261,7 @@ MUTATIONS = [
         LIB,
         "RATING_BAND_LIKED -> items.filter { it.liked == true }",
         "RATING_BAND_LIKED -> items.filter { it.liked != false }",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     (
@@ -275,7 +275,7 @@ MUTATIONS = [
         LIB,
         "civilMonthKeyFromEpochMillis(clock(), utcOffsetMillis)",
         "civilMonthKeyFromEpochMillis(clock(), 0L)",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "LibraryMonthKeyTest",
     ),
     # ---- DetailsHeader.kt / DetailsHeaderSubtextTest ------------------------
@@ -284,7 +284,7 @@ MUTATIONS = [
         HDR,
         "watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {",
         "watchCta.remainingMinutes != null -> {",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "DetailsHeaderSubtextTest",
     ),
     (
@@ -292,7 +292,7 @@ MUTATIONS = [
         HDR,
         "watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {",
         "watchCta.kind == WatchCtaKind.REWATCH -> {",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "DetailsHeaderSubtextTest",
     ),
     (
@@ -300,7 +300,7 @@ MUTATIONS = [
         HDR,
         "watchCta.remainingMinutes != null -> {",
         "(watchCta.remainingMinutes ?: 0) > 0 -> {",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "DetailsHeaderSubtextTest",
     ),
     (
@@ -308,7 +308,7 @@ MUTATIONS = [
         HDR,
         '"Last watched on $date"',
         '"Last watched"',
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "DetailsHeaderSubtextTest",
     ),
     (
@@ -320,7 +320,7 @@ MUTATIONS = [
         HDR,
         "val endsAtMs = clock() + (watchCta.remainingMinutes * 60_000L)",
         "val endsAtMs = watchCta.remainingMinutes * 60_000L",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "DetailsHeaderSubtextTest",
     ),
     (
@@ -328,7 +328,7 @@ MUTATIONS = [
         HDR,
         "val endsAtMs = clock() + (watchCta.remainingMinutes * 60_000L)",
         "val endsAtMs = clock() + (watchCta.remainingMinutes * 1_000L)",
-        ":android:app:desktopTest",
+        ":android:app:testAndroidHostTest",
         "DetailsHeaderSubtextTest",
     ),
 ]

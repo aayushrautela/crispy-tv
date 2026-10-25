@@ -66,8 +66,6 @@ kotlin {
         withHostTest {}
     }
 
-    jvm("desktop")
-
     // Compile-only verification target, never shipped and never run. See
     // :android:core-domain for why it exists and why the import-based purity gate
     // cannot substitute for it.

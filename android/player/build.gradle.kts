@@ -13,8 +13,8 @@ plugins {
  *
  * The `androidMain` source set is deliberately left empty. `:android:native-engine`
  * owns Media3 and libmpv and stays a plain `com.android.library`; players are
- * Android-only by design, not by accident. The interfaces here are the part that
- * the desktop app and the iOS shell can both see.
+ * Android-only by design, not by accident. The interfaces here are the part the
+ * iOS shell can see.
  */
 kotlin {
     jvmToolchain(21)
@@ -34,8 +34,6 @@ kotlin {
         // Android, and AGP only warns.
         withHostTest {}
     }
-
-    jvm("desktop")
 
     // Compile-only verification target, never shipped and never run. It is the one
     // Kotlin/Native target that builds on a Linux host, so it enforces the same

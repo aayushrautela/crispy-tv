@@ -20,9 +20,10 @@ Rules this driver obeys, and why each is here:
   "the build failed" and the verdict survives while the evidence is lost.
 * The log is truncated **per entry**. Appending across entries makes each one report
   every earlier failure as its own evidence.
-* Two `FAILED` line shapes are accepted, because both occur in this repository:
-  `desktopTest` prints `Class[desktop] > method FAILED` and the host task prints
-  `Class > method FAILED` with no bracket.
+* The `FAILED` line shape is `Class > method FAILED` with no `[desktop]` suffix,
+  because every task this driver runs is an AGP host test. The parser also accepts
+  the suffixed form, so a log written before the desktop JVM target was removed
+  cannot be read as a pass.
 * A surviving mutation is a claim about the code, not about the suite. Every survivor
   is listed in the closing report for hand-checking.
 * **The task is never filtered and never cached.** `--tests` names a *class*, and
@@ -283,7 +284,7 @@ def run_gradle() -> str:
     # multiplies the run by an order of magnitude for no added signal.
     #
     # `--no-build-cache` is **not** optional here. Without it Gradle serves
-    # `desktopTest` `FROM-CACHE` when it believes the inputs are unchanged, the
+    # the test task `FROM-CACHE` when it believes the inputs are unchanged, the
     # Kotlin compile is skipped as `UP-TO-DATE`, and the mutation under test is never
     # compiled at all — the run reports `BUILD SUCCESSFUL` in about a second and the
     # driver records a confident `SURVIVED` from a test task that did not execute. It
@@ -291,7 +292,7 @@ def run_gradle() -> str:
     # and the entry was genuinely caught. **A verdict from a `FROM-CACHE` task is not
     # evidence about the code**, and the `NO EVIDENCE` rule does not catch it because
     # the task did report a verdict.
-    cmd = ["./gradlew", ":android:player:desktopTest", "--no-build-cache"]
+    cmd = ["./gradlew", ":android:player:testAndroidHostTest", "--no-build-cache"]
     LOG.parent.mkdir(parents=True, exist_ok=True)
     # Truncated per entry on purpose: an accumulating log makes every entry report
     # every earlier failure as its own evidence, and a longer failure list is not a
@@ -342,7 +343,7 @@ def main() -> None:
             mutated = original.replace(entry["old"], entry["new"], 1)
             assert mutated != original, "replacement is identical to the original"
             path.write_text(mutated)
-            for task in ("desktopTest",):
+            for task in ("testAndroidHostTest",):
                 subprocess.run(
                     ["rm", "-rf", str(ROOT / f"android/player/build/test-results/{task}")],
                     check=False,
@@ -355,15 +356,15 @@ def main() -> None:
                 continue
             # A cached or skipped test task ran no test. The mutation was then never
             # compiled, so the verdict describes the previous state of the tree.
-            if re.search(r"^> Task :android:player:desktopTest (FROM-CACHE|UP-TO-DATE)$", output, re.M):
-                print("  NO EVIDENCE — desktopTest was FROM-CACHE/UP-TO-DATE")
+            if re.search(r"^> Task :android:player:testAndroidHostTest (FROM-CACHE|UP-TO-DATE)$", output, re.M):
+                print("  NO EVIDENCE — the test task was FROM-CACHE/UP-TO-DATE")
                 no_evidence.append(index)
                 continue
             if "e: " in output:
                 print("  COMPILE FAILED -- not evidence")
                 compile_failed.append(index)
                 continue
-            names = failed_tests(output) | failures_from_xml("desktopTest")
+            names = failed_tests(output) | failures_from_xml("testAndroidHostTest")
             # Gradle writes the failing test as `…Test.method[desktop]` and the XML as
             # `classname` + `name`, so a substring test over the method name is the one
             # match that works for both sources without a second parsing path.

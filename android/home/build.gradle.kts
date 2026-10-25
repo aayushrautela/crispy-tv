@@ -55,7 +55,7 @@ plugins {
  * | `CachingHomeCatalogService` | `commonMain` | The algorithm, every wire-to-model mapping and the in-flight dedup moved, and so did the snapshot cache behind the two-member `HomeCatalogSnapshotCache` port. The row's stated reason for the split was "`org.json` has no KMP answer in this repository", and **`kotlinx.serialization` is that answer** -- the same conversion `WatchProgressStore` already made. **The old row named three pins and two of them were proxies**: `OkHttp` was already behind `BackendApi`, and `formatRating` is `:android:addons`' `commonMain` code that `:home` merely declared in `androidMain.dependencies`. The pin that actually survived was neither: it was the map-to-model helpers in this module's own `images` file, which imports nothing |
  * | `ResponsiveImageSetMapping` | `commonMain` | moved with its only consumer. Its own KDoc said `androidMain` "because those caches are" -- a statement about its callers, not about the file, and the second time in this table that a file's stated reason named a consumer instead of a cause |
  * | `CatalogModels` | `commonMain` | moved in Phase 4. The row used to read "`androidMain` / Compose runtime", which was **incomplete rather than a real blocker** -- the only Compose call in the file is the `@Immutable` annotation, and Compose runtime publishes for every target `:home` builds. What actually pinned it was `java.util.Locale`, on one line: `catalogId.trim().lowercase(Locale.US)`. That is the second time this file's stated reason was a proxy rather than the cause, and the difference matters -- the real blocker was a single call that had a portable equivalent, where the stated one implied giving up the annotation |
- * | `RecommendationCatalogDiskCacheStore`, `DiskHomeCatalogSnapshotCache`, `JsonObjectToStringMap` | `commonMain` | moved together with the landing that gave `AppServices.homeSnapshotCache` a real desktop answer. All three stated reasons were discharged rather than carried: `Context.filesDir` became an injected okio `Path`, `org.json` became `kotlinx.serialization`, `java.io` became okio's `FileSystem`. **All three moved rather than only the two named classes because `DiskHomeCatalogSnapshotCache`'s writer is the only place the file *format* exists** -- copying the reader for desktop would have been two codecs for one format. The on-disk **file name** is pinned by `CacheFileNameTest` (okio's `sha256()` had to be *measured* against the hand-rolled `MessageDigest` loop it replaced, not assumed equal), and the written payload's key set by `DiskHomeCatalogSnapshotCacheTest`. **Nothing claims the payload bytes are unchanged**: the `androidMain` writer this replaced was an uncommitted working file, so there was no golden to diff against -- see the KDoc on `DiskHomeCatalogSnapshotCache` for what is pinned instead and why a divergence there is bounded to a cold start |
+ * | `RecommendationCatalogDiskCacheStore`, `DiskHomeCatalogSnapshotCache`, `JsonObjectToStringMap` | `commonMain` | moved together with the landing that made `AppServices.homeSnapshotCache` platform-free. All three stated reasons were discharged rather than carried: `Context.filesDir` became an injected okio `Path`, `org.json` became `kotlinx.serialization`, `java.io` became okio's `FileSystem`. **All three moved rather than only the two named classes because `DiskHomeCatalogSnapshotCache`'s writer is the only place the file *format* exists** -- copying the reader for desktop would have been two codecs for one format. The on-disk **file name** is pinned by `CacheFileNameTest` (okio's `sha256()` had to be *measured* against the hand-rolled `MessageDigest` loop it replaced, not assumed equal), and the written payload's key set by `DiskHomeCatalogSnapshotCacheTest`. **Nothing claims the payload bytes are unchanged**: the `androidMain` writer this replaced was an uncommitted working file, so there was no golden to diff against -- see the KDoc on `DiskHomeCatalogSnapshotCache` for what is pinned instead and why a divergence there is bounded to a cold start |
  *
  * The two `java.*` calls that moved out of `commonMain` files followed precedents already
  * set in this module and in `:core-domain`, rather than being reinvented: `lowercase(Locale.US)`
@@ -79,8 +79,6 @@ kotlin {
         // same cases on the platform the module actually ships.
         withHostTest {}
     }
-
-    jvm("desktop")
 
     // Compile-only verification target, never shipped and never run. See
     // :android:core-domain for why it exists and why the import-based purity gate
@@ -139,8 +137,8 @@ kotlin {
             implementation(project(":android:backend"))
 
             // For `RecommendationCatalogDiskCacheStore`, which is `commonMain` so
-            // the desktop `AppServices` can hand `AppServices.homeSnapshotCache`
-            // the same file-backed cache Android already had rather than
+            // the file-backed cache behind `AppServices.homeSnapshotCache` is a
+            // portable okio-backed type rather than an Android-only one, in place of
             // `NoHomeCatalogSnapshotCache`. It used `java.io`, a hand-rolled
             // `MessageDigest` and `org.json`; all three
             // pins were discharged rather than moved — `FileSystem.SYSTEM` /

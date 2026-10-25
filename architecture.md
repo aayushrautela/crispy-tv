@@ -1,7 +1,9 @@
 # Crispy Client Architecture
 
 ## Status
-This document defines the target architecture for the Crispy clients: the Android app, the Android TV app, the iOS and tvOS apps, and the desktop app (Windows, macOS, Linux). All four ship from one Kotlin Multiplatform codebase, and the rules below are the rules every one of them is held to.
+This document defines the target architecture for the Crispy clients: the Android app, the Android TV app, and the iOS and tvOS apps. They ship from one Kotlin Multiplatform codebase, and the rules below are the rules every one of them is held to.
+
+The Android apps render the shared Compose shell in `:app`'s `commonMain`. **The Apple apps are native SwiftUI over the same Kotlin engine** — see `docs/plans/ios-native-plan.md`. **There is no desktop app and no desktop target.**
 
 The core decision is simple:
 
@@ -528,15 +530,15 @@ shared, and reachable from every target
   player             player-facing interfaces
   network            trailer classification and extraction
   watchhistory       watch sync surface
-  app                the shared UI and presentation layer: 110 files in commonMain, 81 in androidMain
+  app                the shared UI and presentation layer: 176 files in commonMain, 48 in androidMain (the Android-only halves; the Apple apps build their own UI)
 
 per-platform, one implementation each
-  platform-android   Android's side of the six ports
-  platform-desktop   desktop's side of the six ports, and the only SecretStore
-  desktopApp         the desktop entry point and the seam proof
+  platform-android   Android's side of the ports in :platform-core
   androidApp         the Android entry point; owns the store / sideload flavour axis
   tv                 the Android TV entry point
-  ios/               the CrispyUI framework and the Swift shells over it
+  ios/               the SwiftUI apps (Apps/iOS, Apps/tvOS), CrispyKit, and the Swift
+                     contract runner; the CrispyUI framework is exported and imported
+                     by no Swift file -- see docs/plans/ios-native-plan.md
 
 pinned to androidMain, deliberately and permanently
   native-engine, platform-android, plugins, torrent-engine, ui-assets, youtube-extractor
@@ -546,10 +548,11 @@ Two of the older rules are load-bearing and are kept verbatim in substance:
 
 - Keep `core-domain` for platform-independent rules that are shared with Swift contract runners. This
   is the module the contract suite is compiled into, and the reason the rules can be asserted on
-  Android, desktop and both Apple targets from one fixture set.
+  Android (through the host test), on linuxX64 and on both Apple targets from one fixture set.
 - `platform-core` holds only interfaces, and each platform implements them. That is what lets one
-  `:app` `commonMain` run on all four targets without an `expect`/`actual` seam anywhere: the app
-  takes a `KeyValueStore`, and Android, desktop and (once Phase 6 lands) Apple each supply one.
+  `:app` `commonMain` compile for every declared target without an `expect`/`actual` seam anywhere:
+  the app takes a `KeyValueStore`, and Android supplies one today -- the Apple implementation is
+  `docs/plans/ios-native-plan.md` Landing 1, and there is no desktop one.
 
 Within `:app`, the two directories that answer the old tree's question concretely are:
 
@@ -639,8 +642,10 @@ indistinguishable; the port is finished and this document now describes the only
 - Standardize screen states so cached content remains visible during refresh and transient failures.
 
 ### Phase 7: Align Android and iOS
-- Mirror repository interfaces and domain models.
-- Keep deterministic contract-driven logic shared in behavior, even if implementations are platform-native.
+- Call the shared Kotlin engine from SwiftUI through an iOS framework, instead of mirroring repository
+  interfaces and domain models by hand (`docs/plans/ios-native-plan.md`).
+- Keep the Swift contract runner as the independent cross-check the agent rules require.
+- Keep deterministic contract-driven logic shared in behavior, even if a surface is platform-native.
 
 ## Guardrails
 - No new viewmodel may call `CrispyBackendClient` directly.

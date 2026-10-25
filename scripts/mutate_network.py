@@ -37,7 +37,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LOG = Path("/tmp/opencode/mutate-network-entry.log")
 SRC = "android/network/src/commonMain/kotlin/com/crispy/tv/details/trailer/TrailerSource.kt"
-TASK = ":android:network:desktopTest"
+TASK = ":android:network:testAndroidHostTest"
 
 # Two capture groups, both used — so the indices are 1 and 2. The three-group pattern
 # in the sibling drivers needs index 3; this pattern does not.
@@ -255,7 +255,7 @@ def main() -> None:
             assert mutated != original, "replacement is identical to the original"
             path.write_text(mutated)
             subprocess.run(
-                ["rm", "-rf", str(ROOT / "android/network/build/test-results/desktopTest")],
+                ["rm", "-rf", str(ROOT / "android/network/build/test-results/testAndroidHostTest")],
                 check=False,
             )
             output = run_gradle()
@@ -273,7 +273,7 @@ def main() -> None:
                       "source was never compiled")
                 no_evidence.append(index)
                 continue
-            names = failed_tests(output) | failures_from_xml("desktopTest")
+            names = failed_tests(output) | failures_from_xml("testAndroidHostTest")
             # Substring over the method name, so the same test works for the log's
             # `Class[desktop] > method FAILED` and the XML's classname + name.
             hit = sorted(n for n in names for e in entry["expect"] if e in n)

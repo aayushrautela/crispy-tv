@@ -31,9 +31,11 @@ plugins {
  * ## Deliberately a plain `com.android.library`
  *
  * Not multiplatform, and not because of laziness: the implementations are
- * Android-only and there is nothing portable to put in a `commonMain`. The desktop
- * equivalents arrived in Phase 5, in `:android:platform-desktop`, against the same
- * `platform-core` interfaces. That is the whole point of the interfaces existing.
+ * Android-only and there is nothing portable to put in a `commonMain`. That is the
+ * whole point of the `platform-core` interfaces existing -- Android supplies one
+ * implementation against them, and the Apple one is a standing gap rather than a
+ * closed question: `docs/plans/ios-native-plan.md` (Landing 1) is the landing that
+ * creates `:android:platform-ios` behind them.
  *
  * ## This paragraph used to promise Apple equivalents in Phase 6, and it was wrong
  *
@@ -53,12 +55,10 @@ plugins {
  * dependency with no consumer: the one thing this repository's own rules call
  * speculative.
  *
- * **The desktop implementation landed and the Apple one did not, and the difference
- * is a product decision rather than a technical block.** `platform-desktop` has
- * `desktopApp` as a real caller; Apple has no equivalent caller yet. The plan that
- * would create one is Phase 6, which wires `CrispyKit` to `CrispyUI` and reconciles
- * the six Swift files that duplicate shared code — and until that lands, the honest
- * statement is the one above.
+ * **A `platform-desktop` module once supplied the second implementation and has
+ * since been removed with the desktop app**, which is the shape of the answer this
+ * paragraph is about: an implementation lands when a real caller exists, and not
+ * before. Apple has no such caller yet, so the honest statement is the one above.
  */
 android {
     namespace = "com.crispy.tv.platform.android"

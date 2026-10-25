@@ -30,7 +30,7 @@ SHEET = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerInfoShee
 CTX = "android/app/src/commonMain/kotlin/com/crispy/tv/playerui/PlayerEpisodeContext.kt"
 SEL = "android/app/src/commonMain/kotlin/com/crispy/tv/streams/StreamSelectorContent.kt"
 
-APP_TEST = ":android:app:desktopTest"
+APP_TEST = ":android:app:testAndroidHostTest"
 
 # (label, path, old, new, filter)
 MUTATIONS = [

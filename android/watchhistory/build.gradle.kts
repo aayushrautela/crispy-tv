@@ -42,13 +42,10 @@ kotlin {
         // classpath. **Both reasons are gone.** `WatchProgressStore` is in
         // `commonMain` and parses with `JsonElement`, so the suite is in
         // `commonTest`, needs no Robolectric, and runs on every target --
-        // desktop JVM and Android host included, which is the two-halves rule
-        // the repo records. `implementation(libs.robolectric)` was removed
+        // the Android host test and the Apple targets included. `implementation(libs.robolectric)` was removed
         // here rather than left for a suite that does not exist.
         withHostTest {}
     }
-
-    jvm("desktop")
 
     // Compile-only verification target, never shipped and never run. See
     // :android:core-domain for why it exists and why the import-based purity gate

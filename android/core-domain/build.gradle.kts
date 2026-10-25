@@ -10,8 +10,8 @@ plugins {
 //
 // The contract suite used to be the separate `:android:contract-tests` JVM
 // module and read `contracts/fixtures/**/*.json` off disk with java.nio.file.
-// Moving it into this module's `commonTest` is what makes it run on desktop and
-// the Apple targets as well, and `java.nio.file` is exactly what cannot make
+// Moving it into this module's `commonTest` is what makes it run on the Apple
+// targets and the Android host as well, and `java.nio.file` is exactly what cannot make
 // that jump: it does not exist on Kotlin/Native, and on every other target the
 // path differs (the old code walked up from the working directory looking for
 // `settings.gradle.kts`, so it only worked when Gradle was invoked from the
@@ -110,8 +110,6 @@ kotlin {
         withHostTest {}
     }
 
-    jvm("desktop")
-
     // Compile-only verification target. Kotlin/Native enforces exactly the same
     // "no JVM API" rule as the Apple targets, and linuxX64 is the one Native
     // target that builds on a Linux host. So `compileKotlinLinuxX64` in
@@ -120,7 +118,7 @@ kotlin {
     linuxX64()
 
     // Declared, not merely intended. `commonMain` carries no java.* / android.*
-    // imports, so these compile from the same sources as Android and desktop.
+    // imports, so these compile from the same sources as Android.
     // Apple targets cannot be built on Linux, so they are proven by the
     // .github/workflows/apple.yml rather than by check-local.sh.
     iosArm64()

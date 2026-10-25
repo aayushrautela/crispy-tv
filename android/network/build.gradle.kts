@@ -6,18 +6,16 @@ plugins {
 /**
  * HTTP transport and the trailer-extraction seam.
  *
- * ## Why there is a `jvmCommonMain` here
+ * ## Why OkHttp lives in `androidMain`
  *
- * OkHttp publishes no Kotlin/Native artifact, but Android and the desktop are both
- * JVM, so the implementation belongs in a source set they share rather than in
- * `androidMain`. `jvmCommonMain` is that set: `androidMain` and `desktopMain` both
- * depend on it, and it holds the three OkHttp-backed files. `commonMain` keeps only
- * the `CrispyHttpClient` interface, which is the name portable consumers use.
+ * OkHttp publishes no Kotlin/Native artifact, so the three OkHttp-backed files
+ * cannot live in `commonMain`, and Android is the only JVM target this repository
+ * declares -- so `androidMain` is where they sit. `commonMain` keeps only the
+ * `CrispyHttpClient` interface, which is the name portable consumers use.
  *
  * The only thing the factory needed from `Context` was `context.cacheDir`, so it
  * takes a `File` instead: `AppHttp` supplies a directory under the Android cache
- * root and the desktop adapter supplies its own. That is the whole platform
- * difference.
+ * root. That is the whole platform difference.
  *
  * ## No flavour axis
  *
@@ -38,8 +36,8 @@ kotlin {
         minSdk = 26
 
         // This module's testable surface is exactly two files, and nothing asserted
-        // them. Its `androidMain` is four OkHttp/`Context` adapters that no
-        // `commonMain` can name, so a reader skimming the module concludes there is
+        // them. Its `androidMain` is OkHttp/`Context` adapters that no `commonMain`
+        // can name, so a reader skimming the module concludes there is
         // nothing here to test -- and the two `commonMain` files that do exist
         // (`TrailerSource.kt` above all: a hand-rolled regex with a non-null fallback,
         // and a classifier that matches two literals where the regex matches four
@@ -48,8 +46,6 @@ kotlin {
         // Android, and AGP only warns.
         withHostTest {}
     }
-
-    jvm("desktop")
 
     // Compile-only verification target, never shipped and never run. It is the one
     // Kotlin/Native target that builds on a Linux host, so it enforces the same
@@ -64,24 +60,21 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
-        // Android and desktop are both JVM, so the OkHttp implementation is shared
-        // here instead of living in androidMain. No Kotlin/Native target depends on
-        // this set, because there is no OkHttp artifact to resolve for it.
-        val jvmCommonMain =
-            create("jvmCommonMain") {
-                dependsOn(commonMain.get())
+        // OkHttp is a JVM artifact with no Kotlin/Native counterpart, and Android
+        // is the only JVM target this repository declares, so the OkHttp-backed
+        // implementation sits in `androidMain` next to `AppHttp`. No Kotlin/Native
+        // target extracts these files, because there is no OkHttp artifact to
+        // resolve for one.
+        androidMain.dependencies {
+            // `api`, and deliberately so: five modules -- :app, :tv,
+            // :watchhistory, :backend and :addons -- import okhttp3 without
+            // declaring it, relying on this module re-exporting it.
+            api(libs.okhttp)
+            implementation(libs.okhttp.logging.interceptor)
+            implementation(libs.coroutines.core)
 
-                dependencies {
-                    // `api`, and deliberately so: five modules -- :app, :tv,
-                    // :watchhistory, :backend and :addons -- import okhttp3 without
-                    // declaring it, relying on this module re-exporting it.
-                    api(libs.okhttp)
-                    implementation(libs.okhttp.logging.interceptor)
-                    implementation(libs.coroutines.core)
-                }
-            }
-        androidMain.get().dependsOn(jvmCommonMain)
-        named("desktopMain").get().dependsOn(jvmCommonMain)
+            implementation(libs.coroutines.android)
+        }
 
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -89,10 +82,6 @@ kotlin {
             // functions under test are plain and non-suspend, so a coroutine test
             // dispatcher would be dead weight. Recording the omission so the next
             // agent does not add it "for consistency" with the other four.
-        }
-
-        androidMain.dependencies {
-            implementation(libs.coroutines.android)
         }
     }
 }

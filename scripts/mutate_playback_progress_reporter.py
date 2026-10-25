@@ -54,7 +54,7 @@ TARGET = (
     ROOT + "/android/app/src/commonMain/kotlin/com/crispy/tv/playerui/"
     "PlaybackProgressReporter.kt"
 )
-TASK = ":android:app:desktopTest"
+TASK = ":android:app:testAndroidHostTest"
 CLASS = "com.crispy.tv.playerui.PlaybackProgressReporterTest"
 LOG = "/tmp/opencode/mutate-reporter.log"
 

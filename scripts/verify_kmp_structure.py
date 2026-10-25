@@ -225,29 +225,23 @@ def project_edges(path: str) -> dict[str, set[str]]:
 # resolving into `:backend/commonMain` from `commonTest` is declared, not
 # invisible.
 #
-# `jvmMain` and `appUi` are `:app`'s own intermediate sets, and they were
-# missing here while existing in the build, which made this table a claim about
-# the module rather than a measurement of it.  `appUi` sits between
-# `commonMain` and the platform sets; `jvmMain` sits between `appUi` and the
-# two JVM targets, because both `androidMain` and `desktopMain` now `dependsOn`
-# it -- which is what lets a file pinned only by `java.*` or `Dispatchers.IO`
-# be written once instead of as an androidMain/desktopMain pair.  One level of
-# closure, listed explicitly, is what `declares()` walks.
+# `appUi` is `:app`'s own intermediate set, and it was missing here while
+# existing in the build, which made this table a claim about the module rather
+# than a measurement of it.  `appUi` sits between `commonMain` and the platform
+# sets -- `androidMain` and `iosMain` both `dependsOn` it.  One level of closure,
+# listed explicitly, is what `declares()` walks.
 ANCESTORS = {
     "commonMain": (),
     "appUi": ("commonMain",),
-    "jvmMain": ("appUi", "commonMain"),
-    "androidMain": ("jvmMain", "appUi", "commonMain"),
-    "desktopMain": ("jvmMain", "appUi", "commonMain"),
+    "androidMain": ("appUi", "commonMain"),
     "main": (),
-    "desktop": (),
     "linuxX64": (),
     "commonTest": ("commonMain",),
-    "androidHostTest": ("androidMain", "jvmMain", "appUi", "commonMain"),
-    "androidTest": ("androidMain", "jvmMain", "appUi", "commonMain"),
-    "test": ("main", "androidMain", "jvmMain", "appUi", "commonMain", "store", "sideload"),
-    "store": ("main", "androidMain", "jvmMain", "appUi", "commonMain"),
-    "sideload": ("main", "androidMain", "jvmMain", "appUi", "commonMain"),
+    "androidHostTest": ("androidMain", "appUi", "commonMain"),
+    "androidTest": ("androidMain", "appUi", "commonMain"),
+    "test": ("main", "androidMain", "appUi", "commonMain", "store", "sideload"),
+    "store": ("main", "androidMain", "appUi", "commonMain"),
+    "sideload": ("main", "androidMain", "appUi", "commonMain"),
 }
 
 

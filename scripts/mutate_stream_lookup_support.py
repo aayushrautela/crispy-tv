@@ -37,13 +37,14 @@ from os.path import dirname, exists, join
 
 ROOT = dirname(dirname(__file__))
 TARGET = "android/addons/src/commonMain/kotlin/com/crispy/tv/addons/lookup/StreamLookupSupport.kt"
-TASK = ":android:addons:desktopTest"
+TASK = ":android:addons:testAndroidHostTest"
 CLASS = "com.crispy.tv.addons.lookup.StreamLookupSupportTest"
 LOG = "/tmp/opencode/mutate-stream-lookup.log"
 
-# Two groups: the class, then the method. Bracket groups are non-capturing
-# because desktopTest prints `Class[desktop] > method FAILED` on one target and
-# `Class > method FAILED` on the other.
+# Two groups: the class, then the method. Bracket groups are non-capturing and
+# optional: the host task prints `Class > method FAILED`, and the suffixed form a
+# removed desktop target used to print stays acceptable so an old log cannot be
+# read as a pass.
 FAILED = re.compile(r"^(\w+)(?:\[.*?\])? > (\S+?)(?:\[.*?\])? FAILED", re.M)
 
 ENTRIES = [

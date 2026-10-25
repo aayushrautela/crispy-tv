@@ -39,13 +39,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = os.path.join(
     ROOT, "android/app/src/commonMain/kotlin/com/crispy/tv/details/DetailsMetadataLoader.kt"
 )
-TASK = ":android:app:desktopTest"
+TASK = ":android:app:testAndroidHostTest"
 CLASS = "com.crispy.tv.details.DetailsMetadataLoaderTest"
 LOG = "/tmp/opencode/mutate-loader.log"
 
-# Two groups: (1) the class, (2) the method. Bracket groups are non-capturing
-# because desktopTest prints `Class[desktop] > method FAILED` and the host task
-# prints `Class > method FAILED` with no bracket at all.
+# Two groups: (1) the class, (2) the method. Bracket groups are non-capturing and
+# optional: the host task prints `Class > method FAILED`, and the suffixed form a
+# removed desktop target used to print stays acceptable so an old log cannot be
+# read as a pass.
 FAILED = re.compile(r"^(\w+)(?:\[.*?\])? > (\S+?)(?:\[.*?\])? FAILED", re.M)
 
 ENTRIES = [

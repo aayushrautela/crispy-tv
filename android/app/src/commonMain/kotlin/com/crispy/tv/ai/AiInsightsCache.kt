@@ -15,8 +15,8 @@ package com.crispy.tv.ai
  * **That reason is now discharged.** `AiInsightsCacheStore` takes a
  * `KeyValueStore`, so what this interface says is "somewhere that persists
  * strings" and the class above is free to be any of them -- Android's
- * `SharedPreferences` today, and the same key-value port `:platform-desktop`
- * already implements over files the moment a consumer there asks for one.
+ * `SharedPreferences` today, and whatever implementation a platform supplies
+ * the moment a consumer there asks for one.
  *
  * The cache key is a **BCP-47 tag string**, not a `Locale`. That is the value
  * the wire already speaks (`backend.getAiInsights(locale = …)`) and the value

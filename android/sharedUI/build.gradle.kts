@@ -49,10 +49,9 @@ kotlin {
         withHostTest {}
     }
 
-    jvm("desktop")
-
-    // No linuxX64(), unlike the pure-Kotlin KMP modules. Compose Multiplatform
-    // publishes no linuxX64 artifacts; its targets are Android, iOS and Desktop.
+    // No linuxX64(), unlike the pure-Kotlin KMP modules: Compose Multiplatform
+    // publishes no linuxX64 artifacts, so declaring it makes every `compose.*`
+    // dependency fail to resolve.
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
         iosTarget.binaries.framework {
@@ -78,8 +77,8 @@ kotlin {
             // Deliberately NOT `compose.material3`. The alias tracks the latest
             // stable Material3 (1.4.0), which has no Expressive. This explicit
             // coordinate resolves to androidx material3 on Android and the
-            // JetBrains fork on desktop/iOS, so one declaration covers all four
-            // targets and there is only ever one material3 on the classpath.
+            // JetBrains fork on iOS, so one declaration covers both targets and
+            // there is only ever one material3 on the classpath.
             api(libs.compose.material3)
         }
 

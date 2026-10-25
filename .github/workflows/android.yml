@@ -79,16 +79,11 @@ jobs:
         # Reads the resolved dependency graph, so it is valid for every variant.
         run: ./gradlew :android:androidApp:verifyDistributionExclusions
 
-      - name: Run JVM contract tests
-        # The contract suite lives in :core-domain's commonTest, so one suite
-        # runs on both the Android host JVM and desktop. :desktopApp is the
-        # Compose Multiplatform seam proof; it needs a real render, which is
-        # why it is a separate task rather than folded into the line above.
-        run: |
-          ./gradlew \
-            :android:core-domain:desktopTest \
-            :android:core-domain:testAndroidHostTest \
-            :android:desktopApp:test
+      - name: Run contract tests
+        # The contract suite lives in :core-domain's commonTest, so the host-test
+        # task runs all of it on a JVM. The Apple simulator run in apple.yml is
+        # the other half: it is what notices the suite holding a JVM API.
+        run: ./gradlew :android:core-domain:testAndroidHostTest
 
       - name: Run app composition-root tests
         # The androidMain half of :app. The tests need a Context and nothing
@@ -97,31 +92,33 @@ jobs:
         # all. Robolectric is here for the Context, not for rendering.
         run: ./gradlew :android:app:testAndroidHostTest
 
-      - name: Run app common-domain tests
-        # The commonMain half of :app, and the reason these two steps exist
-        # separately rather than as one `check`: commonTest cannot see androidMain
-        # and androidHostTest cannot see what commonMain alone would compile.
-        # desktop is the target that would catch a JVM API leaking into a file
-        # that has just moved.
-        run: ./gradlew :android:app:desktopTest
-
-      - name: Run domain unit tests
-        run: ./gradlew :android:core-domain:desktopTest
+      - name: Check :app's commonMain against metadata dependencies
+        # The local non-Android signal for :app, which has no JVM test target:
+        # this compiles commonMain against the metadata variant of every
+        # dependency, so it is the one task that catches a JVM-only symbol the
+        # Android compile would accept.
+        run: ./gradlew :android:app:compileCommonMainKotlinMetadata
 
       - name: Run backend common tests
-        # Both targets, deliberately. desktop is what would notice a file that
-        # moved into commonMain reaching for a JVM API; the host test is what
-        # notices it not compiling on the platform the module actually ships to.
-        # :backend declares withHostTest{} precisely so that commonTest is not
-        # desktop-and-Apple-only -- without it AGP warns and runs neither.
-        run: ./gradlew :android:backend:desktopTest :android:backend:testAndroidHostTest
+        # :backend declares withHostTest{} so its commonTest runs on the platform
+        # the module actually ships to -- without it AGP warns and runs neither.
+        # The Apple simulator run in apple.yml is what notices a file that moved
+        # into commonMain reaching for a JVM API.
+        run: ./gradlew :android:backend:testAndroidHostTest
 
       - name: Run home common tests
-        # Same two-target split as :backend. :home's commonTest is where the
-        # moved home services are pinned, and desktop is the target that would
-        # catch one of them reaching for a JVM API -- the exact failure the
-        # commonMain move could not have compiled past on Apple.
-        run: ./gradlew :android:home:desktopTest :android:home:testAndroidHostTest
+        # :home's commonTest is where the moved home services are pinned, and
+        # the host test runs it on the platform the module ships to.
+        run: ./gradlew :android:home:testAndroidHostTest
+
+      - name: Run the feature modules' host tests
+        # Every module declares withHostTest{}, and six of them had a suite no
+        # gate compiled: :addons' ten commonTest files plus its androidHostTest,
+        # and one to three files each in :watchhistory, :player, :network,
+        # :platform-core and :sharedUI. That hole is how a test file that had
+        # never type-checked survived in :addons. They are cheap, and each one is
+        # the only place its module's commonTest is compiled.
+        run: ./gradlew :android:addons:testAndroidHostTest :android:watchhistory:testAndroidHostTest :android:player:testAndroidHostTest :android:network:testAndroidHostTest :android:platform-core:testAndroidHostTest :android:sharedUI:testAndroidHostTest
 
       - name: Run plugins module unit tests
         run: ./gradlew :android:plugins:testDebugUnitTest

@@ -60,8 +60,7 @@ MODULE_ROOT = REPO_ROOT / "android"
 SOURCE_DIR_NAMES = {
     "commonMain", "commonTest",
     "androidMain", "androidUnitTest", "androidInstrumentedTest",
-    "jvmMain", "jvmTest",
-    "desktopMain", "desktopTest",
+    "iosMain", "iosTest",
 }
 
 # Kotlin/JVM emits these for a type; they are the type's own class file.
