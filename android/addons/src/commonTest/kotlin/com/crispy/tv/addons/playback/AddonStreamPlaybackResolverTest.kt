@@ -25,16 +25,16 @@ class AddonStreamPlaybackResolverTest {
         val source = directStream().resolvePlaybackSource(resolver, sessionId = "session-1")
 
         assertEquals("https://example.test/a.mkv", source?.url)
-        assertEquals("the direct branch does not start the engine", null, resolver.lastMagnet)
-        assertEquals("the headers travel with the source", "Bearer token", source?.headers?.get("Authorization"))
-        assertEquals("the sidecar subtitles travel with the source", 1, source?.externalSubtitles?.size)
+        assertEquals(null, resolver.lastMagnet, "the direct branch does not start the engine")
+        assertEquals("Bearer token", source?.headers?.get("Authorization"), "the headers travel with the source")
+        assertEquals(1, source?.externalSubtitles?.size, "the sidecar subtitles travel with the source")
     }
 
     @Test
     fun aMagnetStreamIsRefusedWhenThereIsNoTorrentEngine() = runTest {
         val source = magnetStream().resolvePlaybackSource(torrentResolver = null, sessionId = null)
 
-        assertNull("a build with no engine cannot play a magnet link", source)
+        assertNull(source, "a build with no engine cannot play a magnet link")
     }
 
     @Test
@@ -45,12 +45,12 @@ class AddonStreamPlaybackResolverTest {
 
         assertEquals("http://127.0.0.1:8080/stream", source?.url)
         assertEquals(
-            "the magnet link is passed through as the provider wrote it",
             MAGNET,
             resolver.lastMagnet,
+            "the magnet link is passed through as the provider wrote it",
         )
-        assertEquals("the session id is passed through", "session-1", resolver.lastSessionId)
-        assertEquals("the engine's URL carries no provider headers", 0, source?.headers?.size)
+        assertEquals("session-1", resolver.lastSessionId, "the session id is passed through")
+        assertEquals(0, source?.headers?.size, "the engine's URL carries no provider headers")
     }
 
     @Test
@@ -60,9 +60,9 @@ class AddonStreamPlaybackResolverTest {
         torrentSchemeStream().resolvePlaybackSource(resolver, sessionId = "session-1")
 
         assertEquals(
-            "a torrent:// link carries its hash, and the engine wants a magnet link",
             "magnet:?xt=urn:btih:$INFO_HASH",
             resolver.lastMagnet,
+            "a torrent:// link carries its hash, and the engine wants a magnet link",
         )
     }
 
@@ -72,8 +72,8 @@ class AddonStreamPlaybackResolverTest {
 
         val source = emptyStream().resolvePlaybackSource(resolver, sessionId = "session-1")
 
-        assertNull("there is nothing to play and nothing to resolve", source)
-        assertEquals("the engine is never asked", null, resolver.lastMagnet)
+        assertNull(source, "there is nothing to play and nothing to resolve")
+        assertEquals(null, resolver.lastMagnet, "the engine is never asked")
     }
 
     @Test
@@ -83,7 +83,7 @@ class AddonStreamPlaybackResolverTest {
         val source = torrentWithPlainUrlStream().resolvePlaybackSource(resolver, sessionId = "session-1")
 
         assertEquals("https://example.test/b.mkv", source?.url)
-        assertEquals("the engine is not needed for a stream with a URL", null, resolver.lastMagnet)
+        assertEquals(null, resolver.lastMagnet, "the engine is not needed for a stream with a URL")
     }
 
     private fun directStream(): AddonStream = AddonStream(
