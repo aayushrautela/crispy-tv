@@ -1,11 +1,15 @@
 import Foundation
 
-public struct CrispyHttpResponse {
+public struct CrispyHttpResponse: Sendable {
 public let code: Int
 public let body: String
 }
 
-public final class CrispyHttpClient {
+/// The app's HTTP client.
+///
+/// It is `@unchecked Sendable` because it holds nothing but a `URLSession`,
+/// which is thread-safe, and it is never mutated.
+public final class CrispyHttpClient: @unchecked Sendable {
     private let session: URLSession
 
 public init(session: URLSession = {

@@ -1,28 +1,28 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "player_machine",
-  "case_id": "codec_error_switch_to_mpv",
+  "case_id": "fatal_error_is_terminal",
   "now_ms": 1739923200000,
   "steps": [
     {
       "t_ms": 0,
       "event": {
         "type": "OPEN_HTTP",
-        "engine": "exo"
+        "engine": "mpv"
       },
       "expect": {
         "phase": "loading_media",
         "intent": "play",
-        "engine": "exo"
+        "engine": "mpv"
       }
     },
     {
-      "t_ms": 450,
+      "t_ms": 900,
       "event": {
-        "type": "NATIVE_CODEC_ERROR"
+        "type": "NATIVE_FATAL_ERROR"
       },
       "expect": {
-        "phase": "loading_media",
+        "phase": "error",
         "intent": "play",
         "engine": "mpv"
       }

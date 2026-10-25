@@ -1,0 +1,613 @@
+# iOS player — mpv, native SwiftUI — Plan (`crispy-rewrite`)
+
+Status: **Complete** for the seven original landings, and for the five follow-ups that followed:
+8 (addon subtitles reach the player), 9 (addon management screens), 10 (playback settings),
+11 (the settings hub behind the profile menu) and 12 (the offline mutation outbox and the local
+watch-progress store). Everything below is landed and green on CI.
+
+## Goal
+
+Give the iOS app a real player: a native SwiftUI player screen in the **existing** SwiftUI
+app (`ios/Apps/iOS`), backed by **libmpv** through the upstream SPM package. No Compose
+Multiplatform host, no AVPlayer engine, no Kotlin dependency on the Apple side.
+
+The iOS app today has **no player at all**: `ios/Apps/iOS/Features/Details/DetailsView.swift`
+shows an alert whose text is literally "The player arrives with the next milestone.".
+
+## Decisions (locked)
+
+| Decision | Answer | Why |
+|---|---|---|
+| Host | Native SwiftUI in `ios/Apps/iOS` | The shell, routing and detail screen are already SwiftUI. A Compose host would mean rewriting the shell and dragging Kotlin into Apple — the desktop port already owns the "one shell" budget. |
+| Engine | **mpv only** | The user chose mpv. It is the only engine that plays addon streams (MKV, ASS/SSA, arbitrary HTTP headers) on Apple. |
+| Engine source | `https://github.com/mpvkit/MPVKit` (SPM) | Nuvio's `NuvioMedia/MPVKit` is a private fork of this. The upstream is public, has prebuilt `.xcframework` release assets, and is the honest dependency. |
+| Licence | Product **`MPVKit`** (LGPL), never `MPVKit-GPL` | Upstream's own build script passes mpv `-Dgpl=false` and does not pass FFmpeg `--enable-gpl`; the GPL variant is opt-in. FFmpeg is built `-DBUILD_SHARED_LIBS=0` (static), so LGPL's relink obligation is the heavier variant: ship the source offer and the relinking instructions. |
+| Bridge shape | **Events**, not polling | Nuvio's `NuvioPlayerBridge` is a flat polling getter interface, which only works because Compose recomposes on a timer. A SwiftUI client wants an `AsyncStream`/delegate. |
+
+Not ports of Nuvio's files: the bridge is written from libmpv's own API (`mpv_create`,
+`mpv_set_option_string`, `mpv_observe_property`, `mpv_wait_event`), per AGENTS.md "never port
+files across". Nuvio is the reference for *mechanics* (mpv option set, the metal-layer
+`wid` binding, the `wantsExtendedDynamicRangeContent` main-thread rule), not for code.
+
+## What the engine needs to get right
+
+Measured from Nuvio's iOS bridge and upstream's build flags:
+
+- mpv options: `vo=gpu-next`, `gpu-api=vulkan`, `gpu-context=moltenvk`, `hwdec=videotoolbox`,
+  `ao=default`, `audio-channels=auto`, `audio-fallback-to-null=yes`, `vulkan-swap-mode=fifo`,
+  `vulkan-queue-count=1`, `vulkan-async-compute=no`, `vulkan-async-transfer=no`,
+  `vulkan-disable-interop=yes`, `keep-open=yes`, `target-colorspace-hint=yes`,
+  `tone-mapping=auto`, `hdr-compute-peak=yes`.
+- The video output is a `CAMetalLayer`; mpv binds to it with `mpv_set_option_string(mpv, "wid", …)`.
+  The layer's `drawableSize` is overridden because mpv's moltenvk context polls it and resizes
+  its swapchain.
+- `wantsExtendedDynamicRangeContent` must be set **on the main thread** — mpv's vo thread sets
+  it while holding the core lock, so setting it off the main thread deadlocks.
+- Upstream's Metal support is a patch version only, which is why the Vulkan/MoltenVK path is
+  the one to use on Apple.
+- **No Picture in Picture.** mpv renders its own frames; system PiP needs a sample-buffer
+  layer. Nuvio has no `AVPictureInPictureController` anywhere, and its iOS PiP actual is `Unit`.
+  The iOS player chrome therefore ships without a PiP button.
+
+## Landings
+
+| # | Landing | What it is | State |
+|---|---|---|---|
+| 1 | **Contract v3** (`player_machine`) | Terminal error phase + engine-fallback rules, in SPEC + fixtures + Kotlin `PlayerReducer` + Swift `reducePlayerState`, in lockstep | done |
+| 2 | Seams | `PlaybackEngine` protocol, `PlayerSession` owning the contract reducer, `PlaybackSource` (url + headers + resume) | done |
+| 3 | Engine | libmpv bridge: `mpv_create`, wakeup callback + `mpv_wait_event` on a background queue → `AsyncStream`; `UIViewRepresentable` over a `CAMetalLayer` | done |
+| 4 | Chrome | Overlay, seek bar, ±10s, track sheet from mpv's `track-list`, buffering curtain, error state, Now Playing + remote commands (no PiP) | done |
+| 5 | Progress | `sendWatchEvent` on `CrispyBackendClient` (iOS has none today — it can only read `getWatchState`) + a Swift `PlaybackProgressReporter` on `resolveProgressWrite`; resume from `WatchState.resumePositionSeconds` | done |
+| 6 | Streams | A playable URL. iOS has no addon client and the backend has no resolve-streams endpoint | done |
+| 7 | Smoke harness | A launch-argument-driven debug screen that plays one URL, so "does this actually decode" is one command | done |
+
+### Follow-ups
+
+| # | Landing | What it is | State |
+|---|---|---|---|
+| 8 | Addon subtitles | The subtitles a stream carries reach the player: `PlaybackSubtitle` on `PlaybackSource`, mpv `sub-add` for each of them | done |
+| 9 | Addon management | Install, preview and remove an addon from inside the app — iOS can read the account's addon list but had no way to change it | done |
+| 10 | Playback settings | Default audio/subtitle language, playback speed and auto-select stream — stored on the device, honoured by the engine and the stream picker | done |
+| 11 | Settings & account navigation | The profile menu's "Open settings" opens a hub (account and profiles, playback, addons, about), account settings moves behind profile management, and every tab shows the active profile's avatar | done |
+| 12 | Offline outbox & local progress | Mutations (watchlist, watched, rating) queue durably and replay with backoff while a Retry banner surfaces failures, and every playback event is written to a local progress store before any network send, with resume reading that store first | done |
+
+## Seams (landing 2) — what is in place now
+
+`ios/CrispyKit/Sources/CrispyKit/Player/`:
+
+- `PlaybackSource` — url, request headers, resume position in **milliseconds**, the unit the
+  contract and the whole player use. A caller holding `WatchState.resumePositionSeconds`
+  converts once, at the call site.
+- `PlaybackEngine` — the protocol the session is written against: `engineId`, an event stream
+  (`makeEventStream()`, called once — an `AsyncStream` is consumed once), and
+  `open`/`play`/`pause`/`seek`/`shutdown`. The libmpv engine implements it; the chrome never
+  sees it.
+- `PlaybackEvent` — what an engine reports: position ticks, `firstFrame`, `ready`, `buffering`,
+  `ended`, `codecError`, `failed(String)`. Every case maps onto exactly one contract action.
+- `PlayerSession` — `@MainActor @Observable`. It owns the contract state (written only by
+  `reducePlayerState`) and the transport state the contract has no vocabulary for (position,
+  duration, buffered range, the last error message). The clock is injected, so the session is
+  deterministic under test.
+
+The session lives in `CrispyKit` because that package already depends on `ContractRunner` and
+the app already links it; the chrome (landing 4) stays in `ios/Apps/iOS`.
+
+`CrispyKit` had no test target, so it has one now (`ios/CrispyKit/Tests/CrispyKitTests`): a
+`FakePlaybackEngine` records the commands the session issues and pushes events back, and
+`PlayerSessionTests` covers the open path, the resume position, the event→phase mapping, the
+terminal codec error and fatal error, the frozen intent, the transport ticks, play/pause/seek
+and shutdown. `apple.yml` runs it as `swift test --package-path ios/CrispyKit`.
+
+One consequence: `CrispyKit`'s macOS floor moved from 13 to **14**, because `Observation` (the
+`@Observable` macro) needs macOS 14. The macOS platform exists only so the suite can run in
+CI; the apps themselves are iOS and tvOS.
+
+## Engine (landing 3) — what is in place now
+
+The engine lives in the **iOS app target** (`ios/Apps/iOS/Player/`), not in `CrispyKit`. That is
+deliberate: `CrispyKit` is a Swift package that CI also builds for macOS and that the tvOS app
+links, and the `MPVKit` product carries ~35 binary xcframeworks. Keeping it in the app target
+means the tvOS app does not link the binary and the package graph does not carry it either.
+
+- `MPVMetalLayer` — a `CAMetalLayer` whose `drawableSize` drops 1×1 writes (MoltenVK writes a
+  1×1 size before the real one, and the swapchain would resize to it) and whose
+  `wantsExtendedDynamicRangeContent` is routed to the main thread, because mpv's vo thread sets
+  it while holding the core lock and setting it off the main thread deadlocks.
+- `MPVPlaybackEngine` — the `PlaybackEngine` implementation. It owns the metal layer, creates the
+  mpv handle with `wid` bound to that layer, and runs a background queue blocking in
+  `mpv_wait_event`. Events are delivered as a `PlaybackEvent` `AsyncStream`; the chrome consumes
+  the stream, never the handle.
+- `MPVPlayerSurface` — a `UIViewRepresentable` hosting the engine's metal layer and sizing it to
+  the view.
+- `MPVSmokeScreen` — a `#if DEBUG` screen (reached from Account settings → Developer) that plays
+  one URL through a real `PlayerSession` and shows the contract phase.
+
+The mpv option set is the one measured from Nuvio and upstream's build flags: `vo=gpu-next`,
+`gpu-api=vulkan`, `gpu-context=moltenvk`, `hwdec=videotoolbox`, `ao=avfoundation`,
+`audio-channels=auto`, `audio-fallback-to-null=yes`, `vulkan-swap-mode=fifo`,
+`vulkan-queue-count=1`, `vulkan-async-compute=no`, `vulkan-async-transfer=no`,
+`vulkan-disable-interop=yes`, `keep-open=yes`, `target-colorspace-hint=yes`, `video-rotate=no`,
+`subs-match-os-language=yes`, `subs-fallback=yes`, `terminal=no`, `idle=yes`. Failures of
+`vo`, `gpu-api` and `gpu-context` are fatal (there is no picture without a video output); every
+other option failing is logged and ignored.
+
+Two decisions worth stating, because both look like omissions:
+
+- **The playhead is polled, the state is not.** Position, duration and buffered range are read
+  with `mpv_get_property` on a 200 ms timer, because mpv exposes them as properties that change
+  constantly, and an observer callback per change would wake the UI on every frame. Everything
+  that is a *state transition* (file loaded, video reconfig, end of file, cache stall) comes
+  through `mpv_wait_event` and is pushed on the stream.
+- **There is no `mpv_observe_property` for the position**, so the position the chrome shows is
+  up to 200 ms stale. The contract's `positionChanged` carries no timestamp, so nothing depends
+  on it being exact.
+
+`ios/project.yml` gains the package `MPVKit` (url `https://github.com/mpvkit/MPVKit`, exact
+version `1.1.0-n9.0.2`) and links it — with `ContractRunner`, for the contract's phase names —
+on the **iOS target only**. The tvOS target is untouched.
+
+## Chrome (landing 4) — what is in place now
+
+The chrome lives in the **iOS app target** (`ios/Apps/iOS/Features/Player/`), because the surface
+it draws is the engine's metal layer and the engine is an app-target type.
+
+- `PlayerScreen` — the chrome, written against the session and not against an engine: the video
+  surface, the controls that fade out while the video plays, the seek bar, ±10s, the buffering
+  curtain, and the error and ended curtains the contract's phase decides. The surface is a
+  parameter, so the chrome does not know which engine it drives.
+- `PlayerTrackSheet` — the track picker, fed by the engine's `track-list`.
+- `NowPlayingController` — the lock screen, the control centre and the remote control buttons.
+- `MPVPlayerScreen` — the composition root: it creates the engine and the session, opens the
+  source, takes the audio session, and hosts the chrome.
+
+The contract machine has no vocabulary for a track, so tracks are transport state, like the
+playhead. The seam grew a third caller and the protocol grew with it: `PlaybackTrack`,
+`PlaybackTrackKind`, `PlaybackTrackSelection`, a `tracksChanged` event and a `selectTrack`
+engine method. The session holds the tracks and forwards a selection.
+
+mpv keeps its tracks in a property tree, and the engine reads them one path at a time:
+`track-list/count`, then `track-list/N/id`, `/type`, `/title`, `/lang`, `/default`, `/forced`.
+The track that plays comes from `current-tracks/audio|sub|video/id`, with `aid`/`sid`/`vid` as
+the fallback. Choosing a track sets mpv's `audio-track`, `sub-track` or `video-track` property,
+and "no" turns a kind of track off. The list is read again when mpv reports a change to
+`track-list`, `current-tracks` or the selection aliases, and the engine only reports a change
+when the list actually differs.
+
+There is **no Picture in Picture**: mpv draws its own frames, so the system's picture-in-picture
+controller has no video layer to show, and Nuvio's iOS build has no `AVPictureInPictureController`
+at all.
+
+## Progress (landing 5) — what is in place now
+
+iOS could **read** progress (`getWatchState`) but could not write any: `CrispyBackendClient` had
+no `sendWatchEvent`, so nothing the player did reached the backend. It does now, and the player
+reports what it did.
+
+- `CrispyBackendClient.sendWatchEvent(accessToken:profileId:input:)` — posts to
+  `/v1/profiles/{profileId}/watch/events`. The optional fields are left out of the payload
+  rather than sent as null, because the backend reads "absent" and "null" differently.
+- `PlaybackEventInput` — the event's shape, mirroring the Android `PlaybackEventInput`: the
+  client event id, the event type, the item, the position and duration in seconds, the season
+  and episode, the moment it happened, and a free-form payload.
+- `PlaybackIdentity` — what is playing, in the shape the watch events carry. The Android
+  identity carries more (the content type, the external ids, the year); only the fields that
+  reach an event are here.
+- `PlaybackProgressReporter` — owns every "the player moved" report, member for member with the
+  Android `PlaybackProgressReporter`: `syncWatchHistory` (the poll), `scheduleProgressSyncAfterSeek`
+  (the settle window) and `reportPlaybackStopped` (the end of playback, once). It applies the
+  contract's `resolveProgressWrite` itself, because iOS has no `WatchHistoryService` port to
+  apply it for it. The two clocks are injected — a wall clock for the event's instant and a
+  monotonic clock for the settle window and the persist interval — so the reporter is
+  deterministic under test.
+- `PlaybackEventType` — the backend's vocabulary: `playback_progress`,
+  `playback_progress_snapshot`, `playback_completed`.
+- `WatchState.resumePositionMs` — the resume position in the milliseconds the player counts in,
+  converted once at the boundary.
+
+Two deliberate differences from Android, both documented in the code:
+
+- Android sends **two** events when playback stops (a snapshot, then the completion). The two
+  carry the same position and the backend needs one, so this sends one. The `player_progress`
+  contract covers the gating rules, not the number of events.
+- Android clears the settle window on a timer; here the first poll after the window clears it.
+  Nothing is sent between polls, so the only thing the timer could do was clear the last-sync
+  stamp — which that poll does too.
+
+The app wiring lives in `MPVPlayerScreen`: it owns the reporter, polls the session every 500 ms
+(the cadence the Android player polls on), arms the settle window when the session reports a
+seek, and reports the stop when the player closes. The reporter's send resolves the backend
+context when it sends, because the token may have been refreshed since the player opened. The
+player also asks the backend where to resume: `getWatchState` gives the resume position, and a
+position the caller already put on the source wins over it.
+
+`PlaybackProgressReporterTests` covers the start, the minimum position, the missing duration,
+the missing identity, the persist interval, the paused snapshot, the settle window, the stop
+(latched once, pinned to the duration when the item completed), the client event id and the
+instant.
+
+## Streams (landing 6) — what is in place now
+
+iOS had no way to get a playable URL: there was no addon client at all, and the backend has no
+resolve-streams endpoint. The streams are resolved the way the Android app resolves them — against
+the account's addons, over the addon's own protocol — with one difference: iOS reads the addon list
+from the backend (`/v1/account/addons`) instead of keeping a local registry in sync with it.
+
+- `CrispyBackendClient.listAddons(accessToken:)` — the account's addons.
+- `AddonStreamsClient` — the resolver. It fetches each addon's manifest, reads what the manifest
+  serves (`resources`, `types`, `idPrefixes`), builds the addon's stream resource URL
+  (`{base}/stream/{type}/{id}.json`, with the id percent-encoded and the manifest's own query
+  carried over) and parses the answer. The addons are asked in parallel and their answers are
+  merged in the account's addon order.
+- `StreamLookup` — the id an addon knows an item by: the IMDb id, with the season and the episode
+  for an episode. A backend id that is not an IMDb id is not an addon's id, so it is not used.
+- `StreamSource` — one stream: its title, its URL, the request headers the addon's behavior hints
+  ask for, and the subtitles it offers. A stream with an info hash is a torrent, and iOS has no
+  torrent engine, so the resolver does not offer it.
+- `StreamMediaType` — movie, series or anime.
+- `StreamPickerViewModel` — resolves the streams for one title and holds them.
+- `StreamPickerSheet` — the picker, in the app target. It presents the player over itself, so
+  choosing a stream and watching it is one gesture.
+
+The details screen's Play button opens the picker. A show has no streams of its own — an addon
+serves an episode, not a series — so the show's button plays the first episode of the selected
+season, and each episode row plays its own episode. The identity the watch events carry is the
+episode's, not the show's.
+
+One thing the resolver deliberately does not do: it does not resolve torrents. The addon's
+subtitles are carried on the stream and handed to the player (landing 8).
+
+## Smoke harness (landing 7) — what is in place now
+
+The engine is only proven by playing something, so the app can be asked to play
+one URL by a launch argument:
+
+```sh
+xcrun simctl launch booted com.crispy.rewrite.ios -mpvSmokeURL https://example.com/movie.mkv
+```
+
+- `SmokeLaunchArguments` reads the argument out of `ProcessInfo`'s arguments,
+  once, at launch. A URL that is not there is not an error: the app starts
+  normally.
+- `CrispyRewriteiOSApp` presents the player over the root when the argument
+  was given, so the harness works whatever the app was showing.
+- `MPVSmokeScreen` is the manual half of the same thing: a debug screen
+  (Account settings → Developer) with a URL field, for when the URL is not
+  known in advance.
+
+Both are `#if DEBUG`, so neither is in a release build.
+
+## Addon subtitles (landing 8) — what is in place now
+
+An addon offers subtitles next to the stream it offers — one URL per language,
+inside the stream payload — and those now travel with the media:
+
+- `PlaybackSubtitle` (`CrispyKit/Player/`) is a subtitle file: its URL, the
+  provider's name for it, and its language. `PlaybackSubtitle(rawUrl:label:language:)`
+  is the lenient door the addon payload comes through, and it refuses anything
+  without a scheme.
+- `PlaybackSource` carries `subtitles: [PlaybackSubtitle]`, and `resuming(at:)`
+  keeps them — a replay has to send the same requests as the first open.
+- `StreamSource.playbackSource` maps the addon's own `subtitles` payload into
+  them, so choosing a stream in the picker chooses its subtitles with it. A
+  subtitle entry whose URL does not parse is dropped, not failed on.
+- `MPVPlaybackEngine.open` runs `sub-add <url> auto <title> <lang>` for each of
+  them, right after `loadfile`. `auto` is mpv's "add it, but let the default
+  selection decide": an embedded track that matches the user's language still
+  wins, and the external one is listed in the track sheet either way (mpv
+  reports external subtitle tracks through `track-list` like any other, so the
+  sheet and the selection needed no change).
+- The subtitle request uses the stream's own `http-header-fields`, which is
+  what mpv applies to every request it makes for the file. An addon whose
+  subtitles live behind a *different* header set than its streams is the known
+  limit of this, and nothing in the addon protocol says otherwise; the way out
+  would be `file-local-options/http-header-fields` around the `sub-add`, which
+  mpv refuses to scope to a subtitle track alone.
+
+Tests: `ios/CrispyKit/Tests/CrispyKitTests/PlaybackSourceTests.swift` pins what
+travels with a stream (headers and subtitles survive `resuming(at:)`, the
+addon's subtitles become `PlaybackSubtitle`s, an unparseable URL is dropped).
+
+## Addon management (landing 9) — what is in place now
+
+The app could read the account's addons (landing 6 needs them to resolve streams) but had no way
+to change the list: a fresh account's "This account has no addons installed yet." was a dead end.
+The backend already had the endpoints — `GET`/`POST /v1/account/addons` and
+`DELETE /v1/account/addons/{id}` — and the Android app uses them; iOS has no local addon registry
+and no `:addons` module, so the backend is the source of truth and the screen is its list plus the
+two calls that change it.
+
+`ios/CrispyKit/Sources/CrispyKit/Addons/`:
+
+- `AddonManifestURL` — the pure rules that turn what a user typed into a manifest URL, mirroring
+  the Android `ManifestUri`: a bare host becomes `https://`, a `stremio://` share link becomes
+  `https://`, `manifest.json` is appended unless the last path segment already is it
+  (case-insensitively), and the query survives. `base(of:)` is the addon's own directory (the URL
+  without the manifest's file name), and `resolveAsset(base:raw:)` resolves a logo against it the
+  way HTML does (absolute, protocol-relative, root-relative, or beside the manifest) — including a
+  `data:` URL, which is why the scheme check does not require `//`.
+- `AddonManifest` / `AddonManifestResource` — the manifest, read leniently. **This is the single
+  home for the protocol's "a resource is a string or an object" rule**: the stream resolver reads
+  it from here too (`AddonStreamsClient`'s private manifest parser was replaced by
+  `AddonManifestClient`/`AddonManifest` in this landing, so the two screens cannot drift).
+  `resourceNames` is the order-preserving dedupe the preview shows; the resolver still sees every
+  declaration.
+- `AddonManifestPreview` — what the install card shows, with the Android app's four warnings in
+  its order (insecure HTTP, no addon id, no resources, no media types) and the name falling back
+  `manifest.name ?? manifest.id ?? "Unknown addon"`.
+- `AddonManifestClient` / `AddonManifestFetching` — the manifest fetch, over the same
+  `StreamHttpFetching` transport the resolver uses and with the same request headers. A manifest
+  that cannot be fetched and one that cannot be read are the same answer: there is nothing to
+  install. The protocol is the seam a test fake goes through.
+- `AddonStore` — `listAddons` / `installAddon` / `uninstallAddon`, with
+  `extension CrispyBackendClient: AddonStore`. The concrete methods
+  (`CrispyBackendClient.installAddon` / `uninstallAddon`) are new; the uninstall path needed a
+  profile-scoped header, so the client grew a private `authHeaders(_:profileId:)` — nothing in the
+  iOS client had sent `X-Profile-ID` before.
+- `AddonsSettingsViewModel` — the sequence: load the account's addons once (unless refreshed),
+  check the draft (empty → "Enter an addon manifest URL first."; unnormalizable → "The addon URL is
+  invalid. Try a full manifest URL."; already installed, compared case-insensitively → "That addon
+  is already installed."; unreadable manifest → "Unable to load addon manifest from that URL."),
+  preview it, install it (`Installed <name>.`), remove it (`Removed <name>.`). The store and the
+  manifest fetch are protocols and the backend context is a closure, so the whole sequence is
+  testable without a network.
+
+`ios/Apps/iOS/Features/Settings/AddonsSettingsView.swift` is the screen (List: *Add addon* with
+the URL field and the check step, *Install this addon?* with the preview and its warnings,
+*Installed* with a destructive row action behind a confirmation alert, and a messages section),
+reached from Account settings → Addons → Manage addons. It follows the app's existing shape:
+`@Environment(AppEnvironment.self)`, `@State private var viewModel: …?`, `Binding(get:set:)` for
+the field, and no `@Bindable` (which the app does not use).
+
+Tests: `AddonManifestTests` (the URL rules, both resource shapes, the base and the asset
+resolution, the preview and its warnings) and `AddonsSettingsViewModelTests` (load once and
+forced, no sign-in, every `checkDraft` answer, install with the profile and the previewed URL, a
+failed install that keeps the preview, remove by id and by host).
+
+## Playback settings (landing 10) — what is in place now
+
+**Four preferences, and only the four iOS has a consumer for:** default audio language, default
+subtitle language, playback speed, and auto-select stream. Android's
+`PlaybackSettingsRepository` carries twelve; the other eight are absent here on purpose — a
+setting nothing reads is a switch that lies.
+
+CrispyKit (`ios/CrispyKit/Sources/CrispyKit/Player/`):
+
+- `LanguageTags` — the ISO 639 vocabulary. `normalize(_:)` stores a two-letter code (`eng` → `en`,
+  `fre` → `fr`, `cmn` → `zh`, a blank tag → `und`), `label(for:)` renders a tag as a language name
+  and gives the keywords a backend sends (`none`/`off`, `forced`, `default`, `device`, `original`,
+  `und`) their own labels, and `selectableLanguages` offers the table's own codes in name order,
+  so the picker cannot offer a language the matcher would not recognise. It is the Swift twin of
+  `android/app/src/commonMain/.../playerui/LanguageLabels.kt` — including its 639-2/B table, which
+  carries both spellings (`fre`/`fr`, `ger`/`de`, `ice`/`is`) rather than canonicalising the input.
+  The Android file takes an `englishDisplayName` slot because `Locale.forLanguageTag` is Android
+  work; here Foundation answers the same question inside the file, so no slot is needed.
+- `PlaybackSettings` — the value: two optional languages, a finite positive speed, an auto-select
+  flag.
+- `PlaybackSettingsStore` — `@MainActor @Observable`, over `UserDefaults`. One writer, one
+  snapshot in memory (the same shape Android's repository arrived at after its change listener
+  turned out to be for a writer that no longer exists). The keys are the strings Android stores
+  (`default_audio_language`, `default_subtitle_language`, `playback_speed`, `auto_select_stream`)
+  — legibility, not a compatibility contract, since the two stores are different stores. A blank
+  language is stored as no language and `nil` *removes* the key, so "Automatic" is an absent key
+  rather than an empty string a later reader has to know to treat as absent. A rate that is not
+  finite and positive falls back to 1, on write and again on read.
+
+Where each preference is honoured:
+
+- **Languages** reach mpv as `alang` / `slang`, set as options before `mpv_initialize`, so the
+  file opens with the right tracks selected instead of being corrected afterwards. mpv matches
+  its own language aliases, so the stored two-letter code is what it wants; an unmatched language
+  means mpv picks a track itself, which is also what "Automatic" means — which is why these
+  options are never critical.
+- **Speed** reaches mpv as the `speed` option, for the same reason: the source opens at the rate.
+- **Auto-select** is the stream picker: `StreamPickerSheet.load()` plays the best stream the moment
+  the resolver returns one (`StreamPickerViewModel.autoPlayStream(autoSelect:)`, whose "best" is
+  the resolver's own quality-then-title order). An account with nothing to play still lands on the
+  picker's message.
+- **The language preference is also written from the player.** `PlayerSession.onTrackSelected`
+  reports the track a viewer picked, mirroring Android's `selectAudioTrack`/`selectSubtitleTrack`;
+  `MPVPlayerScreen.rememberSelection` stores the language of a real track and ignores an "off"
+  pick, because "no subtitles right now" is not a statement about subtitles in general. So the
+  settings screen and the track sheet are the same preference in the same place.
+
+The settings screen itself (`ios/Apps/iOS/Features/Settings/`): `PlaybackSettingsScreen` — a
+Languages section whose rows navigate to `LanguagePickerScreen` (a searchable list of Automatic
+plus every mapped language, checkmark on the current one) and a Playback section with a speed
+menu (0.5×–2×) and the auto-select toggle, its footer describing what iOS actually does. Reached
+from Account settings → Playback.
+
+**Deliberately absent, and why:** skip-intro controls (no segment data on iOS — that is IntroDB/
+AniSkip work), trailer autoplay/muted (the details rail plays a trailer on tap and the engine has
+no mute command), libass render type and engine preference (one engine), resize mode (no mapping
+decided), image quality (its Android consumer is Coil's decoded-image cache; iOS has no
+equivalent).
+
+**A change applies the next time a source is opened** — the engine reads the settings once, when
+it is built. That is documented rather than papered over: a mid-playback speed change would need a
+property write on the running handle and a UI that does not pretend otherwise.
+
+Tests: `LanguageTagsTests` (the three-letter reductions, trimming and case, the keywords, the
+unknown-tag fallback, and that the picker's list is unique and in name order),
+`PlaybackSettingsStoreTests` (the defaults, every preference surviving a second store over the
+same defaults, trimming, blank = absent = key removed, rates of 0/negative/infinite/NaN falling
+back to 1, and a junk stored rate reading back as 1), and one `PlayerSessionTests` case for
+`onTrackSelected` reporting both a track and an "off" pick. The picker's auto-play rule itself is
+not covered by a suite: it is one line over an already-sorted list, and the picker's `load` needs a
+real `AppEnvironment`.
+
+## Settings & account navigation (landing 11) — what is in place now
+
+Android's shape, mirrored with measured paths: every tab pushes the profile menu
+(`HomeNavGraph`, `DiscoverNavGraph`, `LibraryNavGraph`, `SearchNavGraph` each push `ProfileMenuRoute`),
+the menu leads with "Open settings", and the hub (`SettingsScreen.kt`) owns the settings IA —
+`ProfileManagementRoute` then carries the "Account settings" row (`AuthScreens.kt:898`), so that
+screen does not duplicate the hub's rows.
+
+CrispyKit:
+
+- `ActiveProfileSnapshot` — `id`, `name?`, `avatarUrl?`, resolved by `resolve(profiles:activeId:)`
+  with the same rule as Android's `ProfileMenuRoute.loadActiveProfile`: the stored id wins while it
+  still names a profile, otherwise the first profile, otherwise nothing. `AppEnvironment` holds
+  `activeProfile` and publishes it two ways: `refreshActiveProfile()` reads the backend and the
+  store, `adoptActiveProfile(profiles:)` takes a list a screen just fetched — so the menu's own load
+  and profile management's saves keep every avatar current without a second request. Sign-out clears
+  it.
+
+App (`ios/Apps/iOS`):
+
+- `ProfileMenuPresentation` / `.profileMenu(onDismissed:)` — one modifier owns the trailing avatar
+  and its sheet, so each screen states only what a dismissal means: Home reloads, Discover and
+  Library reload, Search does nothing. Before this, only Home had an avatar; the other two were
+  inert.
+- `SettingsHubScreen` — List sections Account (footer "Customize your experience", as in
+  `SettingsScreen.kt`), Personalization → Playback, Integrations → Addons, System → About.
+- `AboutScreen` — version and build from the bundle, and credits.
+- `ProfileMenuSheet` — "Open settings" (a new `MenuRoute.settings`), "Manage profiles", Sign out.
+- `ProfileManagementScreen` — an "Account settings" section, matching Android's row of the same
+  name.
+- `AccountSettingsScreen` — lost its Playback and Addons sections; the hub is where settings live
+  now. It keeps email, connected services, sign out and delete.
+
+**Deliberately absent, and why:** the Subtitles, Image Quality, Language & Region and Plugins rows.
+Android has the first two live and the others inert (no `onClick` in `SettingsScreen.kt`); iOS omits
+all four rather than drawing a row that does nothing, and each arrives with its own landing. Plugins
+is additionally sideload-built on Android and has no iOS engine.
+
+Tests: `ActiveProfileSnapshotTests` covers the selection rule (stored id wins, unknown id → first,
+no id → first, empty list → nothing), trimming, and blank-as-nothing. The screens are not covered by
+a suite — they are presentation over the snapshot, per the house convention that app-target screens
+stay untested.
+
+## Offline outbox & local progress (landing 12) — what is in place now
+
+Android's `UserMutationOutbox` and its `WatchProgressStore`, mirrored in CrispyKit at the same
+seams: mutations queue durably before any send, and progress is written locally before any send.
+
+CrispyKit `Sync/`:
+
+- `PendingMutationStore` — the one JSON file Android names `pending_mutations.json` (Application
+  Support), read tolerantly and replaced wholesale on save. The decode table is Android's: an
+  unknown kind or a missing required field drops the entry, `inflight` reads as `pending` (the
+  backend never saw it), an unlabelled failed entry is retryable, a rating's `nil` desired survives
+  as an explicit null (clear is not absent), and a stored episode `0` stays a real 0 while an
+  absent key means none. File IO runs on a serial queue with atomic writes.
+- `MutationExecutor` — maps each mutation kind onto the backend's watch actions (watchlist
+  put/delete, rating set/delete, mark/unmark watched). Episode and season kinds reject with a
+  "no iOS surface yet" failure rather than executing nothing silently.
+- `UserMutationOutbox` — the drain: `startOnce()` loads, coerces and coalesces the queue, then
+  replays due entries on its own clock with Android's backoff (`planOutbox`,
+  `nextBackoffDelayMs`, max 8 attempts). Enqueue coalesces against the **live** queue (the Android
+  lesson: rapid-fire toggles of different targets both survive; the same target collapses to the
+  latest toggle), success removes, failure re-stamps with backoff and **waits for a human** —
+  `planOutbox` only plans `pending`, so a failed entry re-drives through `retry`/`retryFailed`
+  or a fresh toggle of the same target, exactly as Android's does. Conflict records
+  `serverValue` and waits. Inflight is memory-only — a process death mid-send replays the entry.
+  An enqueue that races the load (start hands the file read to a Task) merges with the loaded
+  half instead of being overwritten by it.
+
+CrispyKit `Player/`:
+
+- `WatchProgressStore` — the durability write, `UserDefaults` standing in for Android's
+  `KeyValueStore`: `setWatchProgress`/`getWatchProgress` under `@watch_progress:{type}:{id}`
+  (plus `:{episodeId}` for episodes), `setContentDuration`/`getContentDurationSeconds` under
+  `@content_duration:`, the type segment `movie`/`show`/`anime`, a tolerant read (malformed blob →
+  nil, numeric remote id stringified, blank/null metadata → nothing), and
+  `updateProgressDuration` with Android's 60-second threshold — percentage-preserving re-stamp
+  for a longer cut, skip inside the threshold.
+- `WatchProgressRecorder` — the shared key agreement (`watchProgressKeyParts`) and the
+  record-then-send step: one `PlaybackEventInput` written to the store before the network send,
+  merging whatever the previous entry knew (`remoteImdbId`, `addonId`).
+
+App:
+
+- `MPVPlayerScreen` — `makeReporter`'s send closure calls `recordWatchProgress` first, then the
+  unchanged best-effort send; `resumePositionMs` reads the local store **first** (via the shared
+  key parts), falling back to the backend `getWatchState`.
+- `LibraryViewModel` / `DetailsViewModel` — watchlist, watched and rating toggles are optimistic
+  and enqueue; no revert-on-failure, because the outbox owns the retry now.
+- `LibraryView` — a "Changes waiting to sync" banner with Retry above the grid, and a per-row
+  sync badge (failed → warning triangle, else queued → sync icon).
+
+Tests: `PendingMutationStoreTests` (file round trip for all five kinds and status variants, the
+decode tolerances directly), `UserMutationOutboxTests` (coalescing both ways, due execution,
+failure/backoff, thrown error → "Update failed.", conflict, 8-attempt exhaustion, retry and
+retryFailed, idempotent start, inflight coercion — all on a movable clock), and
+`WatchProgressStoreTests` + `WatchProgressRecorderTests` (round trips, key shapes, thresholds,
+merges, no-op identities).
+
+## Contract v3 (landing 1) — what changes and why
+
+The contract reducer is used by exactly two callers: `android/core-domain` and
+`ios/ContractRunner`. The Android app has its own player state (`PlayerUiState` in
+`android/app/.../playerui`) and does not read the contract reducer, so this landing is
+contained.
+
+v2 rules (and their hole): `NATIVE_CODEC_ERROR` always moved to `loading_media` and swapped the
+engine to `mpv` **only** when the engine was `exo`. On a platform whose engine *is* `mpv`
+(iOS), a codec error therefore had no terminal state — the machine spun in `loading_media`
+forever. `PlayerPhase.ERROR` existed in both enums and in `toContractValue()`, but no reducer
+arm ever set it: the error phase was unreachable.
+
+v3 rules:
+
+1. `NATIVE_CODEC_ERROR` — engine is `exo` → phase `loading_media`, engine `mpv` (the Android
+   fallback, unchanged). Any other engine → phase **`error`**, engine unchanged. There is no
+   second engine to fall back to.
+2. `NATIVE_FATAL_ERROR` (new event) → phase **`error`**, engine unchanged. The generic
+   "the engine failed and cannot recover" event, kept distinct from a codec error so the
+   Android app can report an mpv failure without mislabelling it.
+3. `error` is **terminal**: once in it, only `OPEN_HTTP` / `OPEN_TORRENT` leave it. A late
+   engine callback (a buffered event arriving after the failure) must not resurrect the player.
+
+The engine for a session is not a new `initialPlayerState` parameter: `OPEN_HTTP` already
+carries an optional `engine` and the reducer already honours it (`engine ?: state.engine`), so
+iOS opens with engine `mpv` and the fixture asserts it. The schema needs no change
+(`event.engine` and `expect.engine` are already allowed additional properties, and `error` is
+already in the phase enum).
+
+`contract_version` 2 → 3 for the `player_machine` suite; v2 fixtures are superseded and
+removed, exactly as v1 was at v2. `ContractFixturesSanityTest` enforces one version directory
+per suite, and `PlayerMachineContractTest` pins its version directory explicitly, so both are
+updated in the same landing.
+
+## Where the build is verified
+
+This checkout has **no JDK and no Swift toolchain** (`java`, `javac`, `gradle`, `swift` are all
+absent), so the local gates available here are the Python ones (`scripts/validate_contracts.py`
+with `jsonschema==4.23.0` installed via `ensurepip`/`pip`). Everything else is proven by CI:
+
+- `android.yml` — the Kotlin side (`:android:core-domain` tests, `:android:app` tests).
+- `apple.yml` — the Swift side (`swift test --package-path ios/ContractRunner` for the contract
+  suite, `swift test --package-path ios/CrispyKit` for the player's own suite), the Kotlin
+  Apple targets, and the xcodebuild gate for `CrispyRewriteiOS` / `CrispyRewritetvOS`.
+
+Both are `workflow_dispatch`-only by deliberate choice, so a change is verified by pushing the
+branch and dispatching them; a dispatched run has to be *read* (204 means accepted, not green).
+
+## Not in this plan
+
+- The queue is app-scoped, not profile-scoped, and **sign-out does not clear it** — the mirror of
+  Android's app-level store. If that becomes a product decision, it gets its own landing.
+- Episode/season watched toggles: the outbox's executor rejects those kinds ("no iOS surface
+  yet") because iOS has no episode or season toggle UI; they arrive with the screens that call
+  for them.
+- The Details screen's watchlist button: still a plain backend call; the library rows are what
+  enqueue today.
+- Continue-watching's consumption of the local store, plus the APIs Android carries around the
+  same store with no iOS caller — tombstones, the removal list, `getAll`, debounced change
+  notifications. Each lands with the flow that calls for it.
+- Stop-event parity: iOS still sends one stop event where Android's reporter sends two; deferred
+  with the player's own stop-semantics work.
+- Conflict resolution UI: `MutationResult.conflict` records `serverValue` and waits; nothing on
+  iOS surfaces it yet.
+- Picture in Picture on iOS (see above).
+- Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
+  engine; only direct streams are offered.
+- The rest of the settings surface iOS does not have: the rows Android draws are named in the
+  landing-10 and landing-11 sections above — Subtitles styling, Image Quality, Language & Region and
+  Plugins are absent here, each until its own landing, and there is no image-quality screen, because
+  its Android consumer is Coil's decoded-image cache.
+- A Compose Multiplatform Apple host (the KMP `CrispyUI` framework exists and is exported by
+  `:sharedUI`, but no Apple app consumes it; that is a different, larger decision).
+- Apple implementations of `:platform-core`'s six ports (still zero).
+- The desktop work in `docs/plans/desktop-shell-plan.md`, which is separate and in flight.

@@ -6,6 +6,11 @@ packages:
     path: ContractRunner
   CrispyKit:
     path: CrispyKit
+  # libmpv for Apple platforms. The LGPL product, never the GPL one: the
+  # iOS player links `MPVKit`, which is the variant built without GPL.
+  MPVKit:
+    url: https://github.com/mpvkit/MPVKit
+    exactVersion: 1.1.0-n9.0.2
 targets:
   CrispyRewriteiOS:
     type: application
@@ -14,7 +19,9 @@ targets:
     sources:
       - path: Apps/iOS
     dependencies:
+      - package: ContractRunner
       - package: CrispyKit
+      - package: MPVKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.crispy.rewrite.ios

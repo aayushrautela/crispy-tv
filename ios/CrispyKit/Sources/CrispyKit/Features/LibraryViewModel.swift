@@ -1,3 +1,4 @@
+import ContractRunner
 import Foundation
 import Observation
 
@@ -51,27 +52,29 @@ public func loadNextPageIfNeeded(current itemId: String, environment: AppEnviron
         await fetchNextPage(environment: environment)
     }
 
-    /// Optimistic mark/unmark-watched toggle; the UI updates immediately and
-    /// the server call follows. Failures surface via statusMessage.
+    /// Optimistic mark/unmark-watched toggle: the UI updates immediately and
+    /// the mutation waits in the outbox, so the change lands even offline.
     public func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
-        guard let context = await environment.backendContext() else { return }
         if selectedSection == .history && !watched {
             items.removeAll { $0.id == item.id }
         }
-        do {
-            _ = watched
-                ? try await environment.backend.markWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
-                : try await environment.backend.unmarkWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
-            statusMessage = ""
-        } catch {
-            statusMessage = "Sync failed: \(error.localizedDescription)"
-            await reload(environment: environment)
-        }
+        await environment.userMutationOutbox.enqueue(
+            TitleWatchedMutation(
+                id: newPendingMutationId(),
+                titleItemId: item.itemId,
+                entityId: item.itemId,
+                createdAtMs: clientEpochMs(),
+                attempt: 0,
+                status: .pending,
+                nextAttemptAtMs: 0, // the outbox sets the first attempt on enqueue
+                contentType: MediaContentType(rawValue: item.type) ?? .movie,
+                desired: watched
+            )
+        )
     }
 
-    /// Optimistic watchlist add/remove.
+    /// Optimistic watchlist add/remove, queued through the outbox.
     public func toggleWatchlist(_ item: MediaCard, environment: AppEnvironment) async {
-        guard let context = await environment.backendContext() else { return }
         let adding = !item.watchlisted
         if selectedSection == .watchlist && !adding {
             items.removeAll { $0.id == item.id }
@@ -85,15 +88,18 @@ public func loadNextPageIfNeeded(current itemId: String, environment: AppEnviron
                 watchlisted: adding
             )
         }
-        do {
-            _ = adding
-                ? try await environment.backend.putWatchlist(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
-                : try await environment.backend.deleteWatchlist(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
-            statusMessage = ""
-        } catch {
-            statusMessage = "Sync failed: \(error.localizedDescription)"
-            await reload(environment: environment)
-        }
+        await environment.userMutationOutbox.enqueue(
+            WatchlistMutation(
+                id: newPendingMutationId(),
+                titleItemId: item.itemId,
+                entityId: item.itemId,
+                createdAtMs: clientEpochMs(),
+                attempt: 0,
+                status: .pending,
+                nextAttemptAtMs: 0, // the outbox sets the first attempt on enqueue
+                desired: adding
+            )
+        )
     }
 
     private func fetchNextPage(environment: AppEnvironment) async {

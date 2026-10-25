@@ -33,6 +33,8 @@ provider-key strings for planning purposes, but these are never sent to the serv
 - `player_machine`
   - Event-driven playback transitions and engine fallback behavior.
   - `contract_version` 2 renames the fallback engine identifier from `vlc` to `mpv` (libVLC replaced by libmpv). v1 fixtures are superseded.
+  - `contract_version` 3 makes the `error` phase reachable and terminal. A `NATIVE_CODEC_ERROR` falls back to the `mpv` engine only while the active engine is `exo`; on any other engine it is terminal, because there is no second engine to fall back to. `NATIVE_FATAL_ERROR` is the generic terminal failure event, kept distinct from a codec error. Once the phase is `error`, only `OPEN_HTTP` / `OPEN_TORRENT` change the state again. v2 fixtures are superseded.
+  - The engine of a session is chosen by the open event (`OPEN_HTTP` / `OPEN_TORRENT` carry an optional `engine`); there is no separate initial-state parameter for it.
 - `player_progress`
   - Deterministic gating for reporting player progress to our backend (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
   - Positions below `MIN_PROGRESS_POSITION_MS` (1000ms) are dropped unless the item is already complete — this filters transient engine 0s during seeks/buffering/engine fallback, not intentional stops.
@@ -147,6 +149,37 @@ Breaking behavior changes are allowed when needed. For every affected suite:
 2) update this spec plus the relevant fixtures/schemas
 3) keep Android + Swift contract runners in lockstep
 4) include migration notes in the PR description
+
+### Migration: player_machine v3 (2026-10)
+
+The `player_machine` suite migrated from `contract_version` 2 to 3 because the
+`error` phase was unreachable and the codec-error rule had no terminal branch.
+
+v2 reduced `NATIVE_CODEC_ERROR` to "move to `loading_media` and swap the engine to
+`mpv` if the engine is `exo`". On a platform whose engine already is `mpv` — the
+iOS player, where libmpv is the only engine — that left the machine in
+`loading_media` forever: there was no second engine to fall back to and no way to
+report the failure. `PlayerPhase.ERROR` existed in both enums and in
+`toContractValue()`, but no reducer arm ever set it.
+
+v3 adds three rules, mirrored by the Kotlin `PlayerReducer` and the Swift
+`reducePlayerState`:
+
+1. `NATIVE_CODEC_ERROR` falls back to `mpv` only while the active engine is
+   `exo`; on any other engine the phase becomes `error` and the engine is
+   unchanged.
+2. `NATIVE_FATAL_ERROR` is a new event for "the engine failed and cannot
+   recover". It always moves the phase to `error` and never changes the engine.
+   It is distinct from a codec error so a caller can report an mpv failure
+   without mislabelling it.
+3. The `error` phase is terminal. Once the phase is `error`, only `OPEN_HTTP` or
+   `OPEN_TORRENT` change the state again, so a frame that was already in flight
+   when the failure arrived cannot resurrect the session.
+
+The engine of a session is unchanged: it is chosen by the open event, which
+already carried an optional `engine` that the reducer honours.
+
+v2 fixtures were removed; v3 fixtures live under `contracts/fixtures/player_machine/v3/`.
 
 ### Migration: player_machine v2 (2026-07)
 

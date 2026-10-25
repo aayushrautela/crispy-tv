@@ -55,6 +55,10 @@ class LibrarySectionPagersTest {
 
         override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? = null
 
+        // The pager cases never ask for a resume point; `0` is this stub's
+        // "nothing here" answer, like the nulls above.
+        override suspend fun getResumePositionMs(identity: PlaybackIdentity): Long = 0L
+
         override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult =
             throw AssertionError("markWatched is not stubbed")
 

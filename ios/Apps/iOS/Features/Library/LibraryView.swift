@@ -14,6 +14,20 @@ struct LibraryScreen: View {
             LazyVGrid(columns: columns, spacing: 12) {
                 gridHeader
 
+                if !environment.userMutationOutbox.failedMutations.isEmpty {
+                    HStack {
+                        Label("Changes waiting to sync", systemImage: "exclamationmark.icloud")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Retry") {
+                            Task { await environment.userMutationOutbox.retryFailed() }
+                        }
+                        .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 if viewModel.isLoadingFirstPage && viewModel.items.isEmpty {
                     ForEach(0..<6, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: Theme.cardCornerRadius)
@@ -29,6 +43,7 @@ struct LibraryScreen: View {
                         .padding(.vertical, 32)
                 } else {
                     ForEach(viewModel.items) { item in
+                        let queued = environment.userMutationOutbox.mutationsForItem(item.itemId)
                         NavigationLink(value: item.detailsRoute) {
                             LandscapeCardView(
                                 title: item.title,
@@ -41,6 +56,22 @@ struct LibraryScreen: View {
                                 progressPercent: item.progressPercent,
                                 width: nil
                             )
+                            .overlay(alignment: .topTrailing) {
+                                if queued.contains(where: { mutation in
+                                    if case .failed = mutation.status { return true }
+                                    return false
+                                }) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.footnote)
+                                        .foregroundStyle(.orange)
+                                        .padding(8)
+                                } else if !queued.isEmpty {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .padding(8)
+                                }
+                            }
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
@@ -82,13 +113,9 @@ struct LibraryScreen: View {
         }
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ProfileMenuButton(profile: nil) {}
-            }
-        }
         .refreshable { await viewModel.reload(environment: environment) }
         .task { await viewModel.loadIfNeeded(environment: environment) }
+        .profileMenu(onDismissed: { Task { await viewModel.reload(environment: environment) } })
     }
 
     @ViewBuilder

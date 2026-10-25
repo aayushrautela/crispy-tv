@@ -46,7 +46,7 @@ internal object ContractFixtures {
         __SUITES__
     )
 
-    /** Versioned directories, e.g. `player_machine/v2`, sorted. */
+    /** Versioned directories, e.g. `player_machine/v3`, sorted. */
     val versionDirectories: List<String> = listOf(
         __VERSION_DIRECTORIES__
     )
@@ -72,7 +72,7 @@ internal object ContractFixtures {
 
     /**
      * Every fixture directly inside `contracts/fixtures/<directory>/`, where
-     * `directory` is a versioned directory such as `player_machine/v2`.
+     * `directory` is a versioned directory such as `player_machine/v3`.
      *
      * The old implementation walked the tree and filtered on `.json`, so
      * "everything under here" also swept in any nested subdirectory. None

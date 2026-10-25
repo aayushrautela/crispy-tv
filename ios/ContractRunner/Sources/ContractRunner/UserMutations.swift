@@ -13,7 +13,7 @@ public enum MutationKind: String, Codable, Equatable {
 
 /// Pure copy of the content-type taxonomy the watch-history backend needs.
 /// Mirrors `android/core-domain/.../optimistic/UserMutations.kt`.
-public enum MediaContentType: String, Codable, Equatable {
+public enum MediaContentType: String, Codable, Equatable, Sendable {
     case movie
     case series
     case anime

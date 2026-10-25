@@ -119,32 +119,22 @@ public func selectSeason(_ seasonNumber: Int, environment: AppEnvironment) async
         )) ?? []
     }
 
-    /// Binary like/dislike vote. Optimistic flip with revert on failure (no outbox).
+    /// Binary like/dislike vote with an optimistic flip, and the vote waits
+    /// in the outbox — `nil` clears it, and the outbox owns the failures.
     public func setLiked(_ value: Bool?, environment: AppEnvironment) async {
-        let previous = liked
         liked = value
-        guard let context = await environment.backendContext() else {
-            liked = previous
-            return
-        }
-        do {
-            if let value {
-                _ = try await environment.backend.setLiked(
-                    accessToken: context.accessToken,
-                    profileId: context.profileId,
-                    itemId: itemId,
-                    liked: value
-                )
-            } else {
-                _ = try await environment.backend.deleteRating(
-                    accessToken: context.accessToken,
-                    profileId: context.profileId,
-                    itemId: itemId
-                )
-            }
-        } catch {
-            liked = watchState?.liked
-        }
+        await environment.userMutationOutbox.enqueue(
+            RatingMutation(
+                id: newPendingMutationId(),
+                titleItemId: itemId,
+                entityId: itemId,
+                createdAtMs: clientEpochMs(),
+                attempt: 0,
+                status: .pending,
+                nextAttemptAtMs: 0, // the outbox sets the first attempt on enqueue
+                desired: value
+            )
+        )
     }
 }
 

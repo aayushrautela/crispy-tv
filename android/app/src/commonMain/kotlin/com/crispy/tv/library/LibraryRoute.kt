@@ -94,6 +94,7 @@ fun LibraryRoute(
     val viewModel: LibraryViewModel = viewModel(factory = viewModelFactory)
     val currentMonthKey = currentMonthKeyOf(clock, utcOffsetMillis())
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+    val failedSync by viewModel.failedSync.collectAsStateWithLifecycle(initialValue = emptyList())
     val horizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
     var selectedLibraryItem by remember { mutableStateOf<CatalogItem?>(null) }
@@ -215,6 +216,14 @@ ProfileIconButton(
                     onSelectSection = viewModel::selectSection,
                 )
             }
+        }
+
+        item(key = "sync") {
+            LibrarySyncBanner(
+                failedMutations = failedSync,
+                onRetry = viewModel::retryFailedSync,
+                modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 4.dp),
+            )
         }
 
         item(key = "status") {

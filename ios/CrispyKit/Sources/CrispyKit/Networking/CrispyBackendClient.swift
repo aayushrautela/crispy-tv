@@ -297,6 +297,84 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         _ = try perform(response)
     }
 
+    // MARK: - Addons
+
+    /// The addons the account has installed.
+    ///
+    /// This is where the player learns where to look for streams: the addons
+    /// live in the account, and the Android app syncs the same list into a
+    /// local registry. iOS has no local registry, so it asks the backend each
+    /// time it needs a stream.
+    public func listAddons(accessToken: String) async throws -> [AddonDescriptor] {
+        let json = try await getJson(path: "/v1/account/addons", accessToken: accessToken)
+        return json.jsonArray("addons").compactMap(parseAddon)
+    }
+
+    private func parseAddon(_ json: [String: Any]) -> AddonDescriptor? {
+        guard let manifestUrl = json.jsonString("manifestUrl") else { return nil }
+        let id = json.jsonString("id") ?? manifestUrl
+        return AddonDescriptor(
+            id: id,
+            manifestUrl: manifestUrl,
+            name: json.jsonString("name") ?? "",
+            type: json.jsonString("type") ?? "stremio"
+        )
+    }
+
+    /// Installs an addon from its manifest URL.
+    ///
+    /// The manifest is read before this call by the screen doing the install;
+    /// the backend stores the URL (and the addon's own answer for it) against
+    /// the profile.
+    public func installAddon(
+        accessToken: String,
+        profileId: String,
+        manifestUrl: String,
+        type: String = "stremio",
+        payload: [String: String] = [:]
+    ) async throws -> AddonDescriptor {
+        var body: [String: Any] = [
+            "manifestUrl": manifestUrl.trimmingCharacters(in: .whitespacesAndNewlines),
+            "type": type,
+        ]
+        if !payload.isEmpty {
+            body["payload"] = payload
+        }
+        let response = try await httpClient.postJson(
+            url: try requireURL(queryComponents(path: "/v1/account/addons").url),
+            jsonBody: try JsonParser.encodeObject(body),
+            headers: authHeaders(accessToken, profileId: profileId)
+        )
+        let json = try perform(response)
+        guard let addon = json.jsonObject("addon").flatMap(parseAddon) else {
+            throw CrispyBackendError(
+                httpCode: response.code,
+                code: nil,
+                message: "Backend did not return an installed addon.",
+                category: nil,
+                retryable: false,
+                requestId: nil,
+                details: nil
+            )
+        }
+        return addon
+    }
+
+    /// Removes one installed addon.
+    public func uninstallAddon(accessToken: String, profileId: String, addonId: String) async throws {
+        let trimmed = addonId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw CrispyHttpError.invalidResponse }
+        // The id is a path segment, so it is encoded the way the stream resolver
+        // encodes the ids it puts in a path.
+        let response = try await httpClient.delete(
+            url: try requireURL(queryComponents(path: "/v1/account/addons/\(StreamLookup.encodePathSegment(trimmed))").url),
+            headers: authHeaders(accessToken, profileId: profileId)
+        )
+        guard (200..<300).contains(response.code) else {
+            throw errorEnvelope(code: response.code, body: response.body)
+        }
+    }
+
     // MARK: - Calendar
 
     public func getCalendarThisWeek(accessToken: String, profileId: String) async throws -> [SearchMediaItem] {
@@ -448,6 +526,34 @@ public func markWatched(accessToken: String, profileId: String, itemId: String) 
 
 public func unmarkWatched(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
         try await postWatchMutation(accessToken: accessToken, profileId: profileId, path: "unmark-watched", itemId: itemId)
+    }
+
+    /// Records what the player did, mirroring the Android `sendWatchEvent`.
+    ///
+    /// The optional fields are left out of the payload rather than sent as
+    /// null, because the backend reads "absent" and "null" differently.
+    public func sendWatchEvent(
+        accessToken: String,
+        profileId: String,
+        input: PlaybackEventInput
+    ) async throws -> WatchActionResponse {
+        var payload: [String: Any] = [
+            "clientEventId": input.clientEventId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "eventType": input.eventType.trimmingCharacters(in: .whitespacesAndNewlines),
+            "itemId": input.itemId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "payload": input.payload,
+        ]
+        if let positionSeconds = input.positionSeconds { payload["positionSeconds"] = positionSeconds }
+        if let durationSeconds = input.durationSeconds { payload["durationSeconds"] = durationSeconds }
+        if let seasonNumber = input.seasonNumber { payload["seasonNumber"] = seasonNumber }
+        if let episodeNumber = input.episodeNumber { payload["episodeNumber"] = episodeNumber }
+        if let occurredAt = input.occurredAt?.nilIfBlank { payload["occurredAt"] = occurredAt }
+        let json = try await postJson(
+            path: "/v1/profiles/\(profileId)/watch/events",
+            accessToken: accessToken,
+            payload: payload
+        )
+        return parseWatchActionResponse(json)
     }
 
     // MARK: - Parsers
@@ -634,6 +740,19 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             "Content-Type": "application/json",
             "Accept": "application/json",
         ]
+    }
+
+    /// The headers a profile-scoped call sends.
+    ///
+    /// The profile is what an installation belongs to, so a call that installs
+    /// or removes one names it.
+    private func authHeaders(_ accessToken: String, profileId: String) -> [String: String] {
+        var headers = authHeaders(accessToken)
+        let trimmed = profileId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            headers["X-Profile-ID"] = trimmed
+        }
+        return headers
     }
 
     private func queryComponents(path: String) throws -> URLComponents {

@@ -1,8 +1,8 @@
 import CrispyKit
 import SwiftUI
 
-/// Minimal profile menu sheet (first slice of the Android `ProfileMenuRoute`):
-/// switch active profile, sign out. Full management screens come in M3.
+/// The Android `ProfileMenuRoute` entry point, shown as a sheet: switch active
+/// profile, open the settings hub, manage profiles, sign out.
 struct ProfileMenuSheet: View {
     var onDismissed: () -> Void
 
@@ -48,12 +48,15 @@ struct ProfileMenuSheet: View {
                 }
 
                 Section {
+                    NavigationLink(value: MenuRoute.settings) {
+                        Label("Open settings", systemImage: "gearshape")
+                    }
                     NavigationLink(value: MenuRoute.management) {
                         Label("Manage profiles", systemImage: "person.2")
                     }
-                    NavigationLink(value: MenuRoute.accountSettings) {
-                        Label("Account settings", systemImage: "gearshape")
-                    }
+                }
+
+                Section {
                     Button(role: .destructive) {
                         Task { await signOut() }
                     } label: {
@@ -63,8 +66,8 @@ struct ProfileMenuSheet: View {
             }
             .navigationDestination(for: MenuRoute.self) { route in
                 switch route {
+                case .settings: SettingsHubScreen()
                 case .management: ProfileManagementScreen()
-                case .accountSettings: AccountSettingsScreen()
                 }
             }
             .navigationTitle("Account")
@@ -86,13 +89,16 @@ struct ProfileMenuSheet: View {
         let session = await environment.supabase.ensureValidSession()
         activeProfileId = environment.profileStore.activeProfileId(userId: session?.userId)
         guard let session else { return }
-        profiles = (try? await environment.backend.listProfiles(accessToken: session.accessToken)) ?? []
+        let fetched = (try? await environment.backend.listProfiles(accessToken: session.accessToken)) ?? []
+        profiles = fetched
+        environment.adoptActiveProfile(profiles: fetched)
     }
 
     private func select(_ profile: BackendProfile) {
         let userId = environment.supabase.currentSession()?.userId
         environment.profileStore.setActiveProfileId(profile.id, userId: userId)
         activeProfileId = profile.id
+        environment.adoptActiveProfile(profiles: profiles)
         onDismissed()
         dismiss()
     }
@@ -106,6 +112,6 @@ struct ProfileMenuSheet: View {
 }
 
 enum MenuRoute: Hashable {
+    case settings
     case management
-    case accountSettings
 }

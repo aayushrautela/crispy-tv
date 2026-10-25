@@ -10,7 +10,7 @@ package com.crispy.tv.contracts
  * cannot exist on Kotlin/Native at all.
  *
  * The path is repository-relative with `/` separators, e.g.
- * `player_machine/v2/opens_http.json`.
+ * `player_machine/v3/opens_http.json`.
  */
 internal class ContractFixture(val path: String, val json: String) {
 

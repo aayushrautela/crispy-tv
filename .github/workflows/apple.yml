@@ -188,6 +188,9 @@ jobs:
       - name: Run Swift contract tests
         run: swift test --package-path ios/ContractRunner
 
+      - name: Run CrispyKit tests
+        run: swift test --package-path ios/CrispyKit
+
       - name: Generate Apple project
         run: |
           rm -rf ios/CrispyRewriteApple.xcodeproj

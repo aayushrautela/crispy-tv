@@ -5,6 +5,7 @@ import com.crispy.tv.backend.ClientImages
 import com.crispy.tv.backend.ClientMediaCard
 import com.crispy.tv.backend.MetadataProductionInfoView
 import com.crispy.tv.backend.MetadataTitleDetailResponse
+import com.crispy.tv.data.repository.resumePositionMs
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.player.CanonicalContinueWatchingItem
@@ -387,10 +388,18 @@ class HomeSelectorViewModelTest {
     ) : UserMediaRepository {
         var askedFor: PlaybackIdentity? = null
 
-        override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
+        /**
+         * The resume rule is production's ([resumePositionMs]); this fake only
+         * supplies the raw local answer and has nothing for the server side, so
+         * a hand-written copy of the band can never drift from it.
+         */
+        override suspend fun getResumePositionMs(identity: PlaybackIdentity): Long {
             askedFor = identity
-            return progress
+            return resumePositionMs(local = progress, loadServer = { null })
         }
+
+        override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? =
+            unused("getLocalWatchProgress")
 
         override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? =
             unused("getCanonicalWatchState")

@@ -6,7 +6,6 @@ import SwiftUI
 struct HomeScreen: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel = HomeViewModel()
-    @State private var showProfileMenu = false
 
     var body: some View {
         ScrollView {
@@ -31,17 +30,10 @@ struct HomeScreen: View {
             ToolbarItem(placement: .principal) {
                 CrispyWordmark()
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                ProfileMenuButton(profile: nil) {
-                    showProfileMenu = true
-                }
-            }
         }
         .refreshable { await viewModel.load(environment: environment) }
         .task { await viewModel.loadIfNeeded(environment: environment) }
-        .sheet(isPresented: $showProfileMenu) {
-            ProfileMenuSheet(onDismissed: { Task { await viewModel.load(environment: environment) } })
-        }
+        .profileMenu(onDismissed: { Task { await viewModel.load(environment: environment) } })
     }
 
     private var statusOrEmptyMessage: String? {

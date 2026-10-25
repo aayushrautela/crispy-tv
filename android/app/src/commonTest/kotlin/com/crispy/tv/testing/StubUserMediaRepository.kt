@@ -1,5 +1,6 @@
 package com.crispy.tv.testing
 
+import com.crispy.tv.data.repository.resumePositionMs
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.CanonicalWatchStateSnapshot
@@ -39,6 +40,15 @@ internal open class StubUserMediaRepository : UserMediaRepository {
     }
 
     override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? = progressAnswer
+
+    /**
+     * Composed from the same rule the real repository runs, over the two canned
+     * answers above. A hand-written `progressPercent in 1.0..95.0` here would be
+     * a second copy of the decision; this way a suite that seeds
+     * [progressAnswer]/[titleWatchStateAnswer] sees the rule itself run.
+     */
+    override suspend fun getResumePositionMs(identity: PlaybackIdentity): Long =
+        resumePositionMs(local = progressAnswer, loadServer = { titleWatchStateAnswer })
 
     override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? =
         throw AssertionError("getCanonicalWatchState is not stubbed")
