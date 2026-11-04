@@ -5,6 +5,8 @@ import com.crispy.tv.domain.home.HomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogSnapshot
 import com.crispy.tv.domain.home.HomeCatalogSource
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -56,24 +58,28 @@ import kotlinx.serialization.json.put
  */
 class DiskHomeCatalogSnapshotCache(
     private val diskCacheStore: RecommendationCatalogDiskCacheStore,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : HomeCatalogSnapshotCache {
 
     override suspend fun read(profileId: String?): CachedHomeCatalogSnapshot? {
-        for (key in cacheKeys(profileId)) {
-            val payload = diskCacheStore.read(key, maxAgeMs = null)?.payload ?: continue
-            val snapshot = runCatching { payload.toSnapshot() }.getOrNull() ?: continue
-            // The expiry travels inside the payload rather than beside it, so reading it
-            // costs no second walk of the cache keys. `org.json`'s `optString` answered
-            // `""` for a JSON null here, so a snapshot stored without an expiry and one
-            // stored with a null expiry are the same answer.
-            val expiresAt = runCatching { Json.parseToJsonElement(payload).jsonObject }
-                .getOrNull()
-                ?.optStringOrEmpty("expires_at")
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-            return CachedHomeCatalogSnapshot(snapshot = snapshot, expiresAtIso = expiresAt)
+        // The whole read — file IO *and* the JSON parse — runs on [ioDispatcher]: this is
+        // called from `HomeViewModel.ensureLoaded` on the main thread, and parsing the
+        // payload once here replaces the two parses (snapshot, then expiry) the old shape
+        // did on the caller's thread, which froze home's first frame on large snapshots.
+        return withContext(ioDispatcher) {
+            for (key in cacheKeys(profileId)) {
+                val payload = diskCacheStore.read(key, maxAgeMs = null)?.payload ?: continue
+                val json = runCatching { Json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: continue
+                val snapshot = runCatching { json.toSnapshot() }.getOrNull() ?: continue
+                // The expiry travels inside the payload rather than beside it, so reading it
+                // costs no second walk of the cache keys. `org.json`'s `optString` answered
+                // `""` for a JSON null here, so a snapshot stored without an expiry and one
+                // stored with a null expiry are the same answer.
+                val expiresAt = json.optStringOrEmpty("expires_at").trim().takeIf { it.isNotEmpty() }
+                return@withContext CachedHomeCatalogSnapshot(snapshot = snapshot, expiresAtIso = expiresAt)
+            }
+            return@withContext null
         }
-        return null
     }
 
     override suspend fun write(
@@ -158,9 +164,8 @@ class DiskHomeCatalogSnapshotCache(
         }
     }
 
-    private fun String.toSnapshot(): HomeCatalogSnapshot {
-        val json = Json.parseToJsonElement(this).jsonObject
-        val listsJson = json.optJsonArray("lists")
+    private fun JsonObject.toSnapshot(): HomeCatalogSnapshot {
+        val listsJson = optJsonArray("lists")
         val lists = buildList {
             for (element in listsJson.orEmpty()) {
                 if (element !is JsonObject) continue
@@ -168,9 +173,9 @@ class DiskHomeCatalogSnapshotCache(
             }
         }
         return HomeCatalogSnapshot(
-            profileId = json.optStringOrEmpty("profile_id").trim().ifBlank { null },
+            profileId = optStringOrEmpty("profile_id").trim().ifBlank { null },
             lists = lists,
-            statusMessage = json.optStringOrEmpty("status_message").trim(),
+            statusMessage = optStringOrEmpty("status_message").trim(),
         )
     }
 

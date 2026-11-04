@@ -1,5 +1,6 @@
 package com.crispy.tv
 
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.os.Build
@@ -10,6 +11,7 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.allowHardware
+import coil3.request.allowRgb565
 import coil3.request.crossfade
 import com.crispy.tv.app.AndroidAppGraph
 import com.crispy.tv.app.AppGraph
@@ -49,6 +51,13 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory, AppGraphH
 
     override fun newImageLoader(context: Context): ImageLoader {
         val appContext = context.applicationContext
+        val activityManager = appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        // A low-RAM device gets a loader that trades quality for survival: no hardware
+        // bitmaps (they are not GC-reclaimable and live in GPU/system RAM, which is what
+        // the lowmemorykiller counts on these tablets), RGB_565 for opaque images (half
+        // the bytes per pixel), no crossfade (it holds two bitmaps at once), and a tenth
+        // of the heap class for the memory cache instead of a quarter of it.
+        val lowRam = activityManager.isLowRamDevice
 
         return ImageLoader.Builder(appContext)
             .components {
@@ -58,17 +67,18 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory, AppGraphH
                     ),
                 )
             }
-            .crossfade(true)
-            .allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            .crossfade(!lowRam)
+            .allowHardware(!lowRam && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            .allowRgb565(lowRam)
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(appContext, 0.25)
+                    .maxSizePercent(appContext, if (lowRam) 0.10 else 0.20)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(appContext.cacheDir.resolve("image_cache").toOkioPath())
-                    .maxSizeBytes(256L * 1024L * 1024L)
+                    .maxSizeBytes((if (lowRam) 64L else 256L) * 1024L * 1024L)
                     .build()
             }
             .diskCachePolicy(CachePolicy.ENABLED)

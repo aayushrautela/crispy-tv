@@ -1,5 +1,6 @@
 package com.crispy.tv.domain.home
 
+import com.crispy.tv.images.ResponsiveImageSet
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,10 +26,12 @@ class HomeRandomPoolTest {
         genre: String? = null,
         rating: String? = null,
         artworkUrl: String? = null,
+        artwork: Map<String, String?> = emptyMap(),
     ): HomeCatalogItem = HomeCatalogItem(
         itemId = itemId,
         title = title,
         artworkUrl = artworkUrl,
+        artwork = artwork,
         addonId = "test-addon",
         type = type,
         rating = rating,
@@ -111,6 +114,27 @@ class HomeRandomPoolTest {
 
         assertEquals(listOf<HomeRandomCandidate>(), candidates.filter { it.rating != null })
         assertEquals(3, candidates.size, "an unreadable rating must not drop the item")
+    }
+
+    @Test
+    fun toRandomCandidatesCarriesTheArtworkRenditionSet() {
+        val candidate = listOf(
+            item(
+                itemId = "one",
+                artworkUrl = "m",
+                artwork = mapOf("small" to "s", "medium" to "m", "large" to "l"),
+            ),
+        ).toRandomCandidates().single()
+
+        assertEquals("m", candidate.artworkUrl)
+        assertEquals(ResponsiveImageSet(low = "s", medium = "m", high = "l"), candidate.artwork)
+    }
+
+    @Test
+    fun toRandomCandidatesLeavesArtworkNullWhenTheItemHasNoSet() {
+        val candidate = listOf(item(itemId = "one", artworkUrl = "m")).toRandomCandidates().single()
+
+        assertNull(candidate.artwork)
     }
 
     // --- randomPool ---------------------------------------------------------

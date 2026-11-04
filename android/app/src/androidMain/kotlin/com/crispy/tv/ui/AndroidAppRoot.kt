@@ -1,12 +1,15 @@
 package com.crispy.tv.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.authViewModelFactory
 import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.app.appGraph
+import com.crispy.tv.ui.components.LocalImageQuality
 import com.crispy.tv.ui.navigation.appNavHostDependencies
 
 /**
@@ -32,10 +35,15 @@ fun AndroidAppRoot() {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val graph = remember(appContext) { appContext.appGraph().graph }
-    AppRoot(
-        bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
-        authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
-        profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
-        navHostDependencies = { appNavHostDependencies() },
-    )
+    // The image-quality setting reaches every image surface through this local, so the
+    // setting is one value provided once at the root rather than a read per screen.
+    val imageQuality = graph.imageSettingsRepository.settings.collectAsStateWithLifecycle().value.quality
+    CompositionLocalProvider(LocalImageQuality provides imageQuality) {
+        AppRoot(
+            bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
+            authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
+            profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
+            navHostDependencies = { appNavHostDependencies() },
+        )
+    }
 }

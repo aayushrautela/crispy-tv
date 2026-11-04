@@ -1,5 +1,7 @@
 package com.crispy.tv.domain.home
 
+import com.crispy.tv.images.ResponsiveImageSet
+import com.crispy.tv.images.toResponsiveImageSetOrNull
 import kotlin.random.Random
 
 /**
@@ -20,6 +22,10 @@ const val HOME_RANDOM_GENRE_LIMIT: Int = 3
  * [type] is the backend's media type, passed through unchanged, because it is
  * navigation input. Turning it into a display label is the UI's decision, not
  * this type's — see the overlay's type-label helper.
+ *
+ * [artwork] carries the full rendition set so the wheel can fetch the tier its
+ * disc size actually needs; [artworkUrl] is the flat medium fallback for
+ * anything that only wants one URL.
  */
 data class HomeRandomCandidate(
     val itemId: String,
@@ -28,6 +34,7 @@ data class HomeRandomCandidate(
     val genre: String?,
     val rating: Double?,
     val artworkUrl: String?,
+    val artwork: ResponsiveImageSet? = null,
 )
 
 /**
@@ -69,6 +76,7 @@ fun List<HomeCatalogItem>.toRandomCandidates(): List<HomeRandomCandidate> {
             genre = item.genre?.trim()?.takeIf { it.isNotEmpty() },
             rating = item.rating?.trim()?.toDoubleOrNull(),
             artworkUrl = item.artworkUrl?.trim()?.takeIf { it.isNotEmpty() },
+            artwork = item.artwork.toResponsiveImageSetOrNull(),
         )
     }
     return candidates
