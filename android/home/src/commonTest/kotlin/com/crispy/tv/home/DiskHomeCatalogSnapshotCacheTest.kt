@@ -265,12 +265,13 @@ class DiskHomeCatalogSnapshotCacheTest {
     private val root: Path = "/files".toPath()
 
     private fun cache(nowMs: Long = NOW) = DiskHomeCatalogSnapshotCache(
-        RecommendationCatalogDiskCacheStore(
+        diskCacheStore = RecommendationCatalogDiskCacheStore(
             cacheRoot = root,
             timeSource = FixedTimeSource(nowMs),
             ioDispatcher = Dispatchers.Unconfined,
             fileSystem = fileSystem,
         ),
+        ioDispatcher = Dispatchers.Unconfined,
     )
 
     /** The cache directory's listing, by file name, so a test can assert *which* keys exist. */

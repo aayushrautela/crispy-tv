@@ -69,12 +69,13 @@ class AndroidAppServices(context: Context) : AppServices {
     override val keyValueStores: KeyValueStoreFactory = ContextKeyValueStoreFactory(appContext)
 
     override val homeSnapshotCache: HomeCatalogSnapshotCache = DiskHomeCatalogSnapshotCache(
-        RecommendationCatalogDiskCacheStore(
+        diskCacheStore = RecommendationCatalogDiskCacheStore(
             cacheRoot = appContext.filesDir.toOkioPath(),
             timeSource = androidTimeSource,
             ioDispatcher = Dispatchers.IO,
             fileSystem = FileSystem.SYSTEM,
         ),
+        ioDispatcher = Dispatchers.IO,
     )
 
     override val serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

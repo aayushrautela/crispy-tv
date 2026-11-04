@@ -83,12 +83,13 @@ class TvHomeViewModel internal constructor(
                                 backendClient = TvServices.backendClient(appContext),
                                 backendContextResolver = TvServices.contextResolver(appContext),
                                 cache = DiskHomeCatalogSnapshotCache(
-                                    RecommendationCatalogDiskCacheStore(
+                                    diskCacheStore = RecommendationCatalogDiskCacheStore(
                                         cacheRoot = appContext.filesDir.toOkioPath(),
                                         timeSource = AndroidTimeSource(),
                                         ioDispatcher = Dispatchers.IO,
                                         fileSystem = FileSystem.SYSTEM,
                                     ),
+                                    ioDispatcher = Dispatchers.IO,
                                 ),
                                 serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                             ),

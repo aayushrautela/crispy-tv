@@ -1,6 +1,7 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -12,6 +13,17 @@ import coil3.request.crossfade
 import coil3.request.transformations
 import coil3.transform.Transformation
 import com.crispy.tv.images.ResponsiveImageSet
+import com.crispy.tv.images.urlForDisplaySize
+import com.crispy.tv.settings.ImageQuality
+
+/**
+ * The user's image-quality setting, read where images are requested so the
+ * setting selects the fetched rendition instead of only clearing Coil's cache.
+ * Provided once at the Android root (`AndroidAppRoot`) from
+ * `ImageSettingsRepository`; defaults to [ImageQuality.MEDIUM] where no
+ * provider is in scope.
+ */
+val LocalImageQuality = staticCompositionLocalOf { ImageQuality.MEDIUM }
 
 /**
  * Builds the [ImageRequest] every Crispy image goes through, so that a card, a
@@ -75,17 +87,23 @@ private fun buildCrispyImageRequest(
     transformations: List<Transformation> = emptyList(),
     placeholderMemoryCacheKey: MemoryCache.Key? = null,
 ): ImageRequest {
+    // The memory-cache key carries the URL and the target size, so two surfaces
+    // showing the same item at different sizes or from different renditions
+    // (rail card `low` vs Top10 poster `medium`) get separate entries instead of
+    // one shared key under which Coil's size-only validity check can serve the
+    // wrong tier's bitmap.
+    val effectiveMemoryCacheKey = "${memoryCacheKey ?: url}@$url@${widthPx}x${heightPx}"
     return ImageRequest.Builder(context)
         .data(url)
         .apply { if (widthPx > 0 && heightPx > 0) size(widthPx, heightPx) }
         .apply { if (enableCrossfade) crossfade(true) }
         .diskCacheKey(url)
+        .memoryCacheKey(effectiveMemoryCacheKey)
         .apply {
-            if (memoryCacheKey != null) memoryCacheKey(memoryCacheKey)
             if (placeholderMemoryCacheKey != null) {
                 placeholderMemoryCacheKey(placeholderMemoryCacheKey)
-            } else if (memoryCacheKey != null) {
-                placeholderMemoryCacheKey(memoryCacheKey)
+            } else {
+                placeholderMemoryCacheKey(effectiveMemoryCacheKey)
             }
         }
         .transformations(transformations)
@@ -153,9 +171,20 @@ fun rememberCrispyImageModel(
     memoryCacheKey: String? = null,
     transformations: List<Transformation> = emptyList(),
     placeholderMemoryCacheKey: MemoryCache.Key? = null,
+    surfaceCap: ImageQuality = ImageQuality.HIGH,
+    fallbackUrl: String? = null,
 ): Any? {
-    if (image == null || image.isEmpty) return null
-    val url = image.medium ?: image.high ?: image.low
+    val density = LocalDensity.current
+    val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
+    val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
+    // The surface's own ceiling and the user's setting both cap the rendition,
+    // so a 72.dp disc never fetches more than it can display even on High.
+    val cap = minOf(surfaceCap, LocalImageQuality.current)
+    val url = image
+        ?.takeIf { !it.isEmpty }
+        ?.urlForDisplaySize(maxOf(widthPx, heightPx), cap)
+        ?: fallbackUrl?.trim()?.ifBlank { null }
+    if (url == null) return null
     return crispyImageRequest(
         url = url,
         width = width,
