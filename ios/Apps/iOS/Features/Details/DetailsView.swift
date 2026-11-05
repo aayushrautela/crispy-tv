@@ -210,7 +210,7 @@ struct DetailsScreen: View {
 
     private func hero(_ detail: MetadataTitleDetail) -> some View {
         ZStack(alignment: .bottomLeading) {
-            RemoteImage(url: detail.item.artworkUrl)
+            RemoteImage(url: detail.item.heroArtworkUrl)
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.8)],
@@ -471,7 +471,7 @@ struct EpisodeRow: View {
     var onPlay: (() -> Void)?
 
     private var stillUrl: String? {
-        episode.images.still.medium ?? episode.images.still.large ?? episode.images.still.small
+        episode.images.still.large ?? episode.images.still.medium ?? episode.images.still.small ?? episode.images.still.xl
     }
 
     var body: some View {

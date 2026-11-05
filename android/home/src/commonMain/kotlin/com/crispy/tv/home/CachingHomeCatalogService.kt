@@ -242,7 +242,7 @@ class CachingHomeCatalogService constructor(
             itemId = normalizedItemId,
             title = normalizedTitle,
             artworkUrl = artwork.medium,
-            logoUrl = logo.medium,
+            logoUrl = logo.high ?: logo.medium,
             artwork = artwork.toDomainMap(),
             logo = logo.toDomainMap(),
             addonId = "backend",

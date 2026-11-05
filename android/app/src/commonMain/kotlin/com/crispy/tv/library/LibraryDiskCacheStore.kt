@@ -248,6 +248,7 @@ class LibraryDiskCacheStore(
             put("low", low)
             put("medium", medium)
             put("high", high)
+            put("original", original)
         }
     }
 
@@ -256,8 +257,9 @@ class LibraryDiskCacheStore(
         val low = json.optNullableString("low")
         val medium = json.optNullableString("medium")
         val high = json.optNullableString("high")
-        if (low == null && medium == null && high == null) return null
-        return ResponsiveImageSet(low = low, medium = medium, high = high)
+        val original = json.optNullableString("original")
+        if (low == null && medium == null && high == null && original == null) return null
+        return ResponsiveImageSet(low = low, medium = medium, high = high, original = original)
     }
 
     private companion object {

@@ -109,6 +109,7 @@ class AiInsightsCacheStore(private val store: KeyValueStore) : AiInsightsCache {
                                     slide.backdrop.low?.let { put("small", it) }
                                     slide.backdrop.medium?.let { put("medium", it) }
                                     slide.backdrop.high?.let { put("large", it) }
+                                    slide.backdrop.original?.let { put("xl", it) }
                                 },
                             )
                         }

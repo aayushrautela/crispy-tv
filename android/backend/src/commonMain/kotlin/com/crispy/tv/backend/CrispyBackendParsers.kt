@@ -258,6 +258,7 @@ private fun parseResponsiveImageSet(json: JsonObject?): ResponsiveImageSet {
         low = json.optNullableString("small"),
         medium = json.optNullableString("medium"),
         high = json.optNullableString("large"),
+        original = json.optNullableString("xl"),
     )
 }
 

@@ -601,8 +601,8 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             itemId: itemId,
             itemType: mediaType,
             title: title,
-            artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).large,
-            logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
+            artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).large ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).small ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).xl,
+            logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).large ?? ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("logo")).small ?? ResponsiveImageSetDto.parse(images?.jsonObject("logo")).xl,
             year: json.jsonInt("year"),
             rating: json.jsonDouble("rating"),
             genres: json.jsonStringList("genres"),
@@ -670,8 +670,8 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             itemId: itemId,
             mediaType: mediaType,
             title: title,
-            artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium,
-            logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium,
+            artworkUrl: ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).large ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).small ?? ResponsiveImageSetDto.parse(images?.jsonObject("artwork")).xl,
+            logoUrl: ResponsiveImageSetDto.parse(images?.jsonObject("logo")).large ?? ResponsiveImageSetDto.parse(images?.jsonObject("logo")).medium ?? ResponsiveImageSetDto.parse(images?.jsonObject("logo")).small ?? ResponsiveImageSetDto.parse(images?.jsonObject("logo")).xl,
             rating: json.jsonDouble("rating"),
             releaseYear: json.jsonInt("year"),
             genres: json.jsonStringList("genres")
@@ -692,7 +692,7 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
 
     private func parseMetadataCompany(_ json: [String: Any]) -> MetadataCompany? {
         guard let id = json.jsonString("id"), let name = json.jsonString("name") else { return nil }
-        return MetadataCompany(id: id, name: name, logoUrl: ResponsiveImageSetDto.parse(json.jsonObject("logo")).medium)
+        return MetadataCompany(id: id, name: name, logoUrl: ResponsiveImageSetDto.parse(json.jsonObject("logo")).large ?? ResponsiveImageSetDto.parse(json.jsonObject("logo")).medium ?? ResponsiveImageSetDto.parse(json.jsonObject("logo")).small ?? ResponsiveImageSetDto.parse(json.jsonObject("logo")).xl)
     }
 
     // MARK: - Transport plumbing

@@ -259,7 +259,7 @@ class CalendarService constructor(
             isReleased = releasedAtMs?.let { it <= nowMs } ?: false,
             isGroup = false,
             artworkUrl = card.images.artwork.medium,
-            thumbnailUrl = card.images.still.medium ?: card.images.artwork.medium,
+            thumbnailUrl = card.images.still.high ?: card.images.still.medium ?: card.images.artwork.medium,
             watchedKeys = setOf(watchedKey),
             absoluteEpisodeNumber = null,
         )

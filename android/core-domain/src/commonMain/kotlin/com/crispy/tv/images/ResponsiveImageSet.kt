@@ -20,6 +20,12 @@ package com.crispy.tv.images
  * The field names follow `ImageQuality` rather than the wire, because
  * `ImageQuality` is what selects among them.
  *
+ * `original` is the fourth slot the backend now sends (`xl` on the wire): the
+ * uncapped source image. It sits outside the `ImageQuality` ladder on purpose --
+ * it is what a full-screen surface asks for, not a step on the quality
+ * slider -- and it defaults to `null` so every existing construction site keeps
+ * compiling and every cached set written before it existed still parses.
+ *
  * It lives in `:android:core-domain` because that is the only module the wire
  * layer, `:android:home` and `:android:app` all already depend on, and the only
  * one guaranteed to be free of platform types on every target.
@@ -28,15 +34,16 @@ data class ResponsiveImageSet(
     val low: String?,
     val medium: String?,
     val high: String?,
+    val original: String? = null,
 ) {
     val isEmpty: Boolean
-        get() = low.isNullOrBlank() && medium.isNullOrBlank() && high.isNullOrBlank()
+        get() = low.isNullOrBlank() && medium.isNullOrBlank() && high.isNullOrBlank() && original.isNullOrBlank()
 
     fun urlFor(quality: ImageQuality): String? {
         return when (quality) {
-            ImageQuality.LOW -> low ?: medium ?: high
-            ImageQuality.MEDIUM -> medium ?: high ?: low
-            ImageQuality.HIGH -> high ?: medium ?: low
+            ImageQuality.LOW -> low ?: medium ?: high ?: original
+            ImageQuality.MEDIUM -> medium ?: high ?: low ?: original
+            ImageQuality.HIGH -> original ?: high ?: medium ?: low
         }?.trim()?.ifBlank { null }
     }
 
@@ -46,6 +53,7 @@ data class ResponsiveImageSet(
                 low = url,
                 medium = url,
                 high = url,
+                original = url,
             )
         }
     }

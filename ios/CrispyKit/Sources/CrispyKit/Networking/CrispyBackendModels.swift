@@ -32,19 +32,23 @@ public struct ResponsiveImageSetDto: Equatable {
 public let small: String?
 public let medium: String?
 public let large: String?
+/// The uncapped source image, the fourth tier the backend now sends.
+/// Optional so a response from an older backend still parses.
+public let xl: String?
 
-public var isEmpty: Bool { small == nil && medium == nil && large == nil }
+public var isEmpty: Bool { small == nil && medium == nil && large == nil && xl == nil }
 
 public static func parse(_ json: [String: Any]?) -> ResponsiveImageSetDto {
         ResponsiveImageSetDto(
             small: json?.jsonString("small"),
             medium: json?.jsonString("medium"),
-            large: json?.jsonString("large")
+            large: json?.jsonString("large"),
+            xl: json?.jsonString("xl")
         )
     }
 
 public static func empty() -> ResponsiveImageSetDto {
-        ResponsiveImageSetDto(small: nil, medium: nil, large: nil)
+        ResponsiveImageSetDto(small: nil, medium: nil, large: nil, xl: nil)
     }
 }
 
@@ -152,14 +156,18 @@ public let providerIds: MediaExternalIds
 
 public var id: String { itemId }
 
-public var artworkUrl: String? { images.artwork.medium ?? images.artwork.large ?? images.artwork.small }
-    public var logoUrl: String? { images.logo.medium ?? images.logo.large ?? images.logo.small }
+public var artworkUrl: String? { images.artwork.medium ?? images.artwork.large ?? images.artwork.small ?? images.artwork.xl }
+    public var logoUrl: String? { images.logo.large ?? images.logo.medium ?? images.logo.small ?? images.logo.xl }
+
+    /// The artwork for a full-bleed surface, where the largest tier the
+    /// backend sent is the one that should be shown.
+    public var heroArtworkUrl: String? { images.artwork.large ?? images.artwork.xl ?? images.artwork.medium ?? images.artwork.small }
 
     /// The parent series' own artwork; episodes/seasons use it where the UI
     /// should show the show image instead of the episode still.
 public var seriesArtworkUrl: String? {
         guard let artwork = parent?.images?.artwork, !artwork.isEmpty else { return nil }
-        return artwork.medium ?? artwork.large ?? artwork.small
+        return artwork.medium ?? artwork.large ?? artwork.small ?? artwork.xl
     }
 
 public static func parse(_ json: [String: Any]) throws -> ClientMediaCard {

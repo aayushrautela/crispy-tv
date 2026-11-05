@@ -140,7 +140,7 @@ private fun ClientMediaCard.toCatalogItem(
     val showTitle = if (isEpisode) parent?.seriesTitle else null
     val seriesArtwork = if (isEpisode) parent?.images?.artwork?.takeIf { !it.isEmpty } else null
     val cardArtwork = seriesArtwork ?: images.artwork
-    val logoUrl = images.logo.medium ?: images.logo.high ?: images.logo.low
+    val logoUrl = images.logo.high ?: images.logo.medium ?: images.logo.low
     return CatalogItem(
         id = itemId,
         itemId = showItemId ?: itemId,

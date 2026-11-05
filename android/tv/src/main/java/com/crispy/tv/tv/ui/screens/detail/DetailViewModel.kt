@@ -290,10 +290,12 @@ class DetailViewModel(
                 itemRating = item.rating,
                 subtitleMeta = metaParts.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                 overview = item.overview,
-                artworkUrl = item.images.artwork.high
+                artworkUrl = item.images.artwork.original
+                    ?: item.images.artwork.high
                     ?: item.images.artwork.medium
                     ?: item.images.artwork.low,
-                logoUrl = item.images.logo.high
+                logoUrl = item.images.logo.original
+                    ?: item.images.logo.high
                     ?: item.images.logo.medium
                     ?: item.images.logo.low,
                 genres = item.genres,

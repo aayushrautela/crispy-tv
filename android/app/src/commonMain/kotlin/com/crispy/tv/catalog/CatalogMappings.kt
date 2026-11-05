@@ -10,7 +10,7 @@ fun ClientMediaCard.toCatalogItem(): CatalogItem? {
     val normalizedType = normalizedCatalogMediaType()
     val normalizedArtworkUrl = images.artwork.medium ?: images.artwork.high ?: images.artwork.low
     if (normalizedArtworkUrl.isNullOrBlank()) return null
-    val logoUrl = images.logo.medium ?: images.logo.high ?: images.logo.low
+    val logoUrl = images.logo.high ?: images.logo.medium ?: images.logo.low
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,

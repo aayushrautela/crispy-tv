@@ -37,7 +37,7 @@ fun ClientMediaCard.toMediaDetails(): MediaDetails {
         itemType = normalizedCatalogMediaType(),
         title = title.trim().takeIf { it.isNotBlank() } ?: itemId,
         artworkUrl = images.artwork.medium,
-        logoUrl = images.logo.medium,
+        logoUrl = images.logo.high ?: images.logo.medium,
         description = overview,
         genres = genres,
         year = year?.toString() ?: releaseDate?.take(4),
@@ -72,7 +72,7 @@ fun ClientMediaCard.toMediaVideo(): MediaVideo? {
         episode = episode,
         released = releaseDate,
         overview = overview,
-        thumbnailUrl = images.still.medium ?: images.artwork.medium,
+        thumbnailUrl = images.still.high ?: images.still.medium ?: images.artwork.medium,
         lookupId = buildAddonEpisodeLookupId(providerIds?.imdb, season, episode) ?: itemId,
         absoluteEpisodeNumber = null,
     )

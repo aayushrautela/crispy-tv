@@ -503,7 +503,7 @@ private fun AiInsightSlide.slideImageUrl(
     fallbackBackdropUrl: String?,
     posterUrl: String?,
 ): String? =
-    (backdrop.high ?: backdrop.medium ?: backdrop.low)?.trim()?.takeIf { it.isNotEmpty() }
+    (backdrop.original ?: backdrop.high ?: backdrop.medium ?: backdrop.low)?.trim()?.takeIf { it.isNotEmpty() }
         ?: fallbackBackdropUrl?.trim()?.takeIf { it.isNotEmpty() }
         ?: posterUrl?.trim()?.takeIf { it.isNotEmpty() }
 

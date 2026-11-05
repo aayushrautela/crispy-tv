@@ -206,7 +206,7 @@ private fun HomeTop10Poster(
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val cardShape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
     val artworkUrl = item.artwork?.medium ?: item.artworkUrl
-    val logoUrl = item.logo?.medium ?: item.logoUrl
+    val logoUrl = item.logo?.high ?: item.logo?.medium ?: item.logoUrl
     val artworkModel = if (artworkUrl != null) {
         crispyImageRequest(url = artworkUrl, width = posterWidth, height = posterHeight, memoryCacheKey = backdropKey)
     } else {

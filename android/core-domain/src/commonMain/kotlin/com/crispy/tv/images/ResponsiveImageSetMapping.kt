@@ -16,6 +16,7 @@ fun ResponsiveImageSet.toDomainMap(): Map<String, String?> {
         "small" to low,
         "medium" to medium,
         "large" to high,
+        "xl" to original,
     )
 }
 
@@ -24,6 +25,7 @@ fun responsiveImageSetFromDomainMap(values: Map<String, String?>): ResponsiveIma
         low = values["small"],
         medium = values["medium"],
         high = values["large"],
+        original = values["xl"],
     )
 }
 

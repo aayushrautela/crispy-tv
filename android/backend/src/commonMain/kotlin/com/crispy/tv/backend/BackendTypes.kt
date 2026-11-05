@@ -383,7 +383,7 @@ data class MetadataCompanyView(
     val originCountry: String?,
 ) {
     val logoUrl: String?
-        get() = logo.medium
+        get() = logo.high ?: logo.medium
 }
 
 data class MetadataProductionInfoView(

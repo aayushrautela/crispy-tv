@@ -884,7 +884,7 @@ internal fun resolveSlideImageUrl(
     cyclingBackdropUrl: String?,
     artworkUrl: String?,
 ): String? {
-    return (slide.backdrop.high ?: slide.backdrop.medium ?: slide.backdrop.low)?.normalizedUrl()
+    return (slide.backdrop.original ?: slide.backdrop.high ?: slide.backdrop.medium ?: slide.backdrop.low)?.normalizedUrl()
         ?: cyclingBackdropUrl.normalizedUrl()
         ?: artworkUrl.normalizedUrl()
 }
