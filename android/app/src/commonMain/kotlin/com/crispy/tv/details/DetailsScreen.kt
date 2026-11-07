@@ -223,6 +223,12 @@ internal fun DetailsScreen(
     val imageUrl = remember(details, initialArtworkUrl) {
         detailsHeroImageUrl(details = details) ?: initialArtworkUrl
     }
+    // The full rendition set behind the hero, so the hero can pick the tier its
+    // own size needs (capped by the user's image-quality setting) instead of
+    // rendering the flat medium URL and leaning on the card placeholder.
+    val heroArtwork = remember(uiState.titleDetail) {
+        uiState.titleDetail?.item?.images?.artwork
+    }
     val fallbackSeed = Color.White
     // Both values, not one: `showPalettePlaceholder` below distinguishes "no seed"
     // from "the seed is white", and folding the null away here would erase that.
@@ -363,6 +369,7 @@ internal fun DetailsScreen(
                     HeroSection(
                         details = visibleDetails,
                         imageUrl = imageUrl,
+                        artwork = heroArtwork,
                         palette = palette,
                         trailer = heroTrailerSources,
                         screenHeightDp = screenHeightDp,

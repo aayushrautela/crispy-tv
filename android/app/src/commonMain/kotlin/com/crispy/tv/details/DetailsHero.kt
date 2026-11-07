@@ -48,9 +48,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.details.trailer.TrailerSource
+import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
-import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
@@ -66,6 +66,7 @@ import org.jetbrains.compose.resources.painterResource
 internal fun HeroSection(
     details: MediaDetails?,
     imageUrl: String?,
+    artwork: ResponsiveImageSet? = null,
     palette: DetailsPaletteColors,
     trailer: List<HeroTrailerSource> = emptyList(),
     screenHeightDp: Int,
@@ -157,14 +158,20 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        if (!imageUrl.isNullOrBlank()) {
+        if (!imageUrl.isNullOrBlank() || artwork?.isEmpty == false) {
             val cardCacheKey = backdropKey?.let { SharedImageMemoryKeys.getCardKey(it) }
-            val heroRequest = crispyImageRequest(
-                url = imageUrl,
+            // The hero picks its own rendition from the artwork set, capped by the
+            // user's image-quality setting, instead of trusting the flat URL: the
+            // card placeholder above is the card's `low` bitmap, and the hero must
+            // fetch the tier its size actually needs rather than relying on the
+            // placeholder swap. `fallbackUrl` covers the phase before details load.
+            val heroRequest = rememberCrispyImageModel(
+                image = artwork,
                 width = heroMaxWidth,
                 height = heroBoxHeight,
                 memoryCacheKey = backdropKey,
                 placeholderMemoryCacheKey = cardCacheKey,
+                fallbackUrl = imageUrl,
             )
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
                 val cornerRadius = with(animatedVisibilityScope) {
