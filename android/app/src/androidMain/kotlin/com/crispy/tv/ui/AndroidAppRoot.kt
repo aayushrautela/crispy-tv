@@ -1,23 +1,20 @@
 package com.crispy.tv.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.authViewModelFactory
 import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.app.appGraph
-import com.crispy.tv.ui.components.LocalImageQuality
 import com.crispy.tv.ui.navigation.appNavHostDependencies
 
 /**
  * The Android entry point, which is [AppRoot] plus the wiring it can no longer do itself.
  *
  * This file exists so `MainActivity` keeps a one-argument call. The alternative -- having
- * `MainActivity` build the three factories and the navigation bundle -- would put four
- * `remember`s and a composition-local read into an `Activity`, which is the composition root
+ * `MainActivity` build the three factories and the navigation bundle -- would put the
+ * `remember`s into an `Activity`, which is the composition root
  * for the *activity*, not for the app's dependency graph. [AppRoot] is the thing that knows
  * what a bootstrap ViewModel factory is for; this is the thing that knows how to make one on
  * Android. That split is the whole shape of the landing, expressed in two declarations.
@@ -35,15 +32,10 @@ fun AndroidAppRoot() {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val graph = remember(appContext) { appContext.appGraph().graph }
-    // The image-quality setting reaches every image surface through this local, so the
-    // setting is one value provided once at the root rather than a read per screen.
-    val imageQuality = graph.imageSettingsRepository.settings.collectAsStateWithLifecycle().value.quality
-    CompositionLocalProvider(LocalImageQuality provides imageQuality) {
-        AppRoot(
-            bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
-            authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
-            profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
-            navHostDependencies = { appNavHostDependencies() },
-        )
-    }
+    AppRoot(
+        bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
+        authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
+        profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
+        navHostDependencies = { appNavHostDependencies() },
+    )
 }

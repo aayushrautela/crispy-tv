@@ -1,7 +1,6 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -12,18 +11,21 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.transformations
 import coil3.transform.Transformation
+import com.crispy.tv.images.ImageQuality
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.images.urlForDisplaySize
-import com.crispy.tv.settings.ImageQuality
 
 /**
- * The user's image-quality setting, read where images are requested so the
- * setting selects the fetched rendition instead of only clearing Coil's cache.
- * Provided once at the Android root (`AndroidAppRoot`) from
- * `ImageSettingsRepository`; defaults to [ImageQuality.MEDIUM] where no
- * provider is in scope.
+ * The ceiling the app applies to every image it fetches.
+ *
+ * There is no image-quality setting any more: the app picks the rendition
+ * itself. [urlForDisplaySize] fetches the smallest rendition wide enough to
+ * cover the surface and never one above this ceiling, so a full-width hero
+ * resolves `medium` while a small card resolves `low`. A surface that can
+ * display even less passes its own lower `surfaceCap` — the random wheel's
+ * 72.dp disc passes [ImageQuality.LOW].
  */
-val LocalImageQuality = staticCompositionLocalOf { ImageQuality.MEDIUM }
+private val AppImageCap = ImageQuality.MEDIUM
 
 /**
  * Builds the [ImageRequest] every Crispy image goes through, so that a card, a
@@ -177,9 +179,9 @@ fun rememberCrispyImageModel(
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    // The surface's own ceiling and the user's setting both cap the rendition,
-    // so a 72.dp disc never fetches more than it can display even on High.
-    val cap = minOf(surfaceCap, LocalImageQuality.current)
+    // The app's ceiling and the surface's own one both cap the rendition, so a
+    // 72.dp disc never fetches more than it can display.
+    val cap = minOf(surfaceCap, AppImageCap)
     val url = image
         ?.takeIf { !it.isEmpty }
         ?.urlForDisplaySize(maxOf(widthPx, heightPx), cap)

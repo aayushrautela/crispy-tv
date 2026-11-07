@@ -155,8 +155,8 @@ plugins {
  * **Push the pure part toward `commonMain` and the platform part toward
  * `androidMain`, even when the platform part is the smaller one.** The badge
  * receives the result as a composable-slot parameter with no default, so a
- * call site cannot quietly forget it -- the same choice
- * `ImageSettingsRepository(onQualityChanged:)` already made.
+ * call site cannot quietly forget it -- the same choice `SettingsNavDependencies`'s
+ * constructor makes for every member.
  *
  * ## What this module deliberately does not know
  *

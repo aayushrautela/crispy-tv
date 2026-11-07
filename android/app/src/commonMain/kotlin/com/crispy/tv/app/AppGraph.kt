@@ -31,8 +31,6 @@ import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.search.AiSearchRepository
 import com.crispy.tv.search.BackendSearchRepository
 import com.crispy.tv.services.AppServices
-import com.crispy.tv.settings.ImageSettingsRepository
-import com.crispy.tv.settings.KeyValueStoreImageSettingsRepository
 import com.crispy.tv.settings.KeyValueStorePlaybackSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
@@ -55,7 +53,6 @@ private const val ACTIVE_PROFILE_STORE = "supabase_sync_lab"
 private const val PENDING_PROVIDER_AUTH_STORE = "pending_provider_auth"
 private const val PROFILE_DATA_SHADOW_STORE = "profile_data_shadow"
 private const val PLAYBACK_SETTINGS_STORE = "playback_settings"
-private const val IMAGE_SETTINGS_STORE = "image_settings"
 private const val AI_INSIGHTS_CACHE_STORE = "ai_insights_cache"
 private const val WATCH_HISTORY_PROGRESS_STORE = "watch_progress"
 
@@ -215,16 +212,6 @@ class AppGraph(
 
     val playbackSettingsRepository: PlaybackSettingsRepository by lazy {
         KeyValueStorePlaybackSettingsRepository(services.keyValueStores.store(PLAYBACK_SETTINGS_STORE))
-    }
-
-    val imageSettingsRepository: ImageSettingsRepository by lazy {
-        // The Coil cache clear is wired here rather than inside the repository because it is the
-        // one effect of a quality change that is not a stored value, and Coil does not exist off
-        // Android. `AppServices.invalidateImageCache` is what makes that statement portable.
-        KeyValueStoreImageSettingsRepository(
-            store = services.keyValueStores.store(IMAGE_SETTINGS_STORE),
-            onQualityChanged = { services.invalidateImageCache() },
-        )
     }
 
     private val profileDataShadowStore: ProfileDataShadowStore by lazy {

@@ -86,7 +86,7 @@ import com.crispy.tv.domain.home.HomeRandomCandidate
 import com.crispy.tv.domain.home.HomeRandomGenre
 import com.crispy.tv.domain.home.randomPool
 import com.crispy.tv.domain.home.topGenres
-import com.crispy.tv.settings.ImageQuality
+import com.crispy.tv.images.ImageQuality
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.CrispyChip
 import com.crispy.tv.ui.components.CrispyChipRow
@@ -673,8 +673,8 @@ private fun RandomWheelRow(
         animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
         label = "randomPill",
     )
-    // A 72.dp disc never needs more than the smallest rendition, whatever the image-quality
-    // setting says, so the wheel caps itself at LOW and resolves the URL from the set.
+    // A 72.dp disc never needs more than the smallest rendition, so the wheel caps
+    // itself at LOW and resolves the URL from the set.
     val coverModel = rememberCrispyImageModel(
         image = candidate.artwork,
         width = RandomDiscSize,

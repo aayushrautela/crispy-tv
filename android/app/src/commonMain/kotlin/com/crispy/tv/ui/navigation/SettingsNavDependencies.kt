@@ -2,7 +2,6 @@ package com.crispy.tv.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.settings.ImageSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.sync.ProfileDataCloudSync
 
@@ -11,7 +10,7 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  *
  * ## Why this is a composition root wearing a graph's clothes
  *
- * [addSettingsNavGraph] is a *registration* function: it declares six destinations and
+ * [addSettingsNavGraph] is a *registration* function: it declares five destinations and
  * nothing else, and it reads no route argument of any of them. What it did do, for most
  * of this migration, is build its own dependencies — four `androidMain` factories and
  * providers, and three `LocalContext` / `LocalPlatformContext` reads to get an
@@ -19,21 +18,21 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  * claim, and it is the same shape [addHomeNavGraph] had: a graph is not a component,
  * so "keep the wiring near its only use" has no purchase here.
  *
- * **Every one of its four destination callees was already in `commonMain`** —
- * `SettingsScreen`, `ImageSettingsScreen`, `PlaybackSettingsScreen` and
+ * **Every one of its three destination callees was already in `commonMain`** —
+ * `SettingsScreen`, `PlaybackSettingsScreen` and
  * `ProfileManagementRoute`. So this landing had no callee wall left to clear, and the
- * measurements that mattered were the *declared* return types of the four provider
- * functions rather than their locations: `ImageSettingsRepository` and
- * `PlaybackSettingsRepository` are `commonMain` interfaces, `ProfileDataCloudSync` is a
+ * measurements that mattered were the *declared* return types of the three provider
+ * functions rather than their locations: `PlaybackSettingsRepository` is a
+ * `commonMain` interface, `ProfileDataCloudSync` is a
  * `commonMain` class whose one member this graph calls, and the two
- * `ViewModelProvider.Factory`s are the most platform-neutral type in the set. All seven
+ * `ViewModelProvider.Factory`s are the most platform-neutral type in the set. All six
  * members cross unchanged.
  *
  * ## Why one bundle rather than seven parameters
  *
  * The same argument as [HomeNavDependencies], and the same counter-consideration: the
  * other graphs take three to seven plain parameters and this one could too, so a bundle
- * is a real choice rather than a requirement. It is a bundle because seven of them is
+ * is a real choice rather than a requirement. It is a bundle because six of them is
  * where the list stops reading as a list — and because the per-member note is where the
  * lifetime change below gets written down where it will be seen.
  *
@@ -41,10 +40,10 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  *
  * Each destination used to build its own dependency inside its `composable` block,
  * under `remember(appContext)`. Those `remember`s now live in `AppNavHost`, which means
- * the two factories, the two repositories and the cloud sync are constructed **when the
+ * the two factories, the repository and the cloud sync are constructed **when the
  * graph is built** rather than on first navigation to the destination.
  *
- * For the two repositories and the cloud sync that is not a change at all: they were
+ * For the repository and the cloud sync that is not a change at all: they were
  * already singletons per application context, so eager construction moves *when* the
  * one instance is made and not how many. For the two `ViewModelProvider.Factory`s it is
  * worth being precise about, because the `remember` looks load-bearing and is not:
@@ -56,7 +55,7 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  * cheap — each of the four is a `remember` over an existing singleton — but that is a
  * claim about *today's* bodies, and it is the kind of claim a factory body invalidates
  * silently by growing. So the number of things built up front went from "zero, until
- * you navigate" to seven, and this KDoc is where a future reader should look when
+ * you navigate" to six, and this KDoc is where a future reader should look when
  * settings-screen startup cost is the thing being measured.
  *
  * ## What is a product and what is a lambda
@@ -64,8 +63,8 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  * The rule from the rest of this port applies member by member, and here every member
  * lands on the same side:
  *
- * - [imageSettingsRepository], [playbackSettingsRepository] and [profileDataCloudSync]
- *   are products. Each is used by a `collectAsStateWithLifecycle` and five or six
+ * - [playbackSettingsRepository] and [profileDataCloudSync]
+ *   are products. Each is used by a `collectAsStateWithLifecycle` and several
  *   change lambdas inside a composable, so a fresh instance per recomposition would
  *   restart a settings collect on every frame that changed anything.
  * - [profileListViewModelFactory] and [addonsSettingsViewModelFactory] are products
@@ -86,7 +85,6 @@ internal class SettingsNavDependencies(
     val pluginsSettingsScreen: (@Composable (onBack: () -> Unit) -> Unit)?,
     val profileListViewModelFactory: ViewModelProvider.Factory,
     val addonsSettingsViewModelFactory: ViewModelProvider.Factory,
-    val imageSettingsRepository: ImageSettingsRepository,
     val playbackSettingsRepository: PlaybackSettingsRepository,
     val profileDataCloudSync: ProfileDataCloudSync,
 )

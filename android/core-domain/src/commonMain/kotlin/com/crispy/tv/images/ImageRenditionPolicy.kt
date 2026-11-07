@@ -1,7 +1,5 @@
 package com.crispy.tv.images
 
-import com.crispy.tv.settings.ImageQuality
-
 /**
  * The pixel width each rendition of a [ResponsiveImageSet] is assumed to carry.
  *
@@ -32,9 +30,9 @@ object ImageRenditionWidths {
  * and throws most of it away. Choosing the URL here is what actually saves the
  * network bytes and the decode work.
  *
- * [cap] is the lower of the user's image-quality setting and the surface's own
- * ceiling (a disc never needs more than `low` no matter what the setting says),
- * compared on [ImageQuality]'s ordinal order. When no allowed rendition is wide
+ * [cap] is the ceiling the caller allows — the lower of the app's own ceiling and
+ * the surface's (a disc never needs more than `low`), compared on [ImageQuality]'s
+ * ordinal order. When no allowed rendition is wide
  * enough, the widest allowed one is returned -- upscaling a smaller bitmap beats
  * fetching a bigger file on a metered connection, and the fallback chains in
  * [ResponsiveImageSet.urlFor] still apply when a tier's URL is blank.
