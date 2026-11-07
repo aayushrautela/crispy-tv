@@ -9,8 +9,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.crispy.tv.accounts.ProfileManagementRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
-import com.crispy.tv.settings.ImageQuality
-import com.crispy.tv.settings.ImageSettingsScreen
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.SettingsScreen
 import kotlinx.coroutines.launch
@@ -39,9 +37,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
-            },
-            onNavigateToImageSettings = {
-                navController.navigate(AppRoutes.ImageSettingsRoute)
             },
             onNavigateToAccountsProfiles = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
@@ -77,21 +72,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             onBack = { navController.popBackStack() },
             onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
             viewModelFactory = dependencies.profileListViewModelFactory,
-        )
-        }
-    }
-
-    composable(AppRoutes.ImageSettingsRoute) {
-        PredictivePeelContainer {
-        val imageSettingsRepository = dependencies.imageSettingsRepository
-        val imageSettings by imageSettingsRepository.settings.collectAsStateWithLifecycle()
-
-        ImageSettingsScreen(
-            settings = imageSettings,
-            onQualityChanged = { quality: ImageQuality ->
-                imageSettingsRepository.setQuality(quality)
-            },
-            onBack = { navController.popBackStack() }
         )
         }
     }

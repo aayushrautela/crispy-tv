@@ -1,7 +1,5 @@
 package com.crispy.tv.images
 
-import com.crispy.tv.settings.ImageQuality
-
 /**
  * A set of image URLs at three qualities, and the rule for choosing between them.
  *

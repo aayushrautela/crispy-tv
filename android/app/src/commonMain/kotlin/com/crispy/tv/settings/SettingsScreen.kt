@@ -41,7 +41,6 @@ import com.crispy.tv.ui.resources.ic_arrow_back
 import com.crispy.tv.ui.resources.ic_build
 import com.crispy.tv.ui.resources.ic_closed_caption
 import com.crispy.tv.ui.resources.ic_extension
-import com.crispy.tv.ui.resources.ic_image
 import com.crispy.tv.ui.resources.ic_info
 import com.crispy.tv.ui.resources.ic_keyboard_arrow_right
 import com.crispy.tv.ui.resources.ic_language
@@ -89,7 +88,6 @@ fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPluginsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
-    onNavigateToImageSettings: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
@@ -121,13 +119,6 @@ fun SettingsScreen(
                             icon = Res.drawable.ic_video_settings,
                             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                             onClick = onNavigateToPlaybackSettings
-                        ),
-                        SettingsItem(
-                            label = "Image Quality",
-                            description = "Choose artwork detail and cache size",
-                            icon = Res.drawable.ic_image,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            onClick = onNavigateToImageSettings
                         ),
                         SettingsItem(
                             label = "Subtitles",

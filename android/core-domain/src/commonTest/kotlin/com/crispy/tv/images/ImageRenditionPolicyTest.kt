@@ -1,6 +1,5 @@
 package com.crispy.tv.images
 
-import com.crispy.tv.settings.ImageQuality
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

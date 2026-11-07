@@ -243,7 +243,6 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
         pluginsUiSupported = distribution.capabilities.pluginsUiSupported,
         pluginsSettingsScreen = distribution.pluginsSettingsScreen,
         addonsSettingsViewModelFactory = remember(appContext) { addonsSettingsViewModelFactory(appContext) },
-        imageSettingsRepository = remember(appContext) { graph.imageSettingsRepository },
         profileDataCloudSync = remember(appContext) {
             graph.createProfileDataCloudSync()
         },

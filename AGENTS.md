@@ -48,7 +48,7 @@ Repo agent rules:
 | Module | Kind | Notes |
 |---|---|---|
 | `:android:androidApp` | `com.android.application` | manifest, app-only `res/`, signing, ProGuard, ABI splits, the `store`/`sideload` flavours |
-| `:android:app` | KMP + Compose | the shared UI and presentation. **176 `commonMain` / 48 `androidMain` / 4 `androidHostTest` / 87 `commonTest`** — counted by `verify_kmp_structure.py --json`, not by eye. `androidMain` carries the Android halves of the factories and everything a `Context`, a media3 type or a `Class<T>` pins; `iosMain` is declared (the Apple seam) and empty. |
+| `:android:app` | KMP + Compose | the shared UI and presentation. **174 `commonMain` / 48 `androidMain` / 4 `androidHostTest` / 87 `commonTest`** — counted by `verify_kmp_structure.py --json`, not by eye. `androidMain` carries the Android halves of the factories and everything a `Context`, a media3 type or a `Class<T>` pins; `iosMain` is declared (the Apple seam) and empty. |
 | `:android:sharedUI` | KMP + Compose | the design system **and the design assets**; declares both Apple targets as a purity gate, and the `CrispyUI` framework it exports is imported by **no** Swift file (see `docs/plans/ios-native-plan.md`) |
 | `:android:ui-assets` | `com.android.library` | only what CMP cannot carry — launcher mipmaps, splash colour + 2 drawables, 9 provider-logo SVGs |
 | `:android:core-domain` | pure KMP | domain rules, no Android types/IO, **and the contract suite in `commonTest`** |

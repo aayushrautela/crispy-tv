@@ -419,8 +419,7 @@ from Account settings → Playback.
 **Deliberately absent, and why:** skip-intro controls (no segment data on iOS — that is IntroDB/
 AniSkip work), trailer autoplay/muted (the details rail plays a trailer on tap and the engine has
 no mute command), libass render type and engine preference (one engine), resize mode (no mapping
-decided), image quality (its Android consumer is Coil's decoded-image cache; iOS has no
-equivalent).
+decided).
 
 **A change applies the next time a source is opened** — the engine reads the settings once, when
 it is built. That is documented rather than papered over: a mid-playback speed change would need a
@@ -468,10 +467,11 @@ App (`ios/Apps/iOS`):
 - `AccountSettingsScreen` — lost its Playback and Addons sections; the hub is where settings live
   now. It keeps email, connected services, sign out and delete.
 
-**Deliberately absent, and why:** the Subtitles, Image Quality, Language & Region and Plugins rows.
-Android has the first two live and the others inert (no `onClick` in `SettingsScreen.kt`); iOS omits
-all four rather than drawing a row that does nothing, and each arrives with its own landing. Plugins
-is additionally sideload-built on Android and has no iOS engine.
+**Deliberately absent, and why:** the Subtitles, Language & Region and Plugins rows.
+Android has Subtitles live and the others inert (no `onClick` in `SettingsScreen.kt`); iOS omits
+all three rather than drawing a row that does nothing, and each arrives with its own landing. Plugins
+is additionally sideload-built on Android and has no iOS engine. (The Image Quality row was
+removed from Android as well — the app picks the image rendition automatically.)
 
 Tests: `ActiveProfileSnapshotTests` covers the selection rule (stored id wins, unknown id → first,
 no id → first, empty list → nothing), trimming, and blank-as-nothing. The screens are not covered by
@@ -604,9 +604,9 @@ branch and dispatching them; a dispatched run has to be *read* (204 means accept
 - Torrent streams: the resolver drops a stream with an info hash because iOS has no torrent
   engine; only direct streams are offered.
 - The rest of the settings surface iOS does not have: the rows Android draws are named in the
-  landing-10 and landing-11 sections above — Subtitles styling, Image Quality, Language & Region and
-  Plugins are absent here, each until its own landing, and there is no image-quality screen, because
-  its Android consumer is Coil's decoded-image cache.
+  landing-10 and landing-11 sections above — Subtitles styling, Language & Region and
+  Plugins are absent here, each until its own landing. (Image Quality no longer exists on
+  Android either; the app picks the image rendition automatically.)
 - A Compose Multiplatform Apple host (the KMP `CrispyUI` framework exists and is exported by
   `:sharedUI`, but no Apple app consumes it; that is a different, larger decision).
 - Apple implementations of `:platform-core`'s six ports (still zero).
