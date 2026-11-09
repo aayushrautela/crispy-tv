@@ -2,8 +2,10 @@ package com.crispy.tv.tv.ui.theme
 
 import androidx.compose.runtime.Composable
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 import com.crispy.tv.ui.theme.CrispyPalette
+import com.crispy.tv.ui.theme.GoogleSansFlex
 
 /**
  * The 10-foot surface's colour scheme, built from the shared palette.
@@ -85,5 +87,39 @@ internal val CrispyTvDarkColors = darkColorScheme(
 
 @Composable
 fun CrispyTvTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = CrispyTvDarkColors, content = content)
+    MaterialTheme(
+        colorScheme = CrispyTvDarkColors,
+        typography = CrispyTvTypography,
+        content = content,
+    )
 }
+
+/**
+ * Google Sans Flex on every slot of the 10-foot surface's type ramp.
+ *
+ * `androidx.tv.material3` 1.1.0's `Typography` has no leading-family parameter
+ * at all -- measured off the artifact: its constructors take TextStyles only,
+ * and the class file contains no `FontFamily` reference -- so there is nothing
+ * to pass the family *to*, and each slot is copied with it instead. The phone
+ * surface's theme does the same, for the same reason on a different library.
+ */
+private val CrispyTvTypography: Typography
+    @Composable get() = with(Typography()) {
+        copy(
+            displayLarge = displayLarge.copy(fontFamily = GoogleSansFlex),
+            displayMedium = displayMedium.copy(fontFamily = GoogleSansFlex),
+            displaySmall = displaySmall.copy(fontFamily = GoogleSansFlex),
+            headlineLarge = headlineLarge.copy(fontFamily = GoogleSansFlex),
+            headlineMedium = headlineMedium.copy(fontFamily = GoogleSansFlex),
+            headlineSmall = headlineSmall.copy(fontFamily = GoogleSansFlex),
+            titleLarge = titleLarge.copy(fontFamily = GoogleSansFlex),
+            titleMedium = titleMedium.copy(fontFamily = GoogleSansFlex),
+            titleSmall = titleSmall.copy(fontFamily = GoogleSansFlex),
+            bodyLarge = bodyLarge.copy(fontFamily = GoogleSansFlex),
+            bodyMedium = bodyMedium.copy(fontFamily = GoogleSansFlex),
+            bodySmall = bodySmall.copy(fontFamily = GoogleSansFlex),
+            labelLarge = labelLarge.copy(fontFamily = GoogleSansFlex),
+            labelMedium = labelMedium.copy(fontFamily = GoogleSansFlex),
+            labelSmall = labelSmall.copy(fontFamily = GoogleSansFlex),
+        )
+    }

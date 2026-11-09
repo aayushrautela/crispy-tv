@@ -51,6 +51,7 @@ import com.crispy.tv.ui.resources.ic_close
 import com.crispy.tv.ui.resources.ic_search
 import com.crispy.tv.ui.resources.ic_wand_stars
 import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.theme.GoogleSansFlex
 import org.jetbrains.compose.resources.painterResource
 
 private val SearchAiLoadingColors =
@@ -95,7 +96,8 @@ fun SearchBar(
             .then(aiSearchBorderModifier(isAiLoading)),
         singleLine = true,
         shape = RoundedCornerShape(28.dp),
-        textStyle = MaterialTheme.typography.bodyLarge,
+        // Google Sans Flex on the query field; the placeholder inherits this style.
+        textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = GoogleSansFlex),
         placeholder = {
             Text(
                 text = "Find movies and shows",
