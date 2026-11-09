@@ -125,6 +125,7 @@ data class NativePlaybackSnapshot(
     val subtitleTracks: List<NativeTrack> = emptyList(),
     val selectedSubtitleTrackId: String? = null,
     val subtitleDelayMs: Int = 0,
+    val chapters: List<NativeChapter> = emptyList(),
 ) {
     val isPlaying: Boolean
         get() = state == NativePlaybackState.PLAYING
@@ -132,6 +133,19 @@ data class NativePlaybackSnapshot(
     val isBuffering: Boolean
         get() = state == NativePlaybackState.PREPARING || state == NativePlaybackState.BUFFERING
 }
+
+/**
+ * One chapter of the playing file, as the engine reports it.
+ *
+ * [index] is the engine's position in the chapter list and is what
+ * [PlaybackSessionController.selectChapter] takes; [startMs] is where seeking
+ * to the chapter lands. [title] is null when the container carries no title.
+ */
+data class NativeChapter(
+    val index: Int,
+    val startMs: Long,
+    val title: String? = null,
+)
 
 /**
  * One playable stream, with the headers needed to fetch it.

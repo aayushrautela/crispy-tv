@@ -8,9 +8,8 @@ package com.crispy.tv.nativeengine.playback
  * interface in `:android:native-engine` with ExoPlayer and libmpv behind it,
  * but it lived in a plain `com.android.library` with no JVM variant, so a KMP
  * `commonMain` could not name it and every consumer of the types it returns was
- * pinned to `androidMain` for the same reason. It is now declared here,
- * unchanged -- **all thirteen members already used only the lifted value
- * types**, so this was a location change and not an interface change.
+ * pinned to `androidMain` for the same reason. It is now declared here --
+ * **all fifteen members use only the lifted value types**.
  *
  * What did *not* come with it is [PlaybackSurfaceController], the other half of
  * the old `PlaybackController`. All four of its members take a `PlayerView`, a
@@ -36,4 +35,6 @@ interface PlaybackSessionController {
     fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?)
     fun setSubtitleDelayMs(delayMs: Int)
     fun applyResizeMode(mode: PlayerResizeMode)
+    fun selectChapter(index: Int)
+    fun setPictureInPictureActive(active: Boolean)
 }

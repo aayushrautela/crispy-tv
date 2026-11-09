@@ -533,6 +533,23 @@ class NativePlaybackController(
         }
     }
 
+    override fun selectChapter(index: Int) {
+        // Only mpv reports chapters; the EXO path is removed with the mpv-only
+        // switch, so there is deliberately no Exo chapter seek here.
+        if (currentEngine != NativePlaybackEngine.EXO) {
+            mpvRuntime.selectChapter(index)
+        }
+    }
+
+    override fun setPictureInPictureActive(active: Boolean) {
+        // Exo renders into its own PlayerView, which the compositor crops in
+        // PiP without any engine involvement; only the mpv surface needs the
+        // vo switch.
+        if (currentEngine != NativePlaybackEngine.EXO) {
+            mpvRuntime.setPictureInPictureActive(active)
+        }
+    }
+
     override fun stop() {
         Log.d(TAG, "stop currentEngine=$currentEngine")
         sidecar.stop()
