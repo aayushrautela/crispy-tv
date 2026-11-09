@@ -385,6 +385,14 @@ class PlayerSessionViewModel(
         playbackController.applyResizeMode(mode)
     }
 
+    fun setPictureInPictureActive(active: Boolean) {
+        playbackController.setPictureInPictureActive(active)
+    }
+
+    fun selectChapter(index: Int) {
+        playbackController.selectChapter(index)
+    }
+
     fun selectAudioTrack(trackId: String?) {
         val language = trackId?.let(::languageFromTrack)
         Log.d(TAG, "selectAudioTrack id=$trackId language=$language")
