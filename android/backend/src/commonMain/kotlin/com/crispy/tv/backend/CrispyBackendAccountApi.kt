@@ -22,6 +22,7 @@ internal suspend fun CrispyBackendClient.getMeApi(accessToken: String): MeRespon
 
 internal suspend fun CrispyBackendClient.createProfileApi(
     accessToken: String,
+    adminProfileId: String,
     name: String,
     sortOrder: Int? = null,
     isKids: Boolean = false,
@@ -45,7 +46,7 @@ internal suspend fun CrispyBackendClient.createProfileApi(
     val response = httpClient.postJson(
         url = "$baseUrl/v1/profiles",
         jsonBody = payload,
-        headers = authHeaders(accessToken),
+        headers = authHeaders(accessToken, adminProfileId),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
@@ -210,6 +211,7 @@ internal suspend fun CrispyBackendClient.updateProfileApi(
     accessToken: String,
     profileId: String,
     input: UpdateProfileInput,
+    adminProfileId: String,
 ): Profile {
     checkConfigured()
     val payload = buildJsonObject {
@@ -222,7 +224,7 @@ internal suspend fun CrispyBackendClient.updateProfileApi(
         request = HttpRequest(
             method = HttpMethod.PATCH,
             url = "$baseUrl/v1/profiles/${profileId.trim()}",
-            headers = authHeaders(accessToken),
+            headers = authHeaders(accessToken, adminProfileId),
             body = payload,
         ),
         callTimeoutMs = callTimeoutMs,
@@ -246,6 +248,7 @@ internal suspend fun CrispyBackendClient.getAccountSettingsApi(accessToken: Stri
 internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
     accessToken: String,
     settings: Map<String, String>,
+    adminProfileId: String,
 ): AccountSettings {
     checkConfigured()
     val payload = buildJsonObject {
@@ -255,7 +258,7 @@ internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
         request = HttpRequest(
             method = HttpMethod.PATCH,
             url = "$baseUrl/v1/account/settings",
-            headers = authHeaders(accessToken),
+            headers = authHeaders(accessToken, adminProfileId),
             body = payload,
         ),
         callTimeoutMs = callTimeoutMs,
@@ -264,11 +267,11 @@ internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
     return parseAccountSettings(json)
 }
 
-internal suspend fun CrispyBackendClient.deleteAccountApi(accessToken: String): Boolean {
+internal suspend fun CrispyBackendClient.deleteAccountApi(accessToken: String, adminProfileId: String): Boolean {
     checkConfigured()
     val response = httpClient.delete(
         url = "$baseUrl/v1/account",
-        headers = authHeaders(accessToken),
+        headers = authHeaders(accessToken, adminProfileId),
         callTimeoutMs = callTimeoutMs,
     )
     return response.code in 200..299

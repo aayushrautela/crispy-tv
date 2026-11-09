@@ -64,6 +64,7 @@ interface BackendApi {
 
     suspend fun createProfile(
         accessToken: String,
+        adminProfileId: String,
         name: String,
         sortOrder: Int? = null,
         isKids: Boolean = false,
@@ -112,6 +113,7 @@ interface BackendApi {
         accessToken: String,
         profileId: String,
         input: UpdateProfileInput,
+        adminProfileId: String,
     ): Profile
 
     suspend fun getAccountSettings(accessToken: String): AccountSettings
@@ -119,9 +121,10 @@ interface BackendApi {
     suspend fun patchAccountSettings(
         accessToken: String,
         settings: Map<String, String>,
+        adminProfileId: String,
     ): AccountSettings
 
-    suspend fun deleteAccount(accessToken: String): Boolean
+    suspend fun deleteAccount(accessToken: String, adminProfileId: String): Boolean
 
     // --- addons ------------------------------------------------------------
 

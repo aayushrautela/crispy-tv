@@ -46,6 +46,7 @@ internal fun CrispyBackendClient.parseProfile(json: JsonObject): Profile {
         name = name,
         avatarKey = json.optStringOrEmpty("avatarUrl").trim().ifBlank { null },
         isKids = json.jsonPrimitiveOrNull("isKids")?.booleanOrNull ?: false,
+        isAdmin = json.jsonPrimitiveOrNull("isAdmin")?.booleanOrNull ?: false,
         sortOrder = json.jsonPrimitiveOrNull("sortOrder")?.intOrNull ?: 0,
         createdByUserId = json.optStringOrEmpty("createdByUserId").trim().ifBlank { null },
         createdAt = json.optStringOrEmpty("createdAt").trim().ifBlank { null },

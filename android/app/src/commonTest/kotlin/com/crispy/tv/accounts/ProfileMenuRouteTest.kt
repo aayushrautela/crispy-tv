@@ -65,7 +65,7 @@ class ProfileMenuRouteTest {
             anonymous = false,
         )
 
-    /** `Profile` has eight required fields, so every construction goes through here. */
+    /** `Profile` has nine required fields, so every construction goes through here. */
     private fun profile(
         id: String,
         name: String = "Profile $id",
@@ -75,6 +75,7 @@ class ProfileMenuRouteTest {
         name = name,
         avatarKey = avatarKey,
         isKids = false,
+        isAdmin = false,
         sortOrder = 0,
         createdByUserId = null,
         createdAt = null,
