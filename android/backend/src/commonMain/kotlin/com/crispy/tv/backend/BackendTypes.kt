@@ -34,6 +34,8 @@ data class Profile(
     val name: String,
     val avatarKey: String?,
     val isKids: Boolean,
+    /** Parent profile. Writes on the account and on profiles need this profile as their context. */
+    val isAdmin: Boolean,
     val sortOrder: Int,
     val createdByUserId: String?,
     val createdAt: String?,

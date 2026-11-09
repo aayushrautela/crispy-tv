@@ -164,6 +164,7 @@ open class RecordingBackendApi : BackendApi {
     }
     override suspend fun createProfile(
         accessToken: String,
+        adminProfileId: String,
         name: String,
         sortOrder: Int?,
         isKids: Boolean,
@@ -191,7 +192,8 @@ open class RecordingBackendApi : BackendApi {
     override suspend fun updateProfile(
         accessToken: String,
         profileId: String,
-        input: UpdateProfileInput
+        input: UpdateProfileInput,
+        adminProfileId: String
     ): Profile = unused("updateProfile")
     override suspend fun getAccountSettings(accessToken: String): AccountSettings {
         getAccountSettingsCalls += accessToken
@@ -199,9 +201,10 @@ open class RecordingBackendApi : BackendApi {
     }
     override suspend fun patchAccountSettings(
         accessToken: String,
-        settings: Map<String, String>
+        settings: Map<String, String>,
+        adminProfileId: String
     ): AccountSettings = unused("patchAccountSettings")
-    override suspend fun deleteAccount(accessToken: String): Boolean = unused("deleteAccount")
+    override suspend fun deleteAccount(accessToken: String, adminProfileId: String): Boolean = unused("deleteAccount")
     override suspend fun listAddons(accessToken: String): List<AddonDto> {
         listAddonsCalls += accessToken
         return serverAddons

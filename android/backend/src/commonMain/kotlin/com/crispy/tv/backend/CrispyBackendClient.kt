@@ -48,6 +48,7 @@ class CrispyBackendClient(
 
     override suspend fun createProfile(
         accessToken: String,
+        adminProfileId: String,
         name: String,
         sortOrder: Int?,
         isKids: Boolean,
@@ -56,6 +57,7 @@ class CrispyBackendClient(
     ): Profile {
         return createProfileApi(
             accessToken = accessToken,
+            adminProfileId = adminProfileId,
             name = name,
             sortOrder = sortOrder,
             isKids = isKids,
@@ -176,23 +178,33 @@ class CrispyBackendClient(
         return listProfilesApi(accessToken)
     }
 
-    override suspend fun updateProfile(accessToken: String, profileId: String, input: UpdateProfileInput): Profile {
-        return updateProfileApi(accessToken, profileId, input)
+    override suspend fun updateProfile(
+        accessToken: String,
+        profileId: String,
+        input: UpdateProfileInput,
+        adminProfileId: String,
+    ): Profile {
+        return updateProfileApi(accessToken, profileId, input, adminProfileId)
     }
 
     override suspend fun getAccountSettings(accessToken: String): AccountSettings {
         return getAccountSettingsApi(accessToken)
     }
 
-    override suspend fun patchAccountSettings(accessToken: String, settings: Map<String, String>): AccountSettings {
+    override suspend fun patchAccountSettings(
+        accessToken: String,
+        settings: Map<String, String>,
+        adminProfileId: String,
+    ): AccountSettings {
         return patchAccountSettingsApi(
             accessToken = accessToken,
             settings = settings,
+            adminProfileId = adminProfileId,
         )
     }
 
-    override suspend fun deleteAccount(accessToken: String): Boolean {
-        return deleteAccountApi(accessToken)
+    override suspend fun deleteAccount(accessToken: String, adminProfileId: String): Boolean {
+        return deleteAccountApi(accessToken, adminProfileId)
     }
 
     override suspend fun listAddons(accessToken: String): List<AddonDto> {

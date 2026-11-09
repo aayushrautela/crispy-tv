@@ -79,6 +79,7 @@ class ProfileRepository(
     ): Profile {
         return backendClient.createProfile(
             accessToken = accessToken,
+            adminProfileId = backendClient.requireAdminProfileId(accessToken),
             name = name,
             isKids = isKids,
             avatarKey = avatarKey,
@@ -101,6 +102,7 @@ class ProfileRepository(
                 isKids = isKids,
                 avatarKey = avatarKey,
             ),
+            adminProfileId = backendClient.requireAdminProfileId(accessToken),
         )
     }
 
@@ -124,13 +126,33 @@ class AccountSettingsRepository(
         accessToken: String,
         settings: Map<String, String>,
     ): AccountSettings {
-        return backendClient.patchAccountSettings(accessToken = accessToken, settings = settings)
+        return backendClient.patchAccountSettings(
+            accessToken = accessToken,
+            settings = settings,
+            adminProfileId = backendClient.requireAdminProfileId(accessToken),
+        )
     }
 
     suspend fun deleteAccount(accessToken: String): Boolean {
-        return backendClient.deleteAccount(accessToken)
+        return backendClient.deleteAccount(
+            accessToken = accessToken,
+            adminProfileId = backendClient.requireAdminProfileId(accessToken),
+        )
     }
 }
+
+/**
+ * Resolves the admin (parent) profile the server requires as the write
+ * context. Account and profile writes are authorised against the admin
+ * profile, not against the profile the user happens to be looking at, so the
+ * id has to come from the account's own profile list.
+ */
+private suspend fun BackendApi.requireAdminProfileId(accessToken: String): String =
+    listProfiles(accessToken)
+        .firstOrNull { it.isAdmin }
+        ?.id
+        ?.takeIf { it.isNotBlank() }
+        ?: throw IllegalStateException("This account has no admin profile to authorize the change.")
 
 /**
  * Holds the single OAuth `state` / `provider` pair between the browser round

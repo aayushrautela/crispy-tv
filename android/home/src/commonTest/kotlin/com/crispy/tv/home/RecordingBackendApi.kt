@@ -118,6 +118,7 @@ internal class RecordingBackendApi : BackendApi {
     override suspend fun getMe(accessToken: String): Nothing = unused("getMe")
     override suspend fun createProfile(
         accessToken: String,
+        adminProfileId: String,
         name: String,
         sortOrder: Int?,
         isKids: Boolean,
@@ -162,14 +163,16 @@ internal class RecordingBackendApi : BackendApi {
     override suspend fun updateProfile(
         accessToken: String,
         profileId: String,
-        input: UpdateProfileInput
+        input: UpdateProfileInput,
+        adminProfileId: String
 ): Nothing = unused("updateProfile")
     override suspend fun getAccountSettings(accessToken: String): Nothing = unused("getAccountSettings")
     override suspend fun patchAccountSettings(
         accessToken: String,
-        settings: Map<String, String>
+        settings: Map<String, String>,
+        adminProfileId: String
 ): Nothing = unused("patchAccountSettings")
-    override suspend fun deleteAccount(accessToken: String): Nothing = unused("deleteAccount")
+    override suspend fun deleteAccount(accessToken: String, adminProfileId: String): Nothing = unused("deleteAccount")
     override suspend fun listAddons(accessToken: String): Nothing = unused("listAddons")
     override suspend fun installAddon(
         accessToken: String,
