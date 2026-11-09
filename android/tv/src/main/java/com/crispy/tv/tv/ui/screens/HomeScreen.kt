@@ -85,6 +85,7 @@ import com.crispy.tv.tv.ui.components.TvWideRailSkeletonCard
 import com.crispy.tv.tv.ui.components.skeletonElement
 import com.crispy.tv.tv.ui.components.tvRailBringIntoViewSpec
 import com.crispy.tv.tv.ui.components.tvRowsBringIntoViewSpec
+import com.crispy.tv.ui.theme.CrispyTypography
 import kotlinx.coroutines.delay
 
 private const val HERO_SETTLE_DELAY_MS = 140L
@@ -463,7 +464,10 @@ private fun TvWideRailItemActionsDialog(
     onOpenDetails: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    M3MaterialTheme(colorScheme = darkColorScheme()) {
+    // The phone Material3 `AlertDialog` reads the *phone* Material3 typography,
+    // which the TV theme never sets -- without this the dialog's text falls
+    // back to the system face instead of Google Sans Flex.
+    M3MaterialTheme(colorScheme = darkColorScheme(), typography = CrispyTypography) {
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text(text = item.title) },

@@ -1,10 +1,12 @@
 package com.crispy.tv.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.Font as TextFont
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.crispy.tv.ui.resources.Res
+import com.crispy.tv.ui.resources.googlesans_flex
 import org.jetbrains.compose.resources.Font
 
 /**
@@ -38,12 +40,16 @@ val GoogleSansFlex: FontFamily
     )
 
 /**
- * One realized cut of the variable face. The [Font] weight is a matching hint
- * only -- the rendered weight is the `wght` axis in [FontVariation.Settings] --
- * and the two are kept equal, so the family renders exactly the values its
+ * One realized cut of the variable face. The [TextFont] weight is a matching
+ * hint only -- the rendered weight is the `wght` axis in [FontVariation.Settings]
+ * -- and the two are kept equal, so the family renders exactly the values its
  * entries spell.
+ *
+ * [Font] reads the resource bytes, so this is a composable call and the helper
+ * has to be one too.
  */
-private fun googleSansFlexEntry(weight: Int): Font = Font(
+@Composable
+private fun googleSansFlexEntry(weight: Int): TextFont = Font(
     Res.font.googlesans_flex,
     FontWeight(weight),
     variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
