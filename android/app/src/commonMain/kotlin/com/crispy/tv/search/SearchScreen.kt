@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -46,9 +47,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,6 +72,8 @@ import com.crispy.tv.ui.resources.ic_close
 import com.crispy.tv.ui.resources.ic_history
 import com.crispy.tv.ui.theme.CrispyPalette
 import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.theme.GoogleSansFlex
+import com.crispy.tv.ui.theme.GoogleSansFlexNarrow
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
@@ -328,7 +333,7 @@ private fun SuggestionChip(
 ) {
     Text(
         text = suggestion,
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = GoogleSansFlex),
         maxLines = 1,
         modifier = Modifier
             .clip(CircleShape)
@@ -360,7 +365,7 @@ private fun RecentSearchChip(
         )
         Text(
             text = query,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = GoogleSansFlex),
             maxLines = 1,
         )
         Box(
@@ -419,7 +424,7 @@ private fun SearchResultsContent(
                         Text(
                             text = emptyMessage
                                 ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = GoogleSansFlex),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -531,7 +536,7 @@ private fun GenreTab(
     genre: SearchGenreSuggestion,
     onClick: () -> Unit,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(88.dp)
@@ -544,18 +549,42 @@ private fun GenreTab(
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        // The web app's genre tile scrim: a top-to-bottom black gradient
+        // from 55% through 30% (middle) to 60%, not a flat wash.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x1A000000)),
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.30f),
+                            Color.Black.copy(alpha = 0.60f),
+                        ),
+                    ),
+                ),
         )
+        // The label follows the web app's genre tile: the narrow cut of Google
+        // Sans Flex (width 25, weight 156), uppercase, sized at 26% of the tile
+        // width with a 0.85 line and -0.02em of tracking, and the same text
+        // shadow the web version carries.
+        val labelSize = (maxWidth * 0.26f).toSp()
         Text(
-            text = genre.label,
+            text = genre.label.uppercase(),
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(horizontal = 12.dp),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+                .padding(horizontal = 4.dp),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontFamily = GoogleSansFlexNarrow,
+                fontSize = labelSize,
+                lineHeight = (maxWidth * 0.26f * 0.85f).toSp(),
+                letterSpacing = (maxWidth * 0.26f * -0.02f).toSp(),
+                shadow = Shadow(
+                    color = Color.Black.copy(alpha = 0.95f),
+                    offset = Offset(0f, 2f),
+                    blurRadius = 10f,
+                ),
+            ),
             color = Color.White,
             textAlign = TextAlign.Center,
         )
