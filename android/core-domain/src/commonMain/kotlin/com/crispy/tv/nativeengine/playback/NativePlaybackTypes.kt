@@ -126,6 +126,14 @@ data class NativePlaybackSnapshot(
     val selectedSubtitleTrackId: String? = null,
     val subtitleDelayMs: Int = 0,
     val chapters: List<NativeChapter> = emptyList(),
+    /**
+     * The subtitle cue the engine is showing right now, raw as the engine
+     * reports it -- an ASS track still carries its `{\...}` override tags, so
+     * this is what [sanitizeSubtitleCue] is for before anything renders it.
+     * `null` when no cue is active. Engines that render subtitles into their
+     * own surface (ExoPlayer) report `null` here and the UI draws nothing.
+     */
+    val currentSubtitle: String? = null,
 ) {
     val isPlaying: Boolean
         get() = state == NativePlaybackState.PLAYING

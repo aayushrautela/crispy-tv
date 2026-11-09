@@ -332,6 +332,14 @@ internal fun PlayerOverlay(
             }
         }
 
+        PlayerSubtitleCue(
+            text = uiState.currentSubtitleText,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 96.dp),
+        )
+
         PlayerErrorCard(
             errorMessage = uiState.errorMessage,
             onRetry = {

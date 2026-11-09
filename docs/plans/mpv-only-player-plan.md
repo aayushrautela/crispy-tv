@@ -1,7 +1,7 @@
 # Android player — mpv only — Plan (`crispy-rewrite`)
 
 Status: **in progress** on branch `mpv-only-player`. Landings 1 (mpv options), 2 (chapters
-port) and 6 (PiP vo switch) are coded; 3 (subtitle overlay), 4 (delete Exo), 5 (settings
+port), 3 (subtitle overlay) and 6 (PiP vo switch) are coded; 4 (delete Exo), 5 (settings
 cleanup) and 7 (tests/contract v4) remain. All external facts re-verified 2026-11-09.
 Local compile/test is not possible in this container (Robolectric native loader, K/N
 host) — `android.yml` on GitHub Actions is the verification gate.

@@ -47,6 +47,7 @@ import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
+import com.crispy.tv.nativeengine.playback.sanitizeSubtitleCue
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.TorrentResolver
@@ -1254,8 +1255,10 @@ class PlayerSessionViewModel(
                     snapshot.selectedAudioTrackId != state.selectedAudioTrackId ||
                     snapshot.selectedSubtitleTrackId != state.selectedSubtitleTrackId
             val shouldUpdateSubtitleDelay = snapshot.subtitleDelayMs != state.subtitleDelayMs
+            val nextSubtitleText = snapshot.currentSubtitle?.let { sanitizeSubtitleCue(it) }
+            val shouldUpdateSubtitleText = nextSubtitleText != state.currentSubtitleText
 
-            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay)) {
+            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay || shouldUpdateSubtitleText)) {
                 state
             } else {
                 state.copy(
@@ -1272,6 +1275,7 @@ class PlayerSessionViewModel(
                     subtitleTracks = snapshot.subtitleTracks,
                     selectedSubtitleTrackId = snapshot.selectedSubtitleTrackId,
                     subtitleDelayMs = snapshot.subtitleDelayMs,
+                    currentSubtitleText = nextSubtitleText,
                 )
             }
         }

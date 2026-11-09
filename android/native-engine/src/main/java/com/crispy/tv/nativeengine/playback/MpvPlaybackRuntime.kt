@@ -33,6 +33,7 @@ internal class MpvPlaybackRuntime(
     private var subtitleTracks: List<NativeTrack> = emptyList()
     private var selectedSubtitleTrackId: String? = null
     private var chapters: List<NativeChapter> = emptyList()
+    private var subText: String? = null
     private var hasStartedPlayback: Boolean = false
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
@@ -117,7 +118,13 @@ internal class MpvPlaybackRuntime(
             }
         }
 
-        override fun eventProperty(property: String, value: String) = Unit
+        override fun eventProperty(property: String, value: String) {
+            when (property) {
+                // Raw sub-text carries ASS override blocks and markup; the UI
+                // sanitises it before drawing (see SubtitleCueText.kt).
+                "sub-text" -> subText = value.ifEmpty { null }
+            }
+        }
 
         override fun event(eventId: Int) {
             when (eventId) {
@@ -126,6 +133,7 @@ internal class MpvPlaybackRuntime(
                     error = null
                     lastBufferingPercent = 0f
                     chapters = emptyList()
+                    subText = null
                 }
                 MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED,
                 MPVLib.MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
@@ -247,6 +255,11 @@ internal class MpvPlaybackRuntime(
             instance.setOptionString("force-window", "no")
             instance.setOptionString("idle", "once")
             instance.init()
+            // Subtitles are drawn by the app overlay from sub-text, not by mpv:
+            // mediacodec_embed (tunneled) video cannot carry mpv's rendered
+            // overlays, so mpv-rendered subs and native HDR are mutually exclusive.
+            // In PiP the vo switches to gpu, where mpv renders subs itself.
+            instance.setPropertyBoolean("sub-visibility", false)
             instance.setPropertyBoolean("keep-open", true)
             instance.setPropertyBoolean("audio-fallback-to-null", true)
             instance.addObserver(eventObserver)
@@ -281,6 +294,7 @@ internal class MpvPlaybackRuntime(
             "aid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "sid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "chapter-list/count" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "sub-text" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
@@ -327,7 +341,12 @@ internal class MpvPlaybackRuntime(
         // while in PiP and restore the tunneled vo when leaving it.
         val vo = if (active) "gpu" else VO_PREFERRED
         Log.d(TAG, "setPictureInPictureActive active=$active vo=$vo")
-        runCatching { mpv?.setPropertyString("vo", vo) }
+        runCatching {
+            mpv?.setPropertyString("vo", vo)
+            // gpu vo in the small window can render subs; the fullscreen
+            // tunneled surface cannot, so let mpv draw them there instead.
+            mpv?.setPropertyBoolean("sub-visibility", active)
+        }
     }
 
     private fun refreshChapters() {
@@ -585,6 +604,7 @@ internal class MpvPlaybackRuntime(
             selectedSubtitleTrackId = selectedSubtitleTrackId,
             subtitleDelayMs = subtitleDelayMs,
             chapters = chapters,
+            currentSubtitle = subText,
         )
     }
 
@@ -687,6 +707,7 @@ internal class MpvPlaybackRuntime(
         selectedAudioTrackId = null
         selectedSubtitleTrackId = null
         chapters = emptyList()
+        subText = null
         restoreSubtitleMargins()
     }
 

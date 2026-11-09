@@ -91,6 +91,12 @@ data class PlayerUiState(
     val subtitleTracks: List<NativeTrack> = emptyList(),
     val selectedSubtitleTrackId: String? = null,
     val subtitleDelayMs: Int = 0,
+    /**
+     * The current subtitle cue as plain text, already sanitised by
+     * `sanitizeSubtitleCue`; `null` when no cue is showing. Drawn by the
+     * player overlay (mpv renders no subs on the tunneled fullscreen surface).
+     */
+    val currentSubtitleText: String? = null,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,
