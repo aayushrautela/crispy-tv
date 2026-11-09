@@ -52,8 +52,7 @@ private val CrispyDarkColors = darkColorScheme(
 )
 
 /**
- * The phone surface's theme: colours from [CrispyDarkColors] and Google Sans
- * Flex as the app-wide text face.
+ * The phone surface's type ramp: Google Sans Flex on every base slot.
  *
  * The family is applied slot by slot rather than through a constructor
  * parameter because the ramp's constructor shape is not the same everywhere
@@ -65,30 +64,41 @@ private val CrispyDarkColors = darkColorScheme(
  * version has, so that is what is set here. A surface that keeps its own face
  * pins `fontFamily` explicitly and is unaffected -- the top 10 billboard's
  * Archivo is the standing example.
+ *
+ * Public because a surface outside this module may host the *phone* Material3
+ * components -- the TV app's remove-item dialog does -- and such a host has to
+ * hand those components a typography, or they fall back to the system face.
+ */
+val CrispyTypography: Typography
+    @Composable get() = with(Typography()) {
+        copy(
+            displayLarge = displayLarge.copy(fontFamily = GoogleSansFlex),
+            displayMedium = displayMedium.copy(fontFamily = GoogleSansFlex),
+            displaySmall = displaySmall.copy(fontFamily = GoogleSansFlex),
+            headlineLarge = headlineLarge.copy(fontFamily = GoogleSansFlex),
+            headlineMedium = headlineMedium.copy(fontFamily = GoogleSansFlex),
+            headlineSmall = headlineSmall.copy(fontFamily = GoogleSansFlex),
+            titleLarge = titleLarge.copy(fontFamily = GoogleSansFlex),
+            titleMedium = titleMedium.copy(fontFamily = GoogleSansFlex),
+            titleSmall = titleSmall.copy(fontFamily = GoogleSansFlex),
+            bodyLarge = bodyLarge.copy(fontFamily = GoogleSansFlex),
+            bodyMedium = bodyMedium.copy(fontFamily = GoogleSansFlex),
+            bodySmall = bodySmall.copy(fontFamily = GoogleSansFlex),
+            labelLarge = labelLarge.copy(fontFamily = GoogleSansFlex),
+            labelMedium = labelMedium.copy(fontFamily = GoogleSansFlex),
+            labelSmall = labelSmall.copy(fontFamily = GoogleSansFlex),
+        )
+    }
+
+/**
+ * The phone surface's theme: colours from [CrispyDarkColors] and Google Sans
+ * Flex as the app-wide text face.
  */
 @Composable
 fun CrispyRewriteTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = CrispyDarkColors,
-        typography = with(Typography()) {
-            copy(
-                displayLarge = displayLarge.copy(fontFamily = GoogleSansFlex),
-                displayMedium = displayMedium.copy(fontFamily = GoogleSansFlex),
-                displaySmall = displaySmall.copy(fontFamily = GoogleSansFlex),
-                headlineLarge = headlineLarge.copy(fontFamily = GoogleSansFlex),
-                headlineMedium = headlineMedium.copy(fontFamily = GoogleSansFlex),
-                headlineSmall = headlineSmall.copy(fontFamily = GoogleSansFlex),
-                titleLarge = titleLarge.copy(fontFamily = GoogleSansFlex),
-                titleMedium = titleMedium.copy(fontFamily = GoogleSansFlex),
-                titleSmall = titleSmall.copy(fontFamily = GoogleSansFlex),
-                bodyLarge = bodyLarge.copy(fontFamily = GoogleSansFlex),
-                bodyMedium = bodyMedium.copy(fontFamily = GoogleSansFlex),
-                bodySmall = bodySmall.copy(fontFamily = GoogleSansFlex),
-                labelLarge = labelLarge.copy(fontFamily = GoogleSansFlex),
-                labelMedium = labelMedium.copy(fontFamily = GoogleSansFlex),
-                labelSmall = labelSmall.copy(fontFamily = GoogleSansFlex),
-            )
-        },
+        typography = CrispyTypography,
         content = content,
     )
 }
