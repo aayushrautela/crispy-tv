@@ -32,6 +32,7 @@ internal class MpvPlaybackRuntime(
     private var selectedAudioTrackId: String? = null
     private var subtitleTracks: List<NativeTrack> = emptyList()
     private var selectedSubtitleTrackId: String? = null
+    private var chapters: List<NativeChapter> = emptyList()
     private var hasStartedPlayback: Boolean = false
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
@@ -76,6 +77,7 @@ internal class MpvPlaybackRuntime(
                         applySubtitleStyleForSelectedTrack()
                     }
                 }
+                "chapter-list/count" -> refreshChapters()
             }
         }
 
@@ -123,6 +125,7 @@ internal class MpvPlaybackRuntime(
                     state = NativePlaybackState.PREPARING
                     error = null
                     lastBufferingPercent = 0f
+                    chapters = emptyList()
                 }
                 MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED,
                 MPVLib.MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
@@ -133,6 +136,7 @@ internal class MpvPlaybackRuntime(
                         lastProgressAdvanceAtElapsedMs = SystemClock.elapsedRealtime()
                     }
                     refreshTrackLists()
+                    refreshChapters()
                 }
                 MPVLib.MpvEvent.MPV_EVENT_END_FILE -> {
                     if (state != NativePlaybackState.ENDED && state != NativePlaybackState.ERROR) {
@@ -226,7 +230,16 @@ internal class MpvPlaybackRuntime(
         runCatching {
             instance.setOptionString("config", "no")
             instance.setOptionString("profile", "fast")
-            instance.setOptionString("hwdec", "auto")
+            // hwdec=mediacodec is the zero-copy path; "auto" resolves to
+            // mediacodec-copy on Android, which copies every frame through the
+            // CPU. If mediacodec init fails mpv falls back to software decode.
+            instance.setOptionString("hwdec", "mediacodec")
+            // vo order: mediacodec_embed first — the tunneled decoder writes
+            // straight to the SurfaceView surface (zero copy, native HDR via
+            // the HWC, but no mpv overlays). gpu is the fallback when tunneling
+            // is unsupported; gpu (not gpu-next) because gpu-next corrupts on
+            // 10-bit HDR opaque surfaces (mpvEx #817).
+            instance.setOptionString("vo", VO_PREFERRED)
             instance.setOptionString("msg-level", "all=warn")
             instance.setOptionString("demuxer-max-bytes", "$DEMUXER_MAX_BYTES")
             instance.setOptionString("demuxer-max-back-bytes", "$DEMUXER_MAX_BYTES")
@@ -267,6 +280,7 @@ internal class MpvPlaybackRuntime(
             "sub-delay" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
             "aid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "sid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "chapter-list/count" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
@@ -298,6 +312,45 @@ internal class MpvPlaybackRuntime(
         }
         lastProgressAdvanceAtElapsedMs = SystemClock.elapsedRealtime()
         lastObservedPositionMs = positionMs
+    }
+
+    fun selectChapter(index: Int) {
+        val chapter = chapters.getOrNull(index) ?: return
+        Log.d(TAG, "selectChapter index=$index startMs=${chapter.startMs}")
+        seekTo(chapter.startMs)
+    }
+
+    fun setPictureInPictureActive(active: Boolean) {
+        // A PiP window never qualifies for high-brightness HDR (the panel gates
+        // it on HDR screen coverage), and tunneled mediacodec_embed output is
+        // not guaranteed to compose in a small window, so render through gpu
+        // while in PiP and restore the tunneled vo when leaving it.
+        val vo = if (active) "gpu" else VO_PREFERRED
+        Log.d(TAG, "setPictureInPictureActive active=$active vo=$vo")
+        runCatching { mpv?.setPropertyString("vo", vo) }
+    }
+
+    private fun refreshChapters() {
+        val mpv = mpv ?: return
+        val count = runCatching { mpv.getPropertyString("chapter-list/count") }.getOrNull()?.toIntOrNull() ?: 0
+        if (count <= 0) {
+            chapters = emptyList()
+            return
+        }
+        val list = ArrayList<NativeChapter>(count)
+        for (i in 0 until count) {
+            val timeSec =
+                runCatching { mpv.getPropertyString("chapter-list/$i/time") }.getOrNull()?.toDoubleOrNull() ?: continue
+            val title = runCatching { mpv.getPropertyString("chapter-list/$i/title") }.getOrNull()?.takeIf { it.isNotBlank() }
+            list.add(
+                NativeChapter(
+                    index = i,
+                    startMs = (timeSec * 1000.0).toLong().coerceAtLeast(0L),
+                    title = title,
+                ),
+            )
+        }
+        chapters = list
     }
 
     fun stop() {
@@ -531,6 +584,7 @@ internal class MpvPlaybackRuntime(
             subtitleTracks = subtitleTracks,
             selectedSubtitleTrackId = selectedSubtitleTrackId,
             subtitleDelayMs = subtitleDelayMs,
+            chapters = chapters,
         )
     }
 
@@ -632,6 +686,7 @@ internal class MpvPlaybackRuntime(
         subtitleTracks = emptyList()
         selectedAudioTrackId = null
         selectedSubtitleTrackId = null
+        chapters = emptyList()
         restoreSubtitleMargins()
     }
 
@@ -650,6 +705,7 @@ internal class MpvPlaybackRuntime(
 
     companion object {
         private const val TAG = "CrispyMpv"
+        private const val VO_PREFERRED = "mediacodec_embed,gpu"
         private const val DEMUXER_MAX_BYTES = 64 * 1024 * 1024
         private const val POSITION_ADVANCE_TOLERANCE_MS = 150L
         private const val PLAYBACK_STALL_THRESHOLD_MS = 1_000L
