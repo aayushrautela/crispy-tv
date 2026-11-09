@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.accounts.ActiveProfileInfo
@@ -567,8 +568,10 @@ private fun GenreTab(
         // The label follows the web app's genre tile: the narrow cut of Google
         // Sans Flex (width 25, weight 156), uppercase, sized at 26% of the tile
         // width with a 0.85 line and -0.02em of tracking, and the same text
-        // shadow the web version carries.
-        val labelSize = (maxWidth * 0.26f).toSp()
+        // shadow the web version carries. The tile's width in dp is read as the
+        // sp number, so the text lands on the web's physical size and still
+        // follows the user's font scale.
+        val labelSize = (maxWidth.value * 0.26f).sp
         Text(
             text = genre.label.uppercase(),
             modifier = Modifier
@@ -577,8 +580,8 @@ private fun GenreTab(
             style = MaterialTheme.typography.titleLarge.copy(
                 fontFamily = GoogleSansFlexNarrow,
                 fontSize = labelSize,
-                lineHeight = (maxWidth * 0.26f * 0.85f).toSp(),
-                letterSpacing = (maxWidth * 0.26f * -0.02f).toSp(),
+                lineHeight = (maxWidth.value * 0.26f * 0.85f).sp,
+                letterSpacing = (maxWidth.value * 0.26f * -0.02f).sp,
                 shadow = Shadow(
                     color = Color.Black.copy(alpha = 0.95f),
                     offset = Offset(0f, 2f),
