@@ -1,10 +1,10 @@
 # Android player — mpv only — Plan (`crispy-rewrite`)
 
-Status: **in progress** on branch `mpv-only-player`. Landings 1 (mpv options), 2 (chapters
-port), 3 (subtitle overlay), 4 (delete Exo), 5 (settings cleanup) and 6 (PiP vo switch)
-are coded; 7 (tests/contract v4) remains. All external facts re-verified 2026-11-09.
+Status: **in progress** on branch `mpv-only-player`. All seven landings — 1 (mpv options),
+2 (chapters port), 3 (subtitle overlay), 4 (delete Exo), 5 (settings cleanup), 6 (PiP vo
+switch) and 7 (tests/contract v4) — are coded. All external facts re-verified 2026-11-09.
 Local compile/test is not possible in this container (Robolectric native loader, K/N
-host) — `android.yml` on GitHub Actions is the verification gate.
+host) — `android.yml` and `apple.yml` on GitHub Actions are the verification gates.
 
 ## Goal
 
