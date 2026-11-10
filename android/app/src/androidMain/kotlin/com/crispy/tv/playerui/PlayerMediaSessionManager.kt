@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
+import coil3.request.allowHardware
 import coil3.toBitmap
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import com.crispy.tv.ui.assets.R as AssetsR
