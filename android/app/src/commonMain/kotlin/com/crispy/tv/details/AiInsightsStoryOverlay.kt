@@ -3,6 +3,7 @@ package com.crispy.tv.details
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -36,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +72,9 @@ import com.crispy.tv.ai.storyFocus
 import com.crispy.tv.ai.storyLabel
 import com.crispy.tv.ai.storyParagraph
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.navigation.PredictiveSettleDurationMillis
+import com.crispy.tv.ui.navigation.predictivePeelExitTransform
+import com.crispy.tv.ui.navigation.rememberPredictivePeel
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_auto_awesome
 import com.crispy.tv.ui.resources.ic_check_filled
@@ -231,10 +236,36 @@ internal fun AiInsightsStoryOverlay(
     onShare: () -> Unit,
     slideWashSeeds: Map<Int, Color> = emptyMap(),
 ) {
+    // The story is a page, not a dialog: the system back gesture peels it
+    // away with the live scrub -- scale toward the swipe edge, slide, corner,
+    // fade, the same magnitudes a destination peel uses -- and composition
+    // only ends once the settle reaches full progress, so the details page
+    // behind is revealed rather than jumped over. The header close and the
+    // last-slide tap run the same exit through [requestDismiss].
+    val peel = rememberPredictivePeel()
+    var dismissing by remember { mutableStateOf(false) }
+    val settle by animateFloatAsState(
+        targetValue =
+            when {
+                peel.active -> peel.progress
+                dismissing -> 1f
+                else -> 0f
+            },
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        label = "storyPeelSettle",
+        finishedListener = { if (dismissing) onDismiss() },
+    )
+    // While the finger is down the exact scrub fraction is used; after
+    // release the chaser above carries the same motion to its target, so
+    // commit and cancel both continue from where the finger left off.
+    val peelFraction = if (peel.active) peel.progress else settle
+    val peelExit = Modifier.predictivePeelExitTransform(peelFraction, peel.edgeSign)
+    val requestDismiss: () -> Unit = { dismissing = true }
+
     // System back closes the story, not the details page behind it. The
     // handler lives inside the details destination, so it is composed after
     // the NavHost's own back handler and takes precedence over it.
-    StoryBackHandler(onBack = onDismiss)
+    StoryBackHandler(onBackCommit = requestDismiss)
 
     val slides = remember(result) { result.slides.sortedForDisplay() }
 
@@ -247,7 +278,8 @@ internal fun AiInsightsStoryOverlay(
             isInWatchlist = isInWatchlist,
             onToggleWatchlist = onToggleWatchlist,
             onShare = onShare,
-            onDismiss = onDismiss,
+            onDismiss = requestDismiss,
+            modifier = peelExit,
         )
         return
     }
@@ -274,7 +306,7 @@ internal fun AiInsightsStoryOverlay(
 
     fun next() {
         if (safeIndex >= slides.lastIndex) {
-            onDismiss()
+            requestDismiss()
         } else {
             index = safeIndex + 1
         }
@@ -284,7 +316,8 @@ internal fun AiInsightsStoryOverlay(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(StoryDeepColor),
+                .background(StoryDeepColor)
+                .then(peelExit),
     ) {
         // Position-based, not height-based: the chrome column's own bottom
         // padding and the nav bars sit *under* the footer, and a height-only
@@ -341,7 +374,7 @@ internal fun AiInsightsStoryOverlay(
                 posterUrl = artworkUrl,
                 title = title,
                 subtitle = storyHeaderSubtitle(year = year),
-                onDismiss = onDismiss,
+                onDismiss = requestDismiss,
             )
 
             // Chrome sits above the slides, so this is an empty tap target: the
@@ -382,20 +415,25 @@ internal fun AiInsightsStoryOverlay(
  * composed inside the details destination -- after the NavHost -- so it wins
  * and the details route stays on the stack.
  *
+ * The commit is handed to the caller as [onBackCommit] rather than acted on
+ * directly: while the gesture runs the overlay already peels with the live
+ * scrub ([rememberPredictivePeel]), and on commit the caller's settle
+ * carries that same fraction to 1 before the overlay leaves composition.
+ *
  * `LocalNavigationEventDispatcherOwner.current` is null on platforms that
  * have no dispatcher (iOS), and `NavigationBackHandler` `checkNotNull`s it,
  * so the registration is skipped where there is no dispatcher to register
  * with. On Android the owner always resolves to the Activity.
  */
 @Composable
-private fun StoryBackHandler(onBack: () -> Unit) {
+private fun StoryBackHandler(onBackCommit: () -> Unit) {
     if (LocalNavigationEventDispatcherOwner.current == null) return
 
     val state = rememberNavigationEventState(NavigationEventInfo.None)
     NavigationBackHandler(
         state = state,
         isBackEnabled = true,
-        onBackCompleted = onBack,
+        onBackCompleted = onBackCommit,
     )
 }
 
@@ -677,12 +715,16 @@ private fun AiInsightsEmptyStory(
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
+        // The caller's modifier stays last: the peel transform's corner has
+        // to clip this page background too, not just the content.
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(palette.pageBackground),
+                .background(palette.pageBackground)
+                .then(modifier),
     ) {
         Column(
             modifier =
