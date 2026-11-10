@@ -61,6 +61,7 @@ import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_auto_awesome
 import com.crispy.tv.ui.resources.ic_close_filled
+import com.crispy.tv.ui.theme.GoogleSansFlexDisplay
 import org.jetbrains.compose.resources.painterResource
 
 private val AiInsightsBorderColors =
@@ -386,13 +387,18 @@ private fun StorySlideContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.align(Alignment.BottomStart),
             ) {
-                Text(
-                    text = slide.label.trim().uppercase(),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.4.sp,
-                    color = accent,
-                )
+                // The eyebrow: the slide's label in the display cut, sentence
+                // case and in the slide's accent colour. Type only -- no shape
+                // behind it.
+                slide.label.trim().takeIf { it.isNotEmpty() }?.let { label ->
+                    Text(
+                        text = label,
+                        fontFamily = GoogleSansFlexDisplay,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = accent,
+                    )
+                }
                 val headline = slide.focus?.takeIf { it.isNotBlank() }
                 val body = slide.body ?: slide.context
                 if (headline != null) {

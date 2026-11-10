@@ -72,6 +72,7 @@ import com.crispy.tv.ui.resources.ic_sentiment_very_dissatisfied
 import com.crispy.tv.ui.resources.ic_share
 import com.crispy.tv.ui.resources.ic_thumb_up
 import com.crispy.tv.ui.theme.CrispyPalette
+import com.crispy.tv.ui.theme.GoogleSansFlexDisplay
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -450,47 +451,53 @@ private fun AiInsightsStoryCopy(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    val title = slide.storyTitle()
+    val label = slide.storyLabel()
+    val focus = slide.storyFocus()
     val paragraph = slide.storyParagraph()
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (paragraph == null) {
-            // No paragraph: the title IS the body text, so print it at body
-            // size instead of leaving one small line in the middle of the frame.
-            title?.let {
-                Text(
-                    text = it,
-                    style =
-                        MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            shadow = StoryTextShadow,
-                            lineHeight = 34.sp,
-                        ),
-                    color = accent,
-                    maxLines = 20,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        } else {
-            title?.let {
-                Text(
-                    text = it,
-                    style =
-                        MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            shadow = StoryTextShadow,
-                            lineHeight = 32.sp,
-                        ),
-                    color = accent,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        label?.let {
+            // The heading: the slide's own label in the display cut, in the
+            // slide's accent colour. Type only -- there is no shape behind it.
             Text(
-                text = paragraph,
+                text = it,
+                style =
+                    MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = GoogleSansFlexDisplay,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        shadow = StoryTextShadow,
+                        lineHeight = 36.sp,
+                        letterSpacing = (-0.4).sp,
+                    ),
+                color = accent,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        focus?.let {
+            // The headline: the server's focus line. With no body under it,
+            // the headline IS the copy, so it prints at headline size.
+            val standalone = paragraph == null
+            Text(
+                text = it,
+                style =
+                    MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = if (standalone) 34.sp else 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        shadow = StoryTextShadow,
+                        lineHeight = if (standalone) 40.sp else 32.sp,
+                    ),
+                color = Color.White,
+                maxLines = if (standalone) 20 else 4,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        paragraph?.let {
+            Text(
+                text = it,
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 19.sp,
@@ -551,7 +558,7 @@ private fun AiInsightsStorySticker(
 
 /**
  * Player-sheet header: poster thumb, title, year, close. The slide label is
- * the copy block's own title line, so it rides no header row at all.
+ * the copy block's own heading line, so it rides no header row at all.
  */
 @Composable
 private fun AiInsightsStoryHeader(
@@ -611,26 +618,23 @@ private fun AiInsightsStoryHeader(
 internal fun storyHeaderSubtitle(year: String?): String? = year?.trim()?.takeIf { it.isNotEmpty() }
 
 /**
- * The copy block's title line: the slide's `label`, joined to the server's
- * `focus` with a middot when it sent one. Keyed off `focus` being present,
- * not off the slide key, so the standout slide keeps its own title
- * (`Standout • …`) while a plain `The good stuff` slide prints just its
- * label -- and any slide that later grows a focus gets the same treatment.
+ * The copy block's heading line: the slide's own `label` ("Standout", "The
+ * catch"), trimmed, or null when the server sent none.
  */
-internal fun AiInsightSlide.storyTitle(): String? {
-    val cleanLabel = label.trim().takeIf { it.isNotEmpty() }
-    val cleanFocus = focus?.trim()?.takeIf { it.isNotEmpty() }
-    return when {
-        cleanLabel != null && cleanFocus != null -> "$cleanLabel • $cleanFocus"
-        cleanLabel != null -> cleanLabel
-        else -> cleanFocus
-    }
-}
+internal fun AiInsightSlide.storyLabel(): String? =
+    label.trim().takeIf { it.isNotEmpty() }
 
 /**
- * Built from `body`/`context` only, so it can never repeat [storyTitle],
- * which is built from `label`/`focus`. The no-double-print rule is
- * structural, not defensive.
+ * The copy block's headline line: the server's `focus`, trimmed, or null when
+ * it sent none -- or sent only spaces.
+ */
+internal fun AiInsightSlide.storyFocus(): String? =
+    focus?.trim()?.takeIf { it.isNotEmpty() }
+
+/**
+ * Built from `body`/`context` only, so it can never repeat [storyLabel] or
+ * [storyFocus], which are built from `label`/`focus`. The no-double-print
+ * rule is structural, not defensive.
  */
 internal fun AiInsightSlide.storyParagraph(): String? =
     (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }

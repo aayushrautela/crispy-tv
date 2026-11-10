@@ -5,6 +5,7 @@ import androidx.compose.ui.text.font.Font as TextFont
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.googlesans_flex
 import org.jetbrains.compose.resources.Font
@@ -70,5 +71,40 @@ val GoogleSansFlexNarrow: FontFamily
                 FontVariation.weight(156),
                 FontVariation.width(25f),
             ),
+        ),
+    )
+
+/**
+ * The display cut for story headings: wide, bold and slightly rounded -- the
+ * voice of Google's own "greetings" specimen. The axes live on the font, so a
+ * caller names the family and the size it wants and gets the cut; the axes
+ * are not per-`Text` settings.
+ *
+ * Why each axis is here:
+ *  - `wght` 700 -- a heading has to hold against a photo.
+ *  - `wdth` 120 -- the width axis is the personality; the font's default 100
+ *    reads like ordinary text.
+ *  - `opsz` 24.sp -- optical size is set from the size the cut is meant to be
+ *    read at. 24 is the compromise between the two surfaces that share this
+ *    family: the phone heading (30.sp) and the TV eyebrow (22.sp).
+ *  - `ROND` 50 -- a little rounding, to take the hard edge off the wide bold
+ *    shapes.
+ *  - `slnt` stays at the font's default 0 -- upright.
+ *
+ * Compose has no named helper for `ROND`, so it goes through the generic
+ * [FontVariation.Setting] factory, which requires a four-character axis tag.
+ */
+val GoogleSansFlexDisplay: FontFamily
+    @Composable get() = FontFamily(
+        Font(
+            Res.font.googlesans_flex,
+            FontWeight(700),
+            variationSettings =
+                FontVariation.Settings(
+                    FontVariation.weight(700),
+                    FontVariation.width(120f),
+                    FontVariation.opticalSizing(24.sp),
+                    FontVariation.Setting("ROND", 50f),
+                ),
         ),
     )
