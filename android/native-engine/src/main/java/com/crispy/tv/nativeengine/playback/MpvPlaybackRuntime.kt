@@ -21,6 +21,8 @@ internal class MpvPlaybackRuntime(
     private var playRequested: Boolean = false
     private var state: NativePlaybackState = NativePlaybackState.IDLE
     private var videoLayout: NativeVideoLayout? = null
+    private var videoWidth: Int = 0
+    private var videoHeight: Int = 0
     private var error: NativePlaybackError? = null
     private var nextErrorToken: Long = 1L
     private var lastBufferingPercent: Float? = null
@@ -79,6 +81,14 @@ internal class MpvPlaybackRuntime(
                         applySubtitleStyleForSelectedTrack()
                     }
                 }
+                "video-params/w" -> {
+                    videoWidth = value.toInt()
+                    refreshVideoLayout()
+                }
+                "video-params/h" -> {
+                    videoHeight = value.toInt()
+                    refreshVideoLayout()
+                }
                 "chapter-list/count" -> refreshChapters()
             }
         }
@@ -135,6 +145,9 @@ internal class MpvPlaybackRuntime(
                     lastBufferingPercent = 0f
                     chapters = emptyList()
                     subText = null
+                    videoWidth = 0
+                    videoHeight = 0
+                    videoLayout = null
                 }
                 MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED,
                 MPVLib.MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
@@ -175,15 +188,10 @@ internal class MpvPlaybackRuntime(
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             Log.d(TAG, "surfaceChanged size=${width}x$height")
             runCatching { mpv?.setPropertyString("android-surface-size", "${width}x$height") }
-            if (width > 0 && height > 0) {
-                videoLayout = NativeVideoLayout(
-                    width = width,
-                    height = height,
-                    visibleWidth = width,
-                    visibleHeight = height,
-                    pixelWidthHeightRatio = 1f,
-                )
-            }
+            // The surface size is deliberately NOT recorded as the video layout:
+            // the tunneled vo renders at the video's native size and the view
+            // scales it, so the video's own aspect is what the UI must letterbox to.
+            
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -297,6 +305,8 @@ internal class MpvPlaybackRuntime(
             "aid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "sid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "chapter-list/count" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "video-params/w" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "video-params/h" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "sub-text" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
@@ -357,6 +367,25 @@ internal class MpvPlaybackRuntime(
             // gpu vo in the small window can render subs; the fullscreen
             // tunneled surface cannot, so let mpv draw them there instead.
             mpv?.setPropertyBoolean("sub-visibility", active)
+        }
+    }
+
+    /**
+     * The video's own pixel size, from `video-params/w`/`h` -- not the surface's.
+     * The tunneled `mediacodec_embed` vo renders at the video's native size and the
+     * SurfaceView scales that buffer to the view, so a full-screen view stretches
+     * any video whose aspect differs from the screen; the UI needs the video's
+     * aspect to size the view so the scaling stays uniform.
+     */
+    private fun refreshVideoLayout() {
+        if (videoWidth > 0 && videoHeight > 0) {
+            videoLayout = NativeVideoLayout(
+                width = videoWidth,
+                height = videoHeight,
+                visibleWidth = videoWidth,
+                visibleHeight = videoHeight,
+                pixelWidthHeightRatio = 1f,
+            )
         }
     }
 
@@ -720,6 +749,8 @@ internal class MpvPlaybackRuntime(
         durationMs = 0L
         hasStartedPlayback = false
         videoLayout = null
+        videoWidth = 0
+        videoHeight = 0
         error = null
         audioTracks = emptyList()
         subtitleTracks = emptyList()

@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.BackHandler
@@ -83,7 +84,6 @@ fun PlayerRoute(
     }
 
     val surfaceModifier = Modifier
-        .fillMaxSize()
         .playerVerticalDragGestures(
             gestureController = gestureController,
             onBrightnessChange = { level ->
@@ -158,8 +158,25 @@ fun PlayerRoute(
                 .fillMaxSize()
                 .background(Color.Black),
     ) {
+        // The tunneled mediacodec_embed vo renders at the video's native size and
+        // the SurfaceView scales that buffer to the view, so a full-screen view
+        // stretches any video whose aspect differs from the screen. Sizing the
+        // view to the video's own aspect keeps that scaling uniform; the black
+        // box behind letterboxes the remainder. Until the video reports its
+        // size the view fills the screen as before.
+        val videoAspect = uiState.videoLayout?.aspectRatioValue()
+        val screenConfiguration = LocalConfiguration.current
+        val screenAspect =
+            screenConfiguration.screenWidthDp.value / screenConfiguration.screenHeightDp.value
+        val surfaceSizeModifier =
+            if (videoAspect != null && videoAspect > 0f && screenAspect > 0f) {
+                val fitted = Modifier.align(Alignment.Center).aspectRatio(videoAspect)
+                if (videoAspect >= screenAspect) fitted.fillMaxWidth() else fitted.fillMaxHeight()
+            } else {
+                Modifier.fillMaxSize()
+            }
         AndroidView(
-            modifier = surfaceModifier,
+            modifier = surfaceModifier.then(surfaceSizeModifier),
             factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
             update = { surfaceView: SurfaceView ->
                 session.attachMpvSurface(surfaceView)

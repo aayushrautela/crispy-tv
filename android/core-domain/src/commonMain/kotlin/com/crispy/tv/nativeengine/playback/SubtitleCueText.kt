@@ -31,7 +31,7 @@ fun sanitizeSubtitleCue(raw: String): String? {
 }
 
 /** `{\...}` — ASS/SSA override blocks, matched non-greedily up to the closing brace. */
-private val ASS_OVERRIDE_BLOCK_REGEX = Regex("""\{\\[^}]*}""")
+private val ASS_OVERRIDE_BLOCK_REGEX = Regex("""\{[^}]*}""")
 
 /** `<i>`, `</b>`, `<font color=...>` — residual markup some containers leave in the text. */
 private val MARKUP_TAG_REGEX = Regex("""</?[a-zA-Z][^>]*>""")

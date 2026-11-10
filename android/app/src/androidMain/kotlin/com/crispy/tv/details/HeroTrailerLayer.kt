@@ -1,7 +1,9 @@
 package com.crispy.tv.details
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -11,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
@@ -129,6 +132,7 @@ internal fun HeroTrailerLayer(
     var hasRenderedFirstFrame by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
     var lastSentState by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Int?>(null) }
     var lastErrorToken by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Long?>(null) }
+    var videoAspect by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Float?>(null) }
 
     fun sendState(state: Int, positionMs: Long) {
         if (lastSentState == state) return
@@ -141,6 +145,7 @@ internal fun HeroTrailerLayer(
         hasRenderedFirstFrame = false
         lastSentState = null
         lastErrorToken = null
+        videoAspect = null
         trailerPlayer.play(playbackSource.videoUrl, playbackSource.audioUrl)
     }
 
@@ -154,6 +159,7 @@ internal fun HeroTrailerLayer(
                 lastErrorToken = error.token
                 advanceRequests++
             } else if (error == null) {
+                snapshot.videoLayout?.aspectRatioValue()?.let { videoAspect = it }
                 if (snapshot.state == NativePlaybackState.PLAYING && !hasRenderedFirstFrame) {
                     hasRenderedFirstFrame = true
                     latestOnFirstFrameRendered.value()
@@ -187,8 +193,20 @@ internal fun HeroTrailerLayer(
     Box(
         modifier = modifier.clipToBounds()
     ) {
+        // Size the surface to the video's own aspect, the way PlayerRoute does:
+        // the tunneled vo renders at the video's native size and the view scales
+        // it, so a viewport-sized surface would stretch the picture.
+        val viewportAspect = viewportWidthPx.toFloat() / viewportHeightPx.toFloat()
+        val aspect = videoAspect
+        val surfaceSizeModifier =
+            if (aspect != null && aspect > 0f && viewportAspect > 0f) {
+                val fitted = Modifier.align(Alignment.Center).aspectRatio(aspect)
+                if (aspect >= viewportAspect) fitted.fillMaxWidth() else fitted.fillMaxHeight()
+            } else {
+                Modifier.fillMaxSize()
+            }
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = surfaceSizeModifier,
             factory = { viewContext -> trailerPlayer.createSurfaceView(viewContext) },
             update = { surfaceView -> trailerPlayer.attach(surfaceView) },
         )

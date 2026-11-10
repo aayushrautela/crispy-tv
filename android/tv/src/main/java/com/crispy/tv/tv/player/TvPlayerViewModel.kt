@@ -14,6 +14,7 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.NativeTrack
+import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
@@ -73,6 +74,8 @@ data class TvPlayerUiState(
     val selectedSubtitleTrackId: String? = null,
     val playbackSpeed: Float = 1f,
     val muted: Boolean = false,
+    /** The video's own pixel size, so the surface can be letterboxed to its aspect. */
+    val videoLayout: NativeVideoLayout? = null,
     val overlay: TvPlayerOverlay = TvPlayerOverlay.NONE,
     val notice: String? = null,
     /** The lookup the picked source came from, so "change source" can go back to it. */
@@ -437,6 +440,7 @@ class TvPlayerViewModel(
             durationMs = snapshot.durationMs,
             playbackSpeed = snapshot.playbackSpeed,
             muted = snapshot.muted,
+            videoLayout = snapshot.videoLayout,
             audioTracks = snapshot.audioTracks,
             selectedAudioTrackId = snapshot.selectedAudioTrackId,
             subtitleTracks = snapshot.subtitleTracks,

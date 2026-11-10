@@ -34,6 +34,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -119,10 +120,23 @@ fun TvPlayerScreen(
                 handleKey(event, state, viewModel) { chromeVisible = true }
             },
     ) {
+        // Size the surface to the video's own aspect: the tunneled vo renders at
+        // the video's native size and the view scales it, so a full-screen surface
+        // would stretch any video whose aspect differs from the screen.
+        val videoAspect = state.videoLayout?.aspectRatioValue()
+        val metrics = LocalContext.current.resources.displayMetrics
+        val screenAspect = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
+        val surfaceSizeModifier =
+            if (videoAspect != null && videoAspect > 0f && screenAspect > 0f) {
+                val fitted = Modifier.align(Alignment.Center).aspectRatio(videoAspect)
+                if (videoAspect >= screenAspect) fitted.fillMaxWidth() else fitted.fillMaxHeight()
+            } else {
+                Modifier.fillMaxSize()
+            }
         AndroidView(
             factory = { context -> viewModel.createMpvSurfaceView(context) },
             update = { surfaceView -> viewModel.attachMpvSurface(surfaceView) },
-            modifier = Modifier.fillMaxSize(),
+            modifier = surfaceSizeModifier,
         )
 
         AnimatedVisibility(visible = chromeVisible || state.hasError || state.preparing) {
