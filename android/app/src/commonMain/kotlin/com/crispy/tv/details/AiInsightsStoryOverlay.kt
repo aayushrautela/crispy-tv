@@ -58,6 +58,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
@@ -227,6 +231,11 @@ internal fun AiInsightsStoryOverlay(
     onShare: () -> Unit,
     slideWashSeeds: Map<Int, Color> = emptyMap(),
 ) {
+    // System back closes the story, not the details page behind it. The
+    // handler lives inside the details destination, so it is composed after
+    // the NavHost's own back handler and takes precedence over it.
+    StoryBackHandler(onBack = onDismiss)
+
     val slides = remember(result) { result.slides.sortedForDisplay() }
 
     if (slides.isEmpty()) {
@@ -362,6 +371,32 @@ internal fun AiInsightsStoryOverlay(
             )
         }
     }
+}
+
+/**
+ * System back closes the story overlay and nothing else.
+ *
+ * The handler joins the same `NavigationEventDispatcher` that carries the
+ * NavHost's back handler, so the two compete directly: the dispatcher runs
+ * the most recently registered enabled handler first, and this one is
+ * composed inside the details destination -- after the NavHost -- so it wins
+ * and the details route stays on the stack.
+ *
+ * `LocalNavigationEventDispatcherOwner.current` is null on platforms that
+ * have no dispatcher (iOS), and `NavigationBackHandler` `checkNotNull`s it,
+ * so the registration is skipped where there is no dispatcher to register
+ * with. On Android the owner always resolves to the Activity.
+ */
+@Composable
+private fun StoryBackHandler(onBack: () -> Unit) {
+    if (LocalNavigationEventDispatcherOwner.current == null) return
+
+    val state = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = state,
+        isBackEnabled = true,
+        onBackCompleted = onBack,
+    )
 }
 
 /** One slide: full-bleed image, its own wash over it, type in the lower third. */

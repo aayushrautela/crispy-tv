@@ -396,8 +396,10 @@ kotlin {
     // `androidx.navigationevent:navigationevent-compose`, pinned explicitly in
     // the catalog. The fork re-exports it on metadata+android but ships hollow
     // non-Android variants, so without this line `commonMain` can name the
-    // package on Android and nowhere else. Read-only use only: this module
-    // never registers a handler, it only observes `transitionState`.
+    // package on Android and nowhere else. `commonMain` uses it for both jobs
+    // now: `PredictivePeel` observes `transitionState`, and the AI-insights
+    // story overlay registers a back handler (`StoryBackHandler`) so system
+    // back closes the story instead of popping the details route.
     implementation(libs.androidx.navigationevent.compose)
     // androidx.lifecycle:lifecycle-viewmodel is a genuine KMP artifact at 2.11.0 -- this was
     // measured by declaring it here and compiling it for a non-Android target, not read
