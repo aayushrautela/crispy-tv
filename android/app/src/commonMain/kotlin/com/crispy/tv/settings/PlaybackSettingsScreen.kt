@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
@@ -36,10 +35,6 @@ fun PlaybackSettingsScreen(
     onTrailerAutoplayChanged: (Boolean) -> Unit,
     onSkipIntroChanged: (Boolean) -> Unit,
     onAutoSelectStreamChanged: (Boolean) -> Unit,
-    onUseLibassChanged: (Boolean) -> Unit,
-    onLibassRenderTypeChanged: (String) -> Unit,
-    playbackEnginePreference: NativePlaybackEnginePreference = NativePlaybackEnginePreference.Auto,
-    onPlaybackEnginePreferenceChanged: (NativePlaybackEnginePreference) -> Unit = {},
     onBack: () -> Unit
 ) {
     val scrollBehavior = appBarScrollBehavior()
@@ -136,172 +131,11 @@ fun PlaybackSettingsScreen(
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    supportingContent = {
-                        Column(modifier = Modifier.padding(top = 4.dp)) {
-                            Text(
-                                "Render ASS/SSA subtitles with libass for full styling and animation support. Takes effect on next playback."
-                            )
-                            if (settings.useLibass) {
-                                Text(
-                                    text = "Render: ${settings.libassRenderType}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
-                            }
-                        }
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = settings.useLibass,
-                            onCheckedChange = onUseLibassChanged,
-                            colors = androidx.compose.material3.SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        )
-                    }
-                ) {
-                    Text("libass Subtitle Rendering")
-                }
-            }
-
-            if (settings.useLibass) {
-                LibassRenderTypeChips(
-                    selected = settings.libassRenderType,
-                    onSelect = onLibassRenderTypeChanged,
-                )
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    supportingContent = {
-                        Text(
-                            "Auto uses ExoPlayer and falls back to libmpv on playback errors. " +
-                                "Force a specific engine if you run into issues."
-                        )
-                    }
-                ) {
-                    Text("Playback Engine")
-                }
-            }
-
-            EnginePreferenceChips(
-                selected = playbackEnginePreference,
-                onSelect = onPlaybackEnginePreferenceChanged,
-            )
-
             Text(
                 text = "Segment data is fetched from IntroDB first with AniSkip fallback.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-private val LIBASS_RENDER_TYPES = listOf(
-    "OVERLAY_OPEN_GL",
-    "OVERLAY_CANVAS",
-    "EFFECTS_OPEN_GL",
-    "EFFECTS_CANVAS",
-    "CUES",
-)
-
-private val ENGINE_PREFERENCES = NativePlaybackEnginePreference.entries
-
-@Composable
-private fun EnginePreferenceChips(
-    selected: NativePlaybackEnginePreference,
-    onSelect: (NativePlaybackEnginePreference) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = "Engine",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ENGINE_PREFERENCES.forEach { preference ->
-            val isSelected = preference == selected
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onSelect(preference) },
-            ) {
-                ListItem(
-                    trailingContent = {
-                        if (isSelected) {
-                            Text(
-                                text = "On",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    },
-                ) {
-                    Text(
-                        text = preference.label,
-                        style = if (isSelected) MaterialTheme.typography.bodyLarge
-                        else MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LibassRenderTypeChips(
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = "Render type",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        LIBASS_RENDER_TYPES.forEach { type ->
-            val isSelected = type == selected
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .let { if (isSelected) it else it },
-                onClick = { onSelect(type) },
-            ) {
-                ListItem(
-                    trailingContent = {
-                        if (isSelected) {
-                            Text(
-                                text = "On",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    },
-                ) {
-                    Text(
-                        text = type,
-                        style = if (isSelected) MaterialTheme.typography.bodyLarge
-                        else MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
-                    )
-                }
-            }
         }
     }
 }

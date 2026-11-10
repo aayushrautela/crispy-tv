@@ -1,6 +1,5 @@
 package com.crispy.tv.settings
 
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.testing.FakeKeyValueStore
 import kotlin.test.Test
@@ -35,11 +34,8 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         repository.setMuted(true)
         repository.setDefaultAudioLanguage("eng")
         repository.setDefaultSubtitleLanguage("deu")
-        repository.setUseLibass(true)
-        repository.setLibassRenderType("SL")
         repository.setResizeMode(PlayerResizeMode.Zoom)
         repository.setAutoSelectStream(true)
-        repository.setPlaybackEnginePreference(NativePlaybackEnginePreference.Libmpv)
 
         val settings = repository.settings.value
         assertEquals(
@@ -51,11 +47,8 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
                 muted = true,
                 defaultAudioLanguage = "eng",
                 defaultSubtitleLanguage = "deu",
-                useLibass = true,
-                libassRenderType = "SL",
                 resizeMode = PlayerResizeMode.Zoom,
                 autoSelectStream = true,
-                playbackEnginePreference = NativePlaybackEnginePreference.Libmpv,
             ),
             settings,
         )
@@ -87,7 +80,6 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
             setTrailerMuted(false)
             setPlaybackSpeed(2f)
             setResizeMode(PlayerResizeMode.Zoom)
-            setPlaybackEnginePreference(NativePlaybackEnginePreference.ExoPlayer)
             setDefaultAudioLanguage("fra")
         }
 
@@ -96,14 +88,13 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         assertEquals(false, reread.trailerMuted)
         assertEquals(2f, reread.playbackSpeed)
         assertEquals(PlayerResizeMode.Zoom, reread.resizeMode)
-        assertEquals(NativePlaybackEnginePreference.ExoPlayer, reread.playbackEnginePreference)
         assertEquals("fra", reread.defaultAudioLanguage)
     }
 
     /**
      * Every setter, called with the value it already holds.
      *
-     * All twelve share the same short-circuit, so a test that picked a few of
+     * All of them share the same short-circuit, so a test that picked a few of
      * them was a test of the few, not of the rule: deleting the guard from an
      * untested setter changed nothing observable. The full list is also the
      * cheapest way to notice a setter added later without one.
@@ -121,11 +112,8 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         repository.setMuted(current.muted)
         repository.setDefaultAudioLanguage(current.defaultAudioLanguage)
         repository.setDefaultSubtitleLanguage(current.defaultSubtitleLanguage)
-        repository.setUseLibass(current.useLibass)
-        repository.setLibassRenderType(current.libassRenderType)
         repository.setAutoSelectStream(current.autoSelectStream)
         repository.setResizeMode(current.resizeMode)
-        repository.setPlaybackEnginePreference(current.playbackEnginePreference)
 
         assertEquals(emptyList(), store.writes)
     }
@@ -161,17 +149,6 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
     }
 
     @Test
-    fun aBlankLibassRenderTypeFallsBackToTheDefault() {
-        val store = FakeKeyValueStore()
-        val repository = KeyValueStorePlaybackSettingsRepository(store)
-
-        repository.setLibassRenderType("   ")
-
-        assertEquals("OVERLAY_OPEN_GL", repository.settings.value.libassRenderType)
-        assertEquals("OVERLAY_OPEN_GL", KeyValueStorePlaybackSettingsRepository(store).settings.value.libassRenderType)
-    }
-
-    @Test
     fun anUnusableSpeedFallsBackToTheDefault() {
         val store = FakeKeyValueStore()
         val repository = KeyValueStorePlaybackSettingsRepository(store)
@@ -197,13 +174,11 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
             FakeKeyValueStore(
                 mapOf(
                     "resize_mode" to "Stretch",
-                    "playback_engine" to "VLC",
                 ),
             ),
         ).settings.value
 
         assertEquals(PlayerResizeMode.Fit, settings.resizeMode)
-        assertEquals(NativePlaybackEnginePreference.Auto, settings.playbackEnginePreference)
     }
 
     @Test
@@ -222,15 +197,6 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         ).settings.value
 
         assertNull(settings.defaultAudioLanguage)
-    }
-
-    @Test
-    fun aStoredBlankLibassRenderTypeFallsBackToTheDefault() {
-        val settings = KeyValueStorePlaybackSettingsRepository(
-            FakeKeyValueStore(mapOf("libass_render_type" to "")),
-        ).settings.value
-
-        assertEquals("OVERLAY_OPEN_GL", settings.libassRenderType)
     }
 
     private fun repository() = KeyValueStorePlaybackSettingsRepository(FakeKeyValueStore())

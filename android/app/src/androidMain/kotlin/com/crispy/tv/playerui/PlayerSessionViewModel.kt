@@ -35,7 +35,6 @@ import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.nativeengine.playback.EXTERNAL_SUBTITLE_TRACK_ID_PREFIX
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.NativeTrack
@@ -180,8 +179,7 @@ class PlayerSessionViewModel(
     private var subtitleAutoSelectApplied = false
     private var initialTarget: StreamLookupTarget? = null
 
-    private val initialEngine: NativePlaybackEngine =
-        resolveInitialEngine(playbackSettingsRepository.settings.value.playbackEnginePreference)
+    private val initialEngine: NativePlaybackEngine = resolveInitialEngine()
     private val initialSelectedSeason = identity?.season
     private val initialSeasonEpisodes = emptyList<MediaVideo>()
 

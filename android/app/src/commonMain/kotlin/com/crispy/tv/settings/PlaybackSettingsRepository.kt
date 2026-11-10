@@ -1,6 +1,5 @@
 package com.crispy.tv.settings
 
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.platform.KeyValueStore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,21 +17,21 @@ private const val KEY_PLAYBACK_SPEED = "playback_speed"
 private const val KEY_MUTED = "muted"
 private const val KEY_DEFAULT_AUDIO_LANGUAGE = "default_audio_language"
 private const val KEY_DEFAULT_SUBTITLE_LANGUAGE = "default_subtitle_language"
-private const val KEY_USE_LIBASS = "use_libass"
-private const val KEY_LIBASS_RENDER_TYPE = "libass_render_type"
 private const val KEY_RESIZE_MODE = "resize_mode"
 private const val KEY_AUTO_SELECT_STREAM = "auto_select_stream"
-private const val KEY_PLAYBACK_ENGINE = "playback_engine"
+
+// Deliberately unread, and the reason is a decision rather than an omission:
+// `use_libass`, `libass_render_type` and `playback_engine` still exist on every
+// install that wrote them, but mpv is the only engine and subtitles are drawn by
+// the app overlay, so nothing reads them any more. The keys are left in place so
+// a downgrade does not crash on an unknown value; they are simply never consulted.
 private const val DEFAULT_SKIP_INTRO_ENABLED = true
 private const val DEFAULT_TRAILER_AUTOPLAY_ENABLED = true
 private const val DEFAULT_TRAILER_MUTED = false
 private const val DEFAULT_PLAYBACK_SPEED = 1f
 private const val DEFAULT_MUTED = false
-private const val DEFAULT_USE_LIBASS = false
-private const val DEFAULT_LIBASS_RENDER_TYPE = "OVERLAY_OPEN_GL"
 private const val DEFAULT_RESIZE_MODE = "Fit"
 private const val DEFAULT_AUTO_SELECT_STREAM = false
-private const val DEFAULT_PLAYBACK_ENGINE = "Auto"
 
 data class PlaybackSettings(
     val skipIntroEnabled: Boolean = DEFAULT_SKIP_INTRO_ENABLED,
@@ -42,11 +41,8 @@ data class PlaybackSettings(
     val muted: Boolean = DEFAULT_MUTED,
     val defaultAudioLanguage: String? = null,
     val defaultSubtitleLanguage: String? = null,
-    val useLibass: Boolean = DEFAULT_USE_LIBASS,
-    val libassRenderType: String = DEFAULT_LIBASS_RENDER_TYPE,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val autoSelectStream: Boolean = DEFAULT_AUTO_SELECT_STREAM,
-    val playbackEnginePreference: NativePlaybackEnginePreference = NativePlaybackEnginePreference.Auto,
 )
 
 interface PlaybackSettingsRepository {
@@ -58,11 +54,8 @@ interface PlaybackSettingsRepository {
     fun setMuted(muted: Boolean)
     fun setDefaultAudioLanguage(language: String?)
     fun setDefaultSubtitleLanguage(language: String?)
-    fun setUseLibass(enabled: Boolean)
-    fun setLibassRenderType(renderType: String)
     fun setAutoSelectStream(enabled: Boolean)
     fun setResizeMode(mode: PlayerResizeMode)
-    fun setPlaybackEnginePreference(preference: NativePlaybackEnginePreference)
 }
 
 /**
@@ -165,25 +158,6 @@ internal class KeyValueStorePlaybackSettingsRepository(
         }
     }
 
-    override fun setUseLibass(enabled: Boolean) {
-        if (_settings.value.useLibass == enabled) {
-            return
-        }
-
-        _settings.value = _settings.value.copy(useLibass = enabled)
-        store.putBoolean(KEY_USE_LIBASS, enabled)
-    }
-
-    override fun setLibassRenderType(renderType: String) {
-        val normalized = renderType.trim().ifBlank { DEFAULT_LIBASS_RENDER_TYPE }
-        if (_settings.value.libassRenderType == normalized) {
-            return
-        }
-
-        _settings.value = _settings.value.copy(libassRenderType = normalized)
-        store.putString(KEY_LIBASS_RENDER_TYPE, normalized)
-    }
-
     override fun setAutoSelectStream(enabled: Boolean) {
         if (_settings.value.autoSelectStream == enabled) {
             return
@@ -202,15 +176,6 @@ internal class KeyValueStorePlaybackSettingsRepository(
         store.putString(KEY_RESIZE_MODE, mode.name)
     }
 
-    override fun setPlaybackEnginePreference(preference: NativePlaybackEnginePreference) {
-        if (_settings.value.playbackEnginePreference == preference) {
-            return
-        }
-
-        _settings.value = _settings.value.copy(playbackEnginePreference = preference)
-        store.putString(KEY_PLAYBACK_ENGINE, preference.name)
-    }
-
     private fun readSettings(): PlaybackSettings {
         return PlaybackSettings(
             skipIntroEnabled = store.getBoolean(KEY_SKIP_INTRO_ENABLED, DEFAULT_SKIP_INTRO_ENABLED),
@@ -223,20 +188,11 @@ internal class KeyValueStorePlaybackSettingsRepository(
                 ?.takeIf { it.isNotBlank() },
             defaultSubtitleLanguage = store.getString(KEY_DEFAULT_SUBTITLE_LANGUAGE, null)
                 ?.takeIf { it.isNotBlank() },
-            useLibass = store.getBoolean(KEY_USE_LIBASS, DEFAULT_USE_LIBASS),
-            libassRenderType =
-                store.getString(KEY_LIBASS_RENDER_TYPE, DEFAULT_LIBASS_RENDER_TYPE)
-                    ?.takeIf { it.isNotBlank() }
-                    ?: DEFAULT_LIBASS_RENDER_TYPE,
             resizeMode =
                 store.getString(KEY_RESIZE_MODE, DEFAULT_RESIZE_MODE)
                     ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
                     ?: PlayerResizeMode.Fit,
             autoSelectStream = store.getBoolean(KEY_AUTO_SELECT_STREAM, DEFAULT_AUTO_SELECT_STREAM),
-            playbackEnginePreference =
-                store.getString(KEY_PLAYBACK_ENGINE, DEFAULT_PLAYBACK_ENGINE)
-                    ?.let { runCatching { NativePlaybackEnginePreference.valueOf(it) }.getOrNull() }
-                    ?: NativePlaybackEnginePreference.Auto,
         )
     }
 }

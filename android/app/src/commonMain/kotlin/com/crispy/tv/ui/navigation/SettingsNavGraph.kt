@@ -118,19 +118,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
                 playbackSettingsRepository.setAutoSelectStream(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
             },
-            onUseLibassChanged = { enabled ->
-                playbackSettingsRepository.setUseLibass(enabled)
-                coroutineScope.launch { cloudSync.pushForActiveProfile() }
-            },
-            onLibassRenderTypeChanged = { renderType ->
-                playbackSettingsRepository.setLibassRenderType(renderType)
-                coroutineScope.launch { cloudSync.pushForActiveProfile() }
-            },
-            playbackEnginePreference = playbackSettings.playbackEnginePreference,
-            onPlaybackEnginePreferenceChanged = { preference ->
-                playbackSettingsRepository.setPlaybackEnginePreference(preference)
-                coroutineScope.launch { cloudSync.pushForActiveProfile() }
-            },
             onBack = { navController.popBackStack() }
         )
         }

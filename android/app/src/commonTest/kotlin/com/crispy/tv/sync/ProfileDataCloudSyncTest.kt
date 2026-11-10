@@ -6,7 +6,6 @@ import com.crispy.tv.accounts.RecordingBackendApi
 import com.crispy.tv.accounts.Session
 import com.crispy.tv.backend.ProfileSettings
 import com.crispy.tv.discover.FakeAccountApi
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.platform.RecordingKeyValueStore
 import com.crispy.tv.settings.PlaybackSettings
@@ -484,12 +483,8 @@ private class RecordingPlaybackSettingsRepository(
     override fun setMuted(muted: Boolean): Unit = unused("setMuted")
     override fun setDefaultAudioLanguage(language: String?): Unit = unused("setDefaultAudioLanguage")
     override fun setDefaultSubtitleLanguage(language: String?): Unit = unused("setDefaultSubtitleLanguage")
-    override fun setUseLibass(enabled: Boolean): Unit = unused("setUseLibass")
-    override fun setLibassRenderType(renderType: String): Unit = unused("setLibassRenderType")
     override fun setAutoSelectStream(enabled: Boolean): Unit = unused("setAutoSelectStream")
     override fun setResizeMode(mode: PlayerResizeMode): Unit = unused("setResizeMode")
-    override fun setPlaybackEnginePreference(preference: NativePlaybackEnginePreference): Unit =
-        unused("setPlaybackEnginePreference")
 
     private fun unused(name: String): Nothing = throw AssertionError("$name is not stubbed")
 }

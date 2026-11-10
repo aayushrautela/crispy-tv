@@ -1,8 +1,6 @@
 package com.crispy.tv.playerui
 
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
-import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 
@@ -38,15 +36,15 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackState
  * port itself were lifted into `:core-domain`'s `commonMain` under this same package,
  * which is why moving this file needed no import edit anywhere.
  *
- * The lesson worth keeping is the one [NativePlaybackEnginePreference] already demonstrated:
+ * The lesson worth keeping is the one the engine-preference enum already demonstrated:
  * **a file can be portable in every line it writes and still be unpinnable, and what
  * decides is the *kind* of the names it mentions, not how much platform API it calls.** This
- * file calls none. It named four data types that had no business living in an Android
+ * file calls none. It named data types that had no business living in an Android
  * library.
  *
  * Its only production consumer is `PlayerSessionViewModel`, which is still in `androidMain`
- * because it holds a Media3 `PlayerView`. It reaches this file with no import, from the
- * same package.
+ * because it holds the playback controller and the `Context` wiring. It reaches this
+ * file with no import, from the same package.
  */
 
 /**
@@ -61,19 +59,15 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackState
 internal const val INITIAL_SEEK_TOLERANCE_MS = 1_000L
 
 /**
- * The engine the session starts on, for a stored preference.
+ * The engine the session starts on.
  *
- * **`Auto` resolving to ExoPlayer is a product decision, not an oversight.** "Auto" does
- * not mean "pick the best engine"; it means *start on ExoPlayer and switch to MPV if
- * ExoPlayer fails on a codec* -- which is [shouldFallBackToMpv]. A reader reasonably
- * assumes otherwise, which is why this is pinned rather than left implicit.
+ * mpv is the only engine left, so this always answers [NativePlaybackEngine.MPV]:
+ * the stored preference it used to read is gone with the engine picker, and a
+ * function that always returns one value exists only to keep the call site's
+ * shape -- which is fine, because the call site reads better naming the
+ * decision than spelling the enum at every use.
  */
-internal fun resolveInitialEngine(preference: NativePlaybackEnginePreference): NativePlaybackEngine =
-    if (preference == NativePlaybackEnginePreference.Libmpv) {
-        NativePlaybackEngine.MPV
-    } else {
-        NativePlaybackEngine.EXO
-    }
+internal fun resolveInitialEngine(): NativePlaybackEngine = NativePlaybackEngine.MPV
 
 /**
  * The user-facing line for a playback state.
@@ -140,35 +134,3 @@ internal fun initialSeekDecision(
     return InitialSeekDecision.Seek(targetPositionMs)
 }
 
-/**
- * Whether an ExoPlayer failure should be retried on the MPV fallback.
- *
- * All three conditions are required, and each is a separate reason to say no:
- *
- * - **not a codec problem** -- a network or DRM failure will fail identically on MPV, and
- *   switching engines would hide a real network error behind a second, identical failure.
- * - **already on ExoPlayer** -- the fallback is a change *away* from ExoPlayer, so a
- *   failure on the fallback engine has nothing to fall back to.
- * - **the user has not pinned ExoPlayer** -- this is the conjunct people expect to be
- *   "pinned to MPV", and it is not. A user who pinned **libmpv** and somehow reached
- *   ExoPlayer still falls back, because the alternative is a codec error with no retry at
- *   all. What "pinned to ExoPlayer" means is *this choice has already been made, so stop
- *   asking me*.
- *
- * That last point is the one worth testing, because reversing the conjunct to
- * `preference == Libmpv` compiles, reads sensibly, and makes `Auto` never fall back -- which
- * would quietly reduce `Auto` to `ExoPlayer`.
- *
- * The caller assigns its "already handled this error" token *before* calling this, and that
- * ordering is load-bearing: a non-codec error still consumes its token, so a snapshot that
- * repeats the same failure is not re-handled. It stays in the view model.
- */
-internal fun shouldFallBackToMpv(
-    error: NativePlaybackError,
-    engine: NativePlaybackEngine,
-    preference: NativePlaybackEnginePreference,
-): Boolean {
-    return error.codecLikely &&
-        engine == NativePlaybackEngine.EXO &&
-        preference != NativePlaybackEnginePreference.ExoPlayer
-}
