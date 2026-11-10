@@ -9,14 +9,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * The story's two text slots: the title joins `label` to `focus` with a
- * middot, the paragraph is `body ?: context`. The two halves are built from
- * disjoint sources, so a slide can never print the same sentence twice.
+ * The story's three text slots: the heading is `label`, the headline is
+ * `focus`, the paragraph is `body ?: context`. The heading and the headline
+ * are separate lines now, so they are separate helpers; the paragraph is
+ * still built from disjoint sources, so a slide can never print the same
+ * sentence twice.
  */
 class AiInsightStoryCopyTest {
 
     @Test
-    fun labelAndFocusJoinWithAMiddot() {
+    fun labelAndFocusAreSeparateSlots() {
         val slide =
             slide(
                 label = "Standout",
@@ -24,7 +26,8 @@ class AiInsightStoryCopyTest {
                 body = "Hiddleston shifts from a quiet adult.",
             )
 
-        assertEquals("Standout • Hiddleston's quiet portrayal of Chuck", slide.storyTitle())
+        assertEquals("Standout", slide.storyLabel())
+        assertEquals("Hiddleston's quiet portrayal of Chuck", slide.storyFocus())
         assertEquals("Hiddleston shifts from a quiet adult.", slide.storyParagraph())
     }
 
@@ -37,7 +40,8 @@ class AiInsightStoryCopyTest {
                 body = "A twelve-minute standing ovation.",
             )
 
-        assertEquals("The good stuff", slide.storyTitle())
+        assertEquals("The good stuff", slide.storyLabel())
+        assertNull(slide.storyFocus())
         assertEquals("A twelve-minute standing ovation.", slide.storyParagraph())
     }
 
@@ -45,7 +49,8 @@ class AiInsightStoryCopyTest {
     fun aBlankFocusIsNoFocusSoTheLabelStillStandsAlone() {
         val slide = slide(label = "The catch", focus = "   ", body = "Sags in the middle.")
 
-        assertEquals("The catch", slide.storyTitle())
+        assertEquals("The catch", slide.storyLabel())
+        assertNull(slide.storyFocus())
         assertEquals("Sags in the middle.", slide.storyParagraph())
     }
 
@@ -53,13 +58,14 @@ class AiInsightStoryCopyTest {
     fun withoutALabelTheFocusStandsAlone() {
         val slide = slide(label = "  ", focus = "A killer first act", body = "Ana carries it.")
 
-        assertEquals("A killer first act", slide.storyTitle())
+        assertNull(slide.storyLabel())
+        assertEquals("A killer first act", slide.storyFocus())
         assertEquals("Ana carries it.", slide.storyParagraph())
     }
 
     /** The rule the slots exist for: a slide never prints the same sentence twice. */
     @Test
-    fun theTwoSlotsNeverRepeatEachOther() {
+    fun theSlotsNeverRepeatEachOther() {
         val cases =
             listOf(
                 slide(label = "Standout", focus = "A killer first act", body = "Ana carries it.", context = null),
@@ -71,7 +77,8 @@ class AiInsightStoryCopyTest {
             )
 
         cases.forEach { slide ->
-            val printed = listOfNotNull(slide.storyTitle(), slide.storyParagraph())
+            val printed =
+                listOfNotNull(slide.storyLabel(), slide.storyFocus(), slide.storyParagraph())
             assertEquals(
                 printed.size,
                 printed.distinct().size,
@@ -84,7 +91,8 @@ class AiInsightStoryCopyTest {
     fun contextStandsInForAnAbsentBody() {
         val slide = slide(label = "Trivia", focus = null, body = null, context = "From the second act.")
 
-        assertEquals("Trivia", slide.storyTitle())
+        assertEquals("Trivia", slide.storyLabel())
+        assertNull(slide.storyFocus())
         assertEquals("From the second act.", slide.storyParagraph())
     }
 
@@ -92,7 +100,8 @@ class AiInsightStoryCopyTest {
     fun aSlideWithNothingToSayPrintsNothing() {
         val slide = slide(label = "  ", focus = "  ", body = null, context = null)
 
-        assertNull(slide.storyTitle())
+        assertNull(slide.storyLabel())
+        assertNull(slide.storyFocus())
         assertNull(slide.storyParagraph())
     }
 
