@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
@@ -167,7 +168,7 @@ fun PlayerRoute(
         val videoAspect = uiState.videoLayout?.aspectRatioValue()
         val screenConfiguration = LocalConfiguration.current
         val screenAspect =
-            screenConfiguration.screenWidthDp.value / screenConfiguration.screenHeightDp.value
+            (screenConfiguration.screenWidthDp / screenConfiguration.screenHeightDp)
         val surfaceSizeModifier =
             if (videoAspect != null && videoAspect > 0f && screenAspect > 0f) {
                 val fitted = Modifier.align(Alignment.Center).aspectRatio(videoAspect)
