@@ -1,5 +1,5 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "suite": "player_machine",
   "case_id": "torrent_boot_to_ready",
   "now_ms": 1739923200000,
@@ -8,12 +8,12 @@
       "t_ms": 0,
       "event": {
         "type": "OPEN_TORRENT",
-        "engine": "exo"
+        "engine": "mpv"
       },
       "expect": {
         "phase": "booting_torrent",
         "intent": "play",
-        "engine": "exo"
+        "engine": "mpv"
       }
     },
     {
@@ -24,7 +24,7 @@
       "expect": {
         "phase": "loading_media",
         "intent": "play",
-        "engine": "exo"
+        "engine": "mpv"
       }
     },
     {
@@ -35,7 +35,7 @@
       "expect": {
         "phase": "ready",
         "intent": "play",
-        "engine": "exo"
+        "engine": "mpv"
       }
     }
   ]
