@@ -9,7 +9,7 @@ import com.crispy.tv.details.trailer.TrailerSource
  *
  * Both are pure: one reads a field off an already-fetched `MediaDetails` and the
  * other is a two-field value. Neither touched the platform, and neither had any
- * business sitting in a 577-line file whose other tenant inflated a `PlayerView`.
+ * business sitting in a 577-line file whose other tenant owned a video surface.
  *
  * The package deliberately did not change, so `DetailsScreen` reaches both with no
  * import edit -- which is the same-package mechanism the `PlayerUiState`

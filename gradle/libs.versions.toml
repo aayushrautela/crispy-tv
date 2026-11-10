@@ -126,8 +126,6 @@ navigationEventCompose = "1.1.1"
 # --- Paging ---
 paging = "3.5.1"
 
-# --- Media3 ---
-media3 = "1.11.0"
 
 # --- Networking ---
 okhttp = "5.5.0"
@@ -149,7 +147,6 @@ tvMaterial = "1.1.0"
 
 # --- Playback ---
 libmpv = "1.0.0"
-assMedia = "0.5.1"
 androidyoutubeplayer = "13.0.0"
 
 # --- Plugin runtime (sideload flavor) ---
@@ -217,16 +214,6 @@ androidx-paging-common = { group = "androidx.paging", name = "paging-common", ve
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 
-androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
-androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
-androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
-androidx-media3-exoplayer-dash = { group = "androidx.media3", name = "media3-exoplayer-dash", version.ref = "media3" }
-androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
-androidx-media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
-androidx-media3-datasource = { group = "androidx.media3", name = "media3-datasource", version.ref = "media3" }
-androidx-media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
-androidx-media3-extractor = { group = "androidx.media3", name = "media3-extractor", version.ref = "media3" }
-androidx-media3-effect = { group = "androidx.media3", name = "media3-effect", version.ref = "media3" }
 
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
@@ -267,7 +254,6 @@ serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serializ
 androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
 
 libmpv = { group = "dev.jdtech.mpv", name = "libmpv", version.ref = "libmpv" }
-ass-media = { group = "io.github.peerless2012", name = "ass-media", version.ref = "assMedia" }
 androidyoutubeplayer = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", name = "core", version.ref = "androidyoutubeplayer" }
 
 quickjs-kt = { group = "io.github.dokar3", name = "quickjs-kt", version.ref = "quickjsKt" }

@@ -208,10 +208,6 @@ dependencies {
 
     implementation(libs.zxing.core)
 
-    implementation(libs.androidx.media3.common)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
-
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     // JUnit only, and deliberately not Robolectric. The one thing this module's tests

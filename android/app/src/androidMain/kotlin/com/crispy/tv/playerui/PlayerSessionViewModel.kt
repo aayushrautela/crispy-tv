@@ -8,7 +8,6 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.media3.ui.PlayerView
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.backend.CrispyBackendClient
@@ -37,7 +36,6 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.nativeengine.playback.EXTERNAL_SUBTITLE_TRACK_ID_PREFIX
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
-import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.NativeTrack
@@ -149,7 +147,6 @@ class PlayerSessionViewModel(
     private var activeIdentity: PlaybackIdentity? = identity
     private var activeSubtitle: String? = null
     private var activeArtworkUrl: String? = null
-    private var lastHandledErrorToken: Long? = null
     private var pendingInitialSeekMs: Long? = null
     private var autoSelectPending = false
     /**
@@ -335,10 +332,6 @@ class PlayerSessionViewModel(
         viewModelScope.launch {
             startPlayback()
         }
-    }
-
-    fun bindExoPlayerView(playerView: PlayerView) {
-        playbackController.bindExoPlayerView(playerView)
     }
 
     fun createMpvSurfaceView(context: Context): SurfaceView = playbackController.createMpvSurfaceView(context)
@@ -1296,7 +1289,6 @@ class PlayerSessionViewModel(
             return
         }
 
-        lastHandledErrorToken = null
         Log.d(TAG, "play request engine=$engine playbackUrlHash=${activePlaybackSource.url.hashCode()}")
         playbackController.play(activePlaybackSource, engine)
         applyPersistedPlaybackSettings()
@@ -1318,13 +1310,6 @@ class PlayerSessionViewModel(
     private suspend fun pollPlaybackState() {
         while (coroutineContext.isActive) {
             val snapshot = playbackController.snapshot()
-
-            val fallbackHandled = maybeHandlePlaybackError(snapshot.error, snapshot.engine)
-            if (fallbackHandled) {
-                publishMediaSessionFromUiState()
-                delay(500)
-                continue
-            }
 
             applyPendingInitialSeekIfNeeded(snapshot)
 
@@ -1388,48 +1373,7 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun maybeHandlePlaybackError(
-        error: NativePlaybackError?,
-        engine: NativePlaybackEngine,
-    ): Boolean {
-        if (error == null || lastHandledErrorToken == error.token) {
-            return false
-        }
-
-        lastHandledErrorToken = error.token
-        val playbackEnginePreference = playbackSettingsRepository.settings.value.playbackEnginePreference
-        val shouldFallback = shouldFallBackToMpv(error, engine, playbackEnginePreference)
-        if (!shouldFallback) {
-            return false
-        }
-
-        Log.w(TAG, "ExoPlayer error, retrying on MPV fallback. message=${error.message}")
-        resetPlaybackPosition()
-        _uiState.update { state ->
-            state.copy(
-                activeEngine = NativePlaybackEngine.MPV,
-                isBuffering = true,
-                isPlaying = false,
-                durationMs = 0L,
-                stableDurationMs = 0L,
-                statusMessage = "",
-                errorMessage = null,
-                videoLayout = null,
-            )
-        }
-        requestPlayback(engine = NativePlaybackEngine.MPV)
-        // The engine switch is a brand new playback session: drop the stale start/stop
-        // flags and let the settled MPV position emit a fresh playback_started event.
-        progressReporter.resetReportingState()
-        progressReporter.scheduleProgressSyncAfterSeek()
-        return true
-    }
-
     private fun syncPlaybackSnapshot(snapshot: NativePlaybackSnapshot) {
-        if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
-            publishMediaSessionFromUiState()
-            return
-        }
         onPlaybackMetrics(snapshot)
         publishMediaSessionFromUiState()
     }

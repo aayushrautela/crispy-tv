@@ -1,11 +1,10 @@
 package com.crispy.tv.tv.player
 
 import android.app.Application
-import androidx.annotation.OptIn
+import android.content.Context
+import android.view.SurfaceView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
 import com.crispy.tv.addons.lookup.parseAddonEpisodeLookupId
 import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.addons.playback.resolvePlaybackSource
@@ -114,7 +113,6 @@ data class TvPlayerUiState(
  * events under its own key; writing through the service is what makes the two apps
  * agree on where a viewer left off.
  */
-@OptIn(UnstableApi::class)
 class TvPlayerViewModel(
     app: Application,
     private val itemId: String,
@@ -136,7 +134,6 @@ class TvPlayerViewModel(
     private val finalReportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var controller: NativePlaybackController? = null
-    private var pendingPlayerView: PlayerView? = null
     private var pollJob: Job? = null
     private var identity: PlaybackIdentity? = null
     private var startedReported = false
@@ -151,16 +148,16 @@ class TvPlayerViewModel(
      * The video surface.
      *
      * The surface is attached to the engine rather than owned by the screen, because
-     * the engine owns the player the surface shows. A surface that arrives before
-     * the engine does is kept and attached when the engine is built.
+     * the engine owns the player the surface shows. The factory builds the surface
+     * through the engine, so a surface created before the engine exists is still the
+     * engine's own.
      */
-    fun bindPlayerView(playerView: PlayerView) {
-        val engine = controller
-        if (engine == null) {
-            pendingPlayerView = playerView
-            return
-        }
-        engine.bindExoPlayerView(playerView)
+    fun createMpvSurfaceView(context: Context): SurfaceView {
+        return ensureController().createMpvSurfaceView(context)
+    }
+
+    fun attachMpvSurface(surfaceView: SurfaceView) {
+        controller?.attachMpvSurface(surfaceView)
     }
 
     fun togglePlayPause() {
@@ -222,7 +219,7 @@ class TvPlayerViewModel(
         viewModelScope.launch {
             val source = resolveSource(stream) ?: return@launch
             _state.value = _state.value.copy(preparing = false)
-            engine.play(source, NativePlaybackEngine.EXO)
+            engine.play(source, NativePlaybackEngine.MPV)
         }
     }
 
@@ -267,7 +264,6 @@ class TvPlayerViewModel(
         reportFinalPosition()
         val engine = controller
         controller = null
-        pendingPlayerView = null
         engine?.release()
         super.onCleared()
     }
@@ -325,7 +321,7 @@ class TvPlayerViewModel(
             // The player is where "preparing" belongs, and where the failure belongs.
             val source = resolveSource(stream) ?: return@launch
             _state.value = _state.value.copy(preparing = false)
-            engine.play(source, NativePlaybackEngine.EXO)
+            engine.play(source, NativePlaybackEngine.MPV)
             resumeIfNeeded(engine)
             startPolling()
         }
@@ -365,18 +361,14 @@ class TvPlayerViewModel(
     /**
      * The engine for this session.
      *
-     * One engine per session, created when the session starts: the engine owns an
-     * `ExoPlayer` and `release()` on it ends the session for whoever holds it.
+     * One engine per session, created when the session starts: the engine owns a
+     * libmpv runtime, and `release()` on it ends the session for whoever holds it.
      */
     private fun ensureController(): NativePlaybackController {
         val existing = controller
         if (existing != null) return existing
         val created = TvServices.newPlaybackController(getApplication<Application>())
         controller = created
-        pendingPlayerView?.let { view ->
-            created.bindExoPlayerView(view)
-            pendingPlayerView = null
-        }
         return created
     }
 

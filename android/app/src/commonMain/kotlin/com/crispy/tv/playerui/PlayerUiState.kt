@@ -20,7 +20,7 @@ import com.crispy.tv.player.PlaybackIdentity
  * They were extracted so that [com.crispy.tv.playerui.PlayerOverlay] could move into
  * `commonMain`. That composable's first parameter is [PlayerUiState] and it reads
  * `activeSurface` seven times, so **it names both of these** -- and `PlayerSessionViewModel`
- * is a 1,315-line `androidMain` class that holds a Media3 `PlayerView` and a `Context`. A file
+ * is a large `androidMain` class that holds a playback controller and a `Context`. A file
  * that names a type declared in an `androidMain` sibling is pinned by it whether or not it
  * imports anything, and this pair is what the overlay was actually pinned by.
  *

@@ -1,30 +1,26 @@
 package com.crispy.tv.playerui
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
 import android.os.Build
 import android.util.Log
-import androidx.annotation.OptIn
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaStyleNotificationHelper
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
-import coil3.request.allowHardware
 import coil3.toBitmap
-import com.crispy.tv.ui.assets.R as AssetsR
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
-import java.io.ByteArrayOutputStream
+import com.crispy.tv.ui.assets.R as AssetsR
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,16 +30,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Owns the single process-wide Media3 [MediaSession] for video playback.
+ * Owns the single process-wide platform [MediaSession] for video playback,
+ * plus the playback notification.
  *
- * Media3 requires session IDs to be unique per process. Instances must only be created through
- * [obtain], which guarantees at most one live manager: any previous instance is fully released
- * before a new one builds its session, so the fixed [SESSION_ID] can never collide.
+ * The session is the platform `android.media.session.MediaSession`, not a Media3
+ * one. Transport controls from the notification shade, the lock screen and
+ * hardware media keys are routed to [PlaybackSessionCallback], which forwards
+ * them to the [PlaybackSessionController]. The notification's [Notification.MediaStyle]
+ * carries the session token, so the system draws its own transport controls
+ * from the [PlaybackState] published here -- there are no per-action
+ * `PendingIntent`s to keep in step with the callback.
+ *
+ * Instances must only be created through [obtain], which guarantees at most one
+ * live manager: any previous instance is fully released before a new one builds
+ * its session, so the fixed [SESSION_ID] can never collide.
  *
  * Main-thread contract: [obtain] and [release] construct/tear down binder-backed session objects
  * and must be called on the main looper.
  */
-@OptIn(UnstableApi::class)
 internal class PlayerMediaSessionManager private constructor(
     context: Context,
     private val playbackController: PlaybackSessionController,
@@ -51,19 +55,16 @@ internal class PlayerMediaSessionManager private constructor(
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    private val player = PlaybackSessionControllerPlayer(appContext, playbackController)
-
     private val mediaSession: MediaSession =
-        MediaSession.Builder(appContext, player)
-            .setId(SESSION_ID)
-            .setSessionActivity(buildContentPendingIntent())
-            .build()
+        MediaSession(appContext, SESSION_ID).apply {
+            setCallback(PlaybackSessionCallback(playbackController))
+            setActive(true)
+        }
 
     private var currentTitle: String = "Player"
     private var currentSubtitle: String? = null
     private var currentArtworkUrl: String? = null
     private var currentArtworkBitmap: Bitmap? = null
-    private var currentArtworkData: ByteArray? = null
     private var currentIsPlaying: Boolean = false
     private var currentIsBuffering: Boolean = true
     private var currentIsError: Boolean = false
@@ -108,7 +109,6 @@ internal class PlayerMediaSessionManager private constructor(
 
         if (artworkChanged) {
             currentArtworkBitmap = null
-            currentArtworkData = null
             loadArtwork(normalizedArtworkUrl)
         }
 
@@ -129,8 +129,7 @@ internal class PlayerMediaSessionManager private constructor(
         updateMetadata(title = title, subtitle = subtitle, artworkUrl = artworkUrl)
         val wasError = currentIsError
         if (!wasError && currentIsPlaying == isPlaying && currentIsBuffering == isBuffering) {
-            // Play/buffer state unchanged: the SimpleBasePlayer already mirrors live
-            // position from the controller snapshot, so nothing needs republishing.
+            // Play/buffer state unchanged: the published session state already says so.
             return
         }
         Log.d(
@@ -180,7 +179,6 @@ internal class PlayerMediaSessionManager private constructor(
             activeInstance = null
         }
         mediaSession.release()
-        player.release()
         scope.cancel()
     }
 
@@ -207,7 +205,6 @@ internal class PlayerMediaSessionManager private constructor(
                         .build()
                 val result = runCatching { appContext.imageLoader.execute(request) }.getOrNull()
                 val bitmap = (result as? SuccessResult)?.image?.toBitmap()
-                val data = bitmap?.let(::encodeSessionArtwork)
 
                 withContext(Dispatchers.Main.immediate) {
                     if (currentArtworkUrl != artworkUrl) {
@@ -217,14 +214,9 @@ internal class PlayerMediaSessionManager private constructor(
                     if (bitmap == null) {
                         Log.w(TAG, "artwork load failed url=$artworkUrl result=$result")
                     } else {
-                        Log.d(
-                            TAG,
-                            "artwork loaded ${bitmap.width}x${bitmap.height}" +
-                                " bytes=${data?.size ?: 0}",
-                        )
+                        Log.d(TAG, "artwork loaded ${bitmap.width}x${bitmap.height}")
                     }
                     currentArtworkBitmap = bitmap
-                    currentArtworkData = data
                     publishMetadata()
                     publishNotification(force = true)
                 }
@@ -232,11 +224,40 @@ internal class PlayerMediaSessionManager private constructor(
     }
 
     private fun publishMetadata() {
-        player.updateMetadata(currentTitle, currentSubtitle, currentArtworkData)
+        val metadata =
+            MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, currentTitle)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, currentSubtitle ?: "")
+                .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, SESSION_ID)
+        currentArtworkBitmap?.let { bitmap ->
+            metadata.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap)
+        }
+        mediaSession.setMetadata(metadata.build())
     }
 
     private fun publishPlaybackState() {
-        player.invalidatePlaybackState()
+        val playbackState =
+            PlaybackState.Builder()
+                .setState(
+                    when {
+                        currentIsError -> PlaybackState.STATE_ERROR
+                        currentIsPlaying -> PlaybackState.STATE_PLAYING
+                        currentIsBuffering -> PlaybackState.STATE_BUFFERING
+                        else -> PlaybackState.STATE_PAUSED
+                    },
+                    playbackController.snapshot().positionMs,
+                    1.0f,
+                ).setActions(
+                    PlaybackState.ACTION_PLAY or
+                        PlaybackState.ACTION_PAUSE or
+                        PlaybackState.ACTION_PLAY_PAUSE or
+                        PlaybackState.ACTION_SEEK_TO or
+                        PlaybackState.ACTION_FAST_FORWARD or
+                        PlaybackState.ACTION_REWIND or
+                        PlaybackState.ACTION_STOP,
+                ).build()
+        mediaSession.setPlaybackState(playbackState)
     }
 
     private fun publishNotification(force: Boolean = false) {
@@ -264,27 +285,27 @@ internal class PlayerMediaSessionManager private constructor(
         }
 
         val notification =
-            NotificationCompat.Builder(appContext, NOTIFICATION_CHANNEL_ID)
+            Notification.Builder(appContext, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(AssetsR.mipmap.ic_launcher_monochrome)
                 .setContentTitle(currentTitle)
                 .setContentText(currentSubtitle)
                 .setContentIntent(buildContentPendingIntent())
-                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(Notification.CATEGORY_TRANSPORT)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setOnlyAlertOnce(true)
                 .setOngoing(currentIsPlaying || currentIsBuffering)
                 .setShowWhen(false)
                 .setLargeIcon(currentArtworkBitmap)
                 .setStyle(
-                    MediaStyleNotificationHelper.MediaStyle(mediaSession)
-                        .setShowActionsInCompactView(0, 1, 2),
+                    Notification.MediaStyle()
+                        .setMediaSession(mediaSession.sessionToken),
                 ).build()
 
         NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
         Log.d(
             TAG,
             "notification posted title=\"$currentTitle\" art=${currentArtworkBitmap != null}" +
-                " artworkBytes=${currentArtworkData?.size ?: 0} ongoing=${currentIsPlaying || currentIsBuffering}" +
+                " ongoing=${currentIsPlaying || currentIsBuffering}" +
                 " isPlaying=$currentIsPlaying isBuffering=$currentIsBuffering force=$force",
         )
 
@@ -318,31 +339,6 @@ internal class PlayerMediaSessionManager private constructor(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-    }
-
-    private fun encodeSessionArtwork(bitmap: Bitmap): ByteArray? {
-        var candidate = bitmap
-        var data = encodeJpeg(candidate)
-        // The encoded payload crosses binder to SystemUI, so it must stay well below the
-        // ~1MB transaction limit; shrink deterministically until the encode fits.
-        while (data == null || data.size > MAX_ARTWORK_DATA_BYTES) {
-            val nextWidth = (candidate.width * ARTWORK_SHRINK_FACTOR).toInt()
-            val nextHeight = (candidate.height * ARTWORK_SHRINK_FACTOR).toInt()
-            if (nextWidth < ARTWORK_MIN_EDGE || nextHeight < ARTWORK_MIN_EDGE) {
-                break
-            }
-            candidate = Bitmap.createScaledBitmap(candidate, nextWidth, nextHeight, true)
-            data = encodeJpeg(candidate)
-        }
-        return data
-    }
-
-    private fun encodeJpeg(bitmap: Bitmap): ByteArray? {
-        val out = ByteArrayOutputStream()
-        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, ARTWORK_JPEG_QUALITY, out)) {
-            return null
-        }
-        return out.toByteArray()
     }
 
     private fun ensureNotificationChannel() {
@@ -380,11 +376,7 @@ internal class PlayerMediaSessionManager private constructor(
         private const val NOTIFICATION_CHANNEL_ID = "crispy_player_playback"
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001
-        private const val ARTWORK_MAX_EDGE = 1600
-        private const val ARTWORK_JPEG_QUALITY = 90
-        private const val MAX_ARTWORK_DATA_BYTES = 512 * 1024
-        private const val ARTWORK_SHRINK_FACTOR = 0.75f
-        private const val ARTWORK_MIN_EDGE = 320
+        private const val ARTWORK_MAX_EDGE = 512
 
         @Volatile
         private var activeInstance: PlayerMediaSessionManager? = null
@@ -393,7 +385,7 @@ internal class PlayerMediaSessionManager private constructor(
         /**
          * Returns the single live manager, fully releasing any previous instance first. This is the
          * only construction path; it makes a duplicate-session crash impossible even if callers
-         * race, because Media3 rejects a second session with the same ID while one is registered.
+         * race, because only one session with [SESSION_ID] can be active at a time.
          */
         fun obtain(
             context: Context,

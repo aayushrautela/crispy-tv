@@ -13,13 +13,12 @@ package com.crispy.tv.nativeengine.playback
  * The package deliberately did not change, so the seven `:app` files that use
  * these types needed no import edit.
  *
- * The three declarations that were in the same file and did **not** come here:
- * `PlaybackSource.toOkHttpHeaders()` (its return type is okhttp's `Headers`),
- * `PlaybackSurfaceController` (all four of its members take a `PlayerView`, a
- * `SurfaceView` or a `Context`), and `PlaybackController` (the Android
- * composition of the two interfaces). Those stay in `:native-engine` because
- * they are the platform half, and a controller whose surface is a
- * `SurfaceView` is Android by definition.
+ * The two declarations that were in the same file and did **not** come here:
+ * `PlaybackSurfaceController` (its members take a `SurfaceView` or a
+ * `Context`), and `PlaybackController` (the Android composition of the two
+ * interfaces). Those stay in `:native-engine` because they are the platform
+ * half, and a controller whose surface is a `SurfaceView` is Android by
+ * definition.
  */
 enum class NativePlaybackEngine {
     EXO,
@@ -130,8 +129,9 @@ data class NativePlaybackSnapshot(
      * The subtitle cue the engine is showing right now, raw as the engine
      * reports it -- an ASS track still carries its `{\...}` override tags, so
      * this is what [sanitizeSubtitleCue] is for before anything renders it.
-     * `null` when no cue is active. Engines that render subtitles into their
-     * own surface (ExoPlayer) report `null` here and the UI draws nothing.
+     * `null` when no cue is active. Subtitles are always drawn by the app
+     * overlay from this text, so an engine that cannot report a cue reports
+     * `null` and the UI draws nothing.
      */
     val currentSubtitle: String? = null,
 ) {
@@ -159,9 +159,8 @@ data class NativeChapter(
  * One playable stream, with the headers needed to fetch it.
  *
  * [headers] is a `Map` and not a platform header type on purpose: the map is
- * what the shared code can carry, and `PlaybackSource.toOkHttpHeaders()` in
- * `:android:native-engine` is the one place that turns it into okhttp's
- * `Headers` on Android.
+ * what the shared code can carry, and the engine is the one place that turns
+ * it into wire format -- mpv reads it as `http-header-fields`.
  */
 data class PlaybackSource(
     val url: String,

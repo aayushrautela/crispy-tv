@@ -171,10 +171,10 @@ internal fun DetailsScreen(
      */
     screenHeightDp: Int,
     /**
-     * The Media3 trailer surface, as a slot. `HeroTrailerLayer` is an ExoPlayer
-     * plus an inflated `PlayerView` plus libass, so it has no portable form and
-     * stays in `androidMain` -- exactly the split `PlaybackSurfaceController`
-     * made against `PlaybackSessionController`.
+     * The mpv trailer surface, as a slot. `HeroTrailerLayer` is a libmpv
+     * instance plus the `SurfaceView` it renders into, so it has no portable
+     * form and stays in `androidMain` -- exactly the split
+     * `PlaybackSurfaceController` made against `PlaybackSessionController`.
      */
     heroTrailerLayer: @Composable (HeroTrailerLayerArgs) -> Unit,
     /**

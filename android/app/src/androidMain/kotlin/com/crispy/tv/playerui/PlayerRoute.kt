@@ -1,4 +1,3 @@
-@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.crispy.tv.playerui
@@ -26,15 +25,11 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.rememberSeedColor
 import com.crispy.tv.details.detailsPaletteFromScheme
 import com.crispy.tv.details.rememberDetailsColorScheme
-import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
-import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlin.math.roundToInt
 
 @Composable
@@ -154,9 +149,7 @@ fun PlayerRoute(
     }
 
     LaunchedEffect(uiState.resizeMode) {
-        if (uiState.activeEngine == NativePlaybackEngine.MPV) {
-            session.applyResizeMode(uiState.resizeMode)
-        }
+        session.applyResizeMode(uiState.resizeMode)
     }
 
     Box(
@@ -165,33 +158,13 @@ fun PlayerRoute(
                 .fillMaxSize()
                 .background(Color.Black),
     ) {
-        when (uiState.activeEngine) {
-            NativePlaybackEngine.EXO -> {
-                AndroidView(
-                    modifier = surfaceModifier,
-                    factory = { viewContext ->
-                        PlayerView(viewContext).apply {
-                            useController = false
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                            session.bindExoPlayerView(this)
-                        }
-                    },
-                    update = { playerView ->
-                        playerView.resizeMode = uiState.resizeMode.toExoResizeMode()
-                    },
-                )
-            }
-
-            NativePlaybackEngine.MPV -> {
-                AndroidView(
-                    modifier = surfaceModifier,
-                    factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
-                    update = { surfaceView: SurfaceView ->
-                        session.attachMpvSurface(surfaceView)
-                    },
-                )
-            }
-        }
+        AndroidView(
+            modifier = surfaceModifier,
+            factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
+            update = { surfaceView: SurfaceView ->
+                session.attachMpvSurface(surfaceView)
+            },
+        )
 
         if (!isInPictureInPictureMode) {
             PlayerOverlay(
@@ -278,11 +251,5 @@ private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): PictureInPicture
         null
     }
 }
-
-private fun PlayerResizeMode.toExoResizeMode(): Int =
-    when (this) {
-        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-    }
 
 private const val TAG = "PlayerRoute"

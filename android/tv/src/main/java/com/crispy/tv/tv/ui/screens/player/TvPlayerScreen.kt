@@ -1,7 +1,6 @@
 package com.crispy.tv.tv.ui.screens.player
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -42,8 +41,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.nativeengine.playback.NativeTrack
@@ -68,7 +65,6 @@ import kotlinx.coroutines.delay
  * because a list the viewer can only move through one press at a time is a list
  * that can be read without looking at it, and that is what a television wants.
  */
-@OptIn(UnstableApi::class)
 @Composable
 fun TvPlayerScreen(
     viewModel: TvPlayerViewModel,
@@ -124,12 +120,8 @@ fun TvPlayerScreen(
             },
     ) {
         AndroidView(
-            factory = { context ->
-                PlayerView(context).apply {
-                    useController = false
-                    viewModel.bindPlayerView(this)
-                }
-            },
+            factory = { context -> viewModel.createMpvSurfaceView(context) },
+            update = { surfaceView -> viewModel.attachMpvSurface(surfaceView) },
             modifier = Modifier.fillMaxSize(),
         )
 

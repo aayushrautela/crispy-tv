@@ -5,15 +5,15 @@ package com.crispy.tv.nativeengine.playback
  * name no platform.
  *
  * This is the seam that makes a second engine possible. It was already an
- * interface in `:android:native-engine` with ExoPlayer and libmpv behind it,
- * but it lived in a plain `com.android.library` with no JVM variant, so a KMP
+ * interface in `:android:native-engine` behind it, but it lived in a plain
+ * `com.android.library` with no JVM variant, so a KMP
  * `commonMain` could not name it and every consumer of the types it returns was
  * pinned to `androidMain` for the same reason. It is now declared here --
  * **all fifteen members use only the lifted value types**.
  *
  * What did *not* come with it is [PlaybackSurfaceController], the other half of
- * the old `PlaybackController`. All four of its members take a `PlayerView`, a
- * `SurfaceView` or a `Context`, because the video surface is the one part of
+ * the old `PlaybackController`. Its members take a `SurfaceView` or a
+ * `Context`, because the video surface is the one part of
  * playback that genuinely has no portable form. An engine that can report a
  * snapshot does not need to know how a view is attached, and keeping the two
  * apart is what lets a non-Android engine implement this interface while

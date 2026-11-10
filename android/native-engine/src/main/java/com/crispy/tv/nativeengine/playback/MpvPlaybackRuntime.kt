@@ -17,6 +17,7 @@ internal class MpvPlaybackRuntime(
     private var surfaceView: SurfaceView? = null
     private var surfaceAttached: Boolean = false
     private var pendingSource: PlaybackSource? = null
+    private var pendingExternalAudioUrl: String? = null
     private var playRequested: Boolean = false
     private var state: NativePlaybackState = NativePlaybackState.IDLE
     private var videoLayout: NativeVideoLayout? = null
@@ -165,7 +166,9 @@ internal class MpvPlaybackRuntime(
             surfaceAttached = true
             pendingSource?.let { pending ->
                 pendingSource = null
-                startPlayback(pending)
+                val externalAudioUrl = pendingExternalAudioUrl
+                pendingExternalAudioUrl = null
+                startPlayback(pending, externalAudioUrl)
             }
         }
 
@@ -299,18 +302,26 @@ internal class MpvPlaybackRuntime(
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
 
-    fun play(source: PlaybackSource) {
+    /**
+     * Loads [source].
+     *
+     * [externalAudioUrl] is a second stream played alongside the video -- the
+     * trailer case, where the video and the audio come from two different
+     * URLs. mpv takes it as the `audio-file` option of the same `loadfile`.
+     */
+    fun play(source: PlaybackSource, externalAudioUrl: String? = null) {
         resetPlaybackStateForNewMedia()
         playRequested = true
         state = NativePlaybackState.PREPARING
         val url = source.url
-        Log.d(TAG, "play surfaceAttached=$surfaceAttached url=${debugUrl(url)}")
+        Log.d(TAG, "play surfaceAttached=$surfaceAttached url=${debugUrl(url)} externalAudio=${externalAudioUrl != null}")
         if (!surfaceAttached) {
             pendingSource = source
+            pendingExternalAudioUrl = externalAudioUrl
             Log.d(TAG, "play deferred until surface attach url=${debugUrl(url)}")
             return
         }
-        startPlayback(source)
+        startPlayback(source, externalAudioUrl)
     }
 
     fun setPlaying(isPlaying: Boolean) {
@@ -621,15 +632,22 @@ internal class MpvPlaybackRuntime(
         surfaceAttached = false
         surfaceView = null
         pendingSource = null
+        pendingExternalAudioUrl = null
     }
 
-    private fun startPlayback(source: PlaybackSource) {
+    private fun startPlayback(source: PlaybackSource, externalAudioUrl: String? = null) {
         applyRequestHeaders(source.headers)
         val url = source.url
-        Log.d(TAG, "startPlayback url=${debugUrl(url)} surfaceAttached=$surfaceAttached")
+        Log.d(TAG, "startPlayback url=${debugUrl(url)} surfaceAttached=$surfaceAttached externalAudio=${externalAudioUrl != null}")
+        val loadArguments =
+            if (externalAudioUrl.isNullOrBlank()) {
+                arrayOf("loadfile", url, "replace")
+            } else {
+                arrayOf("loadfile", url, "replace", "audio-file=$externalAudioUrl")
+            }
         runCatching {
             mpv?.setPropertyBoolean("pause", !playRequested)
-            mpv?.command(arrayOf("loadfile", url, "replace"))
+            mpv?.command(loadArguments)
         }
         if (source.externalSubtitles.isNotEmpty()) {
             val mpv = mpv
@@ -693,6 +711,7 @@ internal class MpvPlaybackRuntime(
 
     private fun resetPlaybackStateForNewMedia() {
         pendingSource = null
+        pendingExternalAudioUrl = null
         state = NativePlaybackState.IDLE
         lastBufferingPercent = null
         lastProgressAdvanceAtElapsedMs = 0L

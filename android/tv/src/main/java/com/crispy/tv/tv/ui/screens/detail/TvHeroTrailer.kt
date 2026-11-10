@@ -1,6 +1,5 @@
 package com.crispy.tv.tv.ui.screens.detail
 
-import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,23 +13,17 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.source.MergingMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.TrailerSource
+import com.crispy.tv.nativeengine.playback.NativePlaybackState
+import com.crispy.tv.nativeengine.playback.NativeTrailerPlayer
 import com.crispy.tv.youtubetractor.YouTubeTrailerExtractor
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
-@OptIn(UnstableApi::class)
 @Composable
 internal fun TvHeroTrailerLayer(
     trailers: List<TvTrailerEntry>,
@@ -85,79 +78,59 @@ internal fun TvHeroTrailerLayer(
 
     val playbackSource = source ?: return
 
-    val exoPlayer = remember(playbackSource.videoUrl, playbackSource.audioUrl) {
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context))
-            .build()
-            .apply {
-                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                volume = if (isMuted) 0f else 1f
-            }
-    }
-
-    DisposableEffect(exoPlayer) {
-        onDispose {
-            runCatching { exoPlayer.release() }
+    // One mpv instance per resolved source: a new URL means a fresh instance,
+    // because mpv's loadfile state (crop, mute) is per instance.
+    val trailerPlayer = remember(playbackSource.videoUrl, playbackSource.audioUrl) {
+        NativeTrailerPlayer(context).apply {
+            setCropped(true)
         }
     }
 
-    DisposableEffect(exoPlayer) {
-        var errored = false
-        val listener = object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                if (!errored) {
-                    errored = true
-                    advanceRequests++
+    DisposableEffect(trailerPlayer) {
+        onDispose {
+            trailerPlayer.release()
+        }
+    }
+
+    var lastErrorToken by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Long?>(null) }
+    var endedReported by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
+
+    LaunchedEffect(trailerPlayer, playbackSource.videoUrl, playbackSource.audioUrl) {
+        lastErrorToken = null
+        endedReported = false
+        trailerPlayer.play(playbackSource.videoUrl, playbackSource.audioUrl)
+    }
+
+    // mpv reports state through observed properties rather than callbacks, so
+    // the layer polls the snapshot the way the player screen does.
+    LaunchedEffect(trailerPlayer) {
+        while (coroutineContext.isActive) {
+            val snapshot = trailerPlayer.snapshot()
+            val error = snapshot.error
+            if (error != null && lastErrorToken != error.token) {
+                lastErrorToken = error.token
+                advanceRequests++
+            } else if (error == null) {
+                if (snapshot.state == NativePlaybackState.ENDED && !endedReported) {
+                    endedReported = true
+                    onEnded()
                 }
             }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) onEnded()
-            }
+            delay(250)
         }
-        exoPlayer.addListener(listener)
-        onDispose { exoPlayer.removeListener(listener) }
-    }
-
-    LaunchedEffect(exoPlayer, playbackSource.videoUrl, playbackSource.audioUrl) {
-        val mediaSourceFactory = DefaultMediaSourceFactory(context)
-        val videoSource = mediaSourceFactory.createMediaSource(MediaItem.fromUri(playbackSource.videoUrl))
-        val mediaSource =
-            playbackSource.audioUrl?.let { audioUrl ->
-                MergingMediaSource(
-                    videoSource,
-                    mediaSourceFactory.createMediaSource(MediaItem.fromUri(audioUrl)),
-                )
-            } ?: videoSource
-
-        exoPlayer.setMediaSource(mediaSource)
-        exoPlayer.prepare()
     }
 
     SideEffect {
-        exoPlayer.volume = if (isMuted) 0f else 1f
+        trailerPlayer.setMuted(isMuted)
     }
 
-    LaunchedEffect(exoPlayer, shouldPlay) {
-        exoPlayer.playWhenReady = shouldPlay
-        if (shouldPlay) {
-            exoPlayer.play()
-        } else {
-            exoPlayer.pause()
-        }
+    LaunchedEffect(trailerPlayer, shouldPlay) {
+        trailerPlayer.setPlaying(shouldPlay)
     }
 
     AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-            }
-        },
-        update = { view ->
-            view.player = exoPlayer
-        },
+        factory = { ctx -> trailerPlayer.createSurfaceView(ctx) },
+        update = { surfaceView -> trailerPlayer.attach(surfaceView) },
         modifier = modifier.fillMaxSize(),
     )
 }
