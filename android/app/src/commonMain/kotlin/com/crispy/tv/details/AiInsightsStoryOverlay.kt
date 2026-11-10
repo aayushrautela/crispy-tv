@@ -62,6 +62,9 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.ai.storyFocus
+import com.crispy.tv.ai.storyLabel
+import com.crispy.tv.ai.storyParagraph
 import com.crispy.tv.ui.components.CrispyIcon
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_auto_awesome
@@ -459,17 +462,18 @@ private fun AiInsightsStoryCopy(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         label?.let {
-            // The heading: the slide's own label in the display cut, in the
-            // slide's accent colour. Type only -- there is no shape behind it.
+            // The heading: the slide's own label in the display cut -- wide,
+            // heavy, slanted, square corners -- in the slide's accent colour.
+            // Type only -- there is no shape behind it.
             Text(
                 text = it,
                 style =
                     MaterialTheme.typography.headlineMedium.copy(
                         fontFamily = GoogleSansFlexDisplay,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         shadow = StoryTextShadow,
-                        lineHeight = 36.sp,
+                        lineHeight = 46.sp,
                         letterSpacing = (-0.4).sp,
                     ),
                 color = accent,
@@ -496,12 +500,14 @@ private fun AiInsightsStoryCopy(
             )
         }
         paragraph?.let {
+            // The description: the normal face, one step up from regular so it
+            // holds the photo without shouting.
             Text(
                 text = it,
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 19.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         shadow = StoryTextShadow,
                         lineHeight = 27.sp,
                     ),
@@ -616,28 +622,6 @@ private fun AiInsightsStoryHeader(
 
 /** The year, or null when there is none to print. */
 internal fun storyHeaderSubtitle(year: String?): String? = year?.trim()?.takeIf { it.isNotEmpty() }
-
-/**
- * The copy block's heading line: the slide's own `label` ("Standout", "The
- * catch"), trimmed, or null when the server sent none.
- */
-internal fun AiInsightSlide.storyLabel(): String? =
-    label.trim().takeIf { it.isNotEmpty() }
-
-/**
- * The copy block's headline line: the server's `focus`, trimmed, or null when
- * it sent none -- or sent only spaces.
- */
-internal fun AiInsightSlide.storyFocus(): String? =
-    focus?.trim()?.takeIf { it.isNotEmpty() }
-
-/**
- * Built from `body`/`context` only, so it can never repeat [storyLabel] or
- * [storyFocus], which are built from `label`/`focus`. The no-double-print
- * rule is structural, not defensive.
- */
-internal fun AiInsightSlide.storyParagraph(): String? =
-    (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }
 
 private fun AiInsightSlide.storySticker(): DrawableResource =
     when (key) {

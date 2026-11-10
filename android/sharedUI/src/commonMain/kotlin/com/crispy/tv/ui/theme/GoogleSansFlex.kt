@@ -75,36 +75,41 @@ val GoogleSansFlexNarrow: FontFamily
     )
 
 /**
- * The display cut for story headings: wide, bold and slightly rounded -- the
- * voice of Google's own "greetings" specimen. The axes live on the font, so a
- * caller names the family and the size it wants and gets the cut; the axes
- * are not per-`Text` settings.
+ * The display cut for story headings: wide, heavy and slanted, with sharp
+ * corners -- the loudest thing the variable face can do without a shape
+ * behind it. The axes live on the font, so a caller names the family and the
+ * size it wants and gets the cut; the axes are not per-`Text` settings.
  *
  * Why each axis is here:
- *  - `wght` 700 -- a heading has to hold against a photo.
- *  - `wdth` 120 -- the width axis is the personality; the font's default 100
+ *  - `wght` 800 -- thick, so the heading holds against a photo.
+ *  - `wdth` 140 -- the width axis is the personality; the font's default 100
  *    reads like ordinary text.
- *  - `opsz` 24.sp -- optical size is set from the size the cut is meant to be
- *    read at. 24 is the compromise between the two surfaces that share this
- *    family: the phone heading (30.sp) and the TV eyebrow (22.sp).
- *  - `ROND` 50 -- a little rounding, to take the hard edge off the wide bold
- *    shapes.
- *  - `slnt` stays at the font's default 0 -- upright.
- *
- * Compose has no named helper for `ROND`, so it goes through the generic
- * [FontVariation.Setting] factory, which requires a four-character axis tag.
+ *  - `slnt` -10 -- the full slant the axis allows (its range is -10..0), so
+ *    the cut leans instead of standing to attention.
+ *  - `opsz` 34.sp -- optical size is set from the size the cut is meant to be
+ *    read at. The cut is designed for headings in the 30-38.sp band, so 34 is
+ *    the middle of it. Measured on the bundled artifact, that whole band moves
+ *    the heading's advance by 0.14% -- which is why one family serves every
+ *    surface instead of two near-identical ones: a second family would
+ *    duplicate these axis values and let them drift, for a difference nobody
+ *    can see. Compose resolves the setting as 34 x fontScale, so the axis
+ *    tracks accessibility scaling rather than freezing.
+ *  - `ROND` stays at the font's default 0 -- square corners. The rounding
+ *    reads friendly; the cut is meant to read loud. Reaching `ROND` at all
+ *    would need the generic [FontVariation.Setting] factory, which requires a
+ *    four-character axis tag.
  */
 val GoogleSansFlexDisplay: FontFamily
     @Composable get() = FontFamily(
         Font(
             Res.font.googlesans_flex,
-            FontWeight(700),
+            FontWeight(800),
             variationSettings =
                 FontVariation.Settings(
-                    FontVariation.weight(700),
-                    FontVariation.width(120f),
-                    FontVariation.opticalSizing(24.sp),
-                    FontVariation.Setting("ROND", 50f),
+                    FontVariation.weight(800),
+                    FontVariation.width(140f),
+                    FontVariation.slant(-10f),
+                    FontVariation.opticalSizing(34.sp),
                 ),
         ),
     )
