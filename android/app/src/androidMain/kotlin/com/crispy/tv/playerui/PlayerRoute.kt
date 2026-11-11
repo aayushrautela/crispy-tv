@@ -4,12 +4,12 @@ package com.crispy.tv.playerui
 
 import android.util.Log
 import android.view.SurfaceView
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalConfiguration
@@ -73,6 +74,7 @@ fun PlayerRoute(
             videoBounds = bounds
         }
     }
+
     // In Zoom the surface is sized to cover the window, so its own bounds reach
     // past the window edge; the PiP source rect has to be the player area then,
     // because that is what the viewer actually sees.
@@ -83,7 +85,14 @@ fun PlayerRoute(
     val zoomCropActive =
         uiState.resizeMode == PlayerResizeMode.Zoom && !isInPictureInPictureMode
     val effectiveVideoBounds = if (zoomCropActive) playerAreaBounds else videoBounds
-
+    // The PiP window is opened with the geometry on screen when the viewer
+    // leaves, and after that it keeps it. Re-deriving the config inside the
+    // window re-shaped it a beat after entry -- `zoomCropActive` flips the
+    // moment the mode changes, so the cropped window in Zoom became the
+    // video's own aspect once inside -- which reads as the window jumping.
+    // The controller drops an unchanged config, so re-sending the remembered
+    // one costs nothing and nothing re-shapes on its own afterwards.
+    var pipConfigBeforeEntry by remember { mutableStateOf<PictureInPictureConfig?>(null) }
     val gestureController = remember(context) { tryCreateGestureController(context.findActivity()) }
     val gestureFeedback = rememberGestureFeedback()
     val scope = rememberCoroutineScope()
@@ -137,7 +146,15 @@ fun PlayerRoute(
             )
         }
 
-    LaunchedEffect(effectiveVideoBounds, uiState.videoLayout, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
+    LaunchedEffect(
+        effectiveVideoBounds,
+        uiState.videoLayout,
+        uiState.isPlaying,
+        uiState.isBuffering,
+        uiState.errorMessage,
+        uiState.stableDurationMs,
+        isInPictureInPictureMode,
+    ) {
         // Wait for real video geometry before advertising PiP; using the window bounds
         // ratio while the first frames are still loading produces a wrong-aspect window.
         // Audio-only streams never report a layout, so a settled duration unlocks them.
@@ -160,16 +177,26 @@ fun PlayerRoute(
                 uiState.errorMessage == null &&
                 playbackGeometryKnown &&
                 (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
-        Log.d(
-            TAG,
-            "pip config videoBounds=$videoBounds aspectRatio=$aspectRatio enabled=$pipEnabled isPlaying=${uiState.isPlaying} isBuffering=${uiState.isBuffering} stableDurationMs=${uiState.stableDurationMs} error=${uiState.errorMessage}",
-        )
-        onPictureInPictureConfigChanged(
+        val config =
             PictureInPictureConfig(
                 enabled = pipEnabled,
                 sourceRect = effectiveVideoBounds,
                 aspectRatio = aspectRatio,
-            ),
+            )
+        // Enter the window with the shape the fullscreen surface actually
+        // had, then hold it there. `playerAreaBounds` in Zoom is the whole
+        // window, so the window keeps its entered aspect while the surface
+        // inside returns to the clipped video shape -- which is exactly the
+        // "no change after we are in pip" the viewer reported.
+        if (isInPictureInPictureMode) {
+            pipConfigBeforeEntry?.let(onPictureInPictureConfigChanged)
+        } else {
+            pipConfigBeforeEntry = config
+            onPictureInPictureConfigChanged(config)
+        }
+        Log.d(
+            TAG,
+            "pip config videoBounds=$videoBounds aspectRatio=$aspectRatio enabled=$pipEnabled isPlaying=${uiState.isPlaying} isBuffering=${uiState.isBuffering} stableDurationMs=${uiState.stableDurationMs} error=${uiState.errorMessage} frozen=${pipConfigBeforeEntry != null}",
         )
     }
 
@@ -204,30 +231,45 @@ fun PlayerRoute(
             val screenConfiguration = LocalConfiguration.current
             val screenAspect =
                 (screenConfiguration.screenWidthDp / screenConfiguration.screenHeightDp)
+            // Zoom morphs rather than pops: both ends are computed as sizes,
+            // then this fraction walks between them, so the SurfaceView
+            // animates like the controls instead of appearing in one frame.
+            // In PiP the surface stays fitted, so the target is Fit there and
+            // mpv's own panscan does the crop inside the frozen window.
+            val zoomFraction by animateFloatAsState(
+                targetValue = if (zoomCropActive) 1f else 0f,
+                animationSpec =
+                    tween(durationMillis = ZoomCropDurationMillis, easing = FastOutSlowInEasing),
+                label = "zoomCrop",
+            )
             val surfaceSizeModifier =
-                if (zoomCropActive && videoAspect != null && videoAspect > 0f && maxHeight > 0.dp) {
-                    // Zoom crops the picture to fill the screen: the view keeps the
-                    // video's aspect but grows until it covers the window, so the
-                    // overflow falls off the window edge (a centre crop, the way
-                    // ExoPlayer's RESIZE_MODE_ZOOM behaved). The size has to be
-                    // computed here -- `aspectRatio` only ever fits -- and
-                    // `requiredSize` is what lets the view exceed its parent's
-                    // constraints.
-                    val windowAspect = maxWidth / maxHeight
-                    if (videoAspect >= windowAspect) {
-                        Modifier
-                            .align(Alignment.Center)
-                            .requiredSize(maxHeight * videoAspect, maxHeight)
-                    } else {
-                        Modifier
-                            .align(Alignment.Center)
-                            .requiredSize(maxWidth, maxWidth / videoAspect)
-                    }
-                } else if (videoAspect != null && videoAspect > 0f && screenAspect > 0f) {
-                    val fitted = Modifier.align(Alignment.Center).aspectRatio(videoAspect)
-                    if (videoAspect >= screenAspect) fitted.fillMaxWidth() else fitted.fillMaxHeight()
-                } else {
+                if (videoAspect == null || videoAspect <= 0f || maxHeight <= 0.dp) {
+                    // Until the video reports its size the view fills the window.
                     Modifier.fillMaxSize()
+                } else {
+                    // Fitted: the view keeps the video's aspect and the black
+                    // box behind letterboxes the remainder.
+                    val fitSize =
+                        if (videoAspect >= screenAspect) {
+                            SizeDp(maxWidth, maxWidth / videoAspect)
+                        } else {
+                            SizeDp(maxHeight * videoAspect, maxHeight)
+                        }
+                    // Cover: the same aspect, grown until it spans the window,
+                    // so the overflow is cropped by the window edge.
+                    val windowAspect = maxWidth / maxHeight
+                    val coverSize =
+                        if (videoAspect >= windowAspect) {
+                            SizeDp(maxHeight * videoAspect, maxHeight)
+                        } else {
+                            SizeDp(maxWidth, maxWidth / videoAspect)
+                        }
+                    Modifier
+                        .align(Alignment.Center)
+                        .requiredSize(
+                            lerpDp(fitSize.width, coverSize.width, zoomFraction),
+                            lerpDp(fitSize.height, coverSize.height, zoomFraction),
+                        )
                 }
             AndroidView(
                 modifier = surfaceModifier.then(surfaceSizeModifier),
@@ -323,5 +365,24 @@ private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): PictureInPicture
         null
     }
 }
+
+/**
+ * How long the surface takes to walk between its fitted size and its cover
+ * crop. The controls use the same easing family, so the crop settles with
+ * them instead of against them.
+ */
+private const val ZoomCropDurationMillis = 300
+
+/** A size in density units, the pair `requiredSize` wants. */
+private data class SizeDp(val width: Dp, val height: Dp)
+
+/**
+ * Linear interpolation between two sizes. `androidx.compose.ui.unit` ships no
+ * `lerp` for `Dp` (only `Color` has one), and the two ends here are always
+ * sizes in the same unit family, so the arithmetic is spelled out rather
+ * than guessed at through a `Sp` conversion.
+ */
+private fun lerpDp(start: Dp, stop: Dp, fraction: Float): Dp =
+    start + (stop - start) * fraction.coerceIn(0f, 1f)
 
 private const val TAG = "PlayerRoute"
