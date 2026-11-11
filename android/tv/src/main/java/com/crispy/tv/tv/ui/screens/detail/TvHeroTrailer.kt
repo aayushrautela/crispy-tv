@@ -1,10 +1,5 @@
 package com.crispy.tv.tv.ui.screens.detail
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -14,12 +9,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.TrailerSource
@@ -102,12 +93,10 @@ internal fun TvHeroTrailerLayer(
 
     var lastErrorToken by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Long?>(null) }
     var endedReported by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
-    var videoAspect by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Float?>(null) }
 
     LaunchedEffect(trailerPlayer, playbackSource.videoUrl, playbackSource.audioUrl) {
         lastErrorToken = null
         endedReported = false
-        videoAspect = null
         trailerPlayer.play(playbackSource.videoUrl, playbackSource.audioUrl)
     }
 
@@ -121,7 +110,6 @@ internal fun TvHeroTrailerLayer(
                 lastErrorToken = error.token
                 advanceRequests++
             } else if (error == null) {
-                snapshot.videoLayout?.aspectRatioValue()?.let { videoAspect = it }
                 if (snapshot.state == NativePlaybackState.ENDED && !endedReported) {
                     endedReported = true
                     onEnded()
@@ -139,31 +127,11 @@ internal fun TvHeroTrailerLayer(
         trailerPlayer.setPlaying(shouldPlay)
     }
 
-    var boxSize by remember { mutableStateOf(IntSize.Zero) }
-    Box(
-        modifier = modifier
-            .clipToBounds()
-            .onSizeChanged { boxSize = it },
-    ) {
-        // Cover, the way the old Exo RESIZE_MODE_ZOOM hero did: size the surface
-        // to the video's own aspect but larger than the box in one dimension,
-        // and let the box's clipToBounds crop the overflow. The tunneled vo
-        // renders at the video's native size and the view scales it, so the
-        // view must carry the video aspect or the scaling would stretch.
-        val viewportAspect =
-            if (boxSize.height > 0) boxSize.width.toFloat() / boxSize.height.toFloat() else 0f
-        val aspect = videoAspect
-        val surfaceSizeModifier =
-            if (aspect != null && aspect > 0f && viewportAspect > 0f) {
-                val covered = Modifier.align(Alignment.Center).aspectRatio(aspect)
-                if (aspect >= viewportAspect) covered.fillMaxHeight() else covered.fillMaxWidth()
-            } else {
-                Modifier.fillMaxSize()
-            }
-        AndroidView(
-            factory = { ctx -> trailerPlayer.createSurfaceView(ctx) },
-            update = { surfaceView -> trailerPlayer.attach(surfaceView) },
-            modifier = surfaceSizeModifier,
-        )
-    }
+    // The trailer runs on `vo=gpu` with a panscan cover-crop, so mpv renders
+    // the cropped frame into the surface and the view just fills the hero.
+    AndroidView(
+        factory = { ctx -> trailerPlayer.createSurfaceView(ctx) },
+        update = { surfaceView -> trailerPlayer.attach(surfaceView) },
+        modifier = modifier,
+    )
 }

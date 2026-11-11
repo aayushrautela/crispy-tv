@@ -19,7 +19,9 @@ import android.view.SurfaceView
  * a URL, a mute flag, a crop flag and a state to poll.
  */
 class NativeTrailerPlayer(context: Context) {
-    private val runtime = MpvPlaybackRuntime(context.applicationContext)
+    // `gpu`, not the tunneled `mediacodec_embed`: the trailer has no HDR to
+    // preserve and needs panscan, which the tunneled vo ignores.
+    private val runtime = MpvPlaybackRuntime(context.applicationContext, forceGpuVo = true)
 
     /** The view the trailer is drawn into. It must be created by this player. */
     fun createSurfaceView(viewContext: Context): SurfaceView = runtime.createSurfaceView(viewContext)
@@ -49,14 +51,12 @@ class NativeTrailerPlayer(context: Context) {
     }
 
     /**
-     * [cropped] asks mpv for a zoom (panscan) crop, the way the hero did. The
-     * tunneled `mediacodec_embed` vo ignores panscan and renders at the video's
-     * native size, so the actual cover-crop is done by the Compose layer sizing
-     * the SurfaceView larger than its box and clipping; this call still drives
-     * the subtitle-margin decision in [MpvPlaybackRuntime.applyResizeMode].
+     * [cropped] cover-crops the trailer to fill its surface, the way the hero
+     * did under Exo's `RESIZE_MODE_ZOOM`. The trailer runs on `vo=gpu`, so mpv
+     * honours the crop and the UI neither sizes nor clips the surface.
      */
     fun setCropped(cropped: Boolean) {
-        runtime.applyResizeMode(if (cropped) PlayerResizeMode.Zoom else PlayerResizeMode.Fit)
+        runtime.setCoverCrop(cropped)
     }
 
     fun snapshot(): NativePlaybackSnapshot = runtime.snapshot()

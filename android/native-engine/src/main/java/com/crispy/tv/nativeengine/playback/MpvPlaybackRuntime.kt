@@ -10,6 +10,13 @@ import dev.jdtech.mpv.MPVLib
 
 internal class MpvPlaybackRuntime(
     context: Context,
+    /**
+     * Render through `gpu` instead of the tunneled `mediacodec_embed` path.
+     * The tunneled vo gives native HDR and zero-copy but ignores panscan, so a
+     * surface that must be cover-cropped (the hero trailer, which has no HDR
+     * to preserve) needs `gpu`.
+     */
+    private val forceGpuVo: Boolean = false,
 ) {
     private val appContext = context.applicationContext
     private var mpv: MPVLib? = null
@@ -41,6 +48,9 @@ internal class MpvPlaybackRuntime(
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
     private var resizeMode: PlayerResizeMode = PlayerResizeMode.Fit
+
+    /** Cover-crop requested before the mpv instance existed; applied at init. */
+    private var coverCrop: Boolean = false
 
     private val eventObserver = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = Unit
@@ -255,10 +265,12 @@ internal class MpvPlaybackRuntime(
             instance.setOptionString("hwdec", "mediacodec")
             // vo order: mediacodec_embed first — the tunneled decoder writes
             // straight to the SurfaceView surface (zero copy, native HDR via
-            // the HWC, but no mpv overlays). gpu is the fallback when tunneling
-            // is unsupported; gpu (not gpu-next) because gpu-next corrupts on
-            // 10-bit HDR opaque surfaces (mpvEx #817).
-            instance.setOptionString("vo", VO_PREFERRED)
+            // the HWC, but no mpv overlays, and it ignores panscan). gpu is the
+            // fallback when tunneling is unsupported, and the only choice when
+            // the surface must be cover-cropped; gpu (not gpu-next) because
+            // gpu-next corrupts on 10-bit HDR opaque surfaces (mpvEx #817).
+            // The trailer passes forceGpuVo = true — it has no HDR to preserve.
+            instance.setOptionString("vo", if (forceGpuVo) "gpu" else VO_PREFERRED)
             instance.setOptionString("msg-level", "all=warn")
             instance.setOptionString("demuxer-max-bytes", "$DEMUXER_MAX_BYTES")
             instance.setOptionString("demuxer-max-back-bytes", "$DEMUXER_MAX_BYTES")
@@ -266,6 +278,12 @@ internal class MpvPlaybackRuntime(
             instance.setOptionString("force-window", "no")
             instance.setOptionString("idle", "once")
             instance.init()
+            // The trailer asks for its cover-crop at construction, before the
+            // instance exists, so apply the remembered value once it does.
+            if (coverCrop) {
+                instance.setPropertyDouble("panscan", 1.0)
+                instance.setPropertyString("video-aspect-override", "no")
+            }
             // Subtitles are drawn by the app overlay from sub-text, not by mpv:
             // mediacodec_embed (tunneled) video cannot carry mpv's rendered
             // overlays, so mpv-rendered subs and native HDR are mutually exclusive.
@@ -500,6 +518,24 @@ internal class MpvPlaybackRuntime(
     fun setSubtitleDelayMs(delayMs: Int) {
         subtitleDelayMs = delayMs
         runCatching { mpv?.setPropertyDouble("sub-delay", delayMs / 1000.0) }
+    }
+
+    /**
+     * Cover-crop the video to fill the surface (`panscan=1.0`), the hero
+     * trailer's old `RESIZE_MODE_ZOOM` behaviour. Separate from
+     * [applyResizeMode]'s `Zoom`, which is a half zoom for the player's
+     * user-facing resize mode.
+     *
+     * The trailer calls this before its mpv instance exists, so the value is
+     * remembered and applied in [initialize] too.
+     */
+    fun setCoverCrop(enabled: Boolean) {
+        coverCrop = enabled
+        val mpv = mpv ?: return
+        runCatching {
+            mpv.setPropertyDouble("panscan", if (enabled) 1.0 else 0.0)
+            mpv.setPropertyString("video-aspect-override", "no")
+        }
     }
 
     fun applyResizeMode(mode: PlayerResizeMode) {
