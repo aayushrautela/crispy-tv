@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RectangleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,9 +14,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.settings.SubtitleAppearance
 
@@ -70,9 +71,12 @@ internal fun PlayerSubtitleCue(
     if (lines.isEmpty()) return
 
     BoxWithConstraints(modifier = modifier) {
-        val fontSize =
-            (maxWidth * SubtitleFontWidthPercent).coerceIn(MinSubtitleFontSize, MaxSubtitleFontSize) *
-                (appearance.sizePercent / 100f)
+        // Measured off the surface in Dp, used as Sp: `TextStyle` takes a
+        // `TextUnit` and the two unit families do not meet, so the measurement
+        // crosses once, here, rather than at each of the three fields.
+        val fontDp = (maxWidth * SubtitleFontWidthPercent).coerceIn(MinSubtitleFontSize, MaxSubtitleFontSize)
+        val fontSizeValue = fontDp / 1.dp * (appearance.sizePercent / 100f)
+        val fontSize = fontSizeValue.sp
         val bottomInset = maxHeight * (appearance.positionPercent / 100f) + controlsLift
         val textColor = Color(appearance.textColor)
         val borderColor = Color(appearance.borderColor)
@@ -102,9 +106,9 @@ internal fun PlayerSubtitleCue(
                         style =
                             baseStyle.copy(
                                 fontSize = fontSize,
-                                lineHeight = fontSize * SubtitleLineHeightMultiplier,
+                                lineHeight = (fontSizeValue * SubtitleLineHeightMultiplier).sp,
                                 fontWeight = FontWeight.Medium,
-                                letterSpacing = fontSize * SubtitleLetterSpacingFraction,
+                                letterSpacing = (fontSizeValue * SubtitleLetterSpacingFraction).sp,
                                 // No outline when the row already carries a
                                 // background; see the KDoc above.
                                 shadow =
