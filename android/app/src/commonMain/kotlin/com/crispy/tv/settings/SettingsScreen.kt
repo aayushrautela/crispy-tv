@@ -90,6 +90,7 @@ fun SettingsScreen(
     onNavigateToPluginsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToImageSettings: () -> Unit = {},
+    onNavigateToSubtitleSettings: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
@@ -133,7 +134,8 @@ fun SettingsScreen(
                             label = "Subtitles",
                             description = "Caption styling and defaults",
                             icon = Res.drawable.ic_closed_caption,
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            onClick = onNavigateToSubtitleSettings
                         )
                     )
             ),

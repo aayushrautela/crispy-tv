@@ -14,6 +14,7 @@ import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.platform.AppLogger
 import com.crispy.tv.settings.ImageSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepository
+import com.crispy.tv.settings.SubtitleSettingsRepository
 import com.crispy.tv.sync.ProfileDataCloudSync
 
 /**
@@ -132,6 +133,7 @@ class AppNavHostDependencies(
     val pluginsSettingsScreen: (@Composable (onBack: () -> Unit) -> Unit)?,
     val addonsSettingsViewModelFactory: ViewModelProvider.Factory,
     val imageSettingsRepository: ImageSettingsRepository,
+    val subtitleSettingsRepository: SubtitleSettingsRepository,
     val profileDataCloudSync: ProfileDataCloudSync,
     // ---- player -----------------------------------------------------------------
     val addPlayerDestination: (builder: NavGraphBuilder, navController: NavHostController) -> Unit,

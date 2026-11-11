@@ -11,6 +11,7 @@ import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.settings.SubtitleAppearance
 
 /**
  * What the player surface is currently showing, as a value.
@@ -97,6 +98,12 @@ data class PlayerUiState(
      * player overlay (mpv renders no subs on the tunneled fullscreen surface).
      */
     val currentSubtitleText: String? = null,
+    /**
+     * How the cue is drawn: colours, background, size and position, read from
+     * the subtitle settings repository while the player is open rather than
+     * once at state creation.
+     */
+    val subtitleAppearance: SubtitleAppearance = SubtitleAppearance(),
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,

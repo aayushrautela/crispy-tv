@@ -45,7 +45,8 @@ import kotlin.test.assertSame
  * ## The store names are a contract, and they are asserted literally
  *
  * `supabase_sync_lab`, `pending_provider_auth`, `profile_data_shadow`, `playback_settings`,
- * `image_settings` and `ai_insights_cache` are the names every install that has already run has its
+ * `image_settings`, `subtitle_settings` and `ai_insights_cache` are the names every install that
+ * has already run has its
  * state under. Renaming one strands it. They are declared as private constants inside [AppGraph], so
  * a reader of the graph sees them and a test that renamed one would fail here — which is the point:
  * a test written from the constant names would agree with any rename.
@@ -67,6 +68,7 @@ class AppGraphCachingTest {
         assertSame(graph.homeCatalogService, graph.homeCatalogService, why)
         assertSame(graph.playbackSettingsRepository, graph.playbackSettingsRepository, why)
         assertSame(graph.imageSettingsRepository, graph.imageSettingsRepository, why)
+        assertSame(graph.subtitleSettingsRepository, graph.subtitleSettingsRepository, why)
         assertSame(graph.aiInsightsRepository, graph.aiInsightsRepository, why)
         // Watch history and the repository over it used to be reached through a `(Context) ->`
         // factory in `androidMain`, so a reader had four separate instances of each. They are
@@ -86,6 +88,7 @@ class AppGraphCachingTest {
         graph.pendingProviderAuthStore
         graph.playbackSettingsRepository
         graph.imageSettingsRepository
+        graph.subtitleSettingsRepository
         graph.aiInsightsRepository
         graph.watchHistoryService
         graph.userMediaRepository
@@ -97,6 +100,7 @@ class AppGraphCachingTest {
                 "pending_provider_auth",
                 "playback_settings",
                 "image_settings",
+                "subtitle_settings",
                 "ai_insights_cache",
                 "watch_progress",
                 "profile_data_shadow",

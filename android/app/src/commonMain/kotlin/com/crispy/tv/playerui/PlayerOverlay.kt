@@ -334,10 +334,9 @@ internal fun PlayerOverlay(
 
         PlayerSubtitleCue(
             text = uiState.currentSubtitleText,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 96.dp),
+            appearance = uiState.subtitleAppearance,
+            controlsLift = if (controlsVisible) 96.dp else 0.dp,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
 
         PlayerErrorCard(

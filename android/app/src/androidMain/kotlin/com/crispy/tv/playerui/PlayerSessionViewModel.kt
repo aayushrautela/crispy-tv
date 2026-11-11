@@ -49,6 +49,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.TorrentResolver
 import com.crispy.tv.settings.PlaybackSettingsRepository
+import com.crispy.tv.settings.SubtitleSettingsRepository
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamResolver
@@ -96,6 +97,16 @@ class PlayerSessionViewModel(
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         this.appContext.appGraph().graph.playbackSettingsRepository
+    /**
+     * The cue's appearance, read live rather than at state creation.
+     *
+     * Collected below, so an emission lands in `PlayerUiState.subtitleAppearance`
+     * instead of the value the player happened to open with: the style is chosen
+     * on the subtitle settings screen and must be the one currently stored, and a
+     * value read once here would be whatever was true at construction time.
+     */
+    private val subtitleSettingsRepository: SubtitleSettingsRepository =
+        this.appContext.appGraph().graph.subtitleSettingsRepository
     /**
      * The fetch scope is this view model's own, not one the repository creates.
      *
@@ -197,6 +208,7 @@ class PlayerSessionViewModel(
                 currentPlaybackUrl = null,
                 activeEngine = initialEngine,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
+                subtitleAppearance = subtitleSettingsRepository.appearance.value,
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -325,6 +337,11 @@ class PlayerSessionViewModel(
         viewModelScope.launch {
             subtitleRepository.error.collect { error ->
                 _uiState.update { it.copy(addonSubtitlesError = error) }
+            }
+        }
+        viewModelScope.launch {
+            subtitleSettingsRepository.appearance.collect { appearance ->
+                _uiState.update { it.copy(subtitleAppearance = appearance) }
             }
         }
         viewModelScope.launch {

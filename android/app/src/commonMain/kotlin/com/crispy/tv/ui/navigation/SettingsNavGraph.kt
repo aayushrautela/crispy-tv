@@ -13,6 +13,7 @@ import com.crispy.tv.settings.ImageQuality
 import com.crispy.tv.settings.ImageSettingsScreen
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.SettingsScreen
+import com.crispy.tv.settings.SubtitleSettingsScreen
 import kotlinx.coroutines.launch
 
 internal fun NavGraphBuilder.addSettingsNavGraph(
@@ -42,6 +43,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             },
             onNavigateToImageSettings = {
                 navController.navigate(AppRoutes.ImageSettingsRoute)
+            },
+            onNavigateToSubtitleSettings = {
+                navController.navigate(AppRoutes.SubtitleSettingsRoute)
             },
             onNavigateToAccountsProfiles = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
@@ -77,6 +81,22 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             onBack = { navController.popBackStack() },
             onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
             viewModelFactory = dependencies.profileListViewModelFactory,
+        )
+        }
+    }
+
+    composable(AppRoutes.SubtitleSettingsRoute) {
+        PredictivePeelContainer {
+        val subtitleSettingsRepository = dependencies.subtitleSettingsRepository
+        val subtitleAppearance by subtitleSettingsRepository.appearance.collectAsStateWithLifecycle()
+
+        SubtitleSettingsScreen(
+            appearance = subtitleAppearance,
+            onBoxStyleSelected = subtitleSettingsRepository::selectBoxStyle,
+            onTextColorSelected = subtitleSettingsRepository::selectTextColor,
+            onSizePercentChanged = subtitleSettingsRepository::setSizePercent,
+            onPositionPercentChanged = subtitleSettingsRepository::setPositionPercent,
+            onBack = { navController.popBackStack() },
         )
         }
     }
