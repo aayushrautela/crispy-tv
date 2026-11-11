@@ -30,8 +30,14 @@ fun sanitizeSubtitleCue(raw: String): String? {
     return joined.takeIf { it.isNotEmpty() }
 }
 
-/** `{\...}` — ASS/SSA override blocks, matched non-greedily up to the closing brace. */
-private val ASS_OVERRIDE_BLOCK_REGEX = Regex("""\{[^}]*}""")
+/**
+ * `{\...}` — ASS/SSA override blocks, matched up to the closing brace.
+ * Both braces are escaped: ICU (Android's `java.util.regex`) requires `{` and `}`
+ * to be quoted to be treated as literals, and a bare `}` is a syntax error there.
+ * The JVM accepts an unescaped `}`, which is why this crashed `<clinit>` on device
+ * while the tests passed.
+ */
+private val ASS_OVERRIDE_BLOCK_REGEX = Regex("""\{[^}]*\}""")
 
 /** `<i>`, `</b>`, `<font color=...>` — residual markup some containers leave in the text. */
 private val MARKUP_TAG_REGEX = Regex("""</?[a-zA-Z][^>]*>""")
