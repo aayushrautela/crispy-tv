@@ -194,15 +194,17 @@ internal fun HeroTrailerLayer(
     Box(
         modifier = modifier.clipToBounds()
     ) {
-        // Size the surface to the video's own aspect, the way PlayerRoute does:
-        // the tunneled vo renders at the video's native size and the view scales
-        // it, so a viewport-sized surface would stretch the picture.
+        // Cover, the way the old Exo RESIZE_MODE_ZOOM hero did: size the surface
+        // to the video's own aspect but larger than the box in one dimension,
+        // and let the box's clipToBounds crop the overflow. The tunneled vo
+        // renders at the video's native size and the view scales it, so the
+        // view must carry the video aspect or the scaling would stretch.
         val viewportAspect = viewportWidthPx.toFloat() / viewportHeightPx.toFloat()
         val aspect = videoAspect
         val surfaceSizeModifier =
             if (aspect != null && aspect > 0f && viewportAspect > 0f) {
-                val fitted = Modifier.align(Alignment.Center).aspectRatio(aspect)
-                if (aspect >= viewportAspect) fitted.fillMaxWidth() else fitted.fillMaxHeight()
+                val covered = Modifier.align(Alignment.Center).aspectRatio(aspect)
+                if (aspect >= viewportAspect) covered.fillMaxHeight() else covered.fillMaxWidth()
             } else {
                 Modifier.fillMaxSize()
             }

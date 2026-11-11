@@ -48,7 +48,13 @@ class NativeTrailerPlayer(context: Context) {
         runtime.setMuted(muted)
     }
 
-    /** [cropped] fills the surface and cuts the overflow, the way the hero did. */
+    /**
+     * [cropped] asks mpv for a zoom (panscan) crop, the way the hero did. The
+     * tunneled `mediacodec_embed` vo ignores panscan and renders at the video's
+     * native size, so the actual cover-crop is done by the Compose layer sizing
+     * the SurfaceView larger than its box and clipping; this call still drives
+     * the subtitle-margin decision in [MpvPlaybackRuntime.applyResizeMode].
+     */
     fun setCropped(cropped: Boolean) {
         runtime.applyResizeMode(if (cropped) PlayerResizeMode.Zoom else PlayerResizeMode.Fit)
     }
