@@ -2,6 +2,8 @@ package com.crispy.tv.details
 
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.details.trailer.TrailerSource
+import com.crispy.tv.images.ImageQuality
+import com.crispy.tv.images.ResponsiveImageSet
 
 /**
  * The two declarations `DetailsHero.kt` held above its composable, separated out
@@ -17,6 +19,30 @@ import com.crispy.tv.details.trailer.TrailerSource
  */
 internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
     return details?.artworkUrl
+}
+
+/**
+ * The URL the hero backdrop fetches: the widest tier the artwork set carries,
+ * falling back to the flat URL.
+ *
+ * `urlFor(HIGH)` is the call that reaches `original` -- the uncapped tier the
+ * app's ceiling keeps out of `urlForDisplaySize`, which exists so a card never
+ * over-fetches -- and its fallback chain covers a set carrying fewer tiers, so
+ * the answer degrades to `high`/`medium` rather than to nothing.
+ *
+ * Choosing through the set rather than the flat URL is what makes the details
+ * response an upgrade: the flat URL *is* `artwork.medium`, so a hero that
+ * resolves `medium` on both sides of the load is one request that never runs
+ * again.
+ */
+internal fun detailsHeroArtworkUrl(
+    artwork: ResponsiveImageSet?,
+    fallbackUrl: String?,
+): String? {
+    return artwork
+        ?.takeIf { !it.isEmpty }
+        ?.urlFor(ImageQuality.HIGH)
+        ?: fallbackUrl
 }
 
 /**

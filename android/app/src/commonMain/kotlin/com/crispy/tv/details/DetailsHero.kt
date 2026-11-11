@@ -51,6 +51,7 @@ import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.SharedImageMemoryKeys
+import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
@@ -95,8 +96,11 @@ internal fun HeroSection(
 
     val hasTrailer = trailer.isNotEmpty()
     var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
-    var trailerHasRenderedFirstFrame by remember(trailer) { mutableStateOf(false) }
     val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
+    // Keyed on the shared element so a new item resets it: without the trailer
+    // cover, a tier that failed to load is the one thing that would otherwise
+    // leave the card's `low` bitmap stretched over the hero for this item only.
+    var heroTierFailed by remember(resolvedKey) { mutableStateOf(false) }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -160,18 +164,23 @@ internal fun HeroSection(
 
         if (!imageUrl.isNullOrBlank() || artwork?.isEmpty == false) {
             val cardCacheKey = backdropKey?.let { SharedImageMemoryKeys.getCardKey(it) }
-            // The hero picks its own rendition from the artwork set, capped by the
-            // user's image-quality setting, instead of trusting the flat URL: the
-            // card placeholder above is the card's `low` bitmap, and the hero must
-            // fetch the tier its size actually needs rather than relying on the
-            // placeholder swap. `fallbackUrl` covers the phase before details load.
-            val heroRequest = rememberCrispyImageModel(
-                image = artwork,
+            // The hero asks for the widest tier the set carries, not the one
+            // `urlForDisplaySize` picks under the app's card ceiling: it is the only
+            // full-screen image here, so `urlFor(HIGH)` is the call that reaches
+            // `original` and falls back through `high`/`medium` for a set carrying
+            // fewer tiers. Reaching for the set at all is what makes the details
+            // response an upgrade -- `imageUrl` is the flat `artwork.medium`, so a
+            // request resolving `medium` on both sides of the load is one request,
+            // and it never runs again.
+            val heroUrl = detailsHeroArtworkUrl(artwork, imageUrl)
+            // The chosen tier failed to load, so serve the flat URL the rest of the
+            // app fetches instead of leaving the card's placeholder on screen.
+            val heroRequest = crispyImageRequest(
+                url = if (heroTierFailed) imageUrl else heroUrl,
                 width = heroMaxWidth,
                 height = heroBoxHeight,
                 memoryCacheKey = backdropKey,
                 placeholderMemoryCacheKey = cardCacheKey,
-                fallbackUrl = imageUrl,
             )
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
                 val cornerRadius = with(animatedVisibilityScope) {
@@ -198,6 +207,7 @@ internal fun HeroSection(
                     onHeroImageLoaded()
                 },
                 onError = { error ->
+                    heroTierFailed = true
                     onHeroImageLoadFailed()
                 },
             )
@@ -223,37 +233,10 @@ internal fun HeroSection(
                     viewportHeightPx = heightPx.toInt(),
                     shouldPlay = shouldAttemptPlayback,
                     isMuted = isTrailerMuted,
-                    onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
                     onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
                     onFocusLossPause = onFocusLossPause,
                 )
             )
-        }
-
-        val coverAlpha by animateFloatAsState(
-            targetValue = if (showTrailer && hasTrailer && trailerHasRenderedFirstFrame && !isActuallyPlaying) 1f else 0f,
-            animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
-            label = "hero_trailer_cover_alpha",
-        )
-
-        if (showTrailer && hasTrailer && coverAlpha > 0.001f) {
-            if (!imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(alpha = coverAlpha),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(alpha = coverAlpha),
-                    color = palette.pillBackground,
-                ) {}
-            }
         }
 
         if (hasTrailer) {
@@ -385,7 +368,6 @@ class HeroTrailerLayerArgs(
     val viewportHeightPx: Int,
     val shouldPlay: Boolean,
     val isMuted: Boolean,
-    val onFirstFrameRendered: () -> Unit,
     val onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
     val onFocusLossPause: () -> Unit,
 )
