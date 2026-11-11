@@ -80,18 +80,22 @@ fun PlayerRoute(
     // because that is what the viewer actually sees.
     var playerAreaBounds by remember { mutableStateOf<PictureInPictureSourceRect?>(null) }
     // Zoom crops the picture in the UI layer: the surface grows until it covers
-    // the window and the overflow is cropped by the window edge. In PiP the
-    // surface stays fitted to the video and mpv does the crop instead.
+    // the window and the overflow is cropped by the window edge. That crop is
+    // fullscreen-only -- a PiP window keeps the video's own ratio, and mpv's
+    // crop option owns the framing there instead, because there the surface can
+    // stay fitted to the video.
     val zoomCropActive =
         uiState.resizeMode == PlayerResizeMode.Zoom && !isInPictureInPictureMode
     val effectiveVideoBounds = if (zoomCropActive) playerAreaBounds else videoBounds
     // The PiP window is opened with the geometry on screen when the viewer
     // leaves, and after that it keeps it. Re-deriving the config inside the
-    // window re-shaped it a beat after entry -- `zoomCropActive` flips the
-    // moment the mode changes, so the cropped window in Zoom became the
-    // video's own aspect once inside -- which reads as the window jumping.
-    // The controller drops an unchanged config, so re-sending the remembered
-    // one costs nothing and nothing re-shapes on its own afterwards.
+    // window changed the source rect a beat after entry -- `zoomCropActive`
+    // flips the moment the mode changes, so leaving Zoom moved the rect from
+    // the whole player area to the letterboxed surface -- which reads as the
+    // window jumping. The ratio itself never moves, because the window keeps
+    // the video's own shape either way. The controller drops an unchanged
+    // config, so re-sending the remembered one costs nothing and nothing
+    // re-shapes on its own afterwards.
     var pipConfigBeforeEntry by remember { mutableStateOf<PictureInPictureConfig?>(null) }
     val gestureController = remember(context) { tryCreateGestureController(context.findActivity()) }
     val gestureFeedback = rememberGestureFeedback()
@@ -159,19 +163,18 @@ fun PlayerRoute(
         // ratio while the first frames are still loading produces a wrong-aspect window.
         // Audio-only streams never report a layout, so a settled duration unlocks them.
         val playbackGeometryKnown = uiState.videoLayout != null || uiState.stableDurationMs > 0L
-        // The picture the viewer sees is the video in Fit, but the cropped
-        // player area in Zoom, so the PiP window has to follow what is on
-        // screen rather than the video's own shape.
+        // The PiP window keeps the video's own ratio, never the crop: a window
+        // wider than the video letterboxes it inside the window, so the cropped
+        // player-area ratio left permanent black bars in PiP. Cropping is a
+        // fullscreen behaviour -- inside PiP the surface stays fitted to the
+        // video, so there the engine's own crop option is what can move the
+        // framing. The player-area ratio stays as the fallback for audio-only
+        // streams, which never report a layout.
         val visibleBoundsAspect =
             effectiveVideoBounds
                 ?.takeIf { it.width() > 0 && it.height() > 0 }
                 ?.let { bounds -> PictureInPictureAspectRatio(bounds.width(), bounds.height()) }
-        val aspectRatio =
-            if (zoomCropActive) {
-                visibleBoundsAspect
-            } else {
-                uiState.videoLayout.toPictureInPictureAspectRatio() ?: visibleBoundsAspect
-            }
+        val aspectRatio = uiState.videoLayout.toPictureInPictureAspectRatio() ?: visibleBoundsAspect
         val pipEnabled =
             effectiveVideoBounds != null &&
                 uiState.errorMessage == null &&
@@ -183,11 +186,12 @@ fun PlayerRoute(
                 sourceRect = effectiveVideoBounds,
                 aspectRatio = aspectRatio,
             )
-        // Enter the window with the shape the fullscreen surface actually
-        // had, then hold it there. `playerAreaBounds` in Zoom is the whole
-        // window, so the window keeps its entered aspect while the surface
-        // inside returns to the clipped video shape -- which is exactly the
-        // "no change after we are in pip" the viewer reported.
+        // Enter the window with the shape and rect the fullscreen surface
+        // actually had, then hold them there. The ratio is the video's own in
+        // both modes, so only the source rect can move once inside:
+        // `zoomCropActive` flips on entry, and the surface returns to the
+        // letterboxed video rect -- which is exactly the "no change after we
+        // are in pip" the viewer reported.
         if (isInPictureInPictureMode) {
             pipConfigBeforeEntry?.let(onPictureInPictureConfigChanged)
         } else {
@@ -235,7 +239,7 @@ fun PlayerRoute(
             // then this fraction walks between them, so the SurfaceView
             // animates like the controls instead of appearing in one frame.
             // In PiP the surface stays fitted, so the target is Fit there and
-            // mpv's own panscan does the crop inside the frozen window.
+            // mpv's own panscan does the crop inside the window.
             val zoomFraction by animateFloatAsState(
                 targetValue = if (zoomCropActive) 1f else 0f,
                 animationSpec =
