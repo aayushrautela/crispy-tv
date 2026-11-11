@@ -52,6 +52,13 @@ internal class MpvPlaybackRuntime(
     /** Cover-crop requested before the mpv instance existed; applied at init. */
     private var coverCrop: Boolean = false
 
+    /**
+     * Whether the video is currently drawn into the PiP window. PiP renders
+     * through `gpu`, which honours panscan, so mpv does the crop there; in
+     * fullscreen the UI layer crops instead.
+     */
+    private var inPictureInPicture: Boolean = false
+
     private val eventObserver = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = Unit
 
@@ -278,8 +285,13 @@ internal class MpvPlaybackRuntime(
             instance.setOptionString("force-window", "no")
             instance.setOptionString("idle", "once")
             instance.init()
+            // The player can start in a resize mode that was chosen before mpv
+            // existed, so apply the remembered mode too.
+            applyResizeMode(resizeMode)
             // The trailer asks for its cover-crop at construction, before the
-            // instance exists, so apply the remembered value once it does.
+            // instance exists, so apply the remembered value once it does. It
+            // comes after the resize mode because it owns panscan: the trailer
+            // crops itself, the player leaves the crop to the UI layer.
             if (coverCrop) {
                 instance.setPropertyDouble("panscan", 1.0)
                 instance.setPropertyString("video-aspect-override", "no")
@@ -378,6 +390,7 @@ internal class MpvPlaybackRuntime(
         // it on HDR screen coverage), and tunneled mediacodec_embed output is
         // not guaranteed to compose in a small window, so render through gpu
         // while in PiP and restore the tunneled vo when leaving it.
+        inPictureInPicture = active
         val vo = if (active) "gpu" else VO_PREFERRED
         Log.d(TAG, "setPictureInPictureActive active=$active vo=$vo")
         runCatching {
@@ -386,6 +399,9 @@ internal class MpvPlaybackRuntime(
             // tunneled surface cannot, so let mpv draw them there instead.
             mpv?.setPropertyBoolean("sub-visibility", active)
         }
+        // The crop moves between the engine and the UI depending on where the
+        // video is drawn, so re-apply the resize mode for the new context.
+        applyResizeMode(resizeMode)
     }
 
     /**
@@ -523,8 +539,8 @@ internal class MpvPlaybackRuntime(
     /**
      * Cover-crop the video to fill the surface (`panscan=1.0`), the hero
      * trailer's old `RESIZE_MODE_ZOOM` behaviour. Separate from
-     * [applyResizeMode]'s `Zoom`, which is a half zoom for the player's
-     * user-facing resize mode.
+     * [applyResizeMode]'s `Zoom`, which is the player's user-facing resize
+     * mode and is cropped by the UI layer, not by mpv.
      *
      * The trailer calls this before its mpv instance exists, so the value is
      * remembered and applied in [initialize] too.
@@ -542,16 +558,14 @@ internal class MpvPlaybackRuntime(
         resizeMode = mode
         val mpv = mpv ?: return
         runCatching {
-            when (mode) {
-                PlayerResizeMode.Fit -> {
-                    mpv.setPropertyDouble("panscan", 0.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-                PlayerResizeMode.Zoom -> {
-                    mpv.setPropertyDouble("panscan", 0.5)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-            }
+            // Who crops depends on where the video is drawn. Fullscreen crops in
+            // the UI layer: the surface is sized to cover the window and the
+            // overflow is cropped by the window edge, so mpv must not crop as
+            // well (and the tunneled vo ignores panscan anyway). PiP keeps the
+            // surface fitted to the video, so there mpv does the crop.
+            val panscan = if (mode == PlayerResizeMode.Zoom && inPictureInPicture) 0.5 else 0.0
+            mpv.setPropertyDouble("panscan", panscan)
+            mpv.setPropertyString("video-aspect-override", "no")
         }
         // Zoom crops plain-text subs off the video rect unless they are
         // allowed into the margins; re-run the selection-aware decision so a

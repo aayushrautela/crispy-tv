@@ -14,7 +14,15 @@ package com.crispy.tv.nativeengine.playback
  * this enum needed no import edit.
  */
 enum class PlayerResizeMode {
+    /** The whole picture is visible; the window's remainder is black. */
     Fit,
+
+    /**
+     * The picture fills the window and the overflow is cropped, the way
+     * ExoPlayer's `RESIZE_MODE_ZOOM` behaved. The crop happens in the UI
+     * layer, because the tunneled `mediacodec_embed` output ignores mpv's
+     * own crop options.
+     */
     Zoom,
     ;
 
