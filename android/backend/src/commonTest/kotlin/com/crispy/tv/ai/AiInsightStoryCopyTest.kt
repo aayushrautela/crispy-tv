@@ -1,8 +1,5 @@
-package com.crispy.tv.details
+package com.crispy.tv.ai
 
-import com.crispy.tv.ai.AiInsightSlide
-import com.crispy.tv.ai.AiInsightSlideKey
-import com.crispy.tv.ai.AiInsightSlideKind
 import com.crispy.tv.images.ResponsiveImageSet
 import kotlin.test.Test
 import kotlin.test.assertEquals

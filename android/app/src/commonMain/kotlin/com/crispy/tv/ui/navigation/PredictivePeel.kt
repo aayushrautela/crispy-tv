@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.navigationevent.NavigationEvent
@@ -36,6 +37,19 @@ internal const val PredictivePeelMaxCornerRadiusDp = 28f
 internal const val PredictiveSettleDurationMillis = 300
 
 /**
+ * Scale a peeling page settles to at full gesture progress.
+ *
+ * The number `AppNavHost`'s `predictivePeelExitTo` uses for the destination
+ * layer, lifted here so an overlay peeling on top of a destination
+ * ([predictivePeelExitTransform]) and the destination itself cannot drift
+ * apart.
+ */
+internal const val PredictivePeelExitTargetScale = 0.90f
+
+/** Below this fraction the peel is at rest and no render layer is allocated. */
+private const val PredictivePeelRestEpsilon = 0.001f
+
+/**
  * Which way a back gesture moves, as a sign on offsets.
  *
  * The edge is physical -- left edge means the finger travels right -- so there
@@ -54,7 +68,8 @@ internal fun peelSign(swipeEdge: Int): Int =
  *
  * `progress` is the live scrub fraction while a system back gesture runs and
  * 0 at rest; `active` is true exactly while the state is
- * [NavigationEventTransitionState.InProgress]. Read from
+ * [NavigationEventTransitionState.InProgress]; `edgeSign` is the swipe-edge
+ * direction via [peelSign]. Read from
  * `NavigationEventDispatcher.transitionState`, which is the dispatcher's
  * public read-only flow over the whole tree's shared processor -- observing it
  * registers no handler and takes the gesture from nobody, so `NavHost` keeps
@@ -63,6 +78,7 @@ internal fun peelSign(swipeEdge: Int): Int =
 internal data class PredictivePeel(
     val progress: Float,
     val active: Boolean,
+    val edgeSign: Int = 1,
 )
 
 /** `internal` for the same reason as [peelSign]. */
@@ -77,6 +93,7 @@ internal fun rememberPredictivePeel(): PredictivePeel {
     return PredictivePeel(
         progress = inProgress?.latestEvent?.progress ?: 0f,
         active = inProgress != null,
+        edgeSign = peelSign(inProgress?.latestEvent?.swipeEdge ?: NavigationEvent.EDGE_NONE),
     )
 }
 
@@ -104,9 +121,36 @@ internal fun Modifier.predictivePeelClip(): Modifier {
         label = "predictivePeelCorner",
     )
     val progress = if (peel.active) peel.progress else settled
-    if (progress <= 0.001f) return this
+    if (progress <= PredictivePeelRestEpsilon) return this
     return graphicsLayer {
         shape = RoundedCornerShape((PredictivePeelMaxCornerRadiusDp * progress).dp)
+        clip = true
+    }
+}
+
+/**
+ * Peels a whole page away with the back gesture, using the same magnitudes
+ * `AppNavHost`'s `predictivePeelExitTo` gives the destination layer: scale
+ * toward [PredictivePeelExitTargetScale] pivoting on the swipe edge, a
+ * full-width slide with the finger, a fade, and the corner from
+ * [predictivePeelClip]. An overlay on top of a destination therefore peels
+ * exactly like the destination itself would.
+ *
+ * `fraction` is the live scrub while the finger is down and the caller's
+ * settle afterwards, so the page never snaps between the two. At rest (below
+ * the epsilon) the incoming modifier is returned untouched, so no render layer
+ * is allocated for a 0.dp corner.
+ */
+internal fun Modifier.predictivePeelExitTransform(fraction: Float, sign: Int): Modifier {
+    if (fraction <= PredictivePeelRestEpsilon) return this
+    return graphicsLayer {
+        transformOrigin = TransformOrigin(if (sign > 0) 0f else 1f, 0.5f)
+        val scale = 1f - (1f - PredictivePeelExitTargetScale) * fraction
+        scaleX = scale
+        scaleY = scale
+        translationX = sign * size.width * fraction
+        alpha = 1f - fraction
+        shape = RoundedCornerShape((PredictivePeelMaxCornerRadiusDp * fraction).dp)
         clip = true
     }
 }

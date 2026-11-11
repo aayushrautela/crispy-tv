@@ -3,6 +3,7 @@ package com.crispy.tv.details
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -36,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,11 +60,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.ai.storyFocus
+import com.crispy.tv.ai.storyLabel
+import com.crispy.tv.ai.storyParagraph
 import com.crispy.tv.ui.components.CrispyIcon
+import com.crispy.tv.ui.navigation.PredictiveSettleDurationMillis
+import com.crispy.tv.ui.navigation.predictivePeelExitTransform
+import com.crispy.tv.ui.navigation.rememberPredictivePeel
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_auto_awesome
 import com.crispy.tv.ui.resources.ic_check_filled
@@ -224,6 +236,37 @@ internal fun AiInsightsStoryOverlay(
     onShare: () -> Unit,
     slideWashSeeds: Map<Int, Color> = emptyMap(),
 ) {
+    // The story is a page, not a dialog: the system back gesture peels it
+    // away with the live scrub -- scale toward the swipe edge, slide, corner,
+    // fade, the same magnitudes a destination peel uses -- and composition
+    // only ends once the settle reaches full progress, so the details page
+    // behind is revealed rather than jumped over. The header close and the
+    // last-slide tap run the same exit through [requestDismiss].
+    val peel = rememberPredictivePeel()
+    var dismissing by remember { mutableStateOf(false) }
+    val settle by animateFloatAsState(
+        targetValue =
+            when {
+                peel.active -> peel.progress
+                dismissing -> 1f
+                else -> 0f
+            },
+        animationSpec = tween(PredictiveSettleDurationMillis),
+        label = "storyPeelSettle",
+        finishedListener = { if (dismissing) onDismiss() },
+    )
+    // While the finger is down the exact scrub fraction is used; after
+    // release the chaser above carries the same motion to its target, so
+    // commit and cancel both continue from where the finger left off.
+    val peelFraction = if (peel.active) peel.progress else settle
+    val peelExit = Modifier.predictivePeelExitTransform(peelFraction, peel.edgeSign)
+    val requestDismiss: () -> Unit = { dismissing = true }
+
+    // System back closes the story, not the details page behind it. The
+    // handler lives inside the details destination, so it is composed after
+    // the NavHost's own back handler and takes precedence over it.
+    StoryBackHandler(onBackCommit = requestDismiss)
+
     val slides = remember(result) { result.slides.sortedForDisplay() }
 
     if (slides.isEmpty()) {
@@ -235,7 +278,8 @@ internal fun AiInsightsStoryOverlay(
             isInWatchlist = isInWatchlist,
             onToggleWatchlist = onToggleWatchlist,
             onShare = onShare,
-            onDismiss = onDismiss,
+            onDismiss = requestDismiss,
+            modifier = peelExit,
         )
         return
     }
@@ -262,7 +306,7 @@ internal fun AiInsightsStoryOverlay(
 
     fun next() {
         if (safeIndex >= slides.lastIndex) {
-            onDismiss()
+            requestDismiss()
         } else {
             index = safeIndex + 1
         }
@@ -272,7 +316,8 @@ internal fun AiInsightsStoryOverlay(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(StoryDeepColor),
+                .background(StoryDeepColor)
+                .then(peelExit),
     ) {
         // Position-based, not height-based: the chrome column's own bottom
         // padding and the nav bars sit *under* the footer, and a height-only
@@ -329,7 +374,7 @@ internal fun AiInsightsStoryOverlay(
                 posterUrl = artworkUrl,
                 title = title,
                 subtitle = storyHeaderSubtitle(year = year),
-                onDismiss = onDismiss,
+                onDismiss = requestDismiss,
             )
 
             // Chrome sits above the slides, so this is an empty tap target: the
@@ -359,6 +404,37 @@ internal fun AiInsightsStoryOverlay(
             )
         }
     }
+}
+
+/**
+ * System back closes the story overlay and nothing else.
+ *
+ * The handler joins the same `NavigationEventDispatcher` that carries the
+ * NavHost's back handler, so the two compete directly: the dispatcher runs
+ * the most recently registered enabled handler first, and this one is
+ * composed inside the details destination -- after the NavHost -- so it wins
+ * and the details route stays on the stack.
+ *
+ * The commit is handed to the caller as [onBackCommit] rather than acted on
+ * directly: while the gesture runs the overlay already peels with the live
+ * scrub ([rememberPredictivePeel]), and on commit the caller's settle
+ * carries that same fraction to 1 before the overlay leaves composition.
+ *
+ * `LocalNavigationEventDispatcherOwner.current` is null on platforms that
+ * have no dispatcher (iOS), and `NavigationBackHandler` `checkNotNull`s it,
+ * so the registration is skipped where there is no dispatcher to register
+ * with. On Android the owner always resolves to the Activity.
+ */
+@Composable
+private fun StoryBackHandler(onBackCommit: () -> Unit) {
+    if (LocalNavigationEventDispatcherOwner.current == null) return
+
+    val state = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = state,
+        isBackEnabled = true,
+        onBackCompleted = onBackCommit,
+    )
 }
 
 /** One slide: full-bleed image, its own wash over it, type in the lower third. */
@@ -459,17 +535,18 @@ private fun AiInsightsStoryCopy(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         label?.let {
-            // The heading: the slide's own label in the display cut, in the
-            // slide's accent colour. Type only -- there is no shape behind it.
+            // The heading: the slide's own label in the display cut -- wide,
+            // heavy, slanted, square corners -- in the slide's accent colour.
+            // Type only -- there is no shape behind it.
             Text(
                 text = it,
                 style =
                     MaterialTheme.typography.headlineMedium.copy(
                         fontFamily = GoogleSansFlexDisplay,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         shadow = StoryTextShadow,
-                        lineHeight = 36.sp,
+                        lineHeight = 46.sp,
                         letterSpacing = (-0.4).sp,
                     ),
                 color = accent,
@@ -496,12 +573,14 @@ private fun AiInsightsStoryCopy(
             )
         }
         paragraph?.let {
+            // The description: the normal face, one step up from regular so it
+            // holds the photo without shouting.
             Text(
                 text = it,
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 19.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         shadow = StoryTextShadow,
                         lineHeight = 27.sp,
                     ),
@@ -617,28 +696,6 @@ private fun AiInsightsStoryHeader(
 /** The year, or null when there is none to print. */
 internal fun storyHeaderSubtitle(year: String?): String? = year?.trim()?.takeIf { it.isNotEmpty() }
 
-/**
- * The copy block's heading line: the slide's own `label` ("Standout", "The
- * catch"), trimmed, or null when the server sent none.
- */
-internal fun AiInsightSlide.storyLabel(): String? =
-    label.trim().takeIf { it.isNotEmpty() }
-
-/**
- * The copy block's headline line: the server's `focus`, trimmed, or null when
- * it sent none -- or sent only spaces.
- */
-internal fun AiInsightSlide.storyFocus(): String? =
-    focus?.trim()?.takeIf { it.isNotEmpty() }
-
-/**
- * Built from `body`/`context` only, so it can never repeat [storyLabel] or
- * [storyFocus], which are built from `label`/`focus`. The no-double-print
- * rule is structural, not defensive.
- */
-internal fun AiInsightSlide.storyParagraph(): String? =
-    (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }
-
 private fun AiInsightSlide.storySticker(): DrawableResource =
     when (key) {
         AiInsightSlideKey.THE_GOOD_STUFF -> Res.drawable.ic_thumb_up
@@ -658,12 +715,16 @@ private fun AiInsightsEmptyStory(
     onToggleWatchlist: () -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
+        // The caller's modifier stays last: the peel transform's corner has
+        // to clip this page background too, not just the content.
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(palette.pageBackground),
+                .background(palette.pageBackground)
+                .then(modifier),
     ) {
         Column(
             modifier =

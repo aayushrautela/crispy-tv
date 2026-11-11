@@ -347,11 +347,13 @@ private fun predictivePeelEnter(sign: Int): EnterTransition =
     ) + fadeIn(animationSpec = tween(PredictiveSettleDurationMillis))
 
 // The peeling page: scales toward the edge the finger came from -- the pivot
-// is on that edge, not the centre -- while sliding out with the swipe.
+// is on that edge, not the centre -- while sliding out with the swipe. The
+// 0.90 target lives in [PredictivePeelExitTargetScale], shared with the
+// overlay peel in `predictivePeelExitTransform`.
 private fun predictivePeelExitTo(sign: Int): ExitTransition =
     scaleOut(
         animationSpec = tween(PredictiveSettleDurationMillis),
-        targetScale = 0.90f,
+        targetScale = PredictivePeelExitTargetScale,
         transformOrigin = TransformOrigin(if (sign > 0) 0f else 1f, 0.5f),
     ) + slideOutHorizontally(
         animationSpec = tween(PredictiveSettleDurationMillis),

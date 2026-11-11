@@ -58,6 +58,9 @@ import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightStandoutTag
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.ai.storyFocus
+import com.crispy.tv.ai.storyLabel
+import com.crispy.tv.ai.storyParagraph
 import com.crispy.tv.ui.resources.Res
 import com.crispy.tv.ui.resources.ic_auto_awesome
 import com.crispy.tv.ui.resources.ic_close_filled
@@ -387,20 +390,23 @@ private fun StorySlideContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.align(Alignment.BottomStart),
             ) {
-                // The eyebrow: the slide's label in the display cut, sentence
-                // case and in the slide's accent colour. Type only -- no shape
-                // behind it.
-                slide.label.trim().takeIf { it.isNotEmpty() }?.let { label ->
+                // The eyebrow: the slide's label in the display cut -- wide,
+                // heavy, slanted, square corners -- sentence case and in the
+                // slide's accent colour. Type only -- no shape behind it.
+                slide.storyLabel()?.let { label ->
                     Text(
                         text = label,
                         fontFamily = GoogleSansFlexDisplay,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 30.sp,
+                        lineHeight = 36.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         color = accent,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                val headline = slide.focus?.takeIf { it.isNotBlank() }
-                val body = slide.body ?: slide.context
+                val headline = slide.storyFocus()
+                val body = slide.storyParagraph()
                 if (headline != null) {
                     Text(
                         text = headline,
@@ -411,11 +417,14 @@ private fun StorySlideContent(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (!body.isNullOrBlank()) {
+                body?.let { bodyText ->
+                    // The description: the normal face, one step up from
+                    // regular so it holds the screen from the sofa.
                     Text(
-                        text = body,
+                        text = bodyText,
                         fontSize = 15.sp,
                         lineHeight = 21.sp,
+                        fontWeight = FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.86f),
                         maxLines = 6,
                         overflow = TextOverflow.Ellipsis,
