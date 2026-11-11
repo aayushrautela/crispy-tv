@@ -50,7 +50,6 @@ import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.CardStyle
-import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
@@ -163,7 +162,6 @@ internal fun HeroSection(
         }
 
         if (!imageUrl.isNullOrBlank() || artwork?.isEmpty == false) {
-            val cardCacheKey = backdropKey?.let { SharedImageMemoryKeys.getCardKey(it) }
             // The hero asks for the widest tier the set carries, not the one
             // `urlForDisplaySize` picks under the app's card ceiling: it is the only
             // full-screen image here, so `urlFor(HIGH)` is the call that reaches
@@ -174,13 +172,22 @@ internal fun HeroSection(
             // and it never runs again.
             val heroUrl = detailsHeroArtworkUrl(artwork, imageUrl)
             // The chosen tier failed to load, so serve the flat URL the rest of the
-            // app fetches instead of leaving the card's placeholder on screen.
+            // app fetches instead of leaving the hero empty.
+            //
+            // No `placeholderMemoryCacheKey`: the card's bitmap is decoded at the
+            // card's size and stretched over a box several times larger, so showing
+            // it while this request loads is a visible drop in quality and it is
+            // drawn even when this request's own bitmap is already cached. Left
+            // null, `buildCrispyImageRequest` keys the placeholder to this request
+            // instead, which on a warm cache is the tier this hero wants.
+            // `enableCrossfade` covers the cold case, where there is nothing to
+            // show until the bytes land.
             val heroRequest = crispyImageRequest(
                 url = if (heroTierFailed) imageUrl else heroUrl,
                 width = heroMaxWidth,
                 height = heroBoxHeight,
+                enableCrossfade = true,
                 memoryCacheKey = backdropKey,
-                placeholderMemoryCacheKey = cardCacheKey,
             )
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
                 val cornerRadius = with(animatedVisibilityScope) {
