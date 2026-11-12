@@ -127,11 +127,6 @@ class DetailsViewModel internal constructor(
                 recomputeDerived()
             }
         }
-        // TEMPORARY diagnostic for the details-backdrop flicker; delete with it. A
-        // second one of these means the screen's ViewModel was recreated, which is
-        // the only way `titleDetail` goes back to null after the hero already showed
-        // a tier.
-        logger.debug("DetailsViewModel", "DEBUG viewmodel created itemId=$itemId")
         reload()
     }
 
@@ -217,10 +212,6 @@ class DetailsViewModel internal constructor(
     fun reload() {
         reloadJob?.cancel()
         val generation = ++reloadGeneration
-        // TEMPORARY diagnostic for the details-backdrop flicker — delete with it.
-        // `titleDetail` is set to null below, and the hero's request URL is a pure
-        // function of it, so a second entry here is the whole explanation.
-        logger.debug("DetailsViewModel", "DEBUG reload() entered itemId=$itemId generation=$generation")
         reloadJob = viewModelScope.launch {
             val nowMs = clock()
 
@@ -284,18 +275,6 @@ class DetailsViewModel internal constructor(
                         result.seasons.isNotEmpty() -> result.seasons.first()
                         else -> null
                     }
-
-                // TEMPORARY diagnostic for the details-backdrop flicker; delete with it.
-                // The hero's request URL is a pure function of this state: the tier
-                // comes from `artwork`, the flat fallback from `details.artworkUrl`.
-                logger.debug(
-                    "DetailsViewModel",
-                    "DEBUG emitted itemId=" + result.details?.itemId +
-                        " hasTitleDetail=" + (result.titleDetail != null) +
-                        " flatArtworkUrl=" + result.details?.artworkUrl,
-                )
-                logger.debug(
-                    "DetailsViewModel", "DEBUG artwork " + result.titleDetail?.item?.images?.artwork)
 
                 state.copy(
                     isLoading = false,
