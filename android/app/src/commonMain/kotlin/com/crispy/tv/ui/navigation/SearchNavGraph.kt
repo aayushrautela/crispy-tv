@@ -67,6 +67,7 @@ fun NavGraphBuilder.addSearchNavGraph(
                             AppRoutes.homeDetailsRoute(
                                 itemId = item.itemId,
                                 itemType = item.type,
+                                artworkHighUrl = item.artwork?.high,
                                 artworkUrl = item.artworkUrl,
                                 sharedElementKey = sharedElementKey,
                             )

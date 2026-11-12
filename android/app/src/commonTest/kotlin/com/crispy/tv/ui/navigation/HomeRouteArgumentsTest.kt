@@ -1,6 +1,7 @@
 package com.crispy.tv.ui.navigation
 
 import androidx.lifecycle.SavedStateHandle
+import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsArtworkHighUrlArg
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsArtworkUrlArg
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsAutoOpenEpisodeArg
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsHighlightEpisodeIdArg
@@ -52,6 +53,7 @@ class HomeRouteArgumentsTest {
         HomeDetailsRuntimeEpisodeNumberArg,
         HomeDetailsRuntimeAbsoluteEpisodeArg,
         HomeDetailsArtworkUrlArg,
+        HomeDetailsArtworkHighUrlArg,
         HomeDetailsSharedElementKeyArg,
     )
 
@@ -67,6 +69,7 @@ class HomeRouteArgumentsTest {
                 HomeDetailsRuntimeEpisodeNumberArg to "2",
                 HomeDetailsRuntimeAbsoluteEpisodeArg to "7",
                 HomeDetailsArtworkUrlArg to "https://example.test/a.jpg",
+                HomeDetailsArtworkHighUrlArg to "https://example.test/b.jpg",
                 HomeDetailsSharedElementKeyArg to "hero-tt1234",
             ),
         )
@@ -81,6 +84,7 @@ class HomeRouteArgumentsTest {
                 runtimeEpisodeNumber = "2",
                 runtimeAbsoluteEpisodeNumber = "7",
                 initialArtworkUrl = "https://example.test/a.jpg",
+                artworkHighUrl = "https://example.test/b.jpg",
                 sharedElementKey = "hero-tt1234",
             ),
             detailsRouteArguments(handle),
@@ -94,10 +98,12 @@ class HomeRouteArgumentsTest {
      * pairing: a reader that read `HomeDetailsItemTypeArg` where it should read
      * `HomeDetailsItemIdArg` passes a suite that only checks populated values, because both
      * keys are strings. So each key is presented **alone**, and the assertion is that
-     * exactly one field moved and it holds that key's sample value.
+     * exactly one field moved and it holds that key's sample value -- and two URLs sitting
+     * in two keys is the case that pairing is for: the flat medium URL and the carried
+     * tier are both strings, so only the set comparison tells them apart.
      *
      * The sample values are per-key typed, and that is not decoration: the boolean key is
-     * read as a `Boolean`, so a handle of nine strings -- the obvious way to build "all
+     * read as a `Boolean`, so a handle of ten strings -- the obvious way to build "all
      * keys present" -- is a `ClassCastException` rather than a test failure. That is the
      * documented type contract, so the fixture has to honour it.
      */
@@ -112,6 +118,7 @@ class HomeRouteArgumentsTest {
             HomeDetailsRuntimeEpisodeNumberArg to "v-episode",
             HomeDetailsRuntimeAbsoluteEpisodeArg to "v-absolute",
             HomeDetailsArtworkUrlArg to "v-artwork",
+            HomeDetailsArtworkHighUrlArg to "v-artwork-high",
             HomeDetailsSharedElementKeyArg to "v-shared-key",
         )
         assertEquals(detailsKeys.toSet(), sample.keys, "the sample and the declared list disagree")
@@ -127,7 +134,7 @@ class HomeRouteArgumentsTest {
         }
     }
 
-    /** The nine fields by name, so "which field moved" is a question the suite can ask. */
+    /** The ten fields by name, so "which field moved" is a question the suite can ask. */
     private fun HomeDetailsRouteArgs.fields(): Map<String, Any?> = mapOf(
         "itemId" to itemId,
         "itemType" to itemType,
@@ -137,6 +144,7 @@ class HomeRouteArgumentsTest {
         "runtimeEpisodeNumber" to runtimeEpisodeNumber,
         "runtimeAbsoluteEpisodeNumber" to runtimeAbsoluteEpisodeNumber,
         "initialArtworkUrl" to initialArtworkUrl,
+        "artworkHighUrl" to artworkHighUrl,
         "sharedElementKey" to sharedElementKey,
     )
 
@@ -158,6 +166,7 @@ class HomeRouteArgumentsTest {
         assertNull(read.runtimeEpisodeNumber)
         assertNull(read.runtimeAbsoluteEpisodeNumber)
         assertNull(read.initialArtworkUrl)
+        assertNull(read.artworkHighUrl)
         assertNull(read.sharedElementKey)
         assertEquals(false, read.autoOpenEpisode)
     }

@@ -45,6 +45,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                             itemId = hero.id,
                             itemType = hero.type,
                             artworkUrl = hero.artworkUrl,
+                            artworkHighUrl = hero.artwork?.high,
                             sharedElementKey = sharedElementKey,
                         )
                     )
@@ -207,6 +208,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 navArgument(AppRoutes.HomeDetailsRuntimeEpisodeNumberArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsArtworkUrlArg) { type = NavType.StringType; defaultValue = "" },
+                navArgument(AppRoutes.HomeDetailsArtworkHighUrlArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsSharedElementKeyArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
@@ -227,6 +229,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
             absoluteEpisodeNumber = detailsArgs.runtimeAbsoluteEpisodeNumber,
         )
         val initialArtworkUrl = detailsArgs.initialArtworkUrl?.ifBlank { null }
+        val artworkHighUrl = detailsArgs.artworkHighUrl?.ifBlank { null }
         val sharedElementKey = detailsArgs.sharedElementKey?.ifBlank { null }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             // `DetailsRoute` is `commonMain`, and this block used to be where all
@@ -245,6 +248,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                 highlightEpisodeId = highlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
                 initialArtworkUrl = initialArtworkUrl,
+                initialArtworkHighUrl = artworkHighUrl,
                 sharedElementKey = sharedElementKey,
                 onBack = { navController.popBackStack() },
                 onItemClick = { item, sharedElementKey ->
@@ -253,6 +257,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                             itemId = item.itemId,
                             itemType = item.type,
                             artworkUrl = item.artworkUrl,
+                            artworkHighUrl = item.artwork?.high,
                             sharedElementKey = sharedElementKey,
                         )
                     )
@@ -393,6 +398,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(
                             itemId = item.itemId,
                             itemType = item.type,
                             artworkUrl = item.artworkUrl,
+                            artworkHighUrl = item.artwork?.high,
                             sharedElementKey = sharedElementKey,
                         )
                     )

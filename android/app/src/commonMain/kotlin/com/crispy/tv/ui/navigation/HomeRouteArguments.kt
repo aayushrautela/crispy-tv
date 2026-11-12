@@ -85,6 +85,7 @@ internal fun detailsRouteArguments(handle: SavedStateHandle): HomeDetailsRouteAr
         runtimeEpisodeNumber = handle.get<String>(AppRoutes.HomeDetailsRuntimeEpisodeNumberArg),
         runtimeAbsoluteEpisodeNumber = handle.get<String>(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg),
         initialArtworkUrl = handle.get<String>(AppRoutes.HomeDetailsArtworkUrlArg),
+        artworkHighUrl = handle.get<String>(AppRoutes.HomeDetailsArtworkHighUrlArg),
         sharedElementKey = handle.get<String>(AppRoutes.HomeDetailsSharedElementKeyArg),
     )
 
