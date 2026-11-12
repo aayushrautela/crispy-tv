@@ -4,12 +4,17 @@ import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.os.Build
+import android.util.Log
+import coil3.EventListener
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
+import coil3.request.ErrorResult
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.allowRgb565
 import coil3.request.crossfade
@@ -83,6 +88,53 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory, AppGraphH
             }
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
+            .eventListener(BackdropDebugEventListener)
             .build()
+    }
+}
+
+/**
+ * TEMPORARY diagnostic for the details-backdrop flicker — delete with it.
+ *
+ * Scoped to `backdrop-` memory-cache keys, which is every request the details hero
+ * and the rail card make for the same item. Everything needed to explain the
+ * flicker is here and nowhere else: which URL was executed, when, whether it was a
+ * memory-cache hit (an *instant* repaint, which is what a flicker looks like), and
+ * whether it failed. Composing cannot produce any of it — `remember` keeps one
+ * `ImageRequest` object for a given URL, so recomposition alone never re-executes,
+ * and a re-execution can only mean the URL or the key changed under it.
+ */
+private object BackdropDebugEventListener : EventListener() {
+
+    private const val TAG = "BackdropDebug"
+
+    private fun ImageRequest.isBackdrop() = memoryCacheKey?.startsWith("backdrop-") == true
+
+    override fun onStart(request: ImageRequest) {
+        if (!request.isBackdrop()) return
+        Log.i(
+            TAG,
+            "START data=${request.data} key=${request.memoryCacheKey} " +
+                "placeholder=${request.placeholderMemoryCacheKey} size=${request.sizeResolver}",
+        )
+    }
+
+    override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+        if (!request.isBackdrop()) return
+        Log.i(
+            TAG,
+            "SUCCESS data=${request.data} key=${request.memoryCacheKey} " +
+                "source=${result.dataSource} diskKey=${result.diskCacheKey}",
+        )
+    }
+
+    override fun onError(request: ImageRequest, result: ErrorResult) {
+        if (!request.isBackdrop()) return
+        Log.i(TAG, "ERROR data=${request.data} key=${request.memoryCacheKey}", result.throwable)
+    }
+
+    override fun onCancel(request: ImageRequest) {
+        if (!request.isBackdrop()) return
+        Log.i(TAG, "CANCEL data=${request.data} key=${request.memoryCacheKey}")
     }
 }
