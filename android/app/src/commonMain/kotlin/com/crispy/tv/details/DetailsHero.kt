@@ -162,15 +162,19 @@ internal fun HeroSection(
         }
 
         if (!imageUrl.isNullOrBlank() || artwork?.isEmpty == false) {
-            // The hero asks for the widest tier the set carries, not the one
+            // The hero asks for the tier its own size needs, not the one
             // `urlForDisplaySize` picks under the app's card ceiling: it is the only
-            // full-screen image here, so `urlFor(HIGH)` is the call that reaches
-            // `original` and falls back through `high`/`medium` for a set carrying
-            // fewer tiers. Reaching for the set at all is what makes the details
-            // response an upgrade -- `imageUrl` is the flat `artwork.medium`, so a
-            // request resolving `medium` on both sides of the load is one request,
-            // and it never runs again.
-            val heroUrl = detailsHeroArtworkUrl(artwork, imageUrl)
+            // full-screen image here, so `cap` is `HIGH` and the ladder's widest
+            // rung that covers this box is what gets fetched, degrading through
+            // `high`/`medium` for a set carrying fewer tiers. Reaching for the set
+            // at all is what makes the details response an upgrade -- `imageUrl` is
+            // the flat `artwork.medium`, so a request resolving `medium` on both
+            // sides of the load is one request, and it never runs again.
+            val heroUrl = detailsHeroArtworkUrl(
+                artwork = artwork,
+                targetPx = maxOf(widthPx, heightPx.toInt()),
+                fallbackUrl = imageUrl,
+            )
             // The chosen tier failed to load, so serve the flat URL the rest of the
             // app fetches instead of leaving the hero empty.
             //

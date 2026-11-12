@@ -4,6 +4,7 @@ import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.images.ImageQuality
 import com.crispy.tv.images.ResponsiveImageSet
+import com.crispy.tv.images.urlForDisplaySize
 
 /**
  * The two declarations `DetailsHero.kt` held above its composable, separated out
@@ -22,13 +23,17 @@ internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
 }
 
 /**
- * The URL the hero backdrop fetches: the widest tier the artwork set carries,
- * falling back to the flat URL.
+ * The URL the hero backdrop fetches: the widest tier the ladder can justify for
+ * a surface this size, falling back to the flat URL.
  *
- * `urlFor(HIGH)` is the call that reaches `original` -- the uncapped tier the
- * app's ceiling keeps out of `urlForDisplaySize`, which exists so a card never
- * over-fetches -- and its fallback chain covers a set carrying fewer tiers, so
- * the answer degrades to `high`/`medium` rather than to nothing.
+ * `cap` is `HIGH` -- the app-wide ceiling in `CrispyImage` clamps every surface
+ * to `MEDIUM` so a card never over-fetches, and this is the one surface large
+ * enough to need the rung above it. `urlForDisplaySize` therefore picks the
+ * smallest listed rendition that covers [targetPx], and because `original` is
+ * outside the ladder the answer tops out at `high` rather than at the uncapped
+ * source: a hero box measured in height, not in kilobytes, is what sets the
+ * rung, and a 4K file to fill a 1008px box is 1.8 MB for pixels nothing shows.
+ * The fallback chains in `urlFor` still cover a set carrying fewer tiers.
  *
  * Choosing through the set rather than the flat URL is what makes the details
  * response an upgrade: the flat URL *is* `artwork.medium`, so a hero that
@@ -37,11 +42,12 @@ internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
  */
 internal fun detailsHeroArtworkUrl(
     artwork: ResponsiveImageSet?,
+    targetPx: Int,
     fallbackUrl: String?,
 ): String? {
     return artwork
         ?.takeIf { !it.isEmpty }
-        ?.urlFor(ImageQuality.HIGH)
+        ?.urlForDisplaySize(targetPx = targetPx, cap = ImageQuality.HIGH)
         ?: fallbackUrl
 }
 

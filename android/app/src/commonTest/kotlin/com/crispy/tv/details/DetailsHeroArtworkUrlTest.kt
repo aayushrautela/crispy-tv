@@ -6,32 +6,46 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * The hero asks for the widest tier the set carries, so this file pins the two
+ * The hero asks for the tier its box justifies, so this file pins the two
  * properties that make the details response an upgrade rather than a no-op.
  *
  * The first is that the URL **changes** when the set arrives: the flat
  * `fallbackUrl` is `artwork.medium`, so a hero resolving `medium` both before
  * and after the load is one `ImageRequest` that never runs again -- which is
- * what the details backdrop actually did. The second is that the choice is the
- * top of the chain, not the tier `urlForDisplaySize` picks under the app's
- * card ceiling, because `original` has no rung on that ladder.
+ * what the details backdrop actually did. The second is that the choice is
+ * *width-aware*, because the hero box is what decides the rung: `original` is
+ * outside the ladder, so a full-bleed hero tops out at `high` and never reaches
+ * for the uncapped source, and a box too small to need `high` is not held to it.
  */
 class DetailsHeroArtworkUrlTest {
 
     private val set = ResponsiveImageSet(low = "l", medium = "m", high = "h", original = "o")
 
+    /** A full-bleed hero on this device measured 1008x897 px. */
+    private val heroBoxPx = 1008
+
     @Test
-    fun theChosenTierIsTheWidestOneTheSetCarries() {
+    fun theChosenTierCoversTheHeroBoxRatherThanTheSourceFile() {
         assertEquals(
-            "o",
-            detailsHeroArtworkUrl(set, fallbackUrl = "m"),
-            "the hero is the only full-screen image, so it takes the source tier",
+            "h",
+            detailsHeroArtworkUrl(artwork = set, targetPx = heroBoxPx, fallbackUrl = "m"),
+            "the hero is the only full-screen image, and no listed rung covers a 1008px box",
+        )
+    }
+
+    @Test
+    fun theSourceTierIsNotReachedForOnASizedSurface() {
+        val chosen = detailsHeroArtworkUrl(artwork = set, targetPx = heroBoxPx, fallbackUrl = "m")
+
+        assert(
+            chosen != "o",
+            { "`original` is the uncapped source; a sized surface must not fetch it" },
         )
     }
 
     @Test
     fun theChoiceDiffersFromTheFlatUrlRatherThanRepeatingIt() {
-        val chosen = detailsHeroArtworkUrl(set, fallbackUrl = "m")
+        val chosen = detailsHeroArtworkUrl(artwork = set, targetPx = heroBoxPx, fallbackUrl = "m")
 
         assert(
             chosen != "m",
@@ -40,14 +54,24 @@ class DetailsHeroArtworkUrlTest {
     }
 
     @Test
-    fun aSetWithoutTheSourceTierDegradesToTheNextWidest() {
+    fun aSmallHeroBoxDoesNotReachForTheTopRung() {
         assertEquals(
-            "h",
+            "m",
+            detailsHeroArtworkUrl(artwork = set, targetPx = 400, fallbackUrl = "m"),
+            "`medium` covers a 400px box, so the tier is the target's, not the hero's",
+        )
+    }
+
+    @Test
+    fun aSetCarryingOnlyTheSourceTierStillUpgradesPastTheFlatUrl() {
+        assertEquals(
+            "o",
             detailsHeroArtworkUrl(
-                ResponsiveImageSet(low = "l", medium = "m", high = "h", original = null),
+                artwork = ResponsiveImageSet(low = null, medium = null, high = null, original = "o"),
+                targetPx = heroBoxPx,
                 fallbackUrl = "m",
             ),
-            "`original` is the newest tier; a set written before it still upgrades to `high`",
+            "`original` is last in the chain, so it answers when no capped tier carries a URL",
         )
     }
 
@@ -57,8 +81,8 @@ class DetailsHeroArtworkUrlTest {
 
         assertEquals(
             "only",
-            detailsHeroArtworkUrl(single, fallbackUrl = "m"),
-            "the chain is `original ?: high ?: medium ?: low`, so the one URL present is the answer",
+            detailsHeroArtworkUrl(artwork = single, targetPx = heroBoxPx, fallbackUrl = "m"),
+            "the chain ends at `original`, so the one URL present is the answer",
         )
     }
 
@@ -66,7 +90,7 @@ class DetailsHeroArtworkUrlTest {
     fun noArtworkSetLeavesTheFlatUrlInPlace() {
         assertEquals(
             "m",
-            detailsHeroArtworkUrl(artwork = null, fallbackUrl = "m"),
+            detailsHeroArtworkUrl(artwork = null, targetPx = heroBoxPx, fallbackUrl = "m"),
             "before details load there is no set, and the flat URL is all there is",
         )
     }
@@ -77,6 +101,7 @@ class DetailsHeroArtworkUrlTest {
             "m",
             detailsHeroArtworkUrl(
                 artwork = ResponsiveImageSet(low = null, medium = null, high = null, original = null),
+                targetPx = heroBoxPx,
                 fallbackUrl = "m",
             ),
             "`isEmpty` is the guard, not a blank tier: all four slots blank is the same as no set",
@@ -86,7 +111,7 @@ class DetailsHeroArtworkUrlTest {
     @Test
     fun nothingAtAllResolvesToNothingRatherThanToABlankUrl() {
         assertNull(
-            detailsHeroArtworkUrl(artwork = null, fallbackUrl = null),
+            detailsHeroArtworkUrl(artwork = null, targetPx = heroBoxPx, fallbackUrl = null),
             "a blank fallback is null, not an empty string a request would be built from",
         )
     }
