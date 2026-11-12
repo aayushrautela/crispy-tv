@@ -25,6 +25,7 @@ object AppRoutes {
     const val HomeDetailsRuntimeAbsoluteEpisodeArg = "runtimeAbsoluteEpisodeNumber"
     const val HomeDetailsArtworkUrlArg = "artworkUrl"
     const val HomeDetailsArtworkHighUrlArg = "artworkHighUrl"
+    const val HomeDetailsArtworkLowUrlArg = "artworkLowUrl"
     const val HomeDetailsSharedElementKeyArg = "sharedElementKey"
 
     const val PersonDetailsRoute = "person/details"
@@ -72,6 +73,7 @@ object AppRoutes {
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}" +
             "&$HomeDetailsArtworkUrlArg={$HomeDetailsArtworkUrlArg}" +
             "&$HomeDetailsArtworkHighUrlArg={$HomeDetailsArtworkHighUrlArg}" +
+            "&$HomeDetailsArtworkLowUrlArg={$HomeDetailsArtworkLowUrlArg}" +
             "&$HomeDetailsSharedElementKeyArg={$HomeDetailsSharedElementKeyArg}"
     val PersonDetailsRoutePattern: String =
         "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}" +

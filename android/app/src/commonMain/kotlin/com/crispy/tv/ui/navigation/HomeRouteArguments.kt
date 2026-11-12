@@ -46,7 +46,7 @@ import androidx.lifecycle.SavedStateHandle
  *    destinations declares `navArgument(...)`, which is what adds the entry to the back
  *    stack, and each read happens inside its destination block.
  *  2. **`get<T>` is an unchecked cast, where `Bundle.getString` on a wrong-typed value
- *    answers `null`.** As declared, the types match their reads: the eight
+ *    answers `null`.** As declared, the types match their reads: the nine
  *    `HomeDetails*Arg`s are `NavType.StringType` and `HomeDetailsAutoOpenEpisodeArg` is
  *    `NavType.BoolType`, each with the `defaultValue` its read assumes. A caller that
  *    handed a `BoolType` key to `get<String>` would get a `ClassCastException` instead of a
@@ -86,6 +86,7 @@ internal fun detailsRouteArguments(handle: SavedStateHandle): HomeDetailsRouteAr
         runtimeAbsoluteEpisodeNumber = handle.get<String>(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg),
         initialArtworkUrl = handle.get<String>(AppRoutes.HomeDetailsArtworkUrlArg),
         artworkHighUrl = handle.get<String>(AppRoutes.HomeDetailsArtworkHighUrlArg),
+        artworkLowUrl = handle.get<String>(AppRoutes.HomeDetailsArtworkLowUrlArg),
         sharedElementKey = handle.get<String>(AppRoutes.HomeDetailsSharedElementKeyArg),
     )
 

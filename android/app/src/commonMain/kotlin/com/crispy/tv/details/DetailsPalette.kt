@@ -100,6 +100,28 @@ internal suspend fun cacheDetailsSeedColor(imageUrl: String, seedColor: Color) {
 }
 
 /**
+ * The image a seed colour is sampled from, before the details response lands.
+ *
+ * The carried URL is the catalogue's `low` rendition, which is the tier rail
+ * cards already fetch: asking for it here reads a disk entry that is usually
+ * warm instead of starting a download, and when it is cold it is a fraction of
+ * the size of the flat medium URL this used to ask for. The flat URL stays the
+ * fallback, so a route that carried no catalogue set -- a continue-watching row,
+ * a calendar episode -- resolves the image it always did.
+ *
+ * Both arguments are trimmed, because a blank value in a route argument is an
+ * absent one, and a URL of spaces would be fetched as a URL of spaces. The
+ * trimming matches what the loader composable does before it looks the result
+ * up, so the cache key does not change with the choice.
+ */
+internal fun detailsSeedImageUrl(
+    carriedLowUrl: String?,
+    flatArtworkUrl: String?,
+): String? =
+    carriedLowUrl?.trim()?.takeIf { it.isNotEmpty() }
+        ?: flatArtworkUrl?.trim()?.takeIf { it.isNotEmpty() }
+
+/**
  * Extracts a seed colour from a decoded image.
  *
  * The parameter is Compose's `ImageBitmap` rather than a platform bitmap because

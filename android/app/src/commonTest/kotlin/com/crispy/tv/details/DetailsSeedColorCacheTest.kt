@@ -124,3 +124,65 @@ class DetailsSeedColorCacheTest {
         )
     }
 }
+
+/**
+ * Which image the seed colour is sampled from, decided before the details response lands.
+ *
+ * The choice exists because the seed needs a URL at the moment the screen opens and the flat
+ * medium URL is a needless size for a colour. The carried URL is the catalogue's `low`
+ * rendition, and the property worth pinning is the **preference**, not the trim: a route that
+ * carried no set must resolve exactly the image it always did, and one that carried a set must
+ * resolve the carried one rather than falling through to the flat URL.
+ */
+class DetailsSeedImageUrlTest {
+    @Test
+    fun `the carried low tier is chosen over the flat medium url`() {
+        val flat = "https://image.test/w780.jpg"
+        val low = "https://image.test/w300.jpg"
+
+        assertEquals(
+            "the seed must read the tier the cards already fetched, not the larger flat url",
+            low,
+            detailsSeedImageUrl(carriedLowUrl = low, flatArtworkUrl = flat),
+        )
+    }
+
+    @Test
+    fun `a carried url that is only whitespace falls back to the flat url`() {
+        val flat = "https://image.test/w780.jpg"
+
+        assertEquals(
+            "a blank route argument is an absent one, not a url of spaces",
+            flat,
+            detailsSeedImageUrl(carriedLowUrl = "   ", flatArtworkUrl = flat),
+        )
+        assertEquals(
+            "an absent carried url is an absent one too",
+            flat,
+            detailsSeedImageUrl(carriedLowUrl = null, flatArtworkUrl = flat),
+        )
+    }
+
+    @Test
+    fun `the flat url is the answer when nothing was carried`() {
+        val flat = "https://image.test/w780.jpg"
+
+        assertEquals(
+            "continue-watching and calendar episodes carry no set, and must be unchanged",
+            flat,
+            detailsSeedImageUrl(carriedLowUrl = null, flatArtworkUrl = flat),
+        )
+    }
+
+    @Test
+    fun `neither value resolves to an image`() {
+        assertNull(
+            "no carried url and no flat url is no image at all",
+            detailsSeedImageUrl(carriedLowUrl = null, flatArtworkUrl = null),
+        )
+        assertNull(
+            "a blank flat url is blank, not an image",
+            detailsSeedImageUrl(carriedLowUrl = null, flatArtworkUrl = " "),
+        )
+    }
+}

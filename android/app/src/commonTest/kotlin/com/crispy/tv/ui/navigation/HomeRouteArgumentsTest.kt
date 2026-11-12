@@ -2,6 +2,7 @@ package com.crispy.tv.ui.navigation
 
 import androidx.lifecycle.SavedStateHandle
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsArtworkHighUrlArg
+import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsArtworkLowUrlArg
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsArtworkUrlArg
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsAutoOpenEpisodeArg
 import com.crispy.tv.ui.navigation.AppRoutes.HomeDetailsHighlightEpisodeIdArg
@@ -54,6 +55,7 @@ class HomeRouteArgumentsTest {
         HomeDetailsRuntimeAbsoluteEpisodeArg,
         HomeDetailsArtworkUrlArg,
         HomeDetailsArtworkHighUrlArg,
+        HomeDetailsArtworkLowUrlArg,
         HomeDetailsSharedElementKeyArg,
     )
 
@@ -70,6 +72,7 @@ class HomeRouteArgumentsTest {
                 HomeDetailsRuntimeAbsoluteEpisodeArg to "7",
                 HomeDetailsArtworkUrlArg to "https://example.test/a.jpg",
                 HomeDetailsArtworkHighUrlArg to "https://example.test/b.jpg",
+                HomeDetailsArtworkLowUrlArg to "https://example.test/c.jpg",
                 HomeDetailsSharedElementKeyArg to "hero-tt1234",
             ),
         )
@@ -85,6 +88,7 @@ class HomeRouteArgumentsTest {
                 runtimeAbsoluteEpisodeNumber = "7",
                 initialArtworkUrl = "https://example.test/a.jpg",
                 artworkHighUrl = "https://example.test/b.jpg",
+                artworkLowUrl = "https://example.test/c.jpg",
                 sharedElementKey = "hero-tt1234",
             ),
             detailsRouteArguments(handle),
@@ -103,7 +107,7 @@ class HomeRouteArgumentsTest {
      * tier are both strings, so only the set comparison tells them apart.
      *
      * The sample values are per-key typed, and that is not decoration: the boolean key is
-     * read as a `Boolean`, so a handle of ten strings -- the obvious way to build "all
+     * read as a `Boolean`, so a handle of eleven strings -- the obvious way to build "all
      * keys present" -- is a `ClassCastException` rather than a test failure. That is the
      * documented type contract, so the fixture has to honour it.
      */
@@ -119,6 +123,7 @@ class HomeRouteArgumentsTest {
             HomeDetailsRuntimeAbsoluteEpisodeArg to "v-absolute",
             HomeDetailsArtworkUrlArg to "v-artwork",
             HomeDetailsArtworkHighUrlArg to "v-artwork-high",
+            HomeDetailsArtworkLowUrlArg to "v-artwork-low",
             HomeDetailsSharedElementKeyArg to "v-shared-key",
         )
         assertEquals(detailsKeys.toSet(), sample.keys, "the sample and the declared list disagree")
@@ -134,7 +139,7 @@ class HomeRouteArgumentsTest {
         }
     }
 
-    /** The ten fields by name, so "which field moved" is a question the suite can ask. */
+    /** The eleven fields by name, so "which field moved" is a question the suite can ask. */
     private fun HomeDetailsRouteArgs.fields(): Map<String, Any?> = mapOf(
         "itemId" to itemId,
         "itemType" to itemType,
@@ -145,6 +150,7 @@ class HomeRouteArgumentsTest {
         "runtimeAbsoluteEpisodeNumber" to runtimeAbsoluteEpisodeNumber,
         "initialArtworkUrl" to initialArtworkUrl,
         "artworkHighUrl" to artworkHighUrl,
+        "artworkLowUrl" to artworkLowUrl,
         "sharedElementKey" to sharedElementKey,
     )
 
@@ -167,6 +173,7 @@ class HomeRouteArgumentsTest {
         assertNull(read.runtimeAbsoluteEpisodeNumber)
         assertNull(read.initialArtworkUrl)
         assertNull(read.artworkHighUrl)
+        assertNull(read.artworkLowUrl)
         assertNull(read.sharedElementKey)
         assertEquals(false, read.autoOpenEpisode)
     }

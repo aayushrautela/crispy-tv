@@ -99,6 +99,7 @@ internal fun DetailsScreen(
     playbackSettings: PlaybackSettings,
     initialArtworkUrl: String? = null,
     initialArtworkHighUrl: String? = null,
+    initialArtworkLowUrl: String? = null,
     sharedElementKey: String? = null,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
@@ -238,10 +239,16 @@ internal fun DetailsScreen(
     val initialHeroArtwork = remember(initialArtworkHighUrl) {
         detailsHeroInitialArtwork(highUrl = initialArtworkHighUrl)
     }
+    // The seed colour reads the catalogue's `low` rendition, which the rail cards
+    // already fetched, so it usually lands on a warm disk entry. The flat URL
+    // stays the fallback for the routes that carried no set.
+    val seedImageUrl = remember(initialArtworkLowUrl, imageUrl) {
+        detailsSeedImageUrl(carriedLowUrl = initialArtworkLowUrl, flatArtworkUrl = imageUrl)
+    }
     val fallbackSeed = Color.White
     // Both values, not one: `showPalettePlaceholder` below distinguishes "no seed"
     // from "the seed is white", and folding the null away here would erase that.
-    val rawSeed = imageSeedColor(imageUrl, fallbackSeed)
+    val rawSeed = imageSeedColor(seedImageUrl, fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed
     val detailsScheme = rememberDetailsColorScheme(seedColor = seedColor)
     val detailsSchemeAnimated = rememberAnimatedColorScheme(target = detailsScheme)
