@@ -1,5 +1,8 @@
 package com.crispy.tv.details
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.DisposableEffect
@@ -21,7 +24,7 @@ import com.crispy.tv.details.trailer.TrailerSource
  * Everything above it -- the hero image, the focus handling, the artwork crossfade,
  * the cover alpha -- is ordinary Compose.
  *
- * Its own signature is reproduced at the slot **verbatim**, nine parameters and all,
+ * Its own signature is reproduced at the slot **verbatim**, eight parameters and all,
  * because the alternative is a request object that only exists to be a lambda
  * payload, and inventing one here would be a shape decision wearing a port's
  * clothes. The one parameter list in this module that genuinely wants a value type
@@ -67,14 +70,12 @@ internal fun HeroTrailerLayer(
     viewportHeightPx: Int,
     shouldPlay: Boolean,
     isMuted: Boolean,
-    onFirstFrameRendered: () -> Unit,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
     onFocusLossPause: () -> Unit,
 ) {
     val context = LocalContext.current
     val audioFocusManager = PlaybackDependencies.getAudioFocusManager(context)
 
-    val latestOnFirstFrameRendered = rememberUpdatedState(onFirstFrameRendered)
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
     val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
@@ -139,6 +140,18 @@ internal fun HeroTrailerLayer(
 
     var hasRenderedFirstFrame by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
     var lastSentState by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Int?>(null) }
+    // A paused SurfaceView keeps its last frame on screen, so the surface is faded
+    // out whenever the player stops producing frames and the hero underneath shows
+    // through. That used to be covered by a second image over the hero, which sat
+    // outside the shared-element transition; the hero is the only image in that box
+    // now, so the video has to get out of the way itself.
+    var videoIsVisible by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
+
+    val videoAlpha by animateFloatAsState(
+        targetValue = if (videoIsVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+        label = "hero_trailer_video_alpha",
+    )
 
     fun sendState(state: Int) {
         if (lastSentState == state) return
@@ -153,13 +166,13 @@ internal fun HeroTrailerLayer(
             object : Player.Listener {
                 override fun onRenderedFirstFrame() {
                     hasRenderedFirstFrame = true
-                    latestOnFirstFrameRendered.value()
                     if (latestShouldPlay.value) {
                         sendState(1)
                     }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    videoIsVisible = false
                     if (!errored) {
                         errored = true
                         advanceRequests++
@@ -167,6 +180,7 @@ internal fun HeroTrailerLayer(
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    videoIsVisible = isPlaying
                     if (isPlaying) {
                         if (hasRenderedFirstFrame) {
                             sendState(1)
@@ -207,6 +221,7 @@ internal fun HeroTrailerLayer(
 
         hasRenderedFirstFrame = false
         lastSentState = null
+        videoIsVisible = false
 
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
@@ -260,6 +275,10 @@ internal fun HeroTrailerLayer(
             },
             update = { view ->
                 view.player = exoPlayer
+                // The surface view, not the PlayerView: a SurfaceView's own layer is
+                // what SurfaceFlinger composites, so an alpha set on the parent view
+                // is not what reaches the frame the player leaves behind.
+                (view.videoSurfaceView ?: view).alpha = videoAlpha
             }
         )
     }

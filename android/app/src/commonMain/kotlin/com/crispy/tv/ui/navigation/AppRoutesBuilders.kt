@@ -48,6 +48,8 @@ fun AppRoutes.homeDetailsRoute(
     episodeNumber: Int? = null,
     absoluteEpisodeNumber: Int? = null,
     artworkUrl: String? = null,
+    artworkHighUrl: String? = null,
+    artworkLowUrl: String? = null,
     sharedElementKey: String? = null,
 ): String {
     return "$HomeDetailsRoute/${encodeUriComponent(itemType.trim())}/${encodeUriComponent(itemId.trim())}" +
@@ -57,6 +59,8 @@ fun AppRoutes.homeDetailsRoute(
         "&$HomeDetailsRuntimeEpisodeNumberArg=${episodeNumber?.toString().orEmpty()}" +
         "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}" +
         "&$HomeDetailsArtworkUrlArg=${encodeUriComponent(artworkUrl.orEmpty())}" +
+        "&$HomeDetailsArtworkHighUrlArg=${encodeUriComponent(artworkHighUrl.orEmpty())}" +
+        "&$HomeDetailsArtworkLowUrlArg=${encodeUriComponent(artworkLowUrl.orEmpty())}" +
         "&$HomeDetailsSharedElementKeyArg=${encodeUriComponent(sharedElementKey.orEmpty())}"
 }
 

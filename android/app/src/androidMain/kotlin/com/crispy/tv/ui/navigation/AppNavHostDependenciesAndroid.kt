@@ -209,7 +209,7 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
             rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed).value
                 ?: fallbackSeed
         },
-        // The one place the Android trailer surface is named. The layer's own nine
+        // The one place the Android trailer surface is named. The layer's own eight
         // parameters are reproduced verbatim, so this is an unpack rather than a reshape:
         // `HeroTrailerLayerArgs` exists only to keep the seam one parameter wide.
         homeHeroTrailerLayer = { args ->
@@ -220,7 +220,6 @@ internal fun appNavHostDependencies(): AppNavHostDependencies {
                 viewportHeightPx = args.viewportHeightPx,
                 shouldPlay = args.shouldPlay,
                 isMuted = args.isMuted,
-                onFirstFrameRendered = args.onFirstFrameRendered,
                 onPlaybackState = args.onPlaybackState,
                 onFocusLossPause = args.onFocusLossPause,
             )

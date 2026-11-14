@@ -82,6 +82,8 @@ fun NavGraphBuilder.addLibraryNavGraph(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
+                            artworkHighUrl = item.artwork?.high,
+                            artworkLowUrl = item.artwork?.low,
                             artworkUrl = item.artworkUrl,
                             sharedElementKey = sharedElementKey,
                         )

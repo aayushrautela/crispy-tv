@@ -22,9 +22,10 @@ package com.crispy.tv.images
  *
  * `original` is the fourth slot the backend now sends (`xl` on the wire): the
  * uncapped source image. It sits outside the `ImageQuality` ladder on purpose --
- * it is what a full-screen surface asks for, not a step on the quality
- * slider -- and it defaults to `null` so every existing construction site keeps
- * compiling and every cached set written before it existed still parses.
+ * it is what a tier degrades to when no capped tier is wide enough, not a step
+ * on the quality slider -- and it defaults to `null` so every existing
+ * construction site keeps compiling and every cached set written before it
+ * existed still parses.
  *
  * It lives in `:android:core-domain` because that is the only module the wire
  * layer, `:android:home` and `:android:app` all already depend on, and the only
@@ -43,7 +44,7 @@ data class ResponsiveImageSet(
         return when (quality) {
             ImageQuality.LOW -> low ?: medium ?: high ?: original
             ImageQuality.MEDIUM -> medium ?: high ?: low ?: original
-            ImageQuality.HIGH -> original ?: high ?: medium ?: low
+            ImageQuality.HIGH -> high ?: medium ?: low ?: original
         }?.trim()?.ifBlank { null }
     }
 

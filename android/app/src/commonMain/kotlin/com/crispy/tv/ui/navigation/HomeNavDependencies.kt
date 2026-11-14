@@ -150,6 +150,8 @@ internal data class HomeDetailsRouteArgs(
     val runtimeEpisodeNumber: String?,
     val runtimeAbsoluteEpisodeNumber: String?,
     val initialArtworkUrl: String?,
+    val artworkHighUrl: String?,
+    val artworkLowUrl: String?,
     val sharedElementKey: String?,
 )
 

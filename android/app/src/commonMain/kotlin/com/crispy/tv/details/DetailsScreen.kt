@@ -63,6 +63,7 @@ import com.crispy.tv.addons.streams.StreamSelectorUiState
 import com.crispy.tv.backend.MetadataReviewView
 import com.crispy.tv.backend.MetadataVideoView
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.details.detailsHeroInitialArtwork
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource
 import com.crispy.tv.details.trailer.extractYouTubeVideoId
@@ -97,6 +98,8 @@ internal fun DetailsScreen(
     selectorHeaderEpisode: MediaVideo?,
     playbackSettings: PlaybackSettings,
     initialArtworkUrl: String? = null,
+    initialArtworkHighUrl: String? = null,
+    initialArtworkLowUrl: String? = null,
     sharedElementKey: String? = null,
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit,
@@ -229,10 +232,23 @@ internal fun DetailsScreen(
     val heroArtwork = remember(uiState.titleDetail) {
         uiState.titleDetail?.item?.images?.artwork
     }
+    // Until the details response lands, the hero works from the set the tapped
+    // card carried. It names one tier -- the one the hero box justifies -- so the
+    // opening request is already the right one and the response resolves the same
+    // URL instead of a second one.
+    val initialHeroArtwork = remember(initialArtworkHighUrl) {
+        detailsHeroInitialArtwork(highUrl = initialArtworkHighUrl)
+    }
+    // The seed colour reads the catalogue's `low` rendition, which the rail cards
+    // already fetched, so it usually lands on a warm disk entry. The flat URL
+    // stays the fallback for the routes that carried no set.
+    val seedImageUrl = remember(initialArtworkLowUrl, imageUrl) {
+        detailsSeedImageUrl(carriedLowUrl = initialArtworkLowUrl, flatArtworkUrl = imageUrl)
+    }
     val fallbackSeed = Color.White
     // Both values, not one: `showPalettePlaceholder` below distinguishes "no seed"
     // from "the seed is white", and folding the null away here would erase that.
-    val rawSeed = imageSeedColor(imageUrl, fallbackSeed)
+    val rawSeed = imageSeedColor(seedImageUrl, fallbackSeed)
     val seedColor = rawSeed ?: fallbackSeed
     val detailsScheme = rememberDetailsColorScheme(seedColor = seedColor)
     val detailsSchemeAnimated = rememberAnimatedColorScheme(target = detailsScheme)
@@ -369,7 +385,7 @@ internal fun DetailsScreen(
                     HeroSection(
                         details = visibleDetails,
                         imageUrl = imageUrl,
-                        artwork = heroArtwork,
+                        artwork = heroArtwork ?: initialHeroArtwork,
                         palette = palette,
                         trailer = heroTrailerSources,
                         screenHeightDp = screenHeightDp,
