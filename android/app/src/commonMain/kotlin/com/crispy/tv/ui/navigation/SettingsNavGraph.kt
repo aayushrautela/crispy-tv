@@ -138,6 +138,12 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
                 playbackSettingsRepository.setAutoSelectStream(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
             },
+            onHdrOutputChanged = { enabled ->
+                // Deliberately not pushed to the cloud: HDR output describes
+                // this screen, not the profile, so it follows the same rule as
+                // resizeMode and autoSelectStream.
+                playbackSettingsRepository.setHdrOutputEnabled(enabled)
+            },
             onBack = { navController.popBackStack() }
         )
         }

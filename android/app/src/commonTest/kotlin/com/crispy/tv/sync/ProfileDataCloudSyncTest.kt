@@ -485,6 +485,7 @@ private class RecordingPlaybackSettingsRepository(
     override fun setDefaultSubtitleLanguage(language: String?): Unit = unused("setDefaultSubtitleLanguage")
     override fun setAutoSelectStream(enabled: Boolean): Unit = unused("setAutoSelectStream")
     override fun setResizeMode(mode: PlayerResizeMode): Unit = unused("setResizeMode")
+    override fun setHdrOutputEnabled(enabled: Boolean): Unit = unused("setHdrOutputEnabled")
 
     private fun unused(name: String): Nothing = throw AssertionError("$name is not stubbed")
 }

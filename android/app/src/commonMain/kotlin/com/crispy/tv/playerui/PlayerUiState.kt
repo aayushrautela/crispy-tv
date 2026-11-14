@@ -105,6 +105,12 @@ data class PlayerUiState(
      */
     val subtitleAppearance: SubtitleAppearance = SubtitleAppearance(),
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
+    /**
+     * Whether HDR output is on for this session's engine, mirrored from
+     * [com.crispy.tv.settings.PlaybackSettings.hdrOutputEnabled]. Off makes
+     * the player render through mpv's `gpu` vo, which tone-maps to SDR.
+     */
+    val hdrOutputEnabled: Boolean = true,
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,
     val addonSubtitlesError: String? = null,

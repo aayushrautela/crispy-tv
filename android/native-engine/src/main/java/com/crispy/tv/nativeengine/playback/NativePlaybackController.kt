@@ -112,6 +112,10 @@ class NativePlaybackController(
         mpvRuntime.setPictureInPictureActive(active)
     }
 
+    override fun setHdrOutputEnabled(enabled: Boolean) {
+        mpvRuntime.setHdrOutputEnabled(enabled)
+    }
+
     override fun createMpvSurfaceView(context: Context): SurfaceView {
         Log.d(TAG, "createMpvSurfaceView")
         return mpvRuntime.createSurfaceView(context)

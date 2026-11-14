@@ -9,7 +9,7 @@ package com.crispy.tv.nativeengine.playback
  * `com.android.library` with no JVM variant, so a KMP
  * `commonMain` could not name it and every consumer of the types it returns was
  * pinned to `androidMain` for the same reason. It is now declared here --
- * **all fifteen members use only the lifted value types**.
+ * **all sixteen members use only the lifted value types**.
  *
  * What did *not* come with it is [PlaybackSurfaceController], the other half of
  * the old `PlaybackController`. Its members take a `SurfaceView` or a
@@ -37,4 +37,5 @@ interface PlaybackSessionController {
     fun applyResizeMode(mode: PlayerResizeMode)
     fun selectChapter(index: Int)
     fun setPictureInPictureActive(active: Boolean)
+    fun setHdrOutputEnabled(enabled: Boolean)
 }

@@ -208,6 +208,10 @@ fun PlayerRoute(
         session.applyResizeMode(uiState.resizeMode)
     }
 
+    LaunchedEffect(uiState.hdrOutputEnabled) {
+        session.applyHdrOutputEnabled(uiState.hdrOutputEnabled)
+    }
+
     Box(
         modifier =
             Modifier

@@ -19,6 +19,7 @@ private const val KEY_DEFAULT_AUDIO_LANGUAGE = "default_audio_language"
 private const val KEY_DEFAULT_SUBTITLE_LANGUAGE = "default_subtitle_language"
 private const val KEY_RESIZE_MODE = "resize_mode"
 private const val KEY_AUTO_SELECT_STREAM = "auto_select_stream"
+private const val KEY_HDR_OUTPUT_ENABLED = "hdr_output_enabled"
 
 // Deliberately unread, and the reason is a decision rather than an omission:
 // `use_libass`, `libass_render_type` and `playback_engine` still exist on every
@@ -32,6 +33,7 @@ private const val DEFAULT_PLAYBACK_SPEED = 1f
 private const val DEFAULT_MUTED = false
 private const val DEFAULT_RESIZE_MODE = "Fit"
 private const val DEFAULT_AUTO_SELECT_STREAM = false
+private const val DEFAULT_HDR_OUTPUT_ENABLED = true
 
 data class PlaybackSettings(
     val skipIntroEnabled: Boolean = DEFAULT_SKIP_INTRO_ENABLED,
@@ -43,6 +45,14 @@ data class PlaybackSettings(
     val defaultSubtitleLanguage: String? = null,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val autoSelectStream: Boolean = DEFAULT_AUTO_SELECT_STREAM,
+    /**
+     * Whether the mpv player may use the tunneled `mediacodec_embed` output,
+     * which reaches the display in HDR. Off renders through mpv's `gpu` vo,
+     * tone-mapping every source to SDR. Device-local by design -- never a
+     * cloud-synced profile setting, because it describes this screen, not the
+     * profile.
+     */
+    val hdrOutputEnabled: Boolean = DEFAULT_HDR_OUTPUT_ENABLED,
 )
 
 interface PlaybackSettingsRepository {
@@ -56,6 +66,7 @@ interface PlaybackSettingsRepository {
     fun setDefaultSubtitleLanguage(language: String?)
     fun setAutoSelectStream(enabled: Boolean)
     fun setResizeMode(mode: PlayerResizeMode)
+    fun setHdrOutputEnabled(enabled: Boolean)
 }
 
 /**
@@ -176,6 +187,15 @@ internal class KeyValueStorePlaybackSettingsRepository(
         store.putString(KEY_RESIZE_MODE, mode.name)
     }
 
+    override fun setHdrOutputEnabled(enabled: Boolean) {
+        if (_settings.value.hdrOutputEnabled == enabled) {
+            return
+        }
+
+        _settings.value = _settings.value.copy(hdrOutputEnabled = enabled)
+        store.putBoolean(KEY_HDR_OUTPUT_ENABLED, enabled)
+    }
+
     private fun readSettings(): PlaybackSettings {
         return PlaybackSettings(
             skipIntroEnabled = store.getBoolean(KEY_SKIP_INTRO_ENABLED, DEFAULT_SKIP_INTRO_ENABLED),
@@ -193,6 +213,7 @@ internal class KeyValueStorePlaybackSettingsRepository(
                     ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
                     ?: PlayerResizeMode.Fit,
             autoSelectStream = store.getBoolean(KEY_AUTO_SELECT_STREAM, DEFAULT_AUTO_SELECT_STREAM),
+            hdrOutputEnabled = store.getBoolean(KEY_HDR_OUTPUT_ENABLED, DEFAULT_HDR_OUTPUT_ENABLED),
         )
     }
 }

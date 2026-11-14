@@ -35,6 +35,7 @@ fun PlaybackSettingsScreen(
     onTrailerAutoplayChanged: (Boolean) -> Unit,
     onSkipIntroChanged: (Boolean) -> Unit,
     onAutoSelectStreamChanged: (Boolean) -> Unit,
+    onHdrOutputChanged: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     val scrollBehavior = appBarScrollBehavior()
@@ -128,6 +129,31 @@ fun PlaybackSettingsScreen(
                     }
                 ) {
                     Text("Auto-select Stream")
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    supportingContent = {
+                        Text(
+                            "Play HDR video in its full brightness when the screen supports it. " +
+                                "Turn off to always render in standard dynamic range.",
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.hdrOutputEnabled,
+                            onCheckedChange = onHdrOutputChanged,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                checkedThumbColor = MaterialTheme.colorScheme.onSurface,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                    }
+                ) {
+                    Text("HDR Output")
                 }
             }
 

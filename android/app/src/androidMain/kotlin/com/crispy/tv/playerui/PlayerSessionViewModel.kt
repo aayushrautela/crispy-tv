@@ -208,6 +208,7 @@ class PlayerSessionViewModel(
                 currentPlaybackUrl = null,
                 activeEngine = initialEngine,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
+                hdrOutputEnabled = playbackSettingsRepository.settings.value.hdrOutputEnabled,
                 subtitleAppearance = subtitleSettingsRepository.appearance.value,
             )
         )
@@ -388,6 +389,20 @@ class PlayerSessionViewModel(
     fun setResizeMode(mode: PlayerResizeMode) {
         playbackSettingsRepository.setResizeMode(mode)
         _uiState.update { it.copy(resizeMode = mode) }
+    }
+
+    /**
+     * Writes the user's HDR choice into the repository; the live engine is
+     * updated by the route's `LaunchedEffect` on this state value, the same
+     * path [setResizeMode] and [applyResizeMode] take.
+     */
+    fun setHdrOutputEnabled(enabled: Boolean) {
+        playbackSettingsRepository.setHdrOutputEnabled(enabled)
+        _uiState.update { it.copy(hdrOutputEnabled = enabled) }
+    }
+
+    fun applyHdrOutputEnabled(enabled: Boolean) {
+        playbackController.setHdrOutputEnabled(enabled)
     }
 
     fun applyResizeMode(mode: PlayerResizeMode) {

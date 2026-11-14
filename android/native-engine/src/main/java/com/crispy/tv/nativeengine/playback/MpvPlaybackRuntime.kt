@@ -59,6 +59,15 @@ internal class MpvPlaybackRuntime(
      */
     private var inPictureInPicture: Boolean = false
 
+    /**
+     * The user's HDR output choice. `true` (the default) plays through the
+     * tunneled `mediacodec_embed` vo, where the decoder's frames reach the
+     * display with their own colour aspects. `false` renders through `gpu`,
+     * where mpv tone-maps every source down to the surface's SDR target, so
+     * the display never switches into HDR mode.
+     */
+    private var hdrOutputEnabled: Boolean = true
+
     private val eventObserver = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = Unit
 
@@ -274,10 +283,11 @@ internal class MpvPlaybackRuntime(
             // straight to the SurfaceView surface (zero copy, native HDR via
             // the HWC, but no mpv overlays, and it ignores panscan). gpu is the
             // fallback when tunneling is unsupported, and the only choice when
-            // the surface must be cover-cropped; gpu (not gpu-next) because
-            // gpu-next corrupts on 10-bit HDR opaque surfaces (mpvEx #817).
-            // The trailer passes forceGpuVo = true — it has no HDR to preserve.
-            instance.setOptionString("vo", if (forceGpuVo) "gpu" else VO_PREFERRED)
+            // the surface must be cover-cropped or the user turned HDR output
+            // off; gpu (not gpu-next) because gpu-next corrupts on 10-bit HDR
+            // opaque surfaces (mpvEx #817). The trailer passes forceGpuVo =
+            // true — it has no HDR to preserve.
+            instance.setOptionString("vo", activeVo())
             instance.setOptionString("msg-level", "all=warn")
             instance.setOptionString("demuxer-max-bytes", "$DEMUXER_MAX_BYTES")
             instance.setOptionString("demuxer-max-back-bytes", "$DEMUXER_MAX_BYTES")
@@ -391,7 +401,7 @@ internal class MpvPlaybackRuntime(
         // not guaranteed to compose in a small window, so render through gpu
         // while in PiP and restore the tunneled vo when leaving it.
         inPictureInPicture = active
-        val vo = if (active) "gpu" else VO_PREFERRED
+        val vo = activeVo()
         Log.d(TAG, "setPictureInPictureActive active=$active vo=$vo")
         runCatching {
             mpv?.setPropertyString("vo", vo)
@@ -403,6 +413,44 @@ internal class MpvPlaybackRuntime(
         // video is drawn, so re-apply the resize mode for the new context.
         applyResizeMode(resizeMode)
     }
+
+    /**
+     * Turns HDR output on or off while a file is playing.
+     *
+     * Off switches to the `gpu` vo, where mpv tone-maps the stream down to the
+     * surface's SDR target; the display then never enters HDR mode. On
+     * restores the tunneled `mediacodec_embed` vo from [VO_PREFERRED]. Like
+     * every vo change here this is a live property write -- the same mechanism
+     * [setPictureInPictureActive] uses -- so the swap happens without
+     * reloading the file.
+     */
+    fun setHdrOutputEnabled(enabled: Boolean) {
+        if (hdrOutputEnabled == enabled) {
+            return
+        }
+        hdrOutputEnabled = enabled
+        val vo = activeVo()
+        Log.d(TAG, "setHdrOutputEnabled enabled=$enabled vo=$vo")
+        runCatching {
+            mpv?.setPropertyString("vo", vo)
+        }
+        // Where the video is drawn decides who crops it, so re-apply the
+        // resize mode for the new vo.
+        applyResizeMode(resizeMode)
+    }
+
+    /**
+     * The vo the video should be drawn with right now: `gpu` whenever the
+     * surface must be cover-cropped, we are in PiP, or the user turned HDR
+     * output off; the tunneled chain the rest of the time.
+     */
+    private fun activeVo(): String =
+        when {
+            forceGpuVo -> "gpu"
+            inPictureInPicture -> "gpu"
+            !hdrOutputEnabled -> "gpu"
+            else -> VO_PREFERRED
+        }
 
     /**
      * The video's own pixel size, from `video-params/w`/`h` -- not the surface's.

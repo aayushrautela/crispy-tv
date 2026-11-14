@@ -36,6 +36,7 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         repository.setDefaultSubtitleLanguage("deu")
         repository.setResizeMode(PlayerResizeMode.Zoom)
         repository.setAutoSelectStream(true)
+        repository.setHdrOutputEnabled(false)
 
         val settings = repository.settings.value
         assertEquals(
@@ -49,6 +50,7 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
                 defaultSubtitleLanguage = "deu",
                 resizeMode = PlayerResizeMode.Zoom,
                 autoSelectStream = true,
+                hdrOutputEnabled = false,
             ),
             settings,
         )
@@ -81,6 +83,7 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
             setPlaybackSpeed(2f)
             setResizeMode(PlayerResizeMode.Zoom)
             setDefaultAudioLanguage("fra")
+            setHdrOutputEnabled(false)
         }
 
         val reread = KeyValueStorePlaybackSettingsRepository(store).settings.value
@@ -89,6 +92,7 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         assertEquals(2f, reread.playbackSpeed)
         assertEquals(PlayerResizeMode.Zoom, reread.resizeMode)
         assertEquals("fra", reread.defaultAudioLanguage)
+        assertEquals(false, reread.hdrOutputEnabled)
     }
 
     /**
@@ -114,6 +118,7 @@ class KeyValueStorePlaybackSettingsRepositoryTest {
         repository.setDefaultSubtitleLanguage(current.defaultSubtitleLanguage)
         repository.setAutoSelectStream(current.autoSelectStream)
         repository.setResizeMode(current.resizeMode)
+        repository.setHdrOutputEnabled(current.hdrOutputEnabled)
 
         assertEquals(emptyList(), store.writes)
     }
