@@ -30,6 +30,13 @@ internal class MpvPlaybackRuntime(
     private var videoLayout: NativeVideoLayout? = null
     private var videoWidth: Int = 0
     private var videoHeight: Int = 0
+    /**
+     * The stream's colour transfer function as mpv last reported it -- `pq`,
+     * `hlg`, `bt.1886` -- and whether that one is HDR. Both are reset on a new
+     * file, because the property outlives the file that set it otherwise.
+     */
+    private var sourceTransferFunction: String? = null
+    private var sourceIsHdr: Boolean = false
     private var error: NativePlaybackError? = null
     private var nextErrorToken: Long = 1L
     private var lastBufferingPercent: Float? = null
@@ -160,6 +167,10 @@ internal class MpvPlaybackRuntime(
                 // Raw sub-text carries ASS override blocks and markup; the UI
                 // sanitises it before drawing (see SubtitleCueText.kt).
                 "sub-text" -> subText = value.ifEmpty { null }
+                "video-params/trc" -> {
+                    sourceTransferFunction = value
+                    sourceIsHdr = isHdrTransferFunction(value)
+                }
             }
         }
 
@@ -173,6 +184,8 @@ internal class MpvPlaybackRuntime(
                     subText = null
                     videoWidth = 0
                     videoHeight = 0
+                    sourceTransferFunction = null
+                    sourceIsHdr = false
                     videoLayout = null
                 }
                 MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED,
@@ -347,6 +360,7 @@ internal class MpvPlaybackRuntime(
             "chapter-list/count" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "video-params/w" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "video-params/h" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "video-params/trc" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
             "sub-text" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
@@ -733,6 +747,7 @@ internal class MpvPlaybackRuntime(
             durationMs = durationMs,
             bufferingPercent = lastBufferingPercent,
             videoLayout = videoLayout,
+            isHdrSource = sourceIsHdr,
             error = error,
             playbackSpeed = playbackSpeed,
             muted = muted,
@@ -849,6 +864,8 @@ internal class MpvPlaybackRuntime(
         videoLayout = null
         videoWidth = 0
         videoHeight = 0
+        sourceTransferFunction = null
+        sourceIsHdr = false
         error = null
         audioTracks = emptyList()
         subtitleTracks = emptyList()

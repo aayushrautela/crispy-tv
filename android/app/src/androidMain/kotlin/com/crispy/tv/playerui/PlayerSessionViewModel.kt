@@ -209,6 +209,7 @@ class PlayerSessionViewModel(
                 activeEngine = initialEngine,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
                 hdrOutputEnabled = playbackSettingsRepository.settings.value.hdrOutputEnabled,
+                hdrSettingEnabled = playbackSettingsRepository.settings.value.hdrOutputEnabled,
                 subtitleAppearance = subtitleSettingsRepository.appearance.value,
             )
         )
@@ -402,6 +403,22 @@ class PlayerSessionViewModel(
     }
 
     fun applyHdrOutputEnabled(enabled: Boolean) {
+        playbackController.setHdrOutputEnabled(enabled)
+    }
+
+    /**
+     * Flips HDR output for this session, leaving the saved setting where it
+     * was: the player's button answers "not this video", and the Playback
+     * Settings toggle stays the viewer's standing choice.
+     *
+     * Only the engine is called here, not the repository. [setHdrOutputEnabled]
+     * remains the settings-screen path; the two members exist because the two
+     * decisions are different, and collapsing them into one would make the
+     * button silently rewrite a preference it was asked to override.
+     */
+    fun toggleHdrOutput() {
+        val enabled = !_uiState.value.hdrOutputEnabled
+        _uiState.update { it.copy(hdrOutputEnabled = enabled) }
         playbackController.setHdrOutputEnabled(enabled)
     }
 
@@ -1280,8 +1297,9 @@ class PlayerSessionViewModel(
             val shouldUpdateSubtitleDelay = snapshot.subtitleDelayMs != state.subtitleDelayMs
             val nextSubtitleText = snapshot.currentSubtitle?.let { sanitizeSubtitleCue(it) }
             val shouldUpdateSubtitleText = nextSubtitleText != state.currentSubtitleText
+            val shouldUpdateHdr = snapshot.isHdrSource != state.videoIsHdr
 
-            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay || shouldUpdateSubtitleText)) {
+            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay || shouldUpdateSubtitleText || shouldUpdateHdr)) {
                 state
             } else {
                 state.copy(
@@ -1299,6 +1317,7 @@ class PlayerSessionViewModel(
                     selectedSubtitleTrackId = snapshot.selectedSubtitleTrackId,
                     subtitleDelayMs = snapshot.subtitleDelayMs,
                     currentSubtitleText = nextSubtitleText,
+                    videoIsHdr = snapshot.isHdrSource,
                 )
             }
         }

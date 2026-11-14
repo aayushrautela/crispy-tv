@@ -111,6 +111,21 @@ data class PlayerUiState(
      * the player render through mpv's `gpu` vo, which tone-maps to SDR.
      */
     val hdrOutputEnabled: Boolean = true,
+    /**
+     * The saved setting: whether HDR output is a feature this device may use
+     * at all, mirrored from
+     * [com.crispy.tv.settings.PlaybackSettings.hdrOutputEnabled]. Off hides
+     * the player's HDR button entirely -- the player's own flips are session
+     * only and must not be able to switch the feature on for someone who
+     * turned it off.
+     */
+    val hdrSettingEnabled: Boolean = true,
+    /**
+     * Whether the *stream* playing is HDR (its transfer function is PQ or
+     * HLG), which is a different question from [hdrOutputEnabled]: SDR video
+     * has nothing to switch, and a toggle on it would be a lie.
+     */
+    val videoIsHdr: Boolean = false,
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,
     val addonSubtitlesError: String? = null,

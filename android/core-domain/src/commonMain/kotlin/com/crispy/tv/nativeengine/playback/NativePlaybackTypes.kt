@@ -116,6 +116,13 @@ data class NativePlaybackSnapshot(
     val durationMs: Long = 0L,
     val bufferingPercent: Float? = null,
     val videoLayout: NativeVideoLayout? = null,
+    /**
+     * Whether the *source* stream is HDR, from its colour transfer function
+     * (PQ or HLG) -- not whether the output is. SDR video carries no HDR to
+     * switch, so this is what decides whether the player offers the toggle at
+     * all. `false` for an engine that cannot tell the difference.
+     */
+    val isHdrSource: Boolean = false,
     val error: NativePlaybackError? = null,
     val playbackSpeed: Float = 1f,
     val muted: Boolean = false,

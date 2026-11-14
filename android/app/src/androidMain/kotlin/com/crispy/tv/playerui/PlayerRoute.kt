@@ -355,6 +355,12 @@ fun PlayerRoute(
                 onCommitSeek = { targetMs, _ ->
                     session.seekTo(targetMs)
                 },
+                // A session flip, so no gesture feedback label: the pill's own
+                // state is the answer, and writing the setting here would make
+                // the button the preference's owner rather than its override.
+                onToggleHdrOutput = session::toggleHdrOutput,
+                hdrToggleVisible = uiState.videoIsHdr && uiState.hdrSettingEnabled,
+                hdrOutputEnabled = uiState.hdrOutputEnabled,
             )
 
             GestureFeedbackOverlay(feedback = gestureFeedback, palette = palette)

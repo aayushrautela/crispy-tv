@@ -88,6 +88,14 @@ internal fun PlayerOverlay(
     onShowMore: () -> Unit,
     onOpenTitle: (CatalogItem) -> Unit,
     onCycleResizeMode: () -> Unit,
+    // The player's HDR switch: a session flip, so it is a slot of its own rather
+    // than a shared `onHdrOutputChanged` with the settings screen, whose write
+    // is a preference and this one is not.
+    onToggleHdrOutput: () -> Unit,
+    // Drawn only when there is a choice to make: the stream is HDR and the
+    // device has the feature on. See [PlayerUiState.videoIsHdr].
+    hdrToggleVisible: Boolean,
+    hdrOutputEnabled: Boolean,
     onCommitSeek: (targetMs: Long, totalDeltaMs: Long) -> Unit,
 ) {
     val overlayPadding = rememberOverlayPadding(minPadding = 12.dp)
@@ -326,6 +334,9 @@ internal fun PlayerOverlay(
                         onCycleResizeMode()
                     },
                     resizeMode = uiState.resizeMode,
+                    hdrOutputEnabled = uiState.hdrOutputEnabled,
+                    hdrToggleVisible = uiState.videoIsHdr && uiState.hdrSettingEnabled,
+                    onToggleHdrOutput = onToggleHdrOutput,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     pills = pills,
                 )

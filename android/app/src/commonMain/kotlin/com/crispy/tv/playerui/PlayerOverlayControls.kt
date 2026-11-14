@@ -41,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -176,6 +178,9 @@ internal fun PlayerBottomControls(
     onOpenSubtitles: () -> Unit,
     onCycleResizeMode: () -> Unit,
     resizeMode: PlayerResizeMode,
+    hdrOutputEnabled: Boolean,
+    hdrToggleVisible: Boolean,
+    onToggleHdrOutput: () -> Unit,
     modifier: Modifier = Modifier,
     pills: List<PlayerActionPill> = emptyList(),
 ) {
@@ -314,9 +319,48 @@ internal fun PlayerBottomControls(
                             )
                         }
                     }
+                    if (hdrToggleVisible) {
+                        PlayerHdrToggle(
+                            hdrOutputEnabled = hdrOutputEnabled,
+                            contentColor = palette.onPillBackground,
+                            onClick = onToggleHdrOutput,
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * The HDR switch: a labelled pill rather than an icon, because HDR is a state
+ * the viewer reads -- "is this playing as HDR or as SDR?" -- and the design
+ * set has no symbol that says it. `HDR` dimmed is the off state and the full
+ * content colour is on, and the semantics label carries the same distinction
+ * so the button answers to a screen reader either way.
+ */
+@Composable
+private fun PlayerHdrToggle(
+    hdrOutputEnabled: Boolean,
+    contentColor: Color,
+    onClick: () -> Unit,
+) {
+    val stateLabel = if (hdrOutputEnabled) "HDR on" else "HDR off"
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = Color.Transparent,
+        contentColor = if (hdrOutputEnabled) contentColor else contentColor.copy(alpha = 0.5f),
+        modifier =
+            Modifier
+                .height(40.dp)
+                .semantics { contentDescription = stateLabel },
+    ) {
+        Text(
+            text = "HDR",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
     }
 }
 
