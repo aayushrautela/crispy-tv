@@ -3,8 +3,8 @@ package com.crispy.tv.nativeengine.playback
 /**
  * A single audio or subtitle track as the engine reports it.
  *
- * Moved out of `:android:native-engine` for the same reason as [PlayerResizeMode] and
- * [NativePlaybackEnginePreference]: this type is part of the public shape of
+ * Moved out of `:android:native-engine` for the same reason as [PlayerResizeMode]:
+ * this type is part of the public shape of
  * `NativePlaybackSnapshot`, and a plain `com.android.library` cannot be referenced from
  * a KMP `commonMain` at all, so its old location held `PlayerTrackSheet.kt` -- 449
  * lines that name nothing platform-shaped -- in `androidMain` for want of a

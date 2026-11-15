@@ -10,6 +10,13 @@ import dev.jdtech.mpv.MPVLib
 
 internal class MpvPlaybackRuntime(
     context: Context,
+    /**
+     * Render through `gpu` instead of the tunneled `mediacodec_embed` path.
+     * The tunneled vo gives native HDR and zero-copy but ignores panscan, so a
+     * surface that must be cover-cropped (the hero trailer, which has no HDR
+     * to preserve) needs `gpu`.
+     */
+    private val forceGpuVo: Boolean = false,
 ) {
     private val appContext = context.applicationContext
     private var mpv: MPVLib? = null
@@ -17,9 +24,19 @@ internal class MpvPlaybackRuntime(
     private var surfaceView: SurfaceView? = null
     private var surfaceAttached: Boolean = false
     private var pendingSource: PlaybackSource? = null
+    private var pendingExternalAudioUrl: String? = null
     private var playRequested: Boolean = false
     private var state: NativePlaybackState = NativePlaybackState.IDLE
     private var videoLayout: NativeVideoLayout? = null
+    private var videoWidth: Int = 0
+    private var videoHeight: Int = 0
+    /**
+     * The stream's colour transfer function as mpv last reported it -- `pq`,
+     * `hlg`, `bt.1886` -- and whether that one is HDR. Both are reset on a new
+     * file, because the property outlives the file that set it otherwise.
+     */
+    private var sourceTransferFunction: String? = null
+    private var sourceIsHdr: Boolean = false
     private var error: NativePlaybackError? = null
     private var nextErrorToken: Long = 1L
     private var lastBufferingPercent: Float? = null
@@ -32,10 +49,31 @@ internal class MpvPlaybackRuntime(
     private var selectedAudioTrackId: String? = null
     private var subtitleTracks: List<NativeTrack> = emptyList()
     private var selectedSubtitleTrackId: String? = null
+    private var chapters: List<NativeChapter> = emptyList()
+    private var subText: String? = null
     private var hasStartedPlayback: Boolean = false
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
     private var resizeMode: PlayerResizeMode = PlayerResizeMode.Fit
+
+    /** Cover-crop requested before the mpv instance existed; applied at init. */
+    private var coverCrop: Boolean = false
+
+    /**
+     * Whether the video is currently drawn into the PiP window. PiP renders
+     * through `gpu`, which honours panscan, so mpv does the crop there; in
+     * fullscreen the UI layer crops instead.
+     */
+    private var inPictureInPicture: Boolean = false
+
+    /**
+     * The user's HDR output choice. `true` (the default) plays through the
+     * tunneled `mediacodec_embed` vo, where the decoder's frames reach the
+     * display with their own colour aspects. `false` renders through `gpu`,
+     * where mpv tone-maps every source down to the surface's SDR target, so
+     * the display never switches into HDR mode.
+     */
+    private var hdrOutputEnabled: Boolean = true
 
     private val eventObserver = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = Unit
@@ -76,6 +114,15 @@ internal class MpvPlaybackRuntime(
                         applySubtitleStyleForSelectedTrack()
                     }
                 }
+                "video-params/w" -> {
+                    videoWidth = value.toInt()
+                    refreshVideoLayout()
+                }
+                "video-params/h" -> {
+                    videoHeight = value.toInt()
+                    refreshVideoLayout()
+                }
+                "chapter-list/count" -> refreshChapters()
             }
         }
 
@@ -115,7 +162,17 @@ internal class MpvPlaybackRuntime(
             }
         }
 
-        override fun eventProperty(property: String, value: String) = Unit
+        override fun eventProperty(property: String, value: String) {
+            when (property) {
+                // Raw sub-text carries ASS override blocks and markup; the UI
+                // sanitises it before drawing (see SubtitleCueText.kt).
+                "sub-text" -> subText = value.ifEmpty { null }
+                "video-params/trc" -> {
+                    sourceTransferFunction = value
+                    sourceIsHdr = isHdrTransferFunction(value)
+                }
+            }
+        }
 
         override fun event(eventId: Int) {
             when (eventId) {
@@ -123,6 +180,13 @@ internal class MpvPlaybackRuntime(
                     state = NativePlaybackState.PREPARING
                     error = null
                     lastBufferingPercent = 0f
+                    chapters = emptyList()
+                    subText = null
+                    videoWidth = 0
+                    videoHeight = 0
+                    sourceTransferFunction = null
+                    sourceIsHdr = false
+                    videoLayout = null
                 }
                 MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED,
                 MPVLib.MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
@@ -133,6 +197,7 @@ internal class MpvPlaybackRuntime(
                         lastProgressAdvanceAtElapsedMs = SystemClock.elapsedRealtime()
                     }
                     refreshTrackLists()
+                    refreshChapters()
                 }
                 MPVLib.MpvEvent.MPV_EVENT_END_FILE -> {
                     if (state != NativePlaybackState.ENDED && state != NativePlaybackState.ERROR) {
@@ -153,22 +218,19 @@ internal class MpvPlaybackRuntime(
             surfaceAttached = true
             pendingSource?.let { pending ->
                 pendingSource = null
-                startPlayback(pending)
+                val externalAudioUrl = pendingExternalAudioUrl
+                pendingExternalAudioUrl = null
+                startPlayback(pending, externalAudioUrl)
             }
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             Log.d(TAG, "surfaceChanged size=${width}x$height")
             runCatching { mpv?.setPropertyString("android-surface-size", "${width}x$height") }
-            if (width > 0 && height > 0) {
-                videoLayout = NativeVideoLayout(
-                    width = width,
-                    height = height,
-                    visibleWidth = width,
-                    visibleHeight = height,
-                    pixelWidthHeightRatio = 1f,
-                )
-            }
+            // The surface size is deliberately NOT recorded as the video layout:
+            // the tunneled vo renders at the video's native size and the view
+            // scales it, so the video's own aspect is what the UI must letterbox to.
+            
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -226,7 +288,19 @@ internal class MpvPlaybackRuntime(
         runCatching {
             instance.setOptionString("config", "no")
             instance.setOptionString("profile", "fast")
-            instance.setOptionString("hwdec", "auto")
+            // hwdec=mediacodec is the zero-copy path; "auto" resolves to
+            // mediacodec-copy on Android, which copies every frame through the
+            // CPU. If mediacodec init fails mpv falls back to software decode.
+            instance.setOptionString("hwdec", "mediacodec")
+            // vo order: mediacodec_embed first — the tunneled decoder writes
+            // straight to the SurfaceView surface (zero copy, native HDR via
+            // the HWC, but no mpv overlays, and it ignores panscan). gpu is the
+            // fallback when tunneling is unsupported, and the only choice when
+            // the surface must be cover-cropped or the user turned HDR output
+            // off; gpu (not gpu-next) because gpu-next corrupts on 10-bit HDR
+            // opaque surfaces (mpvEx #817). The trailer passes forceGpuVo =
+            // true — it has no HDR to preserve.
+            instance.setOptionString("vo", activeVo())
             instance.setOptionString("msg-level", "all=warn")
             instance.setOptionString("demuxer-max-bytes", "$DEMUXER_MAX_BYTES")
             instance.setOptionString("demuxer-max-back-bytes", "$DEMUXER_MAX_BYTES")
@@ -234,6 +308,22 @@ internal class MpvPlaybackRuntime(
             instance.setOptionString("force-window", "no")
             instance.setOptionString("idle", "once")
             instance.init()
+            // The player can start in a resize mode that was chosen before mpv
+            // existed, so apply the remembered mode too.
+            applyResizeMode(resizeMode)
+            // The trailer asks for its cover-crop at construction, before the
+            // instance exists, so apply the remembered value once it does. It
+            // comes after the resize mode because it owns panscan: the trailer
+            // crops itself, the player leaves the crop to the UI layer.
+            if (coverCrop) {
+                instance.setPropertyDouble("panscan", 1.0)
+                instance.setPropertyString("video-aspect-override", "no")
+            }
+            // Subtitles are drawn by the app overlay from sub-text, not by mpv:
+            // mediacodec_embed (tunneled) video cannot carry mpv's rendered
+            // overlays, so mpv-rendered subs and native HDR are mutually exclusive.
+            // In PiP the vo switches to gpu, where mpv renders subs itself.
+            instance.setPropertyBoolean("sub-visibility", false)
             instance.setPropertyBoolean("keep-open", true)
             instance.setPropertyBoolean("audio-fallback-to-null", true)
             instance.addObserver(eventObserver)
@@ -267,22 +357,35 @@ internal class MpvPlaybackRuntime(
             "sub-delay" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
             "aid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "sid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "chapter-list/count" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "video-params/w" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "video-params/h" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "video-params/trc" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
+            "sub-text" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
 
-    fun play(source: PlaybackSource) {
+    /**
+     * Loads [source].
+     *
+     * [externalAudioUrl] is a second stream played alongside the video -- the
+     * trailer case, where the video and the audio come from two different
+     * URLs. mpv takes it as the `audio-file` option of the same `loadfile`.
+     */
+    fun play(source: PlaybackSource, externalAudioUrl: String? = null) {
         resetPlaybackStateForNewMedia()
         playRequested = true
         state = NativePlaybackState.PREPARING
         val url = source.url
-        Log.d(TAG, "play surfaceAttached=$surfaceAttached url=${debugUrl(url)}")
+        Log.d(TAG, "play surfaceAttached=$surfaceAttached url=${debugUrl(url)} externalAudio=${externalAudioUrl != null}")
         if (!surfaceAttached) {
             pendingSource = source
+            pendingExternalAudioUrl = externalAudioUrl
             Log.d(TAG, "play deferred until surface attach url=${debugUrl(url)}")
             return
         }
-        startPlayback(source)
+        startPlayback(source, externalAudioUrl)
     }
 
     fun setPlaying(isPlaying: Boolean) {
@@ -298,6 +401,111 @@ internal class MpvPlaybackRuntime(
         }
         lastProgressAdvanceAtElapsedMs = SystemClock.elapsedRealtime()
         lastObservedPositionMs = positionMs
+    }
+
+    fun selectChapter(index: Int) {
+        val chapter = chapters.getOrNull(index) ?: return
+        Log.d(TAG, "selectChapter index=$index startMs=${chapter.startMs}")
+        seekTo(chapter.startMs)
+    }
+
+    fun setPictureInPictureActive(active: Boolean) {
+        // A PiP window never qualifies for high-brightness HDR (the panel gates
+        // it on HDR screen coverage), and tunneled mediacodec_embed output is
+        // not guaranteed to compose in a small window, so render through gpu
+        // while in PiP and restore the tunneled vo when leaving it.
+        inPictureInPicture = active
+        val vo = activeVo()
+        Log.d(TAG, "setPictureInPictureActive active=$active vo=$vo")
+        runCatching {
+            mpv?.setPropertyString("vo", vo)
+            // gpu vo in the small window can render subs; the fullscreen
+            // tunneled surface cannot, so let mpv draw them there instead.
+            mpv?.setPropertyBoolean("sub-visibility", active)
+        }
+        // The crop moves between the engine and the UI depending on where the
+        // video is drawn, so re-apply the resize mode for the new context.
+        applyResizeMode(resizeMode)
+    }
+
+    /**
+     * Turns HDR output on or off while a file is playing.
+     *
+     * Off switches to the `gpu` vo, where mpv tone-maps the stream down to the
+     * surface's SDR target; the display then never enters HDR mode. On
+     * restores the tunneled `mediacodec_embed` vo from [VO_PREFERRED]. Like
+     * every vo change here this is a live property write -- the same mechanism
+     * [setPictureInPictureActive] uses -- so the swap happens without
+     * reloading the file.
+     */
+    fun setHdrOutputEnabled(enabled: Boolean) {
+        if (hdrOutputEnabled == enabled) {
+            return
+        }
+        hdrOutputEnabled = enabled
+        val vo = activeVo()
+        Log.d(TAG, "setHdrOutputEnabled enabled=$enabled vo=$vo")
+        runCatching {
+            mpv?.setPropertyString("vo", vo)
+        }
+        // Where the video is drawn decides who crops it, so re-apply the
+        // resize mode for the new vo.
+        applyResizeMode(resizeMode)
+    }
+
+    /**
+     * The vo the video should be drawn with right now: `gpu` whenever the
+     * surface must be cover-cropped, we are in PiP, or the user turned HDR
+     * output off; the tunneled chain the rest of the time.
+     */
+    private fun activeVo(): String =
+        when {
+            forceGpuVo -> "gpu"
+            inPictureInPicture -> "gpu"
+            !hdrOutputEnabled -> "gpu"
+            else -> VO_PREFERRED
+        }
+
+    /**
+     * The video's own pixel size, from `video-params/w`/`h` -- not the surface's.
+     * The tunneled `mediacodec_embed` vo renders at the video's native size and the
+     * SurfaceView scales that buffer to the view, so a full-screen view stretches
+     * any video whose aspect differs from the screen; the UI needs the video's
+     * aspect to size the view so the scaling stays uniform.
+     */
+    private fun refreshVideoLayout() {
+        if (videoWidth > 0 && videoHeight > 0) {
+            videoLayout = NativeVideoLayout(
+                width = videoWidth,
+                height = videoHeight,
+                visibleWidth = videoWidth,
+                visibleHeight = videoHeight,
+                pixelWidthHeightRatio = 1f,
+            )
+        }
+    }
+
+    private fun refreshChapters() {
+        val mpv = mpv ?: return
+        val count = runCatching { mpv.getPropertyString("chapter-list/count") }.getOrNull()?.toIntOrNull() ?: 0
+        if (count <= 0) {
+            chapters = emptyList()
+            return
+        }
+        val list = ArrayList<NativeChapter>(count)
+        for (i in 0 until count) {
+            val timeSec =
+                runCatching { mpv.getPropertyString("chapter-list/$i/time") }.getOrNull()?.toDoubleOrNull() ?: continue
+            val title = runCatching { mpv.getPropertyString("chapter-list/$i/title") }.getOrNull()?.takeIf { it.isNotBlank() }
+            list.add(
+                NativeChapter(
+                    index = i,
+                    startMs = (timeSec * 1000.0).toLong().coerceAtLeast(0L),
+                    title = title,
+                ),
+            )
+        }
+        chapters = list
     }
 
     fun stop() {
@@ -390,20 +598,36 @@ internal class MpvPlaybackRuntime(
         runCatching { mpv?.setPropertyDouble("sub-delay", delayMs / 1000.0) }
     }
 
+    /**
+     * Cover-crop the video to fill the surface (`panscan=1.0`), the hero
+     * trailer's old `RESIZE_MODE_ZOOM` behaviour. Separate from
+     * [applyResizeMode]'s `Zoom`, which is the player's user-facing resize
+     * mode and is cropped by the UI layer, not by mpv.
+     *
+     * The trailer calls this before its mpv instance exists, so the value is
+     * remembered and applied in [initialize] too.
+     */
+    fun setCoverCrop(enabled: Boolean) {
+        coverCrop = enabled
+        val mpv = mpv ?: return
+        runCatching {
+            mpv.setPropertyDouble("panscan", if (enabled) 1.0 else 0.0)
+            mpv.setPropertyString("video-aspect-override", "no")
+        }
+    }
+
     fun applyResizeMode(mode: PlayerResizeMode) {
         resizeMode = mode
         val mpv = mpv ?: return
         runCatching {
-            when (mode) {
-                PlayerResizeMode.Fit -> {
-                    mpv.setPropertyDouble("panscan", 0.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-                PlayerResizeMode.Zoom -> {
-                    mpv.setPropertyDouble("panscan", 0.5)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-            }
+            // Who crops depends on where the video is drawn. Fullscreen crops in
+            // the UI layer: the surface is sized to cover the window and the
+            // overflow is cropped by the window edge, so mpv must not crop as
+            // well (and the tunneled vo ignores panscan anyway). PiP keeps the
+            // surface fitted to the video, so there mpv does the crop.
+            val panscan = if (mode == PlayerResizeMode.Zoom && inPictureInPicture) 0.5 else 0.0
+            mpv.setPropertyDouble("panscan", panscan)
+            mpv.setPropertyString("video-aspect-override", "no")
         }
         // Zoom crops plain-text subs off the video rect unless they are
         // allowed into the margins; re-run the selection-aware decision so a
@@ -523,6 +747,7 @@ internal class MpvPlaybackRuntime(
             durationMs = durationMs,
             bufferingPercent = lastBufferingPercent,
             videoLayout = videoLayout,
+            isHdrSource = sourceIsHdr,
             error = error,
             playbackSpeed = playbackSpeed,
             muted = muted,
@@ -531,6 +756,8 @@ internal class MpvPlaybackRuntime(
             subtitleTracks = subtitleTracks,
             selectedSubtitleTrackId = selectedSubtitleTrackId,
             subtitleDelayMs = subtitleDelayMs,
+            chapters = chapters,
+            currentSubtitle = subText,
         )
     }
 
@@ -547,15 +774,22 @@ internal class MpvPlaybackRuntime(
         surfaceAttached = false
         surfaceView = null
         pendingSource = null
+        pendingExternalAudioUrl = null
     }
 
-    private fun startPlayback(source: PlaybackSource) {
+    private fun startPlayback(source: PlaybackSource, externalAudioUrl: String? = null) {
         applyRequestHeaders(source.headers)
         val url = source.url
-        Log.d(TAG, "startPlayback url=${debugUrl(url)} surfaceAttached=$surfaceAttached")
+        Log.d(TAG, "startPlayback url=${debugUrl(url)} surfaceAttached=$surfaceAttached externalAudio=${externalAudioUrl != null}")
+        val loadArguments =
+            if (externalAudioUrl.isNullOrBlank()) {
+                arrayOf("loadfile", url, "replace")
+            } else {
+                arrayOf("loadfile", url, "replace", "audio-file=$externalAudioUrl")
+            }
         runCatching {
             mpv?.setPropertyBoolean("pause", !playRequested)
-            mpv?.command(arrayOf("loadfile", url, "replace"))
+            mpv?.command(loadArguments)
         }
         if (source.externalSubtitles.isNotEmpty()) {
             val mpv = mpv
@@ -619,6 +853,7 @@ internal class MpvPlaybackRuntime(
 
     private fun resetPlaybackStateForNewMedia() {
         pendingSource = null
+        pendingExternalAudioUrl = null
         state = NativePlaybackState.IDLE
         lastBufferingPercent = null
         lastProgressAdvanceAtElapsedMs = 0L
@@ -627,11 +862,17 @@ internal class MpvPlaybackRuntime(
         durationMs = 0L
         hasStartedPlayback = false
         videoLayout = null
+        videoWidth = 0
+        videoHeight = 0
+        sourceTransferFunction = null
+        sourceIsHdr = false
         error = null
         audioTracks = emptyList()
         subtitleTracks = emptyList()
         selectedAudioTrackId = null
         selectedSubtitleTrackId = null
+        chapters = emptyList()
+        subText = null
         restoreSubtitleMargins()
     }
 
@@ -650,6 +891,7 @@ internal class MpvPlaybackRuntime(
 
     companion object {
         private const val TAG = "CrispyMpv"
+        private const val VO_PREFERRED = "mediacodec_embed,gpu"
         private const val DEMUXER_MAX_BYTES = 64 * 1024 * 1024
         private const val POSITION_ADVANCE_TOLERANCE_MS = 150L
         private const val PLAYBACK_STALL_THRESHOLD_MS = 1_000L

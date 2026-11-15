@@ -13,13 +13,12 @@ package com.crispy.tv.nativeengine.playback
  * The package deliberately did not change, so the seven `:app` files that use
  * these types needed no import edit.
  *
- * The three declarations that were in the same file and did **not** come here:
- * `PlaybackSource.toOkHttpHeaders()` (its return type is okhttp's `Headers`),
- * `PlaybackSurfaceController` (all four of its members take a `PlayerView`, a
- * `SurfaceView` or a `Context`), and `PlaybackController` (the Android
- * composition of the two interfaces). Those stay in `:native-engine` because
- * they are the platform half, and a controller whose surface is a
- * `SurfaceView` is Android by definition.
+ * The two declarations that were in the same file and did **not** come here:
+ * `PlaybackSurfaceController` (its members take a `SurfaceView` or a
+ * `Context`), and `PlaybackController` (the Android composition of the two
+ * interfaces). Those stay in `:native-engine` because they are the platform
+ * half, and a controller whose surface is a `SurfaceView` is Android by
+ * definition.
  */
 enum class NativePlaybackEngine {
     EXO,
@@ -117,6 +116,13 @@ data class NativePlaybackSnapshot(
     val durationMs: Long = 0L,
     val bufferingPercent: Float? = null,
     val videoLayout: NativeVideoLayout? = null,
+    /**
+     * Whether the *source* stream is HDR, from its colour transfer function
+     * (PQ or HLG) -- not whether the output is. SDR video carries no HDR to
+     * switch, so this is what decides whether the player offers the toggle at
+     * all. `false` for an engine that cannot tell the difference.
+     */
+    val isHdrSource: Boolean = false,
     val error: NativePlaybackError? = null,
     val playbackSpeed: Float = 1f,
     val muted: Boolean = false,
@@ -125,6 +131,16 @@ data class NativePlaybackSnapshot(
     val subtitleTracks: List<NativeTrack> = emptyList(),
     val selectedSubtitleTrackId: String? = null,
     val subtitleDelayMs: Int = 0,
+    val chapters: List<NativeChapter> = emptyList(),
+    /**
+     * The subtitle cue the engine is showing right now, raw as the engine
+     * reports it -- an ASS track still carries its `{\...}` override tags, so
+     * this is what [sanitizeSubtitleCue] is for before anything renders it.
+     * `null` when no cue is active. Subtitles are always drawn by the app
+     * overlay from this text, so an engine that cannot report a cue reports
+     * `null` and the UI draws nothing.
+     */
+    val currentSubtitle: String? = null,
 ) {
     val isPlaying: Boolean
         get() = state == NativePlaybackState.PLAYING
@@ -134,12 +150,24 @@ data class NativePlaybackSnapshot(
 }
 
 /**
+ * One chapter of the playing file, as the engine reports it.
+ *
+ * [index] is the engine's position in the chapter list and is what
+ * [PlaybackSessionController.selectChapter] takes; [startMs] is where seeking
+ * to the chapter lands. [title] is null when the container carries no title.
+ */
+data class NativeChapter(
+    val index: Int,
+    val startMs: Long,
+    val title: String? = null,
+)
+
+/**
  * One playable stream, with the headers needed to fetch it.
  *
  * [headers] is a `Map` and not a platform header type on purpose: the map is
- * what the shared code can carry, and `PlaybackSource.toOkHttpHeaders()` in
- * `:android:native-engine` is the one place that turns it into okhttp's
- * `Headers` on Android.
+ * what the shared code can carry, and the engine is the one place that turns
+ * it into wire format -- mpv reads it as `http-header-fields`.
  */
 data class PlaybackSource(
     val url: String,

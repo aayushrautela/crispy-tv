@@ -3,6 +3,7 @@ package com.crispy.tv.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.settings.PlaybackSettingsRepository
+import com.crispy.tv.settings.SubtitleSettingsRepository
 import com.crispy.tv.sync.ProfileDataCloudSync
 
 /**
@@ -63,7 +64,7 @@ import com.crispy.tv.sync.ProfileDataCloudSync
  * The rule from the rest of this port applies member by member, and here every member
  * lands on the same side:
  *
- * - [playbackSettingsRepository] and [profileDataCloudSync]
+ * - [subtitleSettingsRepository], [playbackSettingsRepository] and [profileDataCloudSync]
  *   are products. Each is used by a `collectAsStateWithLifecycle` and several
  *   change lambdas inside a composable, so a fresh instance per recomposition would
  *   restart a settings collect on every frame that changed anything.
@@ -85,6 +86,7 @@ internal class SettingsNavDependencies(
     val pluginsSettingsScreen: (@Composable (onBack: () -> Unit) -> Unit)?,
     val profileListViewModelFactory: ViewModelProvider.Factory,
     val addonsSettingsViewModelFactory: ViewModelProvider.Factory,
+    val subtitleSettingsRepository: SubtitleSettingsRepository,
     val playbackSettingsRepository: PlaybackSettingsRepository,
     val profileDataCloudSync: ProfileDataCloudSync,
 )

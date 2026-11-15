@@ -1,8 +1,6 @@
 package com.crispy.tv.tv.di
 
 import android.content.Context
-import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.addons.registry.metadataAddonRegistry
@@ -216,17 +214,12 @@ object TvServices {
     /**
      * A fresh playback engine for one playback session.
      *
-     * **A new controller per session, not a shared one**: the controller owns an
-     * `ExoPlayer`, a libmpv runtime and a sidecar controller, and `release()` on any
-     * of them ends the session for whoever holds it. The phone gets the same rule for
-     * the same reason -- `PlaybackDependencies.playbackControllerFactory` is a factory
-     * for one session's controller.
-     *
-     * Libass is off here, as it is by default on the phone: a TV box is the device
-     * least likely to be missing a codec, and the libass overlay path is the one with
-     * a surface of its own to keep in step with the video surface.
+     * **A new controller per session, not a shared one**: the controller owns a
+     * libmpv runtime, and `release()` on it ends the session for whoever holds it.
+     * The phone gets the same rule for the same reason --
+     * `PlaybackDependencies.playbackControllerFactory` is a factory for one
+     * session's controller.
      */
-    @OptIn(UnstableApi::class)
     fun newPlaybackController(context: Context): NativePlaybackController {
         return NativePlaybackController(context.applicationContext)
     }

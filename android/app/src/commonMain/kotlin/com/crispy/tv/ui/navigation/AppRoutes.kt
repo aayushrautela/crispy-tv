@@ -33,6 +33,7 @@ object AppRoutes {
     const val PersonDetailsProfileUrlArg = "profileUrl"
 
     const val PlaybackSettingsRoute = "settings/playback"
+    const val SubtitleSettingsRoute = "settings/subtitles"
     const val AddonsSettingsRoute = "settings/addons"
     const val PluginsSettingsRoute = "settings/plugins"
     const val AccountsProfilesRoute = "settings/accounts"

@@ -252,6 +252,7 @@ internal fun AppNavHost(
                     pluginsSettingsScreen = d.pluginsSettingsScreen,
                     profileListViewModelFactory = d.profileListFactory,
                     addonsSettingsViewModelFactory = d.addonsSettingsViewModelFactory,
+                    subtitleSettingsRepository = d.subtitleSettingsRepository,
                     // The *same instance* the Home graph above was given, rather than a
                     // second build of it. This is the one place where the "each graph
                     // builds its own" rule above deliberately does not apply: a repository

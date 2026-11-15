@@ -31,7 +31,7 @@ fun initialPlayerState(sessionId: String, nowMs: Long): PlayerState {
         sessionId = sessionId,
         intent = PlayerIntent.PLAY,
         phase = PlayerPhase.IDLE,
-        engine = "exo",
+        engine = "mpv",
         pendingVersion = 0,
         updatedAtMs = nowMs
     )

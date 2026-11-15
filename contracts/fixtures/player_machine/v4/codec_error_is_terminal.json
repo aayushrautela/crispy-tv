@@ -1,7 +1,7 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "suite": "player_machine",
-  "case_id": "fatal_error_is_terminal",
+  "case_id": "codec_error_is_terminal",
   "now_ms": 1739923200000,
   "steps": [
     {
@@ -17,9 +17,9 @@
       }
     },
     {
-      "t_ms": 900,
+      "t_ms": 450,
       "event": {
-        "type": "NATIVE_FATAL_ERROR"
+        "type": "NATIVE_CODEC_ERROR"
       },
       "expect": {
         "phase": "error",

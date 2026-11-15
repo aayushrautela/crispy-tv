@@ -1,5 +1,5 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "suite": "player_machine",
   "case_id": "autoplay_http_start",
   "now_ms": 1739923200000,
@@ -11,7 +11,8 @@
       },
       "expect": {
         "phase": "loading_media",
-        "intent": "play"
+        "intent": "play",
+        "engine": "mpv"
       }
     },
     {
@@ -21,7 +22,8 @@
       },
       "expect": {
         "phase": "ready",
-        "intent": "play"
+        "intent": "play",
+        "engine": "mpv"
       }
     }
   ]

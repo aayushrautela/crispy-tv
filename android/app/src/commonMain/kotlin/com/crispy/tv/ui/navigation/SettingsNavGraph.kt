@@ -11,6 +11,7 @@ import com.crispy.tv.accounts.ProfileManagementRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.SettingsScreen
+import com.crispy.tv.settings.SubtitleSettingsScreen
 import kotlinx.coroutines.launch
 
 internal fun NavGraphBuilder.addSettingsNavGraph(
@@ -37,6 +38,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
             },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
+            },
+            onNavigateToSubtitleSettings = {
+                navController.navigate(AppRoutes.SubtitleSettingsRoute)
             },
             onNavigateToAccountsProfiles = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
@@ -76,6 +80,22 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
         }
     }
 
+    composable(AppRoutes.SubtitleSettingsRoute) {
+        PredictivePeelContainer {
+        val subtitleSettingsRepository = dependencies.subtitleSettingsRepository
+        val subtitleAppearance by subtitleSettingsRepository.appearance.collectAsStateWithLifecycle()
+
+        SubtitleSettingsScreen(
+            appearance = subtitleAppearance,
+            onBoxStyleSelected = subtitleSettingsRepository::selectBoxStyle,
+            onTextColorSelected = subtitleSettingsRepository::selectTextColor,
+            onSizePercentChanged = subtitleSettingsRepository::setSizePercent,
+            onPositionPercentChanged = subtitleSettingsRepository::setPositionPercent,
+            onBack = { navController.popBackStack() },
+        )
+        }
+    }
+
     composable(AppRoutes.PlaybackSettingsRoute) {
         PredictivePeelContainer {
         val coroutineScope = rememberCoroutineScope()
@@ -98,18 +118,11 @@ internal fun NavGraphBuilder.addSettingsNavGraph(
                 playbackSettingsRepository.setAutoSelectStream(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
             },
-            onUseLibassChanged = { enabled ->
-                playbackSettingsRepository.setUseLibass(enabled)
-                coroutineScope.launch { cloudSync.pushForActiveProfile() }
-            },
-            onLibassRenderTypeChanged = { renderType ->
-                playbackSettingsRepository.setLibassRenderType(renderType)
-                coroutineScope.launch { cloudSync.pushForActiveProfile() }
-            },
-            playbackEnginePreference = playbackSettings.playbackEnginePreference,
-            onPlaybackEnginePreferenceChanged = { preference ->
-                playbackSettingsRepository.setPlaybackEnginePreference(preference)
-                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            onHdrOutputChanged = { enabled ->
+                // Deliberately not pushed to the cloud: HDR output describes
+                // this screen, not the profile, so it follows the same rule as
+                // resizeMode and autoSelectStream.
+                playbackSettingsRepository.setHdrOutputEnabled(enabled)
             },
             onBack = { navController.popBackStack() }
         )

@@ -84,6 +84,10 @@ internal fun NavGraphBuilder.addPlayerDestination(navController: NavHostControll
 
         PlayerWindowPolicyEffect()
         ForegroundPlaybackEffect(entry, sessionViewModel, host.isInPictureInPictureMode)
+        val inPictureInPictureMode = host.isInPictureInPictureMode.value
+        LaunchedEffect(inPictureInPictureMode) {
+            sessionViewModel.setPictureInPictureActive(inPictureInPictureMode)
+        }
         LaunchedEffect(host) { host.maybeRequestNotificationPermission() }
 
         PredictivePeelContainer {

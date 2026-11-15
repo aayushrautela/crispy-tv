@@ -32,7 +32,9 @@ import com.crispy.tv.search.AiSearchRepository
 import com.crispy.tv.search.BackendSearchRepository
 import com.crispy.tv.services.AppServices
 import com.crispy.tv.settings.KeyValueStorePlaybackSettingsRepository
+import com.crispy.tv.settings.KeyValueStoreSubtitleSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepository
+import com.crispy.tv.settings.SubtitleSettingsRepository
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.sync.ProfileDataShadowStore
@@ -53,6 +55,7 @@ private const val ACTIVE_PROFILE_STORE = "supabase_sync_lab"
 private const val PENDING_PROVIDER_AUTH_STORE = "pending_provider_auth"
 private const val PROFILE_DATA_SHADOW_STORE = "profile_data_shadow"
 private const val PLAYBACK_SETTINGS_STORE = "playback_settings"
+private const val SUBTITLE_SETTINGS_STORE = "subtitle_settings"
 private const val AI_INSIGHTS_CACHE_STORE = "ai_insights_cache"
 private const val WATCH_HISTORY_PROGRESS_STORE = "watch_progress"
 
@@ -212,6 +215,21 @@ class AppGraph(
 
     val playbackSettingsRepository: PlaybackSettingsRepository by lazy {
         KeyValueStorePlaybackSettingsRepository(services.keyValueStores.store(PLAYBACK_SETTINGS_STORE))
+    }
+
+    /**
+     * The cue's colours, background, size and position.
+     *
+     * A store of its own rather than a field on [playbackSettingsRepository],
+     * even though the player reads both: the appearance is chosen from the
+     * subtitle settings screen, while playback settings are chosen from the
+     * playback settings screen, and the two have no shared write path to unify.
+     * Its keys are the web app's own (`subtitleColor`, `subtitleBackColor`,
+     * `subtitleBorderColor`, `subtitleSize`, `subtitlePosition`), so a setting
+     * the app has never written still reads the web app's value.
+     */
+    val subtitleSettingsRepository: SubtitleSettingsRepository by lazy {
+        KeyValueStoreSubtitleSettingsRepository(services.keyValueStores.store(SUBTITLE_SETTINGS_STORE))
     }
 
     private val profileDataShadowStore: ProfileDataShadowStore by lazy {

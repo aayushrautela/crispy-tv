@@ -1,13 +1,10 @@
 package com.crispy.tv.playerui
 
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -41,29 +38,11 @@ class PlayerSessionDecisionsTest {
     // ---------------------------------------------------------------- engine
 
     @Test
-    fun onlyTheLibmpvPreferenceSelectsTheMpvEngine() {
-        val expected = mapOf(
-            NativePlaybackEnginePreference.Auto to NativePlaybackEngine.EXO,
-            NativePlaybackEnginePreference.ExoPlayer to NativePlaybackEngine.EXO,
-            NativePlaybackEnginePreference.Libmpv to NativePlaybackEngine.MPV,
-        )
+    fun theSessionAlwaysStartsOnMpv() {
         assertEquals(
-            "a preference value has no pinned engine, so the decision is unpinned",
-            expected.keys,
-            NativePlaybackEnginePreference.entries.toSet(),
-        )
-        for ((preference, engine) in expected) {
-            assertEquals("$preference should start on $engine", engine, resolveInitialEngine(preference))
-        }
-    }
-
-    @Test
-    fun autoAndExoPlayerAgreeBecauseAutoMeansTryExoThenFallBack() {
-        assertEquals(
-            "Auto resolving to EXO is the product decision that makes the codec-error " +
-                "fallback meaningful, not a 'pick the best engine' heuristic",
-            resolveInitialEngine(NativePlaybackEnginePreference.ExoPlayer),
-            resolveInitialEngine(NativePlaybackEnginePreference.Auto),
+            "mpv is the only engine left, so the initial-engine decision has one answer",
+            NativePlaybackEngine.MPV,
+            resolveInitialEngine(),
         )
     }
 
@@ -195,65 +174,6 @@ class PlayerSessionDecisionsTest {
                 NativePlaybackState.PREPARING,
                 positionMs = 60_000L,
             ),
-        )
-    }
-
-    // ------------------------------------------------------ codec fallback
-
-    @Test
-    fun aCodecErrorOnExoPlayerFallsBackUnderAutoAndLibmpvButNotExoPlayer() {
-        val codecError = NativePlaybackError(token = 1L, message = "no decoder", codecLikely = true)
-        val expected = setOf(
-            NativePlaybackEnginePreference.Auto,
-            NativePlaybackEnginePreference.Libmpv,
-        )
-        val actual = NativePlaybackEnginePreference.entries
-            .filter { shouldFallBackToMpv(codecError, NativePlaybackEngine.EXO, it) }
-            .toSet()
-        assertEquals(
-            "the third conjunct is `preference != ExoPlayer`, so Auto and Libmpv both fall " +
-                "back and only an explicitly pinned ExoPlayer does not",
-            expected,
-            actual,
-        )
-    }
-
-    @Test
-    fun anErrorTheEngineDidNotBlameOnTheCodecDoesNotFallBack() {
-        val networkError = NativePlaybackError(token = 2L, message = "stream ended", codecLikely = false)
-        for (preference in NativePlaybackEnginePreference.entries) {
-            assertFalse(
-                "a non-codec error under $preference must not restart on another engine",
-                shouldFallBackToMpv(networkError, NativePlaybackEngine.EXO, preference),
-            )
-        }
-    }
-
-    @Test
-    fun aCodecErrorWhileAlreadyOnMpvDoesNotFallBack() {
-        val codecError = NativePlaybackError(token = 3L, message = "no decoder", codecLikely = true)
-        for (preference in NativePlaybackEnginePreference.entries) {
-            assertFalse(
-                "falling back from MPV to MPV would restart playback in a loop under $preference",
-                shouldFallBackToMpv(codecError, NativePlaybackEngine.MPV, preference),
-            )
-        }
-    }
-
-    @Test
-    fun theFallbackIsIndependentOfTheErrorToken() {
-        // The token is consumed by the caller, before this decision runs, so that a
-        // repeated failure is not handled twice. That is why it is not a parameter here:
-        // the decision itself must be a pure function of the three things it is given.
-        val first = NativePlaybackError(token = 4L, message = "no decoder", codecLikely = true)
-        val sameTokenNewText = first.copy(message = "still no decoder")
-        assertEquals(
-            shouldFallBackToMpv(first, NativePlaybackEngine.EXO, NativePlaybackEnginePreference.Auto),
-            shouldFallBackToMpv(sameTokenNewText, NativePlaybackEngine.EXO, NativePlaybackEnginePreference.Auto),
-        )
-        assertTrue(
-            "and the answer is the affirmative one this suite exists to pin",
-            shouldFallBackToMpv(first, NativePlaybackEngine.EXO, NativePlaybackEnginePreference.Auto),
         )
     }
 

@@ -11,6 +11,7 @@ import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.settings.SubtitleAppearance
 
 /**
  * What the player surface is currently showing, as a value.
@@ -20,7 +21,7 @@ import com.crispy.tv.player.PlaybackIdentity
  * They were extracted so that [com.crispy.tv.playerui.PlayerOverlay] could move into
  * `commonMain`. That composable's first parameter is [PlayerUiState] and it reads
  * `activeSurface` seven times, so **it names both of these** -- and `PlayerSessionViewModel`
- * is a 1,315-line `androidMain` class that holds a Media3 `PlayerView` and a `Context`. A file
+ * is a large `androidMain` class that holds a playback controller and a `Context`. A file
  * that names a type declared in an `androidMain` sibling is pinned by it whether or not it
  * imports anything, and this pair is what the overlay was actually pinned by.
  *
@@ -91,7 +92,40 @@ data class PlayerUiState(
     val subtitleTracks: List<NativeTrack> = emptyList(),
     val selectedSubtitleTrackId: String? = null,
     val subtitleDelayMs: Int = 0,
+    /**
+     * The current subtitle cue as plain text, already sanitised by
+     * `sanitizeSubtitleCue`; `null` when no cue is showing. Drawn by the
+     * player overlay (mpv renders no subs on the tunneled fullscreen surface).
+     */
+    val currentSubtitleText: String? = null,
+    /**
+     * How the cue is drawn: colours, background, size and position, read from
+     * the subtitle settings repository while the player is open rather than
+     * once at state creation.
+     */
+    val subtitleAppearance: SubtitleAppearance = SubtitleAppearance(),
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
+    /**
+     * Whether HDR output is on for this session's engine, mirrored from
+     * [com.crispy.tv.settings.PlaybackSettings.hdrOutputEnabled]. Off makes
+     * the player render through mpv's `gpu` vo, which tone-maps to SDR.
+     */
+    val hdrOutputEnabled: Boolean = true,
+    /**
+     * The saved setting: whether HDR output is a feature this device may use
+     * at all, mirrored from
+     * [com.crispy.tv.settings.PlaybackSettings.hdrOutputEnabled]. Off hides
+     * the player's HDR button entirely -- the player's own flips are session
+     * only and must not be able to switch the feature on for someone who
+     * turned it off.
+     */
+    val hdrSettingEnabled: Boolean = true,
+    /**
+     * Whether the *stream* playing is HDR (its transfer function is PQ or
+     * HLG), which is a different question from [hdrOutputEnabled]: SDR video
+     * has nothing to switch, and a toggle on it would be a lie.
+     */
+    val videoIsHdr: Boolean = false,
     val addonSubtitles: List<AddonSubtitle> = emptyList(),
     val addonSubtitlesLoading: Boolean = false,
     val addonSubtitlesError: String? = null,

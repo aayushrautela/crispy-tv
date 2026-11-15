@@ -8,7 +8,6 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.media3.ui.PlayerView
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.backend.CrispyBackendClient
@@ -36,8 +35,6 @@ import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.nativeengine.playback.EXTERNAL_SUBTITLE_TRACK_ID_PREFIX
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
-import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
-import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.NativeTrack
@@ -47,10 +44,12 @@ import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.nativeengine.playback.externalSubtitleTrackId
+import com.crispy.tv.nativeengine.playback.sanitizeSubtitleCue
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.TorrentResolver
 import com.crispy.tv.settings.PlaybackSettingsRepository
+import com.crispy.tv.settings.SubtitleSettingsRepository
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.addons.streams.StreamResolver
@@ -98,6 +97,16 @@ class PlayerSessionViewModel(
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         this.appContext.appGraph().graph.playbackSettingsRepository
+    /**
+     * The cue's appearance, read live rather than at state creation.
+     *
+     * Collected below, so an emission lands in `PlayerUiState.subtitleAppearance`
+     * instead of the value the player happened to open with: the style is chosen
+     * on the subtitle settings screen and must be the one currently stored, and a
+     * value read once here would be whatever was true at construction time.
+     */
+    private val subtitleSettingsRepository: SubtitleSettingsRepository =
+        this.appContext.appGraph().graph.subtitleSettingsRepository
     /**
      * The fetch scope is this view model's own, not one the repository creates.
      *
@@ -148,7 +157,6 @@ class PlayerSessionViewModel(
     private var activeIdentity: PlaybackIdentity? = identity
     private var activeSubtitle: String? = null
     private var activeArtworkUrl: String? = null
-    private var lastHandledErrorToken: Long? = null
     private var pendingInitialSeekMs: Long? = null
     private var autoSelectPending = false
     /**
@@ -182,8 +190,7 @@ class PlayerSessionViewModel(
     private var subtitleAutoSelectApplied = false
     private var initialTarget: StreamLookupTarget? = null
 
-    private val initialEngine: NativePlaybackEngine =
-        resolveInitialEngine(playbackSettingsRepository.settings.value.playbackEnginePreference)
+    private val initialEngine: NativePlaybackEngine = resolveInitialEngine()
     private val initialSelectedSeason = identity?.season
     private val initialSeasonEpisodes = emptyList<MediaVideo>()
 
@@ -201,6 +208,9 @@ class PlayerSessionViewModel(
                 currentPlaybackUrl = null,
                 activeEngine = initialEngine,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
+                hdrOutputEnabled = playbackSettingsRepository.settings.value.hdrOutputEnabled,
+                hdrSettingEnabled = playbackSettingsRepository.settings.value.hdrOutputEnabled,
+                subtitleAppearance = subtitleSettingsRepository.appearance.value,
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -332,12 +342,13 @@ class PlayerSessionViewModel(
             }
         }
         viewModelScope.launch {
+            subtitleSettingsRepository.appearance.collect { appearance ->
+                _uiState.update { it.copy(subtitleAppearance = appearance) }
+            }
+        }
+        viewModelScope.launch {
             startPlayback()
         }
-    }
-
-    fun bindExoPlayerView(playerView: PlayerView) {
-        playbackController.bindExoPlayerView(playerView)
     }
 
     fun createMpvSurfaceView(context: Context): SurfaceView = playbackController.createMpvSurfaceView(context)
@@ -381,8 +392,46 @@ class PlayerSessionViewModel(
         _uiState.update { it.copy(resizeMode = mode) }
     }
 
+    /**
+     * Writes the user's HDR choice into the repository; the live engine is
+     * updated by the route's `LaunchedEffect` on this state value, the same
+     * path [setResizeMode] and [applyResizeMode] take.
+     */
+    fun setHdrOutputEnabled(enabled: Boolean) {
+        playbackSettingsRepository.setHdrOutputEnabled(enabled)
+        _uiState.update { it.copy(hdrOutputEnabled = enabled) }
+    }
+
+    fun applyHdrOutputEnabled(enabled: Boolean) {
+        playbackController.setHdrOutputEnabled(enabled)
+    }
+
+    /**
+     * Flips HDR output for this session, leaving the saved setting where it
+     * was: the player's button answers "not this video", and the Playback
+     * Settings toggle stays the viewer's standing choice.
+     *
+     * Only the engine is called here, not the repository. [setHdrOutputEnabled]
+     * remains the settings-screen path; the two members exist because the two
+     * decisions are different, and collapsing them into one would make the
+     * button silently rewrite a preference it was asked to override.
+     */
+    fun toggleHdrOutput() {
+        val enabled = !_uiState.value.hdrOutputEnabled
+        _uiState.update { it.copy(hdrOutputEnabled = enabled) }
+        playbackController.setHdrOutputEnabled(enabled)
+    }
+
     fun applyResizeMode(mode: PlayerResizeMode) {
         playbackController.applyResizeMode(mode)
+    }
+
+    fun setPictureInPictureActive(active: Boolean) {
+        playbackController.setPictureInPictureActive(active)
+    }
+
+    fun selectChapter(index: Int) {
+        playbackController.selectChapter(index)
     }
 
     fun selectAudioTrack(trackId: String?) {
@@ -1246,8 +1295,11 @@ class PlayerSessionViewModel(
                     snapshot.selectedAudioTrackId != state.selectedAudioTrackId ||
                     snapshot.selectedSubtitleTrackId != state.selectedSubtitleTrackId
             val shouldUpdateSubtitleDelay = snapshot.subtitleDelayMs != state.subtitleDelayMs
+            val nextSubtitleText = snapshot.currentSubtitle?.let { sanitizeSubtitleCue(it) }
+            val shouldUpdateSubtitleText = nextSubtitleText != state.currentSubtitleText
+            val shouldUpdateHdr = snapshot.isHdrSource != state.videoIsHdr
 
-            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay)) {
+            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay || shouldUpdateSubtitleText || shouldUpdateHdr)) {
                 state
             } else {
                 state.copy(
@@ -1264,6 +1316,8 @@ class PlayerSessionViewModel(
                     subtitleTracks = snapshot.subtitleTracks,
                     selectedSubtitleTrackId = snapshot.selectedSubtitleTrackId,
                     subtitleDelayMs = snapshot.subtitleDelayMs,
+                    currentSubtitleText = nextSubtitleText,
+                    videoIsHdr = snapshot.isHdrSource,
                 )
             }
         }
@@ -1284,7 +1338,6 @@ class PlayerSessionViewModel(
             return
         }
 
-        lastHandledErrorToken = null
         Log.d(TAG, "play request engine=$engine playbackUrlHash=${activePlaybackSource.url.hashCode()}")
         playbackController.play(activePlaybackSource, engine)
         applyPersistedPlaybackSettings()
@@ -1306,13 +1359,6 @@ class PlayerSessionViewModel(
     private suspend fun pollPlaybackState() {
         while (coroutineContext.isActive) {
             val snapshot = playbackController.snapshot()
-
-            val fallbackHandled = maybeHandlePlaybackError(snapshot.error, snapshot.engine)
-            if (fallbackHandled) {
-                publishMediaSessionFromUiState()
-                delay(500)
-                continue
-            }
 
             applyPendingInitialSeekIfNeeded(snapshot)
 
@@ -1376,48 +1422,7 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun maybeHandlePlaybackError(
-        error: NativePlaybackError?,
-        engine: NativePlaybackEngine,
-    ): Boolean {
-        if (error == null || lastHandledErrorToken == error.token) {
-            return false
-        }
-
-        lastHandledErrorToken = error.token
-        val playbackEnginePreference = playbackSettingsRepository.settings.value.playbackEnginePreference
-        val shouldFallback = shouldFallBackToMpv(error, engine, playbackEnginePreference)
-        if (!shouldFallback) {
-            return false
-        }
-
-        Log.w(TAG, "ExoPlayer error, retrying on MPV fallback. message=${error.message}")
-        resetPlaybackPosition()
-        _uiState.update { state ->
-            state.copy(
-                activeEngine = NativePlaybackEngine.MPV,
-                isBuffering = true,
-                isPlaying = false,
-                durationMs = 0L,
-                stableDurationMs = 0L,
-                statusMessage = "",
-                errorMessage = null,
-                videoLayout = null,
-            )
-        }
-        requestPlayback(engine = NativePlaybackEngine.MPV)
-        // The engine switch is a brand new playback session: drop the stale start/stop
-        // flags and let the settled MPV position emit a fresh playback_started event.
-        progressReporter.resetReportingState()
-        progressReporter.scheduleProgressSyncAfterSeek()
-        return true
-    }
-
     private fun syncPlaybackSnapshot(snapshot: NativePlaybackSnapshot) {
-        if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
-            publishMediaSessionFromUiState()
-            return
-        }
         onPlaybackMetrics(snapshot)
         publishMediaSessionFromUiState()
     }

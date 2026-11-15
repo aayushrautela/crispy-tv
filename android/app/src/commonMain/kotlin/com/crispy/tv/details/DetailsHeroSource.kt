@@ -13,8 +13,8 @@ import com.crispy.tv.images.urlForDisplaySize
  * All of them are pure: one reads a field off an already-fetched `MediaDetails`,
  * one resolves a tier for a surface of a known size, and one turns a carried URL
  * into the set that decision can run against. None touched the platform, and
- * none had any business sitting in a 577-line file whose other tenant inflated a
- * `PlayerView`.
+ * none had any business sitting in a 577-line file whose other tenant owned a
+ * video surface.
  *
  * The package deliberately did not change, so `DetailsScreen` reaches both with no
  * import edit -- which is the same-package mechanism the `PlayerUiState`

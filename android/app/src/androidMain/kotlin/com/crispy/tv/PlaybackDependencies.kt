@@ -2,7 +2,6 @@ package com.crispy.tv
 
 import android.content.Context
 import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.platform.AppConfig
@@ -17,7 +16,6 @@ import com.crispy.tv.addons.sources.RemoteSupabaseSyncLabService
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.addons.streams.StreamResolver
 import com.crispy.tv.streams.StreamResolverProvider
-import com.crispy.tv.nativeengine.playback.LibassRenderType
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.player.CoreDomainMetadataLabResolver
@@ -85,17 +83,11 @@ private fun newSupabaseSyncService(context: Context): SupabaseSyncLabService {
  * focus, the metadata and intro-skip services, and the stream resolver. Each still needs a
  * `Context`, and each is `androidMain` code today.
  */
-@OptIn(UnstableApi::class)
 object PlaybackDependencies {
     @Volatile
     var playbackControllerFactory: (Context) -> PlaybackController =
         { context ->
-            val settings = context.appGraph().graph.playbackSettingsRepository.settings.value
-            NativePlaybackController(
-                context = context,
-                useLibass = settings.useLibass,
-                libassRenderType = LibassRenderType.fromName(settings.libassRenderType),
-            )
+            NativePlaybackController(context = context)
         }
 
     /**

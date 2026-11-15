@@ -19,15 +19,15 @@ import kotlin.test.fail
 class PlayerMachineContractTest {
 
     /**
-     * Pinned to `v3` rather than taking the suite's only version directory.
+     * Pinned to `v4` rather than taking the suite's only version directory.
      *
-     * That is the point: when the spec revises and `v4` appears, this test
+     * That is the point: when the spec revises and `v5` appears, this test
      * should keep exercising the behaviour it was written against and the
      * mismatch should be a deliberate decision, not an accident of the
      * directory walk. `ContractFixturesSanityTest` enforces the "one version
      * directory per suite" invariant that makes the pin unambiguous.
      */
-    private val directory = "player_machine/v3"
+    private val directory = "player_machine/v4"
 
     @Test
     fun playerMachineFixtures() {

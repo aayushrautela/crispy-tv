@@ -1,13 +1,17 @@
-@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.crispy.tv.playerui
 
 import android.util.Log
 import android.view.SurfaceView
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
@@ -17,8 +21,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -26,13 +33,10 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.rememberSeedColor
 import com.crispy.tv.details.detailsPaletteFromScheme
 import com.crispy.tv.details.rememberDetailsColorScheme
-import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlin.math.roundToInt
@@ -71,6 +75,28 @@ fun PlayerRoute(
         }
     }
 
+    // In Zoom the surface is sized to cover the window, so its own bounds reach
+    // past the window edge; the PiP source rect has to be the player area then,
+    // because that is what the viewer actually sees.
+    var playerAreaBounds by remember { mutableStateOf<PictureInPictureSourceRect?>(null) }
+    // Zoom crops the picture in the UI layer: the surface grows until it covers
+    // the window and the overflow is cropped by the window edge. That crop is
+    // fullscreen-only -- a PiP window keeps the video's own ratio, and mpv's
+    // crop option owns the framing there instead, because there the surface can
+    // stay fitted to the video.
+    val zoomCropActive =
+        uiState.resizeMode == PlayerResizeMode.Zoom && !isInPictureInPictureMode
+    val effectiveVideoBounds = if (zoomCropActive) playerAreaBounds else videoBounds
+    // The PiP window is opened with the geometry on screen when the viewer
+    // leaves, and after that it keeps it. Re-deriving the config inside the
+    // window changed the source rect a beat after entry -- `zoomCropActive`
+    // flips the moment the mode changes, so leaving Zoom moved the rect from
+    // the whole player area to the letterboxed surface -- which reads as the
+    // window jumping. The ratio itself never moves, because the window keeps
+    // the video's own shape either way. The controller drops an unchanged
+    // config, so re-sending the remembered one costs nothing and nothing
+    // re-shapes on its own afterwards.
+    var pipConfigBeforeEntry by remember { mutableStateOf<PictureInPictureConfig?>(null) }
     val gestureController = remember(context) { tryCreateGestureController(context.findActivity()) }
     val gestureFeedback = rememberGestureFeedback()
     val scope = rememberCoroutineScope()
@@ -88,7 +114,6 @@ fun PlayerRoute(
     }
 
     val surfaceModifier = Modifier
-        .fillMaxSize()
         .playerVerticalDragGestures(
             gestureController = gestureController,
             onBrightnessChange = { level ->
@@ -125,72 +150,142 @@ fun PlayerRoute(
             )
         }
 
-    LaunchedEffect(videoBounds, uiState.videoLayout, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
+    LaunchedEffect(
+        effectiveVideoBounds,
+        uiState.videoLayout,
+        uiState.isPlaying,
+        uiState.isBuffering,
+        uiState.errorMessage,
+        uiState.stableDurationMs,
+        isInPictureInPictureMode,
+    ) {
         // Wait for real video geometry before advertising PiP; using the window bounds
         // ratio while the first frames are still loading produces a wrong-aspect window.
         // Audio-only streams never report a layout, so a settled duration unlocks them.
         val playbackGeometryKnown = uiState.videoLayout != null || uiState.stableDurationMs > 0L
-        val aspectRatio =
-            uiState.videoLayout.toPictureInPictureAspectRatio()
-                ?: videoBounds
-                    ?.takeIf { it.width() > 0 && it.height() > 0 }
-                    ?.let { bounds -> PictureInPictureAspectRatio(bounds.width(), bounds.height()) }
+        // The PiP window keeps the video's own ratio, never the crop: a window
+        // wider than the video letterboxes it inside the window, so the cropped
+        // player-area ratio left permanent black bars in PiP. Cropping is a
+        // fullscreen behaviour -- inside PiP the surface stays fitted to the
+        // video, so there the engine's own crop option is what can move the
+        // framing. The player-area ratio stays as the fallback for audio-only
+        // streams, which never report a layout.
+        val visibleBoundsAspect =
+            effectiveVideoBounds
+                ?.takeIf { it.width() > 0 && it.height() > 0 }
+                ?.let { bounds -> PictureInPictureAspectRatio(bounds.width(), bounds.height()) }
+        val aspectRatio = uiState.videoLayout.toPictureInPictureAspectRatio() ?: visibleBoundsAspect
         val pipEnabled =
-            videoBounds != null &&
+            effectiveVideoBounds != null &&
                 uiState.errorMessage == null &&
                 playbackGeometryKnown &&
                 (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
-        Log.d(
-            TAG,
-            "pip config videoBounds=$videoBounds aspectRatio=$aspectRatio enabled=$pipEnabled isPlaying=${uiState.isPlaying} isBuffering=${uiState.isBuffering} stableDurationMs=${uiState.stableDurationMs} error=${uiState.errorMessage}",
-        )
-        onPictureInPictureConfigChanged(
+        val config =
             PictureInPictureConfig(
                 enabled = pipEnabled,
-                sourceRect = videoBounds,
+                sourceRect = effectiveVideoBounds,
                 aspectRatio = aspectRatio,
-            ),
+            )
+        // Enter the window with the shape and rect the fullscreen surface
+        // actually had, then hold them there. The ratio is the video's own in
+        // both modes, so only the source rect can move once inside:
+        // `zoomCropActive` flips on entry, and the surface returns to the
+        // letterboxed video rect -- which is exactly the "no change after we
+        // are in pip" the viewer reported.
+        if (isInPictureInPictureMode) {
+            pipConfigBeforeEntry?.let(onPictureInPictureConfigChanged)
+        } else {
+            pipConfigBeforeEntry = config
+            onPictureInPictureConfigChanged(config)
+        }
+        Log.d(
+            TAG,
+            "pip config videoBounds=$videoBounds aspectRatio=$aspectRatio enabled=$pipEnabled isPlaying=${uiState.isPlaying} isBuffering=${uiState.isBuffering} stableDurationMs=${uiState.stableDurationMs} error=${uiState.errorMessage} frozen=${pipConfigBeforeEntry != null}",
         )
     }
 
     LaunchedEffect(uiState.resizeMode) {
-        if (uiState.activeEngine == NativePlaybackEngine.MPV) {
-            session.applyResizeMode(uiState.resizeMode)
-        }
+        session.applyResizeMode(uiState.resizeMode)
+    }
+
+    LaunchedEffect(uiState.hdrOutputEnabled) {
+        session.applyHdrOutputEnabled(uiState.hdrOutputEnabled)
     }
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(Color.Black)
+                .onGloballyPositioned { coordinates ->
+                    val bounds = coordinates.boundsInWindow()
+                    val rect = PictureInPictureSourceRect(
+                        bounds.left.roundToInt(),
+                        bounds.top.roundToInt(),
+                        bounds.right.roundToInt(),
+                        bounds.bottom.roundToInt(),
+                    )
+                    if (playerAreaBounds != rect) playerAreaBounds = rect
+                },
     ) {
-        when (uiState.activeEngine) {
-            NativePlaybackEngine.EXO -> {
-                AndroidView(
-                    modifier = surfaceModifier,
-                    factory = { viewContext ->
-                        PlayerView(viewContext).apply {
-                            useController = false
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                            session.bindExoPlayerView(this)
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            // The tunneled mediacodec_embed vo renders at the video's native size and
+            // the SurfaceView scales that buffer to the view, so a full-screen view
+            // stretches any video whose aspect differs from the screen. Sizing the
+            // view to the video's own aspect keeps that scaling uniform; the black
+            // box behind letterboxes the remainder. Until the video reports its
+            // size the view fills the screen as before.
+            val videoAspect = uiState.videoLayout?.aspectRatioValue()
+            val screenConfiguration = LocalConfiguration.current
+            val screenAspect =
+                (screenConfiguration.screenWidthDp / screenConfiguration.screenHeightDp)
+            // Zoom morphs rather than pops: both ends are computed as sizes,
+            // then this fraction walks between them, so the SurfaceView
+            // animates like the controls instead of appearing in one frame.
+            // In PiP the surface stays fitted, so the target is Fit there and
+            // mpv's own panscan does the crop inside the window.
+            val zoomFraction by animateFloatAsState(
+                targetValue = if (zoomCropActive) 1f else 0f,
+                animationSpec =
+                    tween(durationMillis = ZoomCropDurationMillis, easing = FastOutSlowInEasing),
+                label = "zoomCrop",
+            )
+            val surfaceSizeModifier =
+                if (videoAspect == null || videoAspect <= 0f || maxHeight <= 0.dp) {
+                    // Until the video reports its size the view fills the window.
+                    Modifier.fillMaxSize()
+                } else {
+                    // Fitted: the view keeps the video's aspect and the black
+                    // box behind letterboxes the remainder.
+                    val fitSize =
+                        if (videoAspect >= screenAspect) {
+                            SizeDp(maxWidth, maxWidth / videoAspect)
+                        } else {
+                            SizeDp(maxHeight * videoAspect, maxHeight)
                         }
-                    },
-                    update = { playerView ->
-                        playerView.resizeMode = uiState.resizeMode.toExoResizeMode()
-                    },
-                )
-            }
-
-            NativePlaybackEngine.MPV -> {
-                AndroidView(
-                    modifier = surfaceModifier,
-                    factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
-                    update = { surfaceView: SurfaceView ->
-                        session.attachMpvSurface(surfaceView)
-                    },
-                )
-            }
+                    // Cover: the same aspect, grown until it spans the window,
+                    // so the overflow is cropped by the window edge.
+                    val windowAspect = maxWidth / maxHeight
+                    val coverSize =
+                        if (videoAspect >= windowAspect) {
+                            SizeDp(maxHeight * videoAspect, maxHeight)
+                        } else {
+                            SizeDp(maxWidth, maxWidth / videoAspect)
+                        }
+                    Modifier
+                        .align(Alignment.Center)
+                        .requiredSize(
+                            lerpDp(fitSize.width, coverSize.width, zoomFraction),
+                            lerpDp(fitSize.height, coverSize.height, zoomFraction),
+                        )
+                }
+            AndroidView(
+                modifier = surfaceModifier.then(surfaceSizeModifier),
+                factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
+                update = { surfaceView: SurfaceView ->
+                    session.attachMpvSurface(surfaceView)
+                },
+            )
         }
 
         if (!isInPictureInPictureMode) {
@@ -260,6 +355,12 @@ fun PlayerRoute(
                 onCommitSeek = { targetMs, _ ->
                     session.seekTo(targetMs)
                 },
+                // A session flip, so no gesture feedback label: the pill's own
+                // state is the answer, and writing the setting here would make
+                // the button the preference's owner rather than its override.
+                onToggleHdrOutput = session::toggleHdrOutput,
+                hdrToggleVisible = uiState.videoIsHdr && uiState.hdrSettingEnabled,
+                hdrOutputEnabled = uiState.hdrOutputEnabled,
             )
 
             GestureFeedbackOverlay(feedback = gestureFeedback, palette = palette)
@@ -279,10 +380,23 @@ private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): PictureInPicture
     }
 }
 
-private fun PlayerResizeMode.toExoResizeMode(): Int =
-    when (this) {
-        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-    }
+/**
+ * How long the surface takes to walk between its fitted size and its cover
+ * crop. The controls use the same easing family, so the crop settles with
+ * them instead of against them.
+ */
+private const val ZoomCropDurationMillis = 300
+
+/** A size in density units, the pair `requiredSize` wants. */
+private data class SizeDp(val width: Dp, val height: Dp)
+
+/**
+ * Linear interpolation between two sizes. `androidx.compose.ui.unit` ships no
+ * `lerp` for `Dp` (only `Color` has one), and the two ends here are always
+ * sizes in the same unit family, so the arithmetic is spelled out rather
+ * than guessed at through a `Sp` conversion.
+ */
+private fun lerpDp(start: Dp, stop: Dp, fraction: Float): Dp =
+    start + (stop - start) * fraction.coerceIn(0f, 1f)
 
 private const val TAG = "PlayerRoute"

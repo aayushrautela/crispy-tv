@@ -73,7 +73,7 @@ public func initialPlayerState(sessionId: String, nowMs: Int64) -> PlayerState {
         sessionId: sessionId,
         intent: .play,
         phase: .idle,
-        engine: "exo",
+        engine: "mpv",
         pendingVersion: 0,
         updatedAtMs: nowMs
     )
@@ -83,17 +83,18 @@ public func initialPlayerState(sessionId: String, nowMs: Int64) -> PlayerState {
 /// `android/core-domain`. The two must change together: the `player_machine`
 /// contract suite exercises both against the same fixtures.
 ///
-/// Three rules make the `error` phase meaningful (`contract_version` 3):
+/// Two rules make the `error` phase meaningful (`contract_version` 4):
 ///
-/// 1. A codec error falls back to the `mpv` engine **only** while the active
-///    engine is `exo`. On a platform whose engine already is `mpv` there is no
-///    second engine to fall back to, so the failure is terminal.
+/// 1. `nativeCodecError` is terminal on every engine: mpv is the only engine
+///    there is, so there is no second engine to fall back to and the phase
+///    becomes `error` with the engine unchanged.
 /// 2. `nativeFatalError` is the generic "the engine failed and cannot recover"
-///    event, kept distinct from a codec error so a caller can report an mpv
-///    failure without mislabelling it.
-/// 3. The `error` phase is terminal: once the machine has failed, only opening
-///    a new source changes the state. A frame that was already in flight when
-///    the failure arrived must not resurrect the session.
+///    event, kept distinct from a codec error so a caller can report a failure
+///    without mislabelling it.
+///
+/// The `error` phase is terminal: once the machine has failed, only opening
+/// a new source changes the state. A frame that was already in flight when
+/// the failure arrived must not resurrect the session.
 public func reducePlayerState(_ state: PlayerState, action: PlayerAction, nowMs: Int64) -> PlayerState {
     if state.phase == .error, !action.opensNewSource {
         var frozen = state
@@ -130,15 +131,9 @@ public func reducePlayerState(_ state: PlayerState, action: PlayerAction, nowMs:
         next.phase = .ended
 
     case .nativeCodecError:
-        // A codec error falls back to the `mpv` engine only while the active
-        // engine is `exo`. Any other engine is the last one there is, so the
-        // failure is terminal.
-        if next.engine.lowercased() == "exo" {
-            next.phase = .loading_media
-            next.engine = "mpv"
-        } else {
-            next.phase = .error
-        }
+        // A codec error is terminal on every engine: mpv is the only engine
+        // left, so there is nothing to fall back to.
+        next.phase = .error
 
     case .nativeFatalError:
         next.phase = .error
