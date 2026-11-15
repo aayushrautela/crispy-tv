@@ -4,7 +4,6 @@ import com.crispy.tv.domain.account.builtInAvatarUrl
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightSlideKind
-import com.crispy.tv.ai.AiInsightStandoutTag
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -633,19 +632,16 @@ fun parseAiInsightsSlides(array: JsonArray?): List<AiInsightSlide> {
         for (index in 0 until safeArray.size) {
             val item = safeArray.getOrNull(index) as? JsonObject ?: continue
             val label = item.optNullableString("label").orEmpty().trim()
+            val heading = item.optNullableString("heading")?.trim().orEmpty()
             val body = item.optNullableString("body")?.trim().orEmpty()
-            val focus = item.optNullableString("focus")?.trim().orEmpty()
-            val context = item.optNullableString("context")?.trim().orEmpty()
-            if (label.isEmpty() && body.isEmpty() && focus.isEmpty() && context.isEmpty()) continue
+            if (label.isEmpty() && heading.isEmpty() && body.isEmpty()) continue
             add(
                 AiInsightSlide(
                     key = AiInsightSlideKey.fromWire(item.optNullableString("key")),
                     label = label,
                     kind = AiInsightSlideKind.fromWire(item.optNullableString("kind")),
+                    heading = heading.takeIf { it.isNotEmpty() },
                     body = body.takeIf { it.isNotEmpty() },
-                    tag = AiInsightStandoutTag.fromWire(item.optNullableString("tag")),
-                    focus = focus.takeIf { it.isNotEmpty() },
-                    context = context.takeIf { it.isNotEmpty() },
                     backdrop = parseResponsiveImageSet(item.optJsonObject("backdrop")),
                     accent = item.optNullableString("accent").orEmpty().trim(),
                 )

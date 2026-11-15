@@ -98,10 +98,8 @@ class AiInsightsCacheStore(private val store: KeyValueStore) : AiInsightsCache {
                         put("label", slide.label)
                         put("kind", slide.kind.wire)
                         put("accent", slide.accent)
+                        slide.heading?.let { put("heading", it) }
                         slide.body?.let { put("body", it) }
-                        slide.tag?.let { put("tag", it.wire) }
-                        slide.focus?.let { put("focus", it) }
-                        slide.context?.let { put("context", it) }
                         if (!slide.backdrop.isEmpty) {
                             put(
                                 "backdrop",
@@ -123,15 +121,20 @@ class AiInsightsCacheStore(private val store: KeyValueStore) : AiInsightsCache {
     }
 
     private fun purgeLegacyEntries() {
-        store.keys().filter { it.startsWith(LEGACY_CACHE_PREFIX) }.forEach(store::remove)
+        store.keys()
+            .filter { key -> LEGACY_CACHE_PREFIXES.any { key.startsWith(it) } }
+            .forEach(store::remove)
     }
 
     private fun keyFor(itemId: String, languageTag: String): String =
         "$CACHE_PREFIX${itemId}_${languageTag.ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
-        private const val CACHE_PREFIX = "ai_ins_v3_"
-        private const val LEGACY_CACHE_PREFIX = "ai_ins_v2_"
+        // The slide shape changed (the chip and the `focus`/`context` pair are
+        // gone, the heading is one field now), so the cache key moves with it:
+        // a v3 entry holds slides this build cannot read.
+        private const val CACHE_PREFIX = "ai_ins_v4_"
+        private val LEGACY_CACHE_PREFIXES = listOf("ai_ins_v2_", "ai_ins_v3_")
         private const val DEFAULT_LOCALE_TAG = "en-US"
     }
 }

@@ -68,7 +68,7 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.ai.storyFocus
+import com.crispy.tv.ai.storyHeading
 import com.crispy.tv.ai.storyLabel
 import com.crispy.tv.ai.storyParagraph
 import com.crispy.tv.ui.components.CrispyIcon
@@ -528,7 +528,7 @@ private fun AiInsightsStoryCopy(
     modifier: Modifier = Modifier,
 ) {
     val label = slide.storyLabel()
-    val focus = slide.storyFocus()
+    val heading = slide.storyHeading()
     val paragraph = slide.storyParagraph()
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -554,8 +554,8 @@ private fun AiInsightsStoryCopy(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        focus?.let {
-            // The headline: the server's focus line. With no body under it,
+        heading?.let {
+            // The headline: the server's heading line. With no body under it,
             // the headline IS the copy, so it prints at headline size.
             val standalone = paragraph == null
             Text(

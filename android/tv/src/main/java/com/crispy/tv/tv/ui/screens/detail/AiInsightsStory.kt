@@ -56,9 +56,8 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
-import com.crispy.tv.ai.AiInsightStandoutTag
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.ai.storyFocus
+import com.crispy.tv.ai.storyHeading
 import com.crispy.tv.ai.storyLabel
 import com.crispy.tv.ai.storyParagraph
 import com.crispy.tv.ui.resources.Res
@@ -405,7 +404,7 @@ private fun StorySlideContent(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                val headline = slide.storyFocus()
+                val headline = slide.storyHeading()
                 val body = slide.storyParagraph()
                 if (headline != null) {
                     Text(
@@ -429,21 +428,6 @@ private fun StorySlideContent(
                         maxLines = 6,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
-                slide.tag?.let { tag ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(accent.copy(alpha = 0.18f))
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                    ) {
-                        Text(
-                            text = tag.displayLabel(),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.88f),
-                        )
-                    }
                 }
             }
         }
@@ -506,12 +490,3 @@ private fun AiInsightSlide.slideImageUrl(
     (backdrop.original ?: backdrop.high ?: backdrop.medium ?: backdrop.low)?.trim()?.takeIf { it.isNotEmpty() }
         ?: fallbackBackdropUrl?.trim()?.takeIf { it.isNotEmpty() }
         ?: posterUrl?.trim()?.takeIf { it.isNotEmpty() }
-
-private fun AiInsightStandoutTag.displayLabel(): String =
-    when (this) {
-        AiInsightStandoutTag.PERFORMANCE -> "Performance"
-        AiInsightStandoutTag.VISUALS -> "Visuals"
-        AiInsightStandoutTag.STORY -> "Story"
-        AiInsightStandoutTag.DIRECTION -> "Direction"
-        AiInsightStandoutTag.WORLD_BUILDING -> "World-building"
-    }

@@ -6,57 +6,56 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * The story's three text slots: the heading is `label`, the headline is
- * `focus`, the paragraph is `body ?: context`. The heading and the headline
- * are separate lines now, so they are separate helpers; the paragraph is
- * still built from disjoint sources, so a slide can never print the same
- * sentence twice.
+ * The story's three text slots: the eyebrow is `label`, the headline is
+ * `heading`, the paragraph is `body`. The eyebrow and the headline are
+ * separate lines, so they are separate helpers; the paragraph is built from
+ * a disjoint source, so a slide can never print the same sentence twice.
  */
 class AiInsightStoryCopyTest {
 
     @Test
-    fun labelAndFocusAreSeparateSlots() {
+    fun labelAndHeadingAreSeparateSlots() {
         val slide =
             slide(
                 label = "Standout",
-                focus = "Hiddleston's quiet portrayal of Chuck",
+                heading = "Hiddleston's quiet portrayal of Chuck",
                 body = "Hiddleston shifts from a quiet adult.",
             )
 
         assertEquals("Standout", slide.storyLabel())
-        assertEquals("Hiddleston's quiet portrayal of Chuck", slide.storyFocus())
+        assertEquals("Hiddleston's quiet portrayal of Chuck", slide.storyHeading())
         assertEquals("Hiddleston shifts from a quiet adult.", slide.storyParagraph())
     }
 
     @Test
-    fun withoutAFocusTheLabelStandsAlone() {
+    fun withoutAHeadingTheLabelStandsAlone() {
         val slide =
             slide(
                 label = "The good stuff",
-                focus = null,
+                heading = null,
                 body = "A twelve-minute standing ovation.",
             )
 
         assertEquals("The good stuff", slide.storyLabel())
-        assertNull(slide.storyFocus())
+        assertNull(slide.storyHeading())
         assertEquals("A twelve-minute standing ovation.", slide.storyParagraph())
     }
 
     @Test
-    fun aBlankFocusIsNoFocusSoTheLabelStillStandsAlone() {
-        val slide = slide(label = "The catch", focus = "   ", body = "Sags in the middle.")
+    fun aBlankHeadingIsNoHeadingSoTheLabelStillStandsAlone() {
+        val slide = slide(label = "The catch", heading = "   ", body = "Sags in the middle.")
 
         assertEquals("The catch", slide.storyLabel())
-        assertNull(slide.storyFocus())
+        assertNull(slide.storyHeading())
         assertEquals("Sags in the middle.", slide.storyParagraph())
     }
 
     @Test
-    fun withoutALabelTheFocusStandsAlone() {
-        val slide = slide(label = "  ", focus = "A killer first act", body = "Ana carries it.")
+    fun withoutALabelTheHeadingStandsAlone() {
+        val slide = slide(label = "  ", heading = "A killer first act", body = "Ana carries it.")
 
         assertNull(slide.storyLabel())
-        assertEquals("A killer first act", slide.storyFocus())
+        assertEquals("A killer first act", slide.storyHeading())
         assertEquals("Ana carries it.", slide.storyParagraph())
     }
 
@@ -65,56 +64,44 @@ class AiInsightStoryCopyTest {
     fun theSlotsNeverRepeatEachOther() {
         val cases =
             listOf(
-                slide(label = "Standout", focus = "A killer first act", body = "Ana carries it.", context = null),
-                slide(label = "The good stuff", focus = null, body = "Takes its time.", context = null),
-                slide(label = "Trivia", focus = "Shot in order", body = null, context = "From the producer."),
-                slide(label = "", focus = null, body = null, context = "Only context."),
-                slide(label = "Standout", focus = "A killer first act", body = null, context = null),
-                slide(label = "", focus = null, body = null, context = null),
+                slide(label = "Standout", heading = "A killer first act", body = "Ana carries it."),
+                slide(label = "The good stuff", heading = null, body = "Takes its time."),
+                slide(label = "Trivia", heading = "Shot in order", body = null),
+                slide(label = "", heading = null, body = "Only body."),
+                slide(label = "Standout", heading = "A killer first act", body = null),
+                slide(label = "", heading = null, body = null),
             )
 
         cases.forEach { slide ->
             val printed =
-                listOfNotNull(slide.storyLabel(), slide.storyFocus(), slide.storyParagraph())
+                listOfNotNull(slide.storyLabel(), slide.storyHeading(), slide.storyParagraph())
             assertEquals(
                 printed.size,
                 printed.distinct().size,
-                "printed the same text twice for label=${slide.label} focus=${slide.focus} body=${slide.body}",
+                "printed the same text twice for label=${slide.label} heading=${slide.heading} body=${slide.body}",
             )
         }
     }
 
     @Test
-    fun contextStandsInForAnAbsentBody() {
-        val slide = slide(label = "Trivia", focus = null, body = null, context = "From the second act.")
-
-        assertEquals("Trivia", slide.storyLabel())
-        assertNull(slide.storyFocus())
-        assertEquals("From the second act.", slide.storyParagraph())
-    }
-
-    @Test
     fun aSlideWithNothingToSayPrintsNothing() {
-        val slide = slide(label = "  ", focus = "  ", body = null, context = null)
+        val slide = slide(label = "  ", heading = "  ", body = null)
 
         assertNull(slide.storyLabel())
-        assertNull(slide.storyFocus())
+        assertNull(slide.storyHeading())
         assertNull(slide.storyParagraph())
     }
 
     private fun slide(
         label: String = "label",
-        focus: String? = null,
+        heading: String? = null,
         body: String? = null,
-        context: String? = null,
     ): AiInsightSlide = AiInsightSlide(
         key = AiInsightSlideKey.THE_GOOD_STUFF,
         label = label,
         kind = AiInsightSlideKind.PROSE,
+        heading = heading,
         body = body,
-        tag = null,
-        focus = focus,
-        context = context,
         backdrop = ResponsiveImageSet(null, null, null),
         accent = "accent",
     )

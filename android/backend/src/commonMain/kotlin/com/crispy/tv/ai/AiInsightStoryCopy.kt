@@ -5,28 +5,28 @@ package com.crispy.tv.ai
 // the slots from here, so the two cannot drift on trimming, or on which field
 // stands in for which.
 //
-// The slots are built from disjoint sources (`label`, `focus`, `body`/`context`),
-// so a slide can never print the same sentence twice.
+// The slots are built from disjoint sources (`label`, `heading`, `body`), so a
+// slide can never print the same sentence twice.
 
 /**
- * The heading line: the slide's own `label` ("Standout", "The catch"),
+ * The eyebrow line: the slide's own `label` ("Standout", "The catch"),
  * trimmed, or null when the server sent none.
  */
 fun AiInsightSlide.storyLabel(): String? =
     label.trim().takeIf { it.isNotEmpty() }
 
 /**
- * The headline line: the server's `focus`, trimmed, or null when it sent none
- * -- or sent only spaces.
+ * The headline line: the server's `heading`, trimmed, or null when it sent
+ * none -- or sent only spaces.
  */
-fun AiInsightSlide.storyFocus(): String? =
-    focus?.trim()?.takeIf { it.isNotEmpty() }
+fun AiInsightSlide.storyHeading(): String? =
+    heading?.trim()?.takeIf { it.isNotEmpty() }
 
 /**
- * The paragraph line: `body`, or `context` when there is no body. Built from
- * `body`/`context` only, so it can never repeat [storyLabel] or [storyFocus],
- * which are built from `label`/`focus`. The no-double-print rule is
- * structural, not defensive.
+ * The paragraph line: `body`, trimmed, or null when there is none. Built from
+ * `body` only, so it can never repeat [storyLabel] or [storyHeading], which
+ * are built from `label`/`heading`. The no-double-print rule is structural,
+ * not defensive.
  */
 fun AiInsightSlide.storyParagraph(): String? =
-    (body ?: context)?.trim()?.takeIf { it.isNotEmpty() }
+    body?.trim()?.takeIf { it.isNotEmpty() }

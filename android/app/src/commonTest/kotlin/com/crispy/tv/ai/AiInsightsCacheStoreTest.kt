@@ -20,25 +20,21 @@ class AiInsightsCacheStoreTest {
         val backing = RecordingKeyValueStore()
         val store = AiInsightsCacheStore(backing)
         val slide = slide(
+            heading = "  heading  ",
             body = "  body  ",
-            tag = AiInsightStandoutTag.VISUALS,
-            focus = "focus",
-            context = "context",
             backdrop = ResponsiveImageSet("low", "medium", "high"),
             accent = "  #123456  ",
         )
 
         store.save("  item-42  ", "", AiInsightsResult(listOf(slide)))
 
-        assertTrue(backing.values.containsKey("ai_ins_v3_item-42_en-US"))
+        assertTrue(backing.values.containsKey("ai_ins_v4_item-42_en-US"))
         val result = requireNotNull(store.load("item-42", ""))
         val loaded = result.slides.single()
         assertEquals(AiInsightSlideKey.THE_GOOD_STUFF, loaded.key)
         assertEquals("label", loaded.label)
+        assertEquals("heading", loaded.heading)
         assertEquals("body", loaded.body)
-        assertEquals(AiInsightStandoutTag.VISUALS, loaded.tag)
-        assertEquals("focus", loaded.focus)
-        assertEquals("context", loaded.context)
         assertEquals(ResponsiveImageSet("low", "medium", "high"), loaded.backdrop)
         assertEquals("#123456", loaded.accent)
     }
@@ -60,8 +56,8 @@ class AiInsightsCacheStoreTest {
     fun loadDropsUnknownSlidesButKeepsAUsableKnownSlide() {
         val backing = RecordingKeyValueStore(
             mapOf(
-                "ai_ins_v3_item_en-US" to
-                    """{"slides":[{"key":"","label":"unknown","kind":"prose","body":"body","accent":""},{"key":"the_good_stuff","label":"Good","kind":"prose","body":"Body","accent":"#fff"}]}""",
+                "ai_ins_v4_item_en-US" to
+                    """{"slides":[{"key":"","label":"unknown","kind":"prose","body":"body","accent":""},{"key":"the_good_stuff","label":"Good","kind":"prose","heading":"A twist that lands","body":"Body","accent":"#fff"}]}""",
             ),
         )
         val store = AiInsightsCacheStore(backing)
@@ -71,18 +67,19 @@ class AiInsightsCacheStoreTest {
         assertEquals(1, result.slides.size)
         assertEquals(AiInsightSlideKey.THE_GOOD_STUFF, result.slides.single().key)
         assertEquals("Good", result.slides.single().label)
+        assertEquals("A twist that lands", result.slides.single().heading)
     }
 
     @Test
     fun malformedOrMissingSlidesReadAsNoCache() {
         val malformed = AiInsightsCacheStore(
-            RecordingKeyValueStore(mapOf("ai_ins_v3_item_en-US" to "{not json")),
+            RecordingKeyValueStore(mapOf("ai_ins_v4_item_en-US" to "{not json")),
         )
         val missingSlides = AiInsightsCacheStore(
-            RecordingKeyValueStore(mapOf("ai_ins_v3_item_en-US" to "{}")),
+            RecordingKeyValueStore(mapOf("ai_ins_v4_item_en-US" to "{}")),
         )
         val notAnObject = AiInsightsCacheStore(
-            RecordingKeyValueStore(mapOf("ai_ins_v3_item_en-US" to "{\"slides\":{}}")),
+            RecordingKeyValueStore(mapOf("ai_ins_v4_item_en-US" to "{\"slides\":{}}")),
         )
 
         assertNull(malformed.load("item", "en-US"))
@@ -110,7 +107,8 @@ class AiInsightsCacheStoreTest {
             mapOf(
                 "ai_ins_v2_item_en-US" to "old",
                 "ai_ins_v2_other" to "old",
-                "ai_ins_v3_item_en-US" to "current",
+                "ai_ins_v3_item_en-US" to "old shape",
+                "ai_ins_v4_item_en-US" to "current",
                 "unrelated" to "keep",
             ),
         )
@@ -119,10 +117,15 @@ class AiInsightsCacheStoreTest {
 
         assertFalse(backing.values.containsKey("ai_ins_v2_item_en-US"))
         assertFalse(backing.values.containsKey("ai_ins_v2_other"))
-        assertEquals("current", backing.values["ai_ins_v3_item_en-US"])
+        assertFalse(backing.values.containsKey("ai_ins_v3_item_en-US"))
+        assertEquals("current", backing.values["ai_ins_v4_item_en-US"])
         assertEquals("keep", backing.values["unrelated"])
         assertEquals(
-            setOf("remove(ai_ins_v2_item_en-US)", "remove(ai_ins_v2_other)"),
+            setOf(
+                "remove(ai_ins_v2_item_en-US)",
+                "remove(ai_ins_v2_other)",
+                "remove(ai_ins_v3_item_en-US)",
+            ),
             backing.calls.toSet(),
         )
     }
@@ -131,8 +134,8 @@ class AiInsightsCacheStoreTest {
     fun aKnownSlideWithAnEmptyLabelAndBodyIsDiscardedByTheParser() {
         val backing = RecordingKeyValueStore(
             mapOf(
-                "ai_ins_v3_item_en-US" to
-                    """{"slides":[{"key":"the_good_stuff","label":"   ","body":"   ","focus":"","context":"","accent":""}]}""",
+                "ai_ins_v4_item_en-US" to
+                    """{"slides":[{"key":"the_good_stuff","label":"   ","heading":"   ","body":"   ","accent":""}]}""",
             ),
         )
         val store = AiInsightsCacheStore(backing)
@@ -142,20 +145,16 @@ class AiInsightsCacheStoreTest {
 
     private fun slide(
         key: AiInsightSlideKey = AiInsightSlideKey.THE_GOOD_STUFF,
+        heading: String? = null,
         body: String? = "body",
-        tag: AiInsightStandoutTag? = null,
-        focus: String? = null,
-        context: String? = null,
         backdrop: ResponsiveImageSet = ResponsiveImageSet(null, null, null),
         accent: String = "accent",
     ): AiInsightSlide = AiInsightSlide(
         key = key,
         label = "label",
         kind = AiInsightSlideKind.PROSE,
+        heading = heading,
         body = body,
-        tag = tag,
-        focus = focus,
-        context = context,
         backdrop = backdrop,
         accent = accent,
     )

@@ -27,28 +27,12 @@ enum class AiInsightSlideKind(val wire: String) {
     }
 }
 
-enum class AiInsightStandoutTag(val wire: String) {
-    PERFORMANCE("PERFORMANCE"),
-    VISUALS("VISUALS"),
-    STORY("STORY"),
-    DIRECTION("DIRECTION"),
-    WORLD_BUILDING("WORLD_BUILDING");
-
-    companion object {
-        fun fromWire(value: String?): AiInsightStandoutTag? =
-            value?.trim()?.takeIf { it.isNotEmpty() }
-                ?.let { raw -> entries.firstOrNull { it.wire == raw } }
-    }
-}
-
 data class AiInsightSlide(
     val key: AiInsightSlideKey,
     val label: String,
     val kind: AiInsightSlideKind,
+    val heading: String?,
     val body: String?,
-    val tag: AiInsightStandoutTag?,
-    val focus: String?,
-    val context: String?,
     val backdrop: ResponsiveImageSet,
     val accent: String,
 )
