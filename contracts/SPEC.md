@@ -49,11 +49,12 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - Skip watched episodes using both raw and `tt`-prefixed show ids.
   - Release parsing accepts full ISO instants or `YYYY-MM-DD`; invalid or blank release values are unreleased.
   - Time-sensitive comparisons use fixture-provided `now_ms`.
-- `trakt_scrobble_policy`
+- `omdb`
+  - Normalize OMDb metadata into the app's detail shape (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
   - Normalize IMDb ids to trimmed lowercase `tt<digits>` form; invalid ids resolve to `null`.
-  - Ignore blank and `N/A` fields case-insensitively.
-  - Ratings dedupe by source case-insensitively while preserving first-seen order.
-  - Append synthetic `Internet Movie Database` and `Metacritic` ratings from top-level OMDb fields only when those sources are otherwise absent.
+  - Ignore blank and `N/A` fields case-insensitively, in rating sources and values as well as in the top-level `metascore`, `imdb_rating`, `imdb_votes` and `type`.
+  - Ratings dedupe by source case-insensitively while preserving first-seen order; the first occurrence of a source wins and keeps its original casing.
+  - Append synthetic `Internet Movie Database` (`<imdb_rating>/10`) and `Metacritic` (`<metascore>/100`) ratings from top-level OMDb fields only when those sources are otherwise absent.
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
@@ -141,6 +142,38 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - `contract_version` 3 replaced the numeric snapshot fields `is_rated`/`user_rating` with a single nullable `liked` and changed `rating.desired` from integer to boolean-or-null.
   - `plan_outbox` operation: `planOutbox(mutations, now_ms)` returns `OutboxAction`s for `pending` mutations whose `next_attempt_ms <= now_ms`, ordered by `(created_at_ms, id)`. `failed`/`conflict`/`inflight` are never scheduled by this step (the processor re-queues failed writes with a new backoff).
   - Backoff is `base * 2^(attempt-1)` capped at `max_delay_ms` (`nextBackoffDelayMs`).
+- `addon_url_normalization`
+  - Validate and normalize an addon manifest URL (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - The scheme must be `https://` (matched case-insensitively); `http://` and every other scheme is invalid.
+  - The normalized URL is the trimmed input lowercased, with the fragment (`#…`) dropped and one trailing `/` removed; the query string is kept.
+  - The path must contain a `/` and its last segment must end with `.json`; a URL without a manifest path is invalid.
+- `onboarding_state_machine`
+  - Advance the onboarding state machine (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - The steps are `SERVICE` then `COMPLETE`; there is no step before `SERVICE`.
+  - A connected service completes onboarding: the next step is `COMPLETE` and the transition is complete.
+  - Without a connected service the step stays `SERVICE` and the transition is not complete.
+  - `COMPLETE` is terminal: the step never moves back to `SERVICE`.
+- `profile_name_validation`
+  - Validate a profile display name (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - The name is trimmed; a valid name is the trimmed value.
+  - A blank name is invalid with reason `blank`.
+  - A trimmed name longer than 24 characters is invalid with reason `too_long`.
+- `profile_settings_sync`
+  - Merge local profile settings with the server's copy (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - The merge is field-wise over `display_name`, `avatar_url`, `sync_provider`, `onboarding_step` and `onboarding_completed_at_ms`.
+  - A present server value wins; a missing (null) server field falls back to the local value.
+- `profile_sorting`
+  - Order the profile switcher (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - Kids profiles come first.
+  - Within a group the most recently used profile comes first; a profile that was never used (`last_used_ms = null`) sorts after every profile with a timestamp.
+  - Ties break on the profile id, ascending.
+- `signup_profile`
+  - Validate the signup profile form (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - The name is trimmed and required; a blank name is reported as missing `name`.
+  - The interface language is required and normalized to a supported language code; a missing or unsupported one is reported as missing `interfaceLanguage`.
+  - The region is optional and normalized to a supported country code; an unsupported region normalizes to `null` and does not block completion.
+  - The avatar is a built-in avatar id (`avatar_01` … `avatar_20`), never a remote URL; a missing or unsupported one is reported as missing `avatarUrl`.
+  - `missing` lists the failing fields in the order `name`, `interfaceLanguage`, `avatarUrl`; the profile is complete only when the list is empty.
 
 ## Breaking Changes
 

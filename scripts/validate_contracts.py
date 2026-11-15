@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 
 import json
+import re
 import sys
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
+
+
+ACTIVE_SUITES_HEADING = "## Active Suites"
+SUITE_ENTRY_PATTERN = re.compile(r"^- `([a-z0-9_]+)`$", re.MULTILINE)
 
 
 SUITE_TO_SCHEMA = {
@@ -37,13 +42,32 @@ def load_json(path: Path) -> dict:
         return json.load(handle)
 
 
+def documented_suites(spec_path: Path) -> list[str]:
+    """Suite names listed under the SPEC's `Active Suites` heading.
+
+    Only that section counts: the migration notes below it name suites that
+    were removed on purpose.
+    """
+    text = spec_path.read_text(encoding="utf-8")
+    start = text.find(ACTIVE_SUITES_HEADING)
+    if start == -1:
+        raise ValueError(f"missing '{ACTIVE_SUITES_HEADING}' section")
+    body = text[start + len(ACTIVE_SUITES_HEADING):]
+    end = body.find("\n## ")
+    if end != -1:
+        body = body[:end]
+    return SUITE_ENTRY_PATTERN.findall(body)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     schemas_root = root / "contracts" / "schemas"
     fixtures_root = root / "contracts" / "fixtures"
+    spec_path = root / "contracts" / "SPEC.md"
 
     schema_cache = {}
     failures = []
+    fixture_suites = set()
 
     for fixture_path in sorted(fixtures_root.rglob("*.json")):
         try:
@@ -61,6 +85,7 @@ def main() -> int:
             )
             continue
 
+        fixture_suites.add(suite)
         schema_name = SUITE_TO_SCHEMA[suite]
         if schema_name not in schema_cache:
             schema_cache[schema_name] = load_json(schemas_root / schema_name)
@@ -72,6 +97,34 @@ def main() -> int:
             failures.append(
                 f"{fixture_path.relative_to(root)} [{path}]: {error.message}"
             )
+
+    # The SPEC is the contract surface: every suite that ships must be
+    # documented there, and every suite documented there must ship.
+    try:
+        documented = documented_suites(spec_path)
+    except (OSError, ValueError) as error:
+        failures.append(f"{spec_path.relative_to(root)}: {error}")
+        documented = []
+
+    for suite in sorted(set(documented)):
+        if documented.count(suite) > 1:
+            failures.append(
+                f"{spec_path.relative_to(root)}: suite '{suite}' is documented "
+                f"{documented.count(suite)} times under '{ACTIVE_SUITES_HEADING}'"
+            )
+    for suite in sorted(set(SUITE_TO_SCHEMA) - set(documented)):
+        failures.append(
+            f"{spec_path.relative_to(root)}: suite '{suite}' is not documented "
+            f"under '{ACTIVE_SUITES_HEADING}'"
+        )
+    for suite in sorted(set(documented) - set(SUITE_TO_SCHEMA)):
+        failures.append(
+            f"{spec_path.relative_to(root)}: documented suite '{suite}' has no schema"
+        )
+    for suite in sorted(set(documented) - fixture_suites):
+        failures.append(
+            f"{spec_path.relative_to(root)}: documented suite '{suite}' has no fixtures"
+        )
 
     if failures:
         print("Contract validation failed:\n")

@@ -659,8 +659,9 @@ live in `:android:sharedUI` as `composeResources`. `:ui-assets` keeps only what 
 
 - Contracts drive behavior. If behavior changes, update `contracts/SPEC.md`, fixtures/schemas, Kotlin
   contract tests, and Swift ContractRunner — bumping `contract_version` per SPEC and keeping Kotlin and
-  Swift in lockstep. Suites: `player_machine`, `continue_watching`, `sync_planner`, `storage_v1`,
-  `player_progress`.
+  Swift in lockstep. The suites are the ones listed under `## Active Suites` in `contracts/SPEC.md`;
+  `scripts/validate_contracts.py` fails when a shipped suite is undocumented there, when a documented
+  suite has no schema or fixtures, or when a suite is listed twice.
 - Determinism: pass `nowMs`/clock; inject seeded RNG; keep output ordering canonical. No
   `System.currentTimeMillis()` in domain; no iteration over unordered maps where order matters. When
   enriching or merging metadata, keep precedence stable (server-first, fill missing only).
