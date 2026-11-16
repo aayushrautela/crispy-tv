@@ -372,6 +372,7 @@ class PlayerSessionViewModel(
         // An explicit command -- the viewer's play/pause, the media session, an
         // audio-focus loss -- overrides whatever the app did on its way out, so
         // the next `onForegroundStart` leaves this session to the viewer.
+        Log.d(TAG, "setPlaying isPlaying=$isPlaying pausedForBackground=$pausedForBackground state=${playbackController.snapshot().state}")
         pausedForBackground = false
         playbackController.setPlaying(isPlaying)
         syncPlaybackSnapshot(playbackController.snapshot())
@@ -382,16 +383,20 @@ class PlayerSessionViewModel(
         // Read the decision before clearing the flag it is an argument of: the
         // visit consumes the pause either way.
         val decision = foregroundResumeDecision(snapshot.state, pausedForBackground)
+        Log.d(TAG, "onForegroundStart state=${snapshot.state} playWhenReady=${snapshot.playWhenReady} pos=${snapshot.positionMs} pausedForBackground=$pausedForBackground decision=$decision")
         pausedForBackground = false
         if (decision is ForegroundResumeDecision.LeaveAsIs) {
+            Log.d(TAG, "onForegroundStart leaving as is state=${snapshot.state}")
             return
         }
         playbackController.setPlaying(true)
+        Log.d(TAG, "onForegroundStart resumed; engine=${playbackController.snapshot().state}")
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun onBackgroundStop() {
         val snapshot = playbackController.snapshot()
+        Log.d(TAG, "onBackgroundStop state=${snapshot.state} playWhenReady=${snapshot.playWhenReady} pos=${snapshot.positionMs} isPlaying=${snapshot.isPlaying}")
         if (snapshot.isPlaying) {
             playbackController.setPlaying(false)
             // The engine's answer to this is `PAUSED`, which is the same answer a

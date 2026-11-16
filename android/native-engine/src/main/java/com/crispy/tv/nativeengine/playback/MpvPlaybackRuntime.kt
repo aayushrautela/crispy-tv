@@ -23,10 +23,38 @@ internal class MpvPlaybackRuntime(
     private var created: Boolean = false
     private var surfaceView: SurfaceView? = null
     private var surfaceAttached: Boolean = false
+
+    /**
+     * The holder whose surface mpv is drawing into right now.
+     *
+     * Android does not order the new view's `surfaceCreated` before the old
+     * view's `surfaceDestroyed`, and [attach] can be handed a second SurfaceView
+     * (AndroidView's factory runs again once the window is recreated), so a
+     * teardown that arrives for a holder that is no longer the live one has to
+     * be dropped: it would write `vo=null` over the surface that just came up.
+     */
+    private var activeHolder: SurfaceHolder? = null
+
+    /**
+     * The view [surfaceHolderCallback] is registered with. A SurfaceHolder keeps
+     * its callbacks across a surface destroy/create cycle, so registering the
+     * same view twice fires every callback twice and the stale duplicate is
+     * indistinguishable from the live one.
+     */
+    private var registeredView: SurfaceView? = null
     private var pendingSource: PlaybackSource? = null
     private var pendingExternalAudioUrl: String? = null
     private var playRequested: Boolean = false
     private var state: NativePlaybackState = NativePlaybackState.IDLE
+        set(value) {
+            // The overlay's loading curtain is driven by this value, so a
+            // session that "keeps loading" is a state that stopped changing;
+            // the last transition line before it stopped is the clue.
+            if (value != field) {
+                Log.d(TAG, "state ${field} -> $value")
+            }
+            field = value
+        }
     private var videoLayout: NativeVideoLayout? = null
     private var videoWidth: Int = 0
     private var videoHeight: Int = 0
@@ -156,6 +184,7 @@ internal class MpvPlaybackRuntime(
                 }
                 "paused-for-cache", "seeking" -> {
                     if (value && state != NativePlaybackState.ERROR && state != NativePlaybackState.ENDED) {
+                        Log.d(TAG, "observer $property=$value -> BUFFERING")
                         state = NativePlaybackState.BUFFERING
                     }
                 }
@@ -198,11 +227,13 @@ internal class MpvPlaybackRuntime(
                     }
                     refreshTrackLists()
                     refreshChapters()
+                    logEngineState("event:${if (eventId == MPVLib.MpvEvent.MPV_EVENT_FILE_LOADED) "file-loaded" else "playback-restart"}")
                 }
                 MPVLib.MpvEvent.MPV_EVENT_END_FILE -> {
                     if (state != NativePlaybackState.ENDED && state != NativePlaybackState.ERROR) {
                         state = NativePlaybackState.IDLE
                     }
+                    logEngineState("event:end-file")
                 }
             }
         }
@@ -210,10 +241,17 @@ internal class MpvPlaybackRuntime(
 
     private val surfaceHolderCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
-            Log.d(TAG, "surfaceCreated")
+            Log.d(
+                TAG,
+                "surfaceCreated holder=${System.identityHashCode(holder)} " +
+                    "viewHash=${System.identityHashCode(surfaceView)} " +
+                    "isActiveHolder=${activeHolder === holder} created=$created " +
+                    "surfaceAttached=$surfaceAttached",
+            )
             runCatching {
                 mpv?.attachSurface(holder.surface)
                 mpv?.setOptionString("force-window", "yes")
+                activeHolder = holder
             }
             surfaceAttached = true
             val pending = pendingSource
@@ -238,10 +276,11 @@ internal class MpvPlaybackRuntime(
             // and the UI reports buffering forever. Same shape as
             // mpv-android's own `surfaceCreated`.
             restoreVideoOutput()
+            logEngineState("surfaceCreated")
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            Log.d(TAG, "surfaceChanged size=${width}x$height")
+            Log.d(TAG, "surfaceChanged size=${width}x$height holder=${System.identityHashCode(holder)}")
             runCatching { mpv?.setPropertyString("android-surface-size", "${width}x$height") }
             // The surface size is deliberately NOT recorded as the video layout:
             // the tunneled vo renders at the video's native size and the view
@@ -250,13 +289,28 @@ internal class MpvPlaybackRuntime(
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
-            Log.d(TAG, "surfaceDestroyed")
+            Log.d(
+                TAG,
+                "surfaceDestroyed holder=${System.identityHashCode(holder)} " +
+                    "isActiveHolder=${activeHolder === holder} " +
+                    "viewHash=${System.identityHashCode(surfaceView)}",
+            )
+            if (activeHolder !== null && activeHolder !== holder) {
+                // The old view's surface went away after the new view's surface
+                // came up. Tearing down here would write `vo=null` over the
+                // surface that is now live, which is exactly the state that
+                // leaves a session buffering forever.
+                Log.d(TAG, "surfaceDestroyed stale holder ignored (a newer surface is up)")
+                return
+            }
             runCatching {
                 mpv?.setPropertyString("vo", "null")
                 mpv?.setPropertyString("force-window", "no")
                 mpv?.detachSurface()
             }
+            activeHolder = null
             surfaceAttached = false
+            logEngineState("surfaceDestroyed")
         }
     }
 
@@ -266,6 +320,11 @@ internal class MpvPlaybackRuntime(
         }
         val created = SurfaceView(viewContext)
         Log.d(TAG, "createSurfaceView viewHash=${System.identityHashCode(created)}")
+        val previous = registeredView
+        if (previous !== created && previous != null) {
+            previous.holder.removeCallback(surfaceHolderCallback)
+        }
+        registeredView = created
         surfaceView = created
         created.holder.addCallback(surfaceHolderCallback)
         return created
@@ -275,14 +334,24 @@ internal class MpvPlaybackRuntime(
         if (surfaceView === view && surfaceAttached) {
             return
         }
-        Log.d(TAG, "attach replacingViewHash=${surfaceView?.let { System.identityHashCode(it) }} pendingUrl=${pendingSource?.url?.hashCode()}")
+        if (registeredView === view) {
+            // Still live. SurfaceHolder.Callback survives a surface
+            // destroy/create cycle, so adding it again would run every callback
+            // twice and the duplicate would be indistinguishable from the live
+            // one in a log.
+            Log.d(TAG, "attach noop alreadyRegistered viewHash=${System.identityHashCode(view)}")
+            surfaceView = view
+            return
+        }
+        Log.d(TAG, "attach replacingViewHash=${surfaceView?.let { System.identityHashCode(it) }} newViewHash=${System.identityHashCode(view)} pendingUrl=${pendingSource?.url?.hashCode()}")
         if (!created) {
             initialize(view.context)
         }
-        val previous = surfaceView
+        val previous = registeredView
         if (previous !== view && previous != null) {
             previous.holder.removeCallback(surfaceHolderCallback)
         }
+        registeredView = view
         surfaceView = view
         view.holder.addCallback(surfaceHolderCallback)
     }
@@ -355,6 +424,7 @@ internal class MpvPlaybackRuntime(
         }
         created = true
         Log.d(TAG, "initialize configDir=${appCtx.filesDir.path}")
+        logEngineState("initialize")
     }
 
     private fun observeProperties(mpv: MPVLib) {
@@ -408,6 +478,7 @@ internal class MpvPlaybackRuntime(
         Log.d(TAG, "setPlaying isPlaying=$isPlaying playRequested=$playRequested")
         playRequested = isPlaying
         runCatching { mpv?.setPropertyBoolean("pause", !isPlaying) }
+        logEngineState("setPlaying:$isPlaying")
     }
 
     fun seekTo(positionMs: Long) {
@@ -492,8 +563,35 @@ internal class MpvPlaybackRuntime(
      */
     private fun restoreVideoOutput() {
         val vo = activeVo()
-        Log.d(TAG, "restoreVideoOutput vo=$vo")
-        runCatching { mpv?.setPropertyString("vo", vo) }
+        Log.d(TAG, "restoreVideoOutput vo=$vo surfaceAttached=$surfaceAttached mpvAlive=${mpv != null}")
+        val failure = runCatching { mpv?.setPropertyString("vo", vo) }.exceptionOrNull()
+        Log.d(
+            TAG,
+            "restoreVideoOutput result vo=$vo failure=${failure?.javaClass?.simpleName ?: "none"} " +
+                "readbackVo=${runCatching { mpv?.getPropertyString("vo") }.getOrNull()}",
+        )
+    }
+
+    /**
+     * One line of every fact that decides whether the picture comes back: the
+     * vo mpv accepted, the decoder it settled on, the pause and cache state, and
+     * the UI state this engine is reporting. Each read is guarded because a name
+     * mpv does not know throws, and the point of the dump is the other fields.
+     */
+    private fun logEngineState(phase: String) {
+        val current = mpv
+        fun read(name: String): String = runCatching { current?.getPropertyString(name) }.getOrNull() ?: "n/a"
+        val path = runCatching { current?.getPropertyString("path") }.getOrNull()
+        Log.d(
+            TAG,
+            "dump[$phase] ui=$state playWhenReady=$playRequested started=$hasStartedPlayback " +
+                "surfaceAttached=$surfaceAttached " +
+                "mpv.vo=${read("vo")} currentVo=${read("current-vo")} hwdec=${read("hwdec")} " +
+                "pause=${read("pause")} cachePaused=${read("paused-for-cache")} seeking=${read("seeking")} " +
+                "coreIdle=${read("core-idle")} eof=${read("eof-reached")} " +
+                "cacheState=${read("cache-buffering-state")} cacheTime=${read("demuxer-cache-time")} " +
+                "pos=${read("time-pos")} dur=${read("duration")} path=${if (path == null) "n/a" else path.hashCode()}",
+        )
     }
 
     /**
@@ -545,6 +643,7 @@ internal class MpvPlaybackRuntime(
         runCatching { mpv?.command(arrayOf("stop")) }
         state = NativePlaybackState.IDLE
         lastBufferingPercent = null
+        logEngineState("stop")
     }
 
     fun setPlaybackSpeed(speed: Float) {
@@ -797,7 +896,7 @@ internal class MpvPlaybackRuntime(
         // steps are ordered, and a `detachSurface` that throws -- mpv can still
         // be reading the surface, the race mpv-android documents -- must not
         // also skip `destroy()`, which would leak the whole native instance.
-        runCatching { surfaceView?.holder?.removeCallback(surfaceHolderCallback) }
+        runCatching { registeredView?.holder?.removeCallback(surfaceHolderCallback) }
         runCatching { mpv?.removeObserver(eventObserver) }
         runCatching { mpv?.detachSurface() }
         runCatching { mpv?.destroy() }
@@ -805,6 +904,8 @@ internal class MpvPlaybackRuntime(
         created = false
         surfaceAttached = false
         surfaceView = null
+        registeredView = null
+        activeHolder = null
         pendingSource = null
         pendingExternalAudioUrl = null
     }
@@ -840,6 +941,7 @@ internal class MpvPlaybackRuntime(
                 )
             }
         }
+        logEngineState("startPlayback")
     }
 
     private fun applyRequestHeaders(headers: Map<String, String>) {
