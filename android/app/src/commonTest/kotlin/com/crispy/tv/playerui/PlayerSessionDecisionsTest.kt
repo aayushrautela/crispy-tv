@@ -177,6 +177,82 @@ class PlayerSessionDecisionsTest {
         )
     }
 
+    // ----------------------------------------------------- foreground resume
+
+    @Test
+    fun everyStateIsPinnedWhenNobodyPausedForTheBackground() {
+        val expected = mapOf(
+            NativePlaybackState.IDLE to ForegroundResumeDecision.ResumePlayback,
+            NativePlaybackState.PREPARING to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.BUFFERING to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.PLAYING to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.PAUSED to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.ENDED to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.ERROR to ForegroundResumeDecision.LeaveAsIs,
+        )
+        assertEquals(
+            "a state has no pinned answer, so the decision is unpinned for it",
+            expected.keys,
+            NativePlaybackState.entries.toSet(),
+        )
+        for ((state, decision) in expected) {
+            assertEquals(
+                "wrong answer for $state with no background pause",
+                decision,
+                foregroundResumeDecision(state, pausedForBackground = false),
+            )
+        }
+    }
+
+    @Test
+    fun onlyThePausedStateResumesForTheBackground() {
+        val expected = mapOf(
+            NativePlaybackState.IDLE to ForegroundResumeDecision.ResumePlayback,
+            NativePlaybackState.PREPARING to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.BUFFERING to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.PLAYING to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.PAUSED to ForegroundResumeDecision.ResumePlayback,
+            NativePlaybackState.ENDED to ForegroundResumeDecision.LeaveAsIs,
+            NativePlaybackState.ERROR to ForegroundResumeDecision.LeaveAsIs,
+        )
+        assertEquals(
+            "a state has no pinned answer, so the decision is unpinned for it",
+            expected.keys,
+            NativePlaybackState.entries.toSet(),
+        )
+        for ((state, decision) in expected) {
+            assertEquals(
+                "wrong answer for $state after the app paused it for the background",
+                decision,
+                foregroundResumeDecision(state, pausedForBackground = true),
+            )
+        }
+    }
+
+    @Test
+    fun aPauseTheAppCausedIsUndoneWhenTheAppComesBack() {
+        // The engine reports PAUSED for both pauses, so the flag is the only
+        // thing that says this one is the app's.
+        assertEquals(
+            "a session the backgrounding paused resumes on the way back",
+            ForegroundResumeDecision.ResumePlayback,
+            foregroundResumeDecision(NativePlaybackState.PAUSED, pausedForBackground = true),
+        )
+    }
+
+    @Test
+    fun aFinishedOrFailedSessionIsNeverResumedByTheFlag() {
+        // Resuming either one asks an engine with no file to play, which answers
+        // PREPARING forever -- the loading state the viewer reported.
+        for (state in listOf(NativePlaybackState.ENDED, NativePlaybackState.ERROR)) {
+            assertEquals(
+                "$state is not resumable",
+                ForegroundResumeDecision.LeaveAsIs,
+                foregroundResumeDecision(state, pausedForBackground = true),
+            )
+        }
+    }
+
     private fun snapshot(
         state: NativePlaybackState,
         error: NativePlaybackError? = null,

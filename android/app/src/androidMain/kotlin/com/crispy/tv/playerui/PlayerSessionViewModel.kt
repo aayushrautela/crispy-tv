@@ -160,6 +160,17 @@ class PlayerSessionViewModel(
     private var pendingInitialSeekMs: Long? = null
     private var autoSelectPending = false
     /**
+     * Whether the *app* paused this session rather than the viewer.
+     *
+     * `onBackgroundStop` pauses playback when the activity stops, and the engine
+     * answers `PAUSED` -- the same answer a pause the viewer pressed gives, so
+     * without this flag the next `onForegroundStart` cannot tell the two apart
+     * and every return-to-app waits for another tap. Cleared by any explicit
+     * command ([setPlaying], which the viewer's play/pause, the media session and
+     * an audio-focus loss all reach) and by the visit itself.
+     */
+    private var pausedForBackground = false
+    /**
      * The in-flight add-on subtitle fetch, so the path that attaches a matched
      * subtitle can wait on the one it started rather than on a signal the repository
      * does not raise.
@@ -358,25 +369,35 @@ class PlayerSessionViewModel(
     }
 
     fun setPlaying(isPlaying: Boolean) {
+        // An explicit command -- the viewer's play/pause, the media session, an
+        // audio-focus loss -- overrides whatever the app did on its way out, so
+        // the next `onForegroundStart` leaves this session to the viewer.
+        pausedForBackground = false
         playbackController.setPlaying(isPlaying)
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun onForegroundStart() {
         val snapshot = playbackController.snapshot()
-        if (snapshot.isBuffering || snapshot.state == NativePlaybackState.PAUSED) {
+        // Read the decision before clearing the flag it is an argument of: the
+        // visit consumes the pause either way.
+        val decision = foregroundResumeDecision(snapshot.state, pausedForBackground)
+        pausedForBackground = false
+        if (decision is ForegroundResumeDecision.LeaveAsIs) {
             return
         }
-        if (!snapshot.isPlaying && snapshot.state != NativePlaybackState.ERROR && snapshot.state != NativePlaybackState.ENDED) {
-            playbackController.setPlaying(true)
-            syncPlaybackSnapshot(playbackController.snapshot())
-        }
+        playbackController.setPlaying(true)
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun onBackgroundStop() {
         val snapshot = playbackController.snapshot()
         if (snapshot.isPlaying) {
             playbackController.setPlaying(false)
+            // The engine's answer to this is `PAUSED`, which is the same answer a
+            // pause the viewer pressed gives; this flag is what tells the two
+            // apart when the app comes back.
+            pausedForBackground = true
             syncPlaybackSnapshot(playbackController.snapshot())
         }
     }

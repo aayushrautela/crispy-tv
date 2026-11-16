@@ -216,12 +216,28 @@ internal class MpvPlaybackRuntime(
                 mpv?.setOptionString("force-window", "yes")
             }
             surfaceAttached = true
-            pendingSource?.let { pending ->
+            val pending = pendingSource
+            if (pending != null) {
+                // Nothing has been drawn yet, so mpv initialises its video
+                // output from the option [initialize] set and the file's own
+                // load re-inits the chain anyway; restoring the vo here would
+                // be a second write of the value mpv already holds.
                 pendingSource = null
                 val externalAudioUrl = pendingExternalAudioUrl
                 pendingExternalAudioUrl = null
                 startPlayback(pending, externalAudioUrl)
+                return
             }
+            // The other half of [surfaceDestroyed]: the vo was turned off when
+            // the last surface went away, and nothing else turns it back on --
+            // the only other writer of a non-null vo is [initialize], which
+            // runs once per instance. Without this the session plays on with
+            // `vo=null` after the activity is stopped and started again (home
+            // button, recents, a configuration change, PiP and back), the
+            // decoder never comes back, the demuxer sits in `paused-for-cache`
+            // and the UI reports buffering forever. Same shape as
+            // mpv-android's own `surfaceCreated`.
+            restoreVideoOutput()
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -465,6 +481,20 @@ internal class MpvPlaybackRuntime(
             !hdrOutputEnabled -> "gpu"
             else -> VO_PREFERRED
         }
+
+    /**
+     * Re-enables the video output that [surfaceDestroyed] turned off.
+     *
+     * The vo is a live property write -- the same mechanism
+     * [setPictureInPictureActive] and [setHdrOutputEnabled] use -- so the chain
+     * that is correct right now comes back without touching the file, and the
+     * frame mpv is sitting on is redrawn as soon as it is up.
+     */
+    private fun restoreVideoOutput() {
+        val vo = activeVo()
+        Log.d(TAG, "restoreVideoOutput vo=$vo")
+        runCatching { mpv?.setPropertyString("vo", vo) }
+    }
 
     /**
      * The video's own pixel size, from `video-params/w`/`h` -- not the surface's.
@@ -763,12 +793,14 @@ internal class MpvPlaybackRuntime(
 
     fun release() {
         Log.d(TAG, "release surfaceAttached=$surfaceAttached created=$created")
-        runCatching {
-            surfaceView?.holder?.removeCallback(surfaceHolderCallback)
-            mpv?.removeObserver(eventObserver)
-            mpv?.detachSurface()
-            mpv?.destroy()
-        }
+        // One `runCatching` per step, deliberately not one around all four: the
+        // steps are ordered, and a `detachSurface` that throws -- mpv can still
+        // be reading the surface, the race mpv-android documents -- must not
+        // also skip `destroy()`, which would leak the whole native instance.
+        runCatching { surfaceView?.holder?.removeCallback(surfaceHolderCallback) }
+        runCatching { mpv?.removeObserver(eventObserver) }
+        runCatching { mpv?.detachSurface() }
+        runCatching { mpv?.destroy() }
         mpv = null
         created = false
         surfaceAttached = false
