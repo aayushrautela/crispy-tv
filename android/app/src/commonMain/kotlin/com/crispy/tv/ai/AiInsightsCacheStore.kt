@@ -130,11 +130,10 @@ class AiInsightsCacheStore(private val store: KeyValueStore) : AiInsightsCache {
         "$CACHE_PREFIX${itemId}_${languageTag.ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
-        // The slide shape changed (the chip and the `focus`/`context` pair are
-        // gone, the heading is one field now), so the cache key moves with it:
-        // a v3 entry holds slides this build cannot read.
-        private const val CACHE_PREFIX = "ai_ins_v4_"
-        private val LEGACY_CACHE_PREFIXES = listOf("ai_ins_v2_", "ai_ins_v3_")
+        // The server now rejects malformed generations and no longer serves
+        // fallback headings, so existing local entries must be regenerated.
+        private const val CACHE_PREFIX = "ai_ins_v5_"
+        private val LEGACY_CACHE_PREFIXES = listOf("ai_ins_v2_", "ai_ins_v3_", "ai_ins_v4_")
         private const val DEFAULT_LOCALE_TAG = "en-US"
     }
 }
