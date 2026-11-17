@@ -71,7 +71,6 @@ private data class SubtitleOption(
     val label: String,
     val language: String?,
     val subtitle: String?,
-    val isSelected: Boolean,
     val trackId: String,
 )
 
@@ -180,41 +179,42 @@ internal fun PlayerSubtitleSheet(
     // published order. Attaching never adds or removes a row -- the catalog
     // entry wins the shared `ext:<hash>` identity and only flips its checkmark --
     // so the list only changes when the catalog itself does (fetch/refresh).
-    val catalogIds = addonSubtitles.mapTo(HashSet()) { externalSubtitleTrackId(it.url) }
     val options =
-        buildList {
-            subtitleTracks
-                .filter { it.id !in catalogIds }
-                .forEach { track ->
-                    add(
-                        SubtitleOption(
-                            key = track.id,
-                            label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, displayName),
-                            language = track.language,
-                            subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, displayName) },
-                            isSelected = track.id == selectedSubtitleTrackId,
-                            trackId = track.id,
-                        ),
-                    )
-                }
-            addonSubtitles
-                .distinctBy { externalSubtitleTrackId(it.url) }
-                .forEach { subtitle ->
-                    val key = externalSubtitleTrackId(subtitle.url)
-                    add(
-                        SubtitleOption(
-                            key = key,
-                            label = subtitle.display.ifBlank { languageLabelForCode(subtitle.language, displayName) },
-                            language = subtitle.language,
-                            subtitle = subtitle.addonName?.takeIf { it.isNotBlank() },
-                            isSelected = key == selectedSubtitleTrackId,
-                            trackId = key,
-                        ),
-                    )
-                }
+        remember(subtitleTracks, addonSubtitles, displayName) {
+            val catalogIds = addonSubtitles.mapTo(HashSet()) { externalSubtitleTrackId(it.url) }
+            buildList {
+                subtitleTracks
+                    .filter { it.id !in catalogIds }
+                    .forEach { track ->
+                        add(
+                            SubtitleOption(
+                                key = track.id,
+                                label = track.title?.takeIf { it.isNotBlank() } ?: languageLabelForCode(track.language, displayName),
+                                language = track.language,
+                                subtitle = track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(track.language, displayName) },
+                                trackId = track.id,
+                            ),
+                        )
+                    }
+                addonSubtitles
+                    .distinctBy { externalSubtitleTrackId(it.url) }
+                    .forEach { subtitle ->
+                        val key = externalSubtitleTrackId(subtitle.url)
+                        add(
+                            SubtitleOption(
+                                key = key,
+                                label = subtitle.display.ifBlank { languageLabelForCode(subtitle.language, displayName) },
+                                language = subtitle.language,
+                                subtitle = subtitle.addonName?.takeIf { it.isNotBlank() },
+                                trackId = key,
+                            ),
+                        )
+                    }
+            }
         }
-    val groups = groupSubtitlesByLanguage(options, displayName)
-    val languagePills = groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) }
+    val groups = remember(options, displayName) { groupSubtitlesByLanguage(options, displayName) }
+    val languagePills =
+        remember(groups) { groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) } }
     // Seeded from the current selection, not 'All': the sheet is disposed on
     // close, so this runs once per open and only pill taps change it after.
     // A selection the list does not contain (nothing picked yet) falls back to
@@ -229,10 +229,12 @@ internal fun PlayerSubtitleSheet(
     }
     val showPills = groups.size > 1
     val visibleOptions =
-        if (!showPills || selectedLang == null) {
-            options
-        } else {
-            options.filter { normalizeLang(it.language) == selectedLang }
+        remember(options, selectedLang, showPills) {
+            if (!showPills || selectedLang == null) {
+                options
+            } else {
+                options.filter { normalizeLang(it.language) == selectedLang }
+            }
         }
     val offSelected = selectedSubtitleTrackId == null
 
@@ -308,7 +310,7 @@ internal fun PlayerSubtitleSheet(
                     TrackRow(
                         label = option.label,
                         subtitle = option.subtitle,
-                        isSelected = option.isSelected,
+                        isSelected = option.trackId == selectedSubtitleTrackId,
                         palette = palette,
                         leadingIcon = Res.drawable.ic_subtitles_filled,
                         onClick = { onSelectSubtitleTrack(option.trackId) },

@@ -49,6 +49,16 @@ internal class MpvPlaybackRuntime(
     private var selectedAudioTrackId: String? = null
     private var subtitleTracks: List<NativeTrack> = emptyList()
     private var selectedSubtitleTrackId: String? = null
+    // The track id the viewer last asked for. Every `sub-add` carries a
+    // `select` flag that fires when the file finishes downloading, so a
+    // subtitle whose pick was already replaced by a newer one can still grab
+    // the selection on completion; comparing the resolved selection against
+    // this id lets the observer correct such a late arrival instead of
+    // believing it. Cleared when a new source loads, so a previous media's
+    // pick is never "corrected" toward the file that is now playing.
+    private data class RequestedSubtitleSelection(val trackId: String?)
+
+    private var requestedSubtitleSelection: RequestedSubtitleSelection? = null
     private var chapters: List<NativeChapter> = emptyList()
     private var subText: String? = null
     private var hasStartedPlayback: Boolean = false
@@ -119,6 +129,10 @@ internal class MpvPlaybackRuntime(
                         selectedSubtitleTrackId = resolveSelectedSubtitleTrackId(value.toString())
                         applySubtitleStyleForSelectedTrack()
                     }
+                    // A superseded sub-add can still land after its replacement
+                    // and pull the selection back, so the fresh list from the
+                    // re-read above decides whether this answer still stands.
+                    current?.let(::correctSupersededSelection)
                 }
                 "video-params/w" -> {
                     videoWidth = value.toInt()
@@ -552,6 +566,9 @@ internal class MpvPlaybackRuntime(
         Log.d(TAG, "selectSubtitleTrack id=$trackId language=$language")
         val mpv = mpv ?: return
         if (trackId == null) {
+            // Guard Off explicitly too, so a late attach cannot switch the
+            // viewer's explicit choice back on.
+            requestedSubtitleSelection = RequestedSubtitleSelection(trackId = null)
             runCatching { mpv.setPropertyString("sid", "no") }
             selectedSubtitleTrackId = null
             restoreSubtitleMargins()
@@ -562,14 +579,19 @@ internal class MpvPlaybackRuntime(
             Log.d(TAG, "selectSubtitleTrack id=$trackId rejected=track-missing")
             return
         }
+        requestedSubtitleSelection = RequestedSubtitleSelection(trackId)
         runCatching { mpv.setPropertyInt("sid", track.index) }
         selectedSubtitleTrackId = trackId
         applySubtitleStyleForSelectedTrack()
     }
 
     fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?) {
-        val mpv = mpv
-        if (mpv == null) return
+        val mpv = mpv ?: return
+        // Armed before the commands so the whole window -- the removal that
+        // clears the previous track and the sub-add that loads the new one --
+        // is guarded, and null clears a pending request.
+        requestedSubtitleSelection =
+            RequestedSubtitleSelection(subtitle?.let { externalSubtitleTrackId(it.url) })
         runCatching {
             if (subtitle != null) {
                 val attachedTrack = subtitleTracks.firstOrNull {
@@ -718,6 +740,33 @@ internal class MpvPlaybackRuntime(
         return subtitleTracks.firstOrNull { it.index == sidInt }?.id
     }
 
+    /**
+     * Forces the selection back to the latest requested track when a
+     * superseded sub-add lands late. The list re-read that ran before this in
+     * the observer makes the current state available, and the correction is
+     * id-only: when the requested track is already listed it wins by index,
+     * and while it is still loading the selection is cleared, which the
+     * completion's own sid event then resolves correctly. No recursion: each
+     * re-issued property change arrives as the observer's next event, and it
+     * stops as soon as the selection agrees with the request.
+     */
+    private fun correctSupersededSelection(mpv: MPVLib) {
+        val request = requestedSubtitleSelection ?: return
+        if (selectedSubtitleTrackId == request.trackId) return
+        val requestedTrack = request.trackId?.let { id -> subtitleTracks.firstOrNull { it.id == id } }
+        runCatching {
+            if (request.trackId == null) {
+                mpv.setPropertyString("sid", "no")
+            } else {
+                mpv.setPropertyInt("sid", requestedTrack?.index ?: 0)
+            }
+        }
+        if (requestedTrack == null) {
+            selectedSubtitleTrackId = null
+            restoreSubtitleMargins()
+        }
+    }
+
     private fun readTrackList(mpv: MPVLib, trackType: String): List<NativeTrack> {
         val count = runCatching { mpv.getPropertyString("track-list/count") }.getOrNull()?.toIntOrNull() ?: 0
         if (count <= 0) return emptyList()
@@ -807,10 +856,15 @@ internal class MpvPlaybackRuntime(
         surfaceView = null
         pendingSource = null
         pendingExternalAudioUrl = null
+        requestedSubtitleSelection = null
     }
 
     private fun startPlayback(source: PlaybackSource, externalAudioUrl: String? = null) {
         applyRequestHeaders(source.headers)
+        // A new file's own picks start unguarded: the carried external is
+        // selected at load, and the previous media's pick must not be
+        // "corrected" toward tracks the new file does not have.
+        requestedSubtitleSelection = null
         val url = source.url
         Log.d(TAG, "startPlayback url=${debugUrl(url)} surfaceAttached=$surfaceAttached externalAudio=${externalAudioUrl != null}")
         val loadArguments =

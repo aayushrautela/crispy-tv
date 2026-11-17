@@ -68,6 +68,60 @@ class SubtitleTrackSelectionTest {
         assertNull(decision, "a pick with no catalog entry belongs to the plain select path")
     }
 
+    @Test
+    fun pendingPickWinsWhileTheEngineStillReportsThePreviousTrack() {
+        val pending = PendingSubtitleSelection(trackId = "fr", ticksLeft = 2)
+
+        assertEquals(
+            "fr",
+            resolveSubtitleSelectionForUi(snapshotId = "en", pending = pending),
+            "the latest tap must stay checked while its attach is pending",
+        )
+    }
+
+    @Test
+    fun engineAgreementSettlesTheOptimisticPick() {
+        val pending = PendingSubtitleSelection(trackId = "fr", ticksLeft = 2)
+
+        assertEquals("fr", resolveSubtitleSelectionForUi(snapshotId = "fr", pending = pending))
+        assertNull(nextPendingSubtitleSelection(pending, snapshotId = "fr"))
+    }
+
+    @Test
+    fun pendingPickExpiresBackToEngineTruth() {
+        val pending = PendingSubtitleSelection(trackId = "fr", ticksLeft = 1)
+
+        val next = nextPendingSubtitleSelection(pending, snapshotId = "en")
+
+        assertNull(next, "the last disagreeing poll exhausts the optimistic budget")
+        assertEquals(
+            "en",
+            resolveSubtitleSelectionForUi(snapshotId = "en", pending = next),
+            "an attach that never settles must return to the engine's selected track",
+        )
+    }
+
+    @Test
+    fun eachDisagreeingPollConsumesOneTick() {
+        val pending = PendingSubtitleSelection(trackId = "fr", ticksLeft = 3)
+
+        assertEquals(
+            PendingSubtitleSelection(trackId = "fr", ticksLeft = 2),
+            nextPendingSubtitleSelection(pending, snapshotId = "en"),
+        )
+    }
+
+    @Test
+    fun aNewPickReplacesTheSupersededPendingPick() {
+        val latestPick = PendingSubtitleSelection(trackId = "de", ticksLeft = 3)
+
+        assertEquals(
+            "de",
+            resolveSubtitleSelectionForUi(snapshotId = "en", pending = latestPick),
+            "the resolver must display the newest pending selection, not an earlier tap",
+        )
+    }
+
     private fun addonSubtitle(url: String) =
         AddonSubtitle(id = url, url = url, language = "pol", display = "Polish")
 }

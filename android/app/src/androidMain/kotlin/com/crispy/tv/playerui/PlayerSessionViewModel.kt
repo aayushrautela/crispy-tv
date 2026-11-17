@@ -188,6 +188,18 @@ class PlayerSessionViewModel(
      * matcher must not undo them on the next poll.
      */
     private var subtitleAutoSelectApplied = false
+
+    /**
+     * The subtitle pick the UI shows while the engine is still announcing it.
+     *
+     * `sub-add` downloads its file asynchronously, so the gap between a tap and
+     * mpv's sid event has a snapshot still naming the previous choice, and
+     * without this the checkmark visibly stays behind the tap for up to a poll
+     * interval or two. The hold is bounded rather than permanent: the engine
+     * agreeing releases it, and an exhausted tick budget hands the decision
+     * back to the engine so a failed attach cannot leave the UI lying forever.
+     */
+    private var pendingSubtitleSelection: PendingSubtitleSelection? = null
     private var initialTarget: StreamLookupTarget? = null
 
     private val initialEngine: NativePlaybackEngine = resolveInitialEngine()
@@ -456,6 +468,15 @@ class PlayerSessionViewModel(
         // undoing it. A pick is also the only writer of the preference, so the two
         // statements belong together.
         subtitleAutoSelectApplied = true
+        // Show the pick the moment it is made, before the engine has announced
+        // it: a fresh attach only becomes true state once its download finishes.
+        // Bounded by the tick budget, so a pick that never resolves still falls
+        // back to the engine's answer rather than pinning the sheet forever.
+        pendingSubtitleSelection = PendingSubtitleSelection(
+            trackId = trackId,
+            ticksLeft = PENDING_SUBTITLE_SELECTION_MAX_TICKS,
+        )
+        _uiState.update { it.copy(selectedSubtitleTrackId = trackId) }
         if (trackId != null && trackId.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)) {
             val subtitle = decideExternalSubtitleSelection(
                 trackId = trackId,
@@ -1152,6 +1173,7 @@ class PlayerSessionViewModel(
         if (previousIdentity != null && previousIdentity != identity) {
             progressReporter.reportPlaybackStopped(previousIdentity)
         }
+        pendingSubtitleSelection = null
         // Fresh playback session: clear reporting state so the next settled poll emits
         // a new playback_started event rather than reusing the previous item's flags.
         progressReporter.resetReportingState()
@@ -1263,9 +1285,25 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun onPlaybackMetrics(snapshot: NativePlaybackSnapshot) {
+    private fun onPlaybackMetrics(
+        snapshot: NativePlaybackSnapshot,
+        advancePendingSubtitleSelection: Boolean = false,
+    ) {
         val sanitizedPositionMs = snapshot.positionMs.coerceAtLeast(0L)
         val sanitizedDurationMs = snapshot.durationMs.coerceAtLeast(0L)
+        val updatedPendingSelection =
+            this.pendingSubtitleSelection?.let { pending ->
+                if (advancePendingSubtitleSelection) {
+                    nextPendingSubtitleSelection(pending, snapshot.selectedSubtitleTrackId)
+                } else if (pending.trackId == snapshot.selectedSubtitleTrackId) {
+                    null
+                } else {
+                    pending
+                }
+            }
+        this.pendingSubtitleSelection = updatedPendingSelection
+        val selectedSubtitleTrackId =
+            resolveSubtitleSelectionForUi(snapshot.selectedSubtitleTrackId, updatedPendingSelection)
 
         // MutableStateFlow skips equal values, so a paused player emits nothing here.
         _playbackPositionMs.value = sanitizedPositionMs
@@ -1293,7 +1331,7 @@ class PlayerSessionViewModel(
                 snapshot.audioTracks != state.audioTracks ||
                     snapshot.subtitleTracks != state.subtitleTracks ||
                     snapshot.selectedAudioTrackId != state.selectedAudioTrackId ||
-                    snapshot.selectedSubtitleTrackId != state.selectedSubtitleTrackId
+                    selectedSubtitleTrackId != state.selectedSubtitleTrackId
             val shouldUpdateSubtitleDelay = snapshot.subtitleDelayMs != state.subtitleDelayMs
             val nextSubtitleText = snapshot.currentSubtitle?.let { sanitizeSubtitleCue(it) }
             val shouldUpdateSubtitleText = nextSubtitleText != state.currentSubtitleText
@@ -1314,7 +1352,7 @@ class PlayerSessionViewModel(
                     audioTracks = snapshot.audioTracks,
                     selectedAudioTrackId = snapshot.selectedAudioTrackId,
                     subtitleTracks = snapshot.subtitleTracks,
-                    selectedSubtitleTrackId = snapshot.selectedSubtitleTrackId,
+                    selectedSubtitleTrackId = selectedSubtitleTrackId,
                     subtitleDelayMs = snapshot.subtitleDelayMs,
                     currentSubtitleText = nextSubtitleText,
                     videoIsHdr = snapshot.isHdrSource,
@@ -1365,7 +1403,7 @@ class PlayerSessionViewModel(
             playbackMetrics.positionMs = snapshot.positionMs
             playbackMetrics.durationMs = snapshot.durationMs
 
-            onPlaybackMetrics(snapshot)
+            onPlaybackMetrics(snapshot, advancePendingSubtitleSelection = true)
 
             publishMediaSessionFromUiState()
             if (uiState.value.isPlaying) {
@@ -1492,6 +1530,63 @@ internal fun decideExternalSubtitleSelection(
     when {
         attached -> null
         else -> catalog.firstOrNull { externalSubtitleTrackId(it.url) == trackId }
+    }
+
+/**
+ * The subtitle selection the viewer asked for, while the engine has not agreed
+ * on it yet, with a countdown of polls it may be held for.
+ *
+ * @property trackId the pick as the UI shows it now.
+ * @property ticksLeft how many further _disagreeing_ engine snapshots are still
+ *   allowed to see the pick before the engine's answer wins unconditionally.
+ */
+internal data class PendingSubtitleSelection(val trackId: String, val ticksLeft: Int)
+
+/**
+ * Polls the optimistic pick survives before the engine's answer wins anyway.
+ * The poll runs every 500ms, so this is about ten seconds: long enough for the
+ * slowest single entry fetch, short enough that a dead pick reverts to the
+ * truth while the viewer is still looking at the sheet.
+ */
+const val PENDING_SUBTITLE_SELECTION_MAX_TICKS = 20
+
+/**
+ * Which subtitle selection the UI shows: the engine's, or the pending pick
+ * while the engine still reports the previous one.
+ *
+ * The hold exists for one specific window -- an async `sub-add` between the
+ * tap and mpv's sid event -- so it releases the instant the engine agrees and
+ * on budget exhaustion, and never resolves a disagreement the engine created
+ * on its own (a language preference application, a new source, an engine track
+ * appearing on its own) other than to step aside for it.
+ */
+internal fun resolveSubtitleSelectionForUi(
+    snapshotId: String?,
+    pending: PendingSubtitleSelection?,
+): String? =
+    when {
+        pending == null -> snapshotId
+        pending.trackId == snapshotId -> snapshotId
+        pending.ticksLeft <= 0 -> snapshotId
+        else -> pending.trackId
+    }
+
+/**
+ * The still-pending pick after one engine report: settled (the engine agrees,
+ * so nothing is held), expired (the budget ran out), or one poll older.
+ *
+ * Counted here rather than in [resolveSubtitleSelectionForUi] so the resolver
+ * stays a pure question and this one stays a pure answer.
+ */
+internal fun nextPendingSubtitleSelection(
+    pending: PendingSubtitleSelection?,
+    snapshotId: String?,
+): PendingSubtitleSelection? =
+    when {
+        pending == null -> null
+        pending.trackId == snapshotId -> null
+        pending.ticksLeft <= 1 -> null
+        else -> pending.copy(ticksLeft = pending.ticksLeft - 1)
     }
 
 /**
