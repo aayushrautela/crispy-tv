@@ -113,7 +113,11 @@ internal class MpvPlaybackRuntime(
                     if (state != NativePlaybackState.ERROR && state != NativePlaybackState.ENDED) {
                         state = when {
                             value in 1..99 -> NativePlaybackState.BUFFERING
-                            value == 100L -> NativePlaybackState.PLAYING
+                            // A full cache while `playRequested` is false means the file
+                            // is ready and waiting, not playing: report PAUSED so the UI
+                            // offers a resume rather than a spinner.
+                            value == 100L ->
+                                if (playRequested) NativePlaybackState.PLAYING else NativePlaybackState.PAUSED
                             else -> state
                         }
                     }
@@ -183,7 +187,13 @@ internal class MpvPlaybackRuntime(
                     }
                 }
                 "paused-for-cache", "seeking" -> {
-                    if (value && state != NativePlaybackState.ERROR && state != NativePlaybackState.ENDED) {
+                    // A session the user has paused is never buffering. A vo change,
+                    // a surface cycle or an audio track switch issues a seek while
+                    // `pause=yes`, and mpv re-arms `seeking` for it; parking the UI in
+                    // BUFFERING there is unrecoverable, because `pause` is already true
+                    // so it fires no second change event and the loading curtain stays
+                    // up for the whole pause.
+                    if (value && playRequested && state != NativePlaybackState.ERROR && state != NativePlaybackState.ENDED) {
                         Log.d(TAG, "observer $property=$value -> BUFFERING")
                         state = NativePlaybackState.BUFFERING
                     }
@@ -969,20 +979,17 @@ internal class MpvPlaybackRuntime(
         }
         lastObservedPositionMs = positionMs
 
-        if (state == NativePlaybackState.PLAYING && hasStartedPlayback) {
+        if (state == NativePlaybackState.PLAYING && playRequested && hasStartedPlayback) {
             val stalled = nowElapsedMs - lastProgressAdvanceAtElapsedMs >= PLAYBACK_STALL_THRESHOLD_MS
             if (stalled) return NativePlaybackState.BUFFERING
         }
 
-        return when (state) {
-            NativePlaybackState.IDLE -> if (playRequested || pendingSource != null) NativePlaybackState.PREPARING else NativePlaybackState.IDLE
-            NativePlaybackState.PREPARING -> NativePlaybackState.PREPARING
-            NativePlaybackState.BUFFERING -> if (hasStartedPlayback) NativePlaybackState.BUFFERING else NativePlaybackState.PREPARING
-            NativePlaybackState.PLAYING -> if (playRequested) NativePlaybackState.PLAYING else NativePlaybackState.PAUSED
-            NativePlaybackState.PAUSED -> NativePlaybackState.PAUSED
-            NativePlaybackState.ENDED -> NativePlaybackState.ENDED
-            NativePlaybackState.ERROR -> NativePlaybackState.ERROR
-        }
+        return visiblePlaybackState(
+            state = state,
+            playRequested = playRequested,
+            hasStartedPlayback = hasStartedPlayback,
+            hasPendingSource = pendingSource != null,
+        )
     }
 
     private fun resetPlaybackStateForNewMedia() {

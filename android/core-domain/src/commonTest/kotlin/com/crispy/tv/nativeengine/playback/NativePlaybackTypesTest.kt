@@ -5,13 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * Two decisions in [NativePlaybackTypes] that no test could reach before the types moved here.
+ * Three decisions in [NativePlaybackTypes] that no test could reach before the types moved here.
  *
  * [NativePlaybackEngine], [NativePlaybackState] and [NativePlaybackError] are pure data and get
  * no cases of their own: a field list is not a decision, and a test that re-asserts a default
  * asserts the constructor. What needed covering was [NativeVideoLayout.aspectRatioValue], which
- * falls back three separate times, and [NativePlaybackSnapshot.isPlaying] / [isBuffering], which
- * are derived from the state rather than stored.
+ * falls back three separate times; [NativePlaybackSnapshot.isPlaying] / [isBuffering], which are
+ * derived from the state rather than stored; and [visiblePlaybackState], which separates what the
+ * engine is doing from what the user is told.
  *
  * **The ratios below are deliberately chosen to be exact in binary floating point** -- 2.0, 1.0,
  * 0.5 and 4.0 have exact `Float` representations, so every assertion here is an equality rather
@@ -230,5 +231,140 @@ class NativePlaybackSnapshotDerivedFlagsTest {
 
         assertEquals(false, snapshot.isPlaying)
         assertEquals(false, snapshot.isBuffering)
+    }
+}
+
+/**
+ * [visiblePlaybackState] -- the gap between what the engine is doing and what the user is told.
+ *
+ * It became a named decision because of a real defect: a vo change (PiP, HDR, a surface cycle)
+ * issues a seek while `pause=yes`, mpv re-arms `seeking` for it, and the observer parks the state
+ * in [NativePlaybackState.BUFFERING]. Nothing clears it -- `pause` is already true so it fires no
+ * second change event, and the playback-restart handler only answers while playback was requested
+ * -- so the overlay's loading curtain stays up for the whole pause, which reads exactly as "the
+ * player is stuck loading".
+ *
+ * Every case below is expressed in the engine's own states, because the mapping's whole job is to
+ * answer for states the engine reports and not for the one the UI wants.
+ */
+class VisiblePlaybackStateTest {
+
+    /**
+     * The defect itself, and the pair that proves the guard reads the user rather than the engine:
+     * the same buffering state, differing in nothing but `playRequested`, gets two different
+     * answers. A fixture that only asserted one of them would pass whichever way the guard was
+     * written.
+     */
+    @Test
+    fun aPausedSessionMidLoadIsReportedAsPausedRatherThanBuffering() {
+        val state = visiblePlaybackState(
+            state = NativePlaybackState.BUFFERING,
+            playRequested = false,
+            hasStartedPlayback = true,
+            hasPendingSource = false,
+        )
+
+        assertEquals(NativePlaybackState.PAUSED, state)
+    }
+
+    @Test
+    fun aBufferingSessionTheUserIsStillWaitingForStaysBuffering() {
+        val state = visiblePlaybackState(
+            state = NativePlaybackState.BUFFERING,
+            playRequested = true,
+            hasStartedPlayback = true,
+            hasPendingSource = false,
+        )
+
+        assertEquals(NativePlaybackState.BUFFERING, state)
+    }
+
+    /**
+     * Before the first frame there is nothing to fall back on, so a paused first load is still
+     * preparing -- the spinner is honest there, and the alternative is a black screen labelled
+     * "paused".
+     */
+    @Test
+    fun aLoadThatHasProducedNoFrameYetIsPreparingEvenWhenPaused() {
+        val state = visiblePlaybackState(
+            state = NativePlaybackState.BUFFERING,
+            playRequested = false,
+            hasStartedPlayback = false,
+            hasPendingSource = false,
+        )
+
+        assertEquals(NativePlaybackState.PREPARING, state)
+    }
+
+    @Test
+    fun theFirstLoadIsPreparingUntilAFrameArrives() {
+        val state = visiblePlaybackState(
+            state = NativePlaybackState.BUFFERING,
+            playRequested = true,
+            hasStartedPlayback = false,
+            hasPendingSource = false,
+        )
+
+        assertEquals(NativePlaybackState.PREPARING, state)
+    }
+
+    @Test
+    fun aPlayingSessionTheUserPausedIsReportedAsPaused() {
+        val state = visiblePlaybackState(
+            state = NativePlaybackState.PLAYING,
+            playRequested = false,
+            hasStartedPlayback = true,
+            hasPendingSource = false,
+        )
+
+        assertEquals(NativePlaybackState.PAUSED, state)
+    }
+
+    @Test
+    fun anIdleSessionIsPreparingOnlyWhenSomethingIsOnItsWay() {
+        val requested = visiblePlaybackState(
+            state = NativePlaybackState.IDLE,
+            playRequested = true,
+            hasStartedPlayback = false,
+            hasPendingSource = false,
+        )
+        val pending = visiblePlaybackState(
+            state = NativePlaybackState.IDLE,
+            playRequested = false,
+            hasStartedPlayback = false,
+            hasPendingSource = true,
+        )
+        val idle = visiblePlaybackState(
+            state = NativePlaybackState.IDLE,
+            playRequested = false,
+            hasStartedPlayback = false,
+            hasPendingSource = false,
+        )
+
+        assertEquals(NativePlaybackState.PREPARING, requested)
+        assertEquals(NativePlaybackState.PREPARING, pending)
+        assertEquals(NativePlaybackState.IDLE, idle)
+    }
+
+    /**
+     * A set comparison over every state rather than a hand-picked list, and over the one input
+     * combination that describes "the user asked for playback and the file is open". A state added
+     * later fails here instead of quietly passing, and the failure names it.
+     */
+    @Test
+    fun whilePlaybackIsRequestedEverySettledStatePassesThroughUnchanged() {
+        val changed = NativePlaybackState.entries
+            .map { state ->
+                state to visiblePlaybackState(
+                    state = state,
+                    playRequested = true,
+                    hasStartedPlayback = true,
+                    hasPendingSource = false,
+                )
+            }
+            .filter { (state, visible) -> state != visible }
+            .map { (state, visible) -> "$state -> $visible" }
+
+        assertEquals(listOf("IDLE -> PREPARING"), changed)
     }
 }

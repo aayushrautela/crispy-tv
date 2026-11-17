@@ -175,11 +175,17 @@ fun PlayerRoute(
                 ?.takeIf { it.width() > 0 && it.height() > 0 }
                 ?.let { bounds -> PictureInPictureAspectRatio(bounds.width(), bounds.height()) }
         val aspectRatio = uiState.videoLayout.toPictureInPictureAspectRatio() ?: visibleBoundsAspect
+        // Auto-enter is armed only while something is actually moving. A settled
+        // duration on its own used to keep PiP enabled, and with
+        // setAutoEnterEnabled(true) that made the system drag the player into a
+        // PiP window the moment the user swiped home after pausing -- the pause
+        // is exactly when a PiP window is unwanted, and it left the app showing
+        // a paused video in a small window the user never asked for.
         val pipEnabled =
             effectiveVideoBounds != null &&
                 uiState.errorMessage == null &&
                 playbackGeometryKnown &&
-                (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
+                (uiState.isPlaying || uiState.isBuffering)
         val config =
             PictureInPictureConfig(
                 enabled = pipEnabled,
