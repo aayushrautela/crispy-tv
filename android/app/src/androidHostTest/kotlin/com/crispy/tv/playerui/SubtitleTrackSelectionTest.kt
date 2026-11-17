@@ -80,6 +80,16 @@ class SubtitleTrackSelectionTest {
     }
 
     @Test
+    fun pendingOffPickWinsWhileTheEngineStillReportsASubtitle() {
+        val pending = PendingSubtitleSelection(trackId = null, ticksLeft = 2)
+
+        assertNull(
+            resolveSubtitleSelectionForUi(snapshotId = "en", pending = pending),
+            "Off must be shown immediately while the engine is still disabling subtitles",
+        )
+    }
+
+    @Test
     fun engineAgreementSettlesTheOptimisticPick() {
         val pending = PendingSubtitleSelection(trackId = "fr", ticksLeft = 2)
 

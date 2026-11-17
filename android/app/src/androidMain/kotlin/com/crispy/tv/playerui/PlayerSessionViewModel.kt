@@ -1540,7 +1540,7 @@ internal fun decideExternalSubtitleSelection(
  * @property ticksLeft how many further _disagreeing_ engine snapshots are still
  *   allowed to see the pick before the engine's answer wins unconditionally.
  */
-internal data class PendingSubtitleSelection(val trackId: String, val ticksLeft: Int)
+internal data class PendingSubtitleSelection(val trackId: String?, val ticksLeft: Int)
 
 /**
  * Polls the optimistic pick survives before the engine's answer wins anyway.
