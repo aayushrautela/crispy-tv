@@ -8,8 +8,10 @@ import com.crispy.tv.plugins.normalizePluginMediaType
 import com.crispy.tv.plugins.repo.PluginRepositoryManager
 import com.crispy.tv.plugins.repo.PluginScraperDescriptor
 import com.crispy.tv.plugins.runtime.PluginRuntime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -43,6 +45,17 @@ internal class PluginStreamsService(
      * Emits one [ProviderStreamsResult] per matching scraper as it finishes.
      * Repo refresh runs alongside and never gates emissions; the flow completes
      * once every scraper (and the refresh) is done.
+     *
+     * The producer is pinned to [Dispatchers.Default]. Everything the
+     * `channelFlow` block runs directly -- QuickJS script evaluation, DOM
+     * parsing, AES decryption, JSON mapping -- executes on the thread that
+     * collects the flow, and the app collects this on `Dispatchers.Main`
+     * (`viewModelScope`), which put the whole scraper fan-out on the UI thread:
+     * input froze for seconds and ANRed while sheets were open. `flowOn` moves
+     * only the producer; emissions still arrive on the collector's dispatcher,
+     * so state updates and cancellation behave exactly as before. `fetch` is
+     * the one suspending step and hops to IO inside the bridge, so Default is
+     * the right pool for the CPU-bound remainder.
      */
     fun stream(
         mediaType: MetadataLabMediaType,
@@ -109,6 +122,7 @@ internal class PluginStreamsService(
                 }
             }
         }
+            .flowOn(Dispatchers.Default)
 
     private suspend fun execute(
         runtime: PluginRuntime,

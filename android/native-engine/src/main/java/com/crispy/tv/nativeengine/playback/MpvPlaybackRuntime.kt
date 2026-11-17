@@ -185,14 +185,20 @@ internal class MpvPlaybackRuntime(
                     }
                 }
                 "sid" -> {
+                    // Re-read on every change rather than checking whether sid's id is
+                    // already known: mpv reuses the track id of a removed external for
+                    // the next sub-add, so a cached entry claiming that id says nothing
+                    // about what is attached. A guard on "index already known" left the
+                    // first external's identity answering for every later one, so the
+                    // sheet's selected row never moved.
+                    val current = mpv
+                    if (current != null) {
+                        subtitleTracks = readTrackList(current, "sub")
+                    }
                     if (value <= 0L) {
                         selectedSubtitleTrackId = null
                         restoreSubtitleMargins()
                     } else {
-                        val current = mpv
-                        if (current != null && subtitleTracks.none { it.index == value.toInt() }) {
-                            subtitleTracks = readTrackList(current, "sub")
-                        }
                         selectedSubtitleTrackId = resolveSelectedSubtitleTrackId(value.toString())
                         applySubtitleStyleForSelectedTrack()
                     }
@@ -913,6 +919,21 @@ internal class MpvPlaybackRuntime(
         val mpv = mpv
         if (mpv == null) return
         runCatching {
+            if (subtitle != null) {
+                val attachedTrack = subtitleTracks.firstOrNull {
+                    it.isExternal && it.id == externalSubtitleTrackId(subtitle.url)
+                }
+                if (attachedTrack != null) {
+                    // Already attached: re-adding removes the live track and
+                    // downloads the same file again, and the track id mpv reuses
+                    // for the re-add would then resolve selection against a cache
+                    // entry the sheet never showed. Select what is already there.
+                    runCatching { mpv.setPropertyInt("sid", attachedTrack.index) }
+                    selectedSubtitleTrackId = attachedTrack.id
+                    applySubtitleStyleForSelectedTrack()
+                    return@runCatching
+                }
+            }
             removeExternalSubtitleTracks(mpv)
             if (subtitle != null) {
                 mpv.command(arrayOf("sub-add", subtitle.url, "select", subtitle.name ?: "", subtitle.language ?: ""))
@@ -1036,9 +1057,13 @@ internal class MpvPlaybackRuntime(
     /** mpv reports the numeric track id; the snapshot exposes the stable NativeTrack id. */
     private fun resolveSelectedSubtitleTrackId(sid: String?): String? {
         if (sid.isNullOrBlank() || sid == "0") return null
-        return sid.toIntOrNull()
-            ?.let { sidInt -> subtitleTracks.firstOrNull { it.index == sidInt }?.id }
-            ?: sid
+        val sidInt = sid.toIntOrNull() ?: return null
+        // Never fall back to the raw sid: a bare number is the vocabulary of the
+        // engine's own tracks, and an unresolved external would publish a value no
+        // sheet row can match -- the checkmark would then disagree with what is
+        // playing. An unresolvable selection is null, and the next sid change or
+        // refreshTrackLists corrects it.
+        return subtitleTracks.firstOrNull { it.index == sidInt }?.id
     }
 
     private fun readTrackList(mpv: MPVLib, trackType: String): List<NativeTrack> {
@@ -1052,8 +1077,15 @@ internal class MpvPlaybackRuntime(
             val lang = runCatching { mpv.getPropertyString("track-list/$i/lang") }.getOrNull()?.takeIf { it.isNotBlank() }
             val title = runCatching { mpv.getPropertyString("track-list/$i/title") }.getOrNull()?.takeIf { it.isNotBlank() }
             val external = runCatching { mpv.getPropertyString("track-list/$i/external") }.getOrNull().equals("yes", true)
+            // Only an external track has a filename to read, so this stays behind the
+            // flag: it is otherwise one failing property read per internal track, and
+            // readTrackList now runs on every sid change.
             val externalFilename =
-                runCatching { mpv.getPropertyString("track-list/$i/external-filename") }.getOrNull()?.takeIf { it.isNotBlank() }
+                if (external) {
+                    runCatching { mpv.getPropertyString("track-list/$i/external-filename") }.getOrNull()?.takeIf { it.isNotBlank() }
+                } else {
+                    null
+                }
             // mpv answers "codec" for every track type; demux-channel-count is
             // audio-only, so the channel read stays behind the audio gate.
             val isAudio = type == "audio"

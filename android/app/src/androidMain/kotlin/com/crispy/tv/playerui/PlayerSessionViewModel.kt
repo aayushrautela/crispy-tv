@@ -490,18 +490,18 @@ class PlayerSessionViewModel(
         // statements belong together.
         subtitleAutoSelectApplied = true
         if (trackId != null && trackId.startsWith(EXTERNAL_SUBTITLE_TRACK_ID_PREFIX)) {
-            val attached = uiState.value.subtitleTracks.any { it.id == trackId }
-            if (!attached) {
+            val subtitle = decideExternalSubtitleSelection(
+                trackId = trackId,
+                attached = uiState.value.subtitleTracks.any { it.id == trackId },
+                catalog = uiState.value.addonSubtitles,
+            )
+            if (subtitle != null) {
                 // Catalog entry not attached yet: resolve it and attach + select in one step.
-                val subtitle =
-                    uiState.value.addonSubtitles.firstOrNull { externalSubtitleTrackId(it.url) == trackId }
-                if (subtitle != null) {
-                    playbackController.setExternalSubtitle(
-                        PlaybackExternalSubtitle(url = subtitle.url, language = subtitle.language, name = subtitle.display),
-                    )
-                    syncPlaybackSnapshot(playbackController.snapshot())
-                    return
-                }
+                playbackController.setExternalSubtitle(
+                    PlaybackExternalSubtitle(url = subtitle.url, language = subtitle.language, name = subtitle.display),
+                )
+                syncPlaybackSnapshot(playbackController.snapshot())
+                return
             }
             // Addon subtitle selection is session-scoped; never persist as default language.
             playbackController.selectSubtitleTrack(trackId)
@@ -1504,6 +1504,28 @@ private class PlaybackMetricsHolder {
 }
 
 private const val TAG = "PlayerSessionViewModel"
+
+/**
+ * The routing decision for an external-subtitle pick: the catalog entry to
+ * attach, or `null` when the pick belongs to the plain select path (already
+ * attached, or one this session never resolved).
+ *
+ * Returned rather than performed because this is the decision that decides
+ * "attach again" against "select what is already there". The ViewModel builds
+ * its own collaborators from the app graph, so no test in this source set can
+ * construct one, while the decision itself is what silently re-downloaded the
+ * same file on every tap of a row the engine state had not yet reported as
+ * attached -- see the sid re-read that makes the attached side trustworthy.
+ */
+internal fun decideExternalSubtitleSelection(
+    trackId: String,
+    attached: Boolean,
+    catalog: List<AddonSubtitle>,
+): AddonSubtitle? =
+    when {
+        attached -> null
+        else -> catalog.firstOrNull { externalSubtitleTrackId(it.url) == trackId }
+    }
 
 /**
  * How long the subtitle-attach path waits for the entry fetch before letting playback
