@@ -8,6 +8,9 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import dev.jdtech.mpv.MPVLib
 
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+
 internal class MpvPlaybackRuntime(
     context: Context,
     /**
@@ -42,6 +45,43 @@ internal class MpvPlaybackRuntime(
      * indistinguishable from the live one.
      */
     private var registeredView: SurfaceView? = null
+
+    /**
+     * Bumped on every surface attach and every surface detach. A readiness
+     * job captures it when it starts and drops itself if it no longer
+     * matches, so a surface destroyed mid-poll -- or replaced by a newer one
+     * -- can never activate a video output for a surface that is already
+     * gone. mpvRx's `surfaceAttachmentToken`.
+     */
+    private var surfaceGeneration: Int = 0
+
+    /**
+     * The video track (`vid`) mpv had selected when the surface went away.
+     * Both `vo` and `wid` changes re-seek the whole file while a track is
+     * selected, so the track is disabled before the output changes and
+     * restored once the renderer is ready again. `null` when nothing was
+     * selected, or when the media changed while the surface was gone (an id
+     * belongs to the file that selected it).
+     */
+    private var suspendedVideoTrack: Int? = null
+
+    /**
+     * Whether the renderer chain is up: a surface is attached and mpv has
+     * accepted the vo for it, confirmed by a `current-vo` readback. The
+     * paused-frame redraw only runs in this state.
+     */
+    private var rendererOutputReady: Boolean = false
+
+    /**
+     * One worker for everything that must not run on the main thread but must
+     * stay ordered with itself: the wid readiness poll after a surface
+     * attach, and the delayed paused-frame redraw after a resize. Daemon,
+     * shut down in [release].
+     */
+    private val surfaceExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "CrispyMpv-surface").apply { isDaemon = true }
+    }
+
     private var pendingSource: PlaybackSource? = null
     private var pendingExternalAudioUrl: String? = null
     private var playRequested: Boolean = false
@@ -258,34 +298,24 @@ internal class MpvPlaybackRuntime(
                     "isActiveHolder=${activeHolder === holder} created=$created " +
                     "surfaceAttached=$surfaceAttached",
             )
+            val generation = ++surfaceGeneration
             runCatching {
+                // mpvRx's bind order: drop whatever renderer the previous
+                // surface still held before handing over the new one, so the
+                // attach starts from a clean detach instead of a replacement.
+                mpv?.detachSurface()
                 mpv?.attachSurface(holder.surface)
-                mpv?.setOptionString("force-window", "yes")
                 activeHolder = holder
             }
             surfaceAttached = true
-            val pending = pendingSource
-            if (pending != null) {
-                // Nothing has been drawn yet, so mpv initialises its video
-                // output from the option [initialize] set and the file's own
-                // load re-inits the chain anyway; restoring the vo here would
-                // be a second write of the value mpv already holds.
-                pendingSource = null
-                val externalAudioUrl = pendingExternalAudioUrl
-                pendingExternalAudioUrl = null
-                startPlayback(pending, externalAudioUrl)
-                return
-            }
-            // The other half of [surfaceDestroyed]: the vo was turned off when
-            // the last surface went away, and nothing else turns it back on --
-            // the only other writer of a non-null vo is [initialize], which
-            // runs once per instance. Without this the session plays on with
-            // `vo=null` after the activity is stopped and started again (home
-            // button, recents, a configuration change, PiP and back), the
-            // decoder never comes back, the demuxer sits in `paused-for-cache`
-            // and the UI reports buffering forever. Same shape as
-            // mpv-android's own `surfaceCreated`.
-            restoreVideoOutput()
+            rendererOutputReady = false
+            // Both the load and the vo wait for the readiness job: the initial
+            // attachSurface queues wid through mpv_set_option, and the
+            // playback thread can run before mpv has consumed it, producing
+            // "Missing surface pointer", a dropped video track and a permanent
+            // black screen. Never load or select a vo before wid is observable
+            // (mpvRx's comment on the same race).
+            scheduleReadinessJob(holder, generation, startPending = pendingSource != null)
             logEngineState("surfaceCreated")
         }
 
@@ -295,7 +325,26 @@ internal class MpvPlaybackRuntime(
             // The surface size is deliberately NOT recorded as the video layout:
             // the tunneled vo renders at the video's native size and the view
             // scales it, so the video's own aspect is what the UI must letterbox to.
-            
+
+            // EGL can finish a resize after the first paused redraw was already
+            // submitted, leaving the old-sized buffer scaled or cropped; redraw
+            // once the window has settled (mpvRx's resize redraw).
+            if (!playRequested && hasStartedPlayback && rendererOutputReady && activeHolder === holder) {
+                val generation = surfaceGeneration
+                surfaceExecutor.execute {
+                    try {
+                        Thread.sleep(RESIZE_REDRAW_DELAY_MS)
+                    } catch (_: InterruptedException) {
+                        return@execute
+                    }
+                    if (surfaceGeneration != generation || activeHolder !== holder ||
+                        !surfaceAttached || playRequested
+                    ) {
+                        return@execute
+                    }
+                    redrawPausedFrame()
+                }
+            }
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -313,6 +362,15 @@ internal class MpvPlaybackRuntime(
                 Log.d(TAG, "surfaceDestroyed stale holder ignored (a newer surface is up)")
                 return
             }
+            // Any readiness job or delayed redraw in flight belongs to the
+            // surface that is going away now; the bump drops them.
+            surfaceGeneration++
+            rendererOutputReady = false
+            // Both vo and wid changes re-seek the whole file while a video
+            // track is selected, so the track is disabled before the output
+            // changes and restored once the renderer is ready again (mpvRx's
+            // suspendVideoTrack / restoreSuspendedVideoTrack pair).
+            suspendVideoTrack()
             runCatching {
                 mpv?.setPropertyString("vo", "null")
                 mpv?.setPropertyString("force-window", "no")
@@ -564,22 +622,162 @@ internal class MpvPlaybackRuntime(
         }
 
     /**
-     * Re-enables the video output that [surfaceDestroyed] turned off.
-     *
-     * The vo is a live property write -- the same mechanism
-     * [setPictureInPictureActive] and [setHdrOutputEnabled] use -- so the chain
-     * that is correct right now comes back without touching the file, and the
-     * frame mpv is sitting on is redrawn as soon as it is up.
+     * The load and the vo wait for this job instead of happening inline in
+     * [surfaceCreated]: the initial attachSurface queues `wid` through
+     * mpv_set_option, and the playback thread can run before mpv has consumed
+     * that option, producing "Missing surface pointer", a dropped video track
+     * and a permanent black screen. Never load a file or select a video
+     * output before `wid` is observable. mpvRx's readiness poll, adapted to
+     * this runtime: the same budget (300 x 16ms) and the same stale-out, via
+     * [surfaceGeneration] where they use a state generation.
      */
-    private fun restoreVideoOutput() {
+    private fun scheduleReadinessJob(holder: SurfaceHolder, generation: Int, startPending: Boolean) {
+        surfaceExecutor.execute {
+            var attempt = 0
+            while (attempt < READINESS_MAX_ATTEMPTS) {
+                if (attempt > 0) {
+                    try {
+                        Thread.sleep(READINESS_POLL_INTERVAL_MS)
+                    } catch (_: InterruptedException) {
+                        return@execute
+                    }
+                }
+                attempt++
+                val mpv = mpv
+                if (surfaceGeneration != generation || activeHolder !== holder ||
+                    !surfaceAttached || mpv == null
+                ) {
+                    // A newer surface owns the output now, or the engine was
+                    // released; a stale job must never activate anything.
+                    return@execute
+                }
+                // Read `wid` as a STRING and parse it: the JNI Int accessor
+                // truncates int64 values, and wid is a native reference, so
+                // its low 32 bits must never decide whether the surface is
+                // attached. 0 is "no surface", -1 is "auto".
+                val wid = runCatching { mpv.getPropertyString("wid") }.getOrNull()?.toLongOrNull() ?: 0L
+                if (wid == 0L || wid == -1L) continue
+                if (!activateVideoOutput(mpv)) continue
+                if (startPending && startPendingPlayback()) {
+                    return@execute
+                }
+                restoreSuspendedVideoTrack()
+                redrawPausedFrame()
+                logEngineState("surfaceReady")
+                return@execute
+            }
+            // Never became ready within the budget. The vo write still goes
+            // out -- that is what this runtime did before the poll existed,
+            // and ending with a vo beats ending with the `vo=null` black
+            // screen the poll exists to fix. A deferred load goes out too, for
+            // the same reason; the line makes the race observable.
+            Log.e(TAG, "renderer not ready after $attempt polls generation=$generation")
+            runCatching {
+                mpv?.setPropertyString("vo", activeVo())
+                mpv?.setPropertyString("force-window", "yes")
+            }
+            if (startPending) {
+                startPendingPlayback()
+            }
+            logEngineState("surfaceNotReady")
+        }
+    }
+
+    /**
+     * Requests the video output for the live surface and confirms it took:
+     * the write plus a `current-vo` readback -- "read back the actual output,
+     * not just the requested option" (mpvRx). False means the write has not
+     * landed yet, which is a keep-polling condition, not a failure. The
+     * requested value may be a fallback list ([VO_PREFERRED]), so any entry
+     * of it counts as arrived.
+     */
+    private fun activateVideoOutput(mpv: MPVLib): Boolean {
         val vo = activeVo()
-        Log.d(TAG, "restoreVideoOutput vo=$vo surfaceAttached=$surfaceAttached mpvAlive=${mpv != null}")
-        val failure = runCatching { mpv?.setPropertyString("vo", vo) }.exceptionOrNull()
-        Log.d(
-            TAG,
-            "restoreVideoOutput result vo=$vo failure=${failure?.javaClass?.simpleName ?: "none"} " +
-                "readbackVo=${runCatching { mpv?.getPropertyString("vo") }.getOrNull()}",
-        )
+        val failure = runCatching {
+            mpv.setPropertyString("vo", vo)
+            mpv.setPropertyString("force-window", "yes")
+        }.exceptionOrNull()
+        if (failure != null) {
+            Log.e(TAG, "activateVideoOutput vo=$vo failed", failure)
+            return false
+        }
+        val currentVo = runCatching { mpv.getPropertyString("current-vo") }.getOrNull()
+        val arrived = currentVo != null && currentVo in vo.split(",").map { it.trim() }
+        if (!arrived) {
+            Log.d(TAG, "activateVideoOutput waiting current-vo=$currentVo requested=$vo")
+            return false
+        }
+        rendererOutputReady = true
+        Log.d(TAG, "renderer ready vo=$vo wid=${runCatching { mpv.getPropertyString("wid") }.getOrNull()}")
+        return true
+    }
+
+    /**
+     * Consumes [pendingSource] if one is queued and starts it. Returns
+     * whether something was started, so the readiness job knows whether the
+     * paused-frame bookkeeping is still its business.
+     */
+    private fun startPendingPlayback(): Boolean {
+        val pending = pendingSource ?: return false
+        pendingSource = null
+        val externalAudioUrl = pendingExternalAudioUrl
+        pendingExternalAudioUrl = null
+        startPlayback(pending, externalAudioUrl)
+        return true
+    }
+
+    /**
+     * Disables the video track before the Android output changes: both `vo`
+     * and `wid` changes re-seek the whole file while a track is selected,
+     * which is the re-seek behind the loading curtain on every surface cycle
+     * (mpvRx's suspendVideoTrack). The selected id is kept in
+     * [suspendedVideoTrack] for [restoreSuspendedVideoTrack].
+     */
+    private fun suspendVideoTrack() {
+        val mpv = mpv ?: return
+        val selected = runCatching { mpv.getPropertyString("vid") }.getOrNull()?.toIntOrNull()
+        suspendedVideoTrack = selected?.takeIf { it > 0 }
+        runCatching { mpv.setPropertyString("vid", "no") }
+        val readback = runCatching { mpv.getPropertyString("vid") }.getOrNull()
+        if (readback != "no") {
+            Log.e(TAG, "suspendVideoTrack vid=$readback (wanted no); the output change may re-seek")
+        }
+    }
+
+    /**
+     * Restores the track [suspendVideoTrack] saved, once the renderer is up.
+     * The readback, not the call, decides: the JNI setter logs native
+     * failures rather than throwing, so a failed restore keeps the saved id
+     * and the next renderer-ready moment retries it (mpvRx's
+     * restoreSuspendedVideoTrack).
+     */
+    private fun restoreSuspendedVideoTrack() {
+        val id = suspendedVideoTrack ?: return
+        val mpv = mpv ?: return
+        if (!rendererOutputReady) return
+        val restored = runCatching {
+            mpv.setPropertyString("vid", id.toString())
+            runCatching { mpv.getPropertyString("vid") }.getOrNull()?.toIntOrNull() == id
+        }.getOrDefault(false)
+        if (restored) {
+            suspendedVideoTrack = null
+            Log.d(TAG, "video track $id restored after the surface came back")
+        } else {
+            Log.w(TAG, "video track $id restore failed; kept for retry")
+        }
+    }
+
+    /**
+     * A paused session repaints its retained frame without seeking: the
+     * empty `osd-overlay` command wakes mpv's render pass, which re-renders
+     * the last video frame onto the (new) surface without touching audio
+     * buffers (mpvRx's redrawVideoFrame). Without it a session that returns
+     * from home paused keeps whatever the old surface last held.
+     */
+    private fun redrawPausedFrame() {
+        if (playRequested || !hasStartedPlayback || !rendererOutputReady) return
+        runCatching { mpv?.command(arrayOf("osd-overlay", "2147483647", "ass-events", "")) }
+        Log.d(TAG, "redrawPausedFrame requested")
     }
 
     /**
@@ -902,6 +1100,11 @@ internal class MpvPlaybackRuntime(
 
     fun release() {
         Log.d(TAG, "release surfaceAttached=$surfaceAttached created=$created")
+        // Drop any in-flight readiness job or delayed redraw first, then stop
+        // the worker: both poll for staleness and both check `mpv == null`,
+        // but the bump makes the check immediate.
+        surfaceGeneration++
+        surfaceExecutor.shutdownNow()
         // One `runCatching` per step, deliberately not one around all four: the
         // steps are ordered, and a `detachSurface` that throws -- mpv can still
         // be reading the surface, the race mpv-android documents -- must not
@@ -918,6 +1121,8 @@ internal class MpvPlaybackRuntime(
         activeHolder = null
         pendingSource = null
         pendingExternalAudioUrl = null
+        suspendedVideoTrack = null
+        rendererOutputReady = false
     }
 
     private fun startPlayback(source: PlaybackSource, externalAudioUrl: String? = null) {
@@ -995,6 +1200,9 @@ internal class MpvPlaybackRuntime(
     private fun resetPlaybackStateForNewMedia() {
         pendingSource = null
         pendingExternalAudioUrl = null
+        // A vid id belongs to the media that selected it; a new file gets a
+        // fresh selection from mpv's default instead.
+        suspendedVideoTrack = null
         state = NativePlaybackState.IDLE
         lastBufferingPercent = null
         lastProgressAdvanceAtElapsedMs = 0L
@@ -1035,6 +1243,14 @@ internal class MpvPlaybackRuntime(
         private const val VO_PREFERRED = "mediacodec_embed,gpu"
         private const val DEMUXER_MAX_BYTES = 64 * 1024 * 1024
         private const val POSITION_ADVANCE_TOLERANCE_MS = 150L
+
+        /** mpvRx's readiness budget: 300 polls x 16ms (~4.8s) for a slow driver. */
+        private const val READINESS_MAX_ATTEMPTS = 300
+
+        private const val READINESS_POLL_INTERVAL_MS = 16L
+
+        /** mpvRx's post-resize settle time before a paused redraw. */
+        private const val RESIZE_REDRAW_DELAY_MS = 150L
         private const val PLAYBACK_STALL_THRESHOLD_MS = 1_000L
     }
 }
