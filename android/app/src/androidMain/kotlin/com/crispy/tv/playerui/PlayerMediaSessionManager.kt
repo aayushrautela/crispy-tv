@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -69,14 +70,17 @@ internal class PlayerMediaSessionManager private constructor(
     private var currentIsPlaying: Boolean = false
     private var currentIsBuffering: Boolean = true
     private var currentIsError: Boolean = false
+    private var currentDurationMs: Long = 0L
     private var released: Boolean = false
     private var artworkJob: Job? = null
     private var lastNotificationSnapshot: NotificationSnapshot? = null
+    private var progressJob: Job? = null
 
     init {
         ensureNotificationChannel()
         publishPlaybackState()
         publishMetadata()
+        startProgressPoll()
     }
 
     fun updateMetadata(
@@ -169,6 +173,8 @@ internal class PlayerMediaSessionManager private constructor(
         released = true
         Log.d(TAG, "release title=$currentTitle")
         artworkJob?.cancel()
+        progressJob?.cancel()
+        progressJob = null
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -231,10 +237,43 @@ internal class PlayerMediaSessionManager private constructor(
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, currentTitle)
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, currentSubtitle ?: "")
                 .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, SESSION_ID)
+                // The shade draws its seekbar against this duration, so a
+                // session whose metadata never carries one has no progress bar
+                // however often the position is republished.
+                .putLong(MediaMetadata.METADATA_KEY_DURATION, currentDurationMs)
         currentArtworkBitmap?.let { bitmap ->
             metadata.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap)
         }
         mediaSession.setMetadata(metadata.build())
+    }
+
+    /**
+     * Republishes the session's position, and the duration once the engine
+     * reports one.
+     *
+     * [publishPlaybackState] is otherwise only reached when the play/buffer
+     * flags change, so the position the system reads stays frozen at whatever
+     * it was when that happened -- which is why the media controls show no
+     * progress. mpv reports `duration` only after the file is open, so this is
+     * also the only place that can put a non-zero duration into the metadata
+     * of a session that was published before it existed.
+     */
+    private fun startProgressPoll() {
+        progressJob =
+            scope.launch {
+                while (!released) {
+                    if (currentIsPlaying || currentIsBuffering || currentDurationMs > 0L) {
+                        val durationMs =
+                            playbackController.snapshot().durationMs.coerceAtLeast(0L)
+                        if (durationMs != currentDurationMs) {
+                            currentDurationMs = durationMs
+                            publishMetadata()
+                        }
+                        publishPlaybackState()
+                    }
+                    delay(PROGRESS_POLL_INTERVAL_MS)
+                }
+            }
     }
 
     private fun publishPlaybackState() {
@@ -378,6 +417,9 @@ internal class PlayerMediaSessionManager private constructor(
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001
         private const val ARTWORK_MAX_EDGE = 512
+
+        /** How often the session's position is republished while it is live. */
+        private const val PROGRESS_POLL_INTERVAL_MS = 1_000L
 
         @Volatile
         private var activeInstance: PlayerMediaSessionManager? = null

@@ -24,9 +24,10 @@ plugins {
  *
  * What deliberately did *not* move here:
  *
- * - `buildConfig = true` and its `buildConfigField`s. Nothing references
- *   `BuildConfig` any more; the generated `AppConfig` in `:android:platform-core`
- *   replaced it (`86eaa9c2`). See :android:app for the same reasoning.
+ * - `buildConfigField`s. Build-time configuration lives in the generated
+ *   `AppConfig` in `:android:platform-core` (`86eaa9c2`). `BuildConfig` itself is
+ *   enabled again solely for `DEBUG`, which only the application can know: the
+ *   debug HUD is wired from `MainActivity` with that value.
  * - `testInstrumentationRunner` and the `androidTestImplementation` deps. There
  *   are zero instrumentation sources in this project.
  */
@@ -141,6 +142,10 @@ android {
 
     buildFeatures {
         compose = true
+        // Generated for this application module only. The debug HUD needs a
+        // compile-time flag to know it is in a debug install; :app cannot name
+        // this class, so MainActivity passes the value into the composition root.
+        buildConfig = true
     }
 
     testOptions {

@@ -160,6 +160,17 @@ class PlayerSessionViewModel(
     private var pendingInitialSeekMs: Long? = null
     private var autoSelectPending = false
     /**
+     * Whether the *app* paused this session rather than the viewer.
+     *
+     * `onBackgroundStop` pauses playback when the activity stops, and the engine
+     * answers `PAUSED` -- the same answer a pause the viewer pressed gives, so
+     * without this flag the next `onForegroundStart` cannot tell the two apart
+     * and every return-to-app waits for another tap. Cleared by any explicit
+     * command ([setPlaying], which the viewer's play/pause, the media session and
+     * an audio-focus loss all reach) and by the visit itself.
+     */
+    private var pausedForBackground = false
+    /**
      * The in-flight add-on subtitle fetch, so the path that attaches a matched
      * subtitle can wait on the one it started rather than on a signal the repository
      * does not raise.
@@ -214,6 +225,13 @@ class PlayerSessionViewModel(
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /**
+     * The engine dump for the debug HUD, passed through unchanged from the
+     * controller. The HUD is a debug-install concern; this is a property, not
+     * another copy of playback state in [PlayerUiState].
+     */
+    val debugInfo: StateFlow<String> get() = playbackController.debugInfo
 
     /**
      * Loads the episode list for the selected season. It lives in `commonMain` because every
@@ -358,25 +376,40 @@ class PlayerSessionViewModel(
     }
 
     fun setPlaying(isPlaying: Boolean) {
+        // An explicit command -- the viewer's play/pause, the media session, an
+        // audio-focus loss -- overrides whatever the app did on its way out, so
+        // the next `onForegroundStart` leaves this session to the viewer.
+        Log.d(TAG, "setPlaying isPlaying=$isPlaying pausedForBackground=$pausedForBackground state=${playbackController.snapshot().state}")
+        pausedForBackground = false
         playbackController.setPlaying(isPlaying)
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun onForegroundStart() {
         val snapshot = playbackController.snapshot()
-        if (snapshot.isBuffering || snapshot.state == NativePlaybackState.PAUSED) {
+        // Read the decision before clearing the flag it is an argument of: the
+        // visit consumes the pause either way.
+        val decision = foregroundResumeDecision(snapshot.state, pausedForBackground)
+        Log.d(TAG, "onForegroundStart state=${snapshot.state} playWhenReady=${snapshot.playWhenReady} pos=${snapshot.positionMs} pausedForBackground=$pausedForBackground decision=$decision")
+        pausedForBackground = false
+        if (decision is ForegroundResumeDecision.LeaveAsIs) {
+            Log.d(TAG, "onForegroundStart leaving as is state=${snapshot.state}")
             return
         }
-        if (!snapshot.isPlaying && snapshot.state != NativePlaybackState.ERROR && snapshot.state != NativePlaybackState.ENDED) {
-            playbackController.setPlaying(true)
-            syncPlaybackSnapshot(playbackController.snapshot())
-        }
+        playbackController.setPlaying(true)
+        Log.d(TAG, "onForegroundStart resumed; engine=${playbackController.snapshot().state}")
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun onBackgroundStop() {
         val snapshot = playbackController.snapshot()
+        Log.d(TAG, "onBackgroundStop state=${snapshot.state} playWhenReady=${snapshot.playWhenReady} pos=${snapshot.positionMs} isPlaying=${snapshot.isPlaying}")
         if (snapshot.isPlaying) {
             playbackController.setPlaying(false)
+            // The engine's answer to this is `PAUSED`, which is the same answer a
+            // pause the viewer pressed gives; this flag is what tells the two
+            // apart when the app comes back.
+            pausedForBackground = true
             syncPlaybackSnapshot(playbackController.snapshot())
         }
     }

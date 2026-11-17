@@ -134,3 +134,52 @@ internal fun initialSeekDecision(
     return InitialSeekDecision.Seek(targetPositionMs)
 }
 
+/** What the session should do when the player destination becomes visible again. */
+internal sealed interface ForegroundResumeDecision {
+    /** Play again: this session was paused by the app leaving, not by the viewer. */
+    data object ResumePlayback : ForegroundResumeDecision
+
+    /** Leave playback as it is. */
+    data object LeaveAsIs : ForegroundResumeDecision
+}
+
+/**
+ * Whether returning to the player resumes playback.
+ *
+ * ## The two pauses look identical to the engine
+ *
+ * `onBackgroundStop` pauses the engine when the activity stops, and the engine
+ * answers `PAUSED` -- which is exactly what a pause the viewer pressed looks
+ * like. The one thing that tells them apart is who asked, so the answer needs
+ * [pausedForBackground] beside the state: without it the previous body's
+ * `if (state == PAUSED) return` made every return-to-app wait for another tap,
+ * because a session the app backgrounded never became playable on its own.
+ *
+ * ## The exits
+ *
+ * `ERROR` and `ENDED` answer [LeaveAsIs] whatever the flag says, because
+ * `setPlaying(true)` on a dead session reports `PREPARING` forever and the
+ * caller cannot tell that from a real load.
+ *
+ * `PREPARING`, `BUFFERING` and `PLAYING` answer [LeaveAsIs] with no flag
+ * involved: the first two are still on their way, and the third already plays.
+ *
+ * `IDLE` answers [ResumePlayback], which is the previous body's remaining arm
+ * -- an engine that is not playing and has not ended is asked to start.
+ */
+internal fun foregroundResumeDecision(
+    state: NativePlaybackState,
+    pausedForBackground: Boolean,
+): ForegroundResumeDecision =
+    when {
+        state == NativePlaybackState.ERROR || state == NativePlaybackState.ENDED ->
+            ForegroundResumeDecision.LeaveAsIs
+
+        pausedForBackground && state == NativePlaybackState.PAUSED ->
+            ForegroundResumeDecision.ResumePlayback
+
+        state == NativePlaybackState.IDLE -> ForegroundResumeDecision.ResumePlayback
+
+        else -> ForegroundResumeDecision.LeaveAsIs
+    }
+

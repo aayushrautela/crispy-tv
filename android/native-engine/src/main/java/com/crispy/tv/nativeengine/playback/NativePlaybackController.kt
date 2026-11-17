@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import android.view.SurfaceView
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The playback controller: mpv, and nothing else.
@@ -57,6 +58,8 @@ class NativePlaybackController(
     }
 
     override fun snapshot(): NativePlaybackSnapshot = mpvRuntime.snapshot()
+
+    override val debugInfo: StateFlow<String> = mpvRuntime.debugInfo
 
     override fun seekTo(positionMs: Long) {
         mpvRuntime.seekTo(positionMs.coerceAtLeast(0L))

@@ -150,6 +150,56 @@ data class NativePlaybackSnapshot(
 }
 
 /**
+ * The state the UI should show for [state], once the engine's own bookkeeping
+ * is taken into account.
+ *
+ * The engine's states are what the decoder is doing; this is what the user is
+ * told. Two of them diverge, and both divergences are the same question:
+ *
+ * - **A paused session is never buffering.** [NativePlaybackState.BUFFERING]
+ *   is entered while the user asked for playback, and a vo change, a surface
+ *   cycle or an audio track switch issues a seek while `pause=yes` that
+ *   re-arms `seeking` without changing `pause` again -- so there is no later
+ *   property event to clear it. `playRequested` is the user's answer to "is
+ *   this playing", and it is the only thing that can settle the question.
+ * - **A loading session with nothing loaded yet is still
+ *   [NativePlaybackState.PREPARING].** `hasStartedPlayback` is what separates
+ *   the first load from a later stall, and only the second has a frame to fall
+ *   back on.
+ *
+ * [hasPendingSource] is the engine's own "a file is on its way", which is why
+ * an idle session can still be preparing.
+ *
+ * Declared here rather than beside the engine that uses it: the engine lives in
+ * `:native-engine`, which publishes no JVM variant, so a rule the shared suite
+ * has to pin cannot live there. It is public rather than `internal` for the
+ * boring reason that Kotlin's `internal` is per-module and the caller that owns
+ * these states is in another module.
+ */
+fun visiblePlaybackState(
+    state: NativePlaybackState,
+    playRequested: Boolean,
+    hasStartedPlayback: Boolean,
+    hasPendingSource: Boolean,
+): NativePlaybackState =
+    when (state) {
+        NativePlaybackState.IDLE ->
+            if (playRequested || hasPendingSource) NativePlaybackState.PREPARING else NativePlaybackState.IDLE
+        NativePlaybackState.PREPARING -> NativePlaybackState.PREPARING
+        NativePlaybackState.BUFFERING ->
+            when {
+                !playRequested && hasStartedPlayback -> NativePlaybackState.PAUSED
+                hasStartedPlayback -> NativePlaybackState.BUFFERING
+                else -> NativePlaybackState.PREPARING
+            }
+        NativePlaybackState.PLAYING ->
+            if (playRequested) NativePlaybackState.PLAYING else NativePlaybackState.PAUSED
+        NativePlaybackState.PAUSED -> NativePlaybackState.PAUSED
+        NativePlaybackState.ENDED -> NativePlaybackState.ENDED
+        NativePlaybackState.ERROR -> NativePlaybackState.ERROR
+    }
+
+/**
  * One chapter of the playing file, as the engine reports it.
  *
  * [index] is the engine's position in the chapter list and is what
