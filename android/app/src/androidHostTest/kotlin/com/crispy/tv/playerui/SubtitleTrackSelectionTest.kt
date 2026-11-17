@@ -46,7 +46,7 @@ class SubtitleTrackSelectionTest {
 
         val decision = decideExternalSubtitleSelection(
             trackId = trackId,
-            attached = false,
+            attached = true,
             catalog = listOf(addonSubtitle(url = "https://subs.example/other.srt"), subtitle),
         )
 
