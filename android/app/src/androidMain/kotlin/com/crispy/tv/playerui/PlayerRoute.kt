@@ -370,6 +370,14 @@ fun PlayerRoute(
             )
 
             GestureFeedbackOverlay(feedback = gestureFeedback, palette = palette)
+            if (LocalIsDebugBuild.current) {
+                val engineDump by session.debugInfo.collectAsStateWithLifecycle()
+                DebugPlaybackHud(
+                    uiState = uiState,
+                    engineDump = engineDump,
+                    positionMs = positionMsState.value,
+                )
+            }
         }
     }
 }

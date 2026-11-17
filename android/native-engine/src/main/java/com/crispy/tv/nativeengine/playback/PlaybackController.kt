@@ -2,6 +2,7 @@ package com.crispy.tv.nativeengine.playback
 
 import android.content.Context
 import android.view.SurfaceView
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The surface half of the playback controller: the view the video is drawn
@@ -20,4 +21,12 @@ interface PlaybackSurfaceController {
     fun attachMpvSurface(surfaceView: SurfaceView)
 }
 
-interface PlaybackController : PlaybackSessionController, PlaybackSurfaceController
+interface PlaybackController : PlaybackSessionController, PlaybackSurfaceController {
+    /**
+     * The engine's own state dump for the debug HUD. It is not a second model
+     * of playback -- the UI still reads the playback snapshot --
+     * only the same string the engine writes to logcat, so the HUD cannot show
+     * a value the log does not.
+     */
+    val debugInfo: StateFlow<String>
+}

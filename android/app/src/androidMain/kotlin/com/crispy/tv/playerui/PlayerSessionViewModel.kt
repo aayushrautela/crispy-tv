@@ -227,6 +227,13 @@ class PlayerSessionViewModel(
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     /**
+     * The engine dump for the debug HUD, passed through unchanged from the
+     * controller. The HUD is a debug-install concern; this is a property, not
+     * another copy of playback state in [PlayerUiState].
+     */
+    val debugInfo: StateFlow<String> get() = playbackController.debugInfo
+
+    /**
      * Loads the episode list for the selected season. It lives in `commonMain` because every
      * type it touches is already shared -- `MediaDetails`/`MediaVideo` in `:android:addons`,
      * `AccountApi`/`BackendApi` in `:android:backend`, `PlaybackIdentity` in `:android:player`.

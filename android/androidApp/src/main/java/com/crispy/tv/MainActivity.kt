@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.metrics.performance.JankStats
 import androidx.metrics.performance.PerformanceMetricsState
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.PendingProviderAuthStore
 import com.crispy.tv.app.appGraph
 import com.crispy.tv.playerui.ComponentActivityPlayerHost
@@ -63,7 +64,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        AndroidAppRoot()
+                        AndroidAppRoot(isDebugBuild = BuildConfig.DEBUG)
                     }
                 }
             }

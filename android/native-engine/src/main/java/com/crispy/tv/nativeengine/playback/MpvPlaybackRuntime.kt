@@ -7,6 +7,9 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import dev.jdtech.mpv.MPVLib
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -142,6 +145,14 @@ internal class MpvPlaybackRuntime(
      * the display never switches into HDR mode.
      */
     private var hdrOutputEnabled: Boolean = true
+
+    /**
+     * The same engine dump `logEngineState` writes to logcat, published for the
+     * debug HUD. Only debug installs collect it; in release it is an unused flow
+     * with one string held at a time, not a second source of playback truth.
+     */
+    private val _debugInfo = MutableStateFlow("")
+    val debugInfo: StateFlow<String> = _debugInfo.asStateFlow()
 
     private val eventObserver = object : MPVLib.EventObserver {
         override fun eventProperty(property: String) = Unit
@@ -790,16 +801,16 @@ internal class MpvPlaybackRuntime(
         val current = mpv
         fun read(name: String): String = runCatching { current?.getPropertyString(name) }.getOrNull() ?: "n/a"
         val path = runCatching { current?.getPropertyString("path") }.getOrNull()
-        Log.d(
-            TAG,
+        val dump =
             "dump[$phase] ui=$state playWhenReady=$playRequested started=$hasStartedPlayback " +
                 "surfaceAttached=$surfaceAttached " +
                 "mpv.vo=${read("vo")} currentVo=${read("current-vo")} hwdec=${read("hwdec")} " +
                 "pause=${read("pause")} cachePaused=${read("paused-for-cache")} seeking=${read("seeking")} " +
                 "coreIdle=${read("core-idle")} eof=${read("eof-reached")} " +
                 "cacheState=${read("cache-buffering-state")} cacheTime=${read("demuxer-cache-time")} " +
-                "pos=${read("time-pos")} dur=${read("duration")} path=${if (path == null) "n/a" else path.hashCode()}",
-        )
+                "pos=${read("time-pos")} dur=${read("duration")} path=${if (path == null) "n/a" else path.hashCode()}"
+        _debugInfo.value = dump
+        Log.d(TAG, dump)
     }
 
     /**

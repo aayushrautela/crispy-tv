@@ -1,12 +1,14 @@
 package com.crispy.tv.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import com.crispy.tv.accounts.appBootstrapViewModelFactory
 import com.crispy.tv.accounts.authViewModelFactory
 import com.crispy.tv.accounts.profileListViewModelFactory
 import com.crispy.tv.app.appGraph
+import com.crispy.tv.playerui.LocalIsDebugBuild
 import com.crispy.tv.ui.navigation.appNavHostDependencies
 
 /**
@@ -28,14 +30,16 @@ import com.crispy.tv.ui.navigation.appNavHostDependencies
  * snapshot cache and a second service scope, and this is the wrong place to decide that.
  */
 @Composable
-fun AndroidAppRoot() {
+fun AndroidAppRoot(isDebugBuild: Boolean) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val graph = remember(appContext) { appContext.appGraph().graph }
-    AppRoot(
-        bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
-        authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
-        profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
-        navHostDependencies = { appNavHostDependencies() },
-    )
+    CompositionLocalProvider(LocalIsDebugBuild provides isDebugBuild) {
+        AppRoot(
+            bootstrapViewModelFactory = remember(graph) { appBootstrapViewModelFactory(graph) },
+            authViewModelFactory = remember(graph) { authViewModelFactory(graph) },
+            profileListViewModelFactory = remember(graph) { profileListViewModelFactory(graph) },
+            navHostDependencies = { appNavHostDependencies() },
+        )
+    }
 }
